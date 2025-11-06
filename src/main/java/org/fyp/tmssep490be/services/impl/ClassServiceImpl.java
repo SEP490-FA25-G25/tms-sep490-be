@@ -823,9 +823,108 @@ public class ClassServiceImpl implements ClassService {
     }
 
     @Override
+    @Transactional
     public AssignTimeSlotsResponse assignTimeSlots(Long classId, AssignTimeSlotsRequest request, Long userId) {
-        // TODO: Implement in Phase 1.3
-        throw new UnsupportedOperationException("Time slot assignment not implemented yet");
+        log.info("Assigning time slots for class ID {} by user {}", classId, userId);
+
+        // Validate request
+        if (!request.isValid()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        if (request.hasDuplicateDays()) {
+            Short duplicateDay = request.getDuplicateDay();
+            throw new CustomException(ErrorCode.DUPLICATE_TIME_SLOT_ASSIGNMENT);
+        }
+
+        // Get class and validate access
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        // Validate user has access to class's branch
+        List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(userId);
+        if (!userBranchIds.contains(classEntity.getBranch().getId())) {
+            throw new CustomException(ErrorCode.CLASS_ACCESS_DENIED);
+        }
+
+        // Get total sessions count
+        int totalSessions = (int) sessionRepository.countByClassEntityId(classId);
+        if (totalSessions == 0) {
+            throw new CustomException(ErrorCode.NO_SESSIONS_FOUND_FOR_CLASS);
+        }
+
+        List<AssignTimeSlotsResponse.AssignmentDetail> assignmentDetails = new ArrayList<>();
+        int totalSessionsUpdated = 0;
+
+        // Process each time slot assignment
+        for (AssignTimeSlotsRequest.TimeSlotAssignment assignment : request.getAssignments()) {
+            try {
+                // Validate time slot exists and belongs to class's branch
+                TimeSlotTemplate timeSlot = timeSlotTemplateRepository.findById(assignment.getTimeSlotTemplateId())
+                        .orElseThrow(() -> new CustomException(ErrorCode.TIME_SLOT_NOT_FOUND));
+
+                if (!timeSlot.getBranch().getId().equals(classEntity.getBranch().getId())) {
+                    throw new CustomException(ErrorCode.TIME_SLOT_NOT_IN_BRANCH);
+                }
+
+                // Update sessions for this day of week
+                int sessionsUpdated = sessionRepository.updateTimeSlotByDayOfWeek(
+                        classId,
+                        assignment.getDayOfWeek().intValue(),
+                        assignment.getTimeSlotTemplateId()
+                );
+
+                // Create assignment detail
+                AssignTimeSlotsResponse.AssignmentDetail detail = AssignTimeSlotsResponse.AssignmentDetail.builder()
+                        .dayOfWeek(assignment.getDayOfWeek())
+                        .dayName(getDayName(assignment.getDayOfWeek()))
+                        .timeSlotTemplateId(assignment.getTimeSlotTemplateId())
+                        .timeSlotName(timeSlot.getName())
+                        .startTime(timeSlot.getStartTime().toString())
+                        .endTime(timeSlot.getEndTime().toString())
+                        .sessionsAffected(sessionsUpdated)
+                        .successful(true)
+                        .build();
+
+                assignmentDetails.add(detail);
+                totalSessionsUpdated += sessionsUpdated;
+
+                log.debug("Updated {} sessions for day {} with time slot {} in class {}",
+                        sessionsUpdated, assignment.getDayOfWeek(), timeSlot.getName(), classEntity.getCode());
+
+            } catch (CustomException e) {
+                // Create failed assignment detail
+                AssignTimeSlotsResponse.AssignmentDetail detail = AssignTimeSlotsResponse.AssignmentDetail.builder()
+                        .dayOfWeek(assignment.getDayOfWeek())
+                        .dayName(getDayName(assignment.getDayOfWeek()))
+                        .timeSlotTemplateId(assignment.getTimeSlotTemplateId())
+                        .successful(false)
+                        .errorMessage(e.getMessage())
+                        .build();
+
+                assignmentDetails.add(detail);
+                log.warn("Failed to assign time slot for day {} in class {}: {}",
+                        assignment.getDayOfWeek(), classEntity.getCode(), e.getMessage());
+            }
+        }
+
+        // Build response
+        AssignTimeSlotsResponse response = AssignTimeSlotsResponse.builder()
+                .success(totalSessionsUpdated > 0)
+                .message(String.format("Time slots assignment completed. %d of %d sessions updated.",
+                        totalSessionsUpdated, totalSessions))
+                .classId(classId)
+                .classCode(classEntity.getCode())
+                .totalSessions(totalSessions)
+                .sessionsUpdated(totalSessionsUpdated)
+                .updatedAt(classEntity.getUpdatedAt())
+                .assignmentDetails(assignmentDetails)
+                .build();
+
+        log.info("Time slots assignment completed for class {}: {}/{} sessions updated",
+                classEntity.getCode(), totalSessionsUpdated, totalSessions);
+
+        return response;
     }
 
     @Override
@@ -891,5 +990,23 @@ public class ClassServiceImpl implements ClassService {
         // For now, assuming UserAccount can be obtained from context
         // TODO: Implement proper UserAccount retrieval
         return null; // Placeholder
+    }
+
+    /**
+     * Convert day of week number to readable name (ISODOW format)
+     * 1=Monday, 7=Sunday
+     */
+    private String getDayName(Short dayOfWeek) {
+        if (dayOfWeek == null) return "Unknown";
+        switch (dayOfWeek) {
+            case 1: return "Monday";
+            case 2: return "Tuesday";
+            case 3: return "Wednesday";
+            case 4: return "Thursday";
+            case 5: return "Friday";
+            case 6: return "Saturday";
+            case 7: return "Sunday";
+            default: return "Unknown";
+        }
     }
 }

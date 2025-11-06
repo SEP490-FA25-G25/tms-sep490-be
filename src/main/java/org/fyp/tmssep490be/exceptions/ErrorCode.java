@@ -148,6 +148,10 @@ public enum ErrorCode {
     SESSIONS_MISSING_TIMESLOT(4024, "{count} sessions missing timeslot"),
     SESSIONS_MISSING_RESOURCE(4025, "{count} sessions missing resource"),
     SESSIONS_MISSING_TEACHER(4026, "{count} sessions missing teacher"),
+    TIME_SLOT_NOT_FOUND(4027, "Time slot template not found"),
+    TIME_SLOT_NOT_IN_BRANCH(4028, "Time slot template does not belong to this branch"),
+    DUPLICATE_TIME_SLOT_ASSIGNMENT(4029, "Duplicate time slot assignment for the same day"),
+    NO_SESSIONS_FOUND_FOR_CLASS(4030, "No sessions found for this class"),
 
     // Teacher errors (3000-3099)
     TEACHER_NOT_FOUND(3000, "Teacher not found"),

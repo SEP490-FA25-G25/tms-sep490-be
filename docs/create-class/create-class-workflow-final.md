@@ -11,7 +11,7 @@
   "code": "ENG-A1-2024-01",
   "modality": "OFFLINE",
   "start_date": "2024-11-18",
-  "schedule_days": [1, 3, 5], // Monday, Wednesday, Friday (PostgreSQL ISODOW: 1=Mon, 7=Sun)
+  "schedule_days": [1, 3, 5], // Monday, Wednesday, Friday (PostgreSQL DOW: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat)
   "max_capacity": 20,
   "status": "draft"
 }
@@ -51,7 +51,7 @@ FUNCTION generateSessions(class, courseSessions):
 
     ALGORITHM:
         startDate ← class.start_date
-        scheduleDays ← class.schedule_days  // [1, 3, 5] = Mon, Wed, Fri (ISODOW standard)
+        scheduleDays ← class.schedule_days  // [1, 3, 5] = Mon, Wed, Fri (PostgreSQL DOW: 1=Mon, 3=Wed, 5=Fri)
         sessions ← empty list
         currentDate ← startDate
         sessionIndex ← 0
@@ -96,7 +96,7 @@ END FUNCTION
 **Input:**
 
 - `start_date`: 2025-01-06 (Monday)
-- `schedule_days`: [1, 3, 5] (Mon, Wed, Fri - PostgreSQL ISODOW standard)
+- `schedule_days`: [1, 3, 5] (Mon, Wed, Fri - PostgreSQL DOW: 1=Mon, 3=Wed, 5=Fri)
 - `course_sessions`: 36 sessions (12 weeks × 3 sessions/week)
 
 **Output:**
@@ -177,10 +177,10 @@ SELECT
 
 ### 3.2. Assign Time Slots (Can be different for Each Day)
 
-- Example Scenario (PostgreSQL ISODOW: 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 7=Sun):
-- Monday (ISODOW=1) → Morning Slot 2 (08:45-10:15) - timeslot_id=2
-- Wednesday (ISODOW=3) → Morning Slot 2 (08:45-10:15) - timeslot_id=2
-- Friday (ISODOW=5) → Afternoon Slot 2 (14:45-16:15) - timeslot_id=5
+- Example Scenario (PostgreSQL DOW: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat):
+- Monday (DOW=1) → Morning Slot 2 (08:45-10:15) - timeslot_id=2
+- Wednesday (DOW=3) → Morning Slot 2 (08:45-10:15) - timeslot_id=2
+- Friday (DOW=5) → Afternoon Slot 2 (14:45-16:15) - timeslot_id=5
 
 ### System Logic (Pseudocode):
 
@@ -191,7 +191,7 @@ FUNCTION assignTimeSlotsByDay(classId, dayToTimeslotMap):
         - dayToTimeslotMap: Mapping from day_of_week to timeslot_id
           Example: {1: 5, 3: 5, 5: 7}
                    // Monday → timeslot 5, Wednesday → timeslot 5, Friday → timeslot 7
-                   // (PostgreSQL ISODOW: 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 7=Sun)
+                   // (PostgreSQL DOW: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat)
 
     ALGORITHM:
         FOR EACH (dayOfWeek, timeslotId) IN dayToTimeslotMap:
@@ -201,7 +201,7 @@ FUNCTION assignTimeSlotsByDay(classId, dayToTimeslotMap):
                 SET time_slot_template_id = timeslotId,
                     updated_at = NOW()
                 WHERE class_id = classId
-                  AND EXTRACT(ISODOW FROM date) = dayOfWeek
+                  AND EXTRACT(DOW FROM date) = dayOfWeek
         END FOR
 
     RESULT:

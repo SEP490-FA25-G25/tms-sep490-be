@@ -21,7 +21,11 @@
       "Bash(gemini -y \"Analyze the testing strategy and additional components of this Java Spring Boot application:\n\n1. Testing structure in src/test - frameworks, patterns, and organization\n2. DTOs and request/response patterns\n3. Exception handling strategy\n4. Utility classes and helper components\n5. Key business features and workflows (enrollments, class management, etc.)\n6. Database seeding and data initialization\n7. API documentation setup\n8. Code quality patterns and potential improvements\n\nFocus on how these components support the main business functionality and maintain code quality.\")",
       "Bash(gemini -y \"Analyze the business domain relationships and key implementation patterns in this Java Spring Boot application:\n\n1. Entity relationships and data model design (JPA annotations, relationships, cascading)\n2. Business logic patterns in the service layer \n3. Authentication and authorization flow implementation\n4. Data validation patterns\n5. Transaction management\n6. Error handling in business logic\n7. Integration patterns between different modules\n8. Performance considerations and optimization patterns\n\nFocus on how the business domain is modeled and the key architectural decisions made in the implementation.\")",
       "Bash(gemini --output-format json \"Analyze the business domain relationships and key implementation patterns in this Java Spring Boot application:\n\n1. Entity relationships and data model design (JPA annotations, relationships, cascading)\n2. Business logic patterns in the service layer \n3. Authentication and authorization flow implementation\n4. Data validation patterns\n5. Transaction management\n6. Error handling in business logic\n7. Integration patterns between different modules\n8. Performance considerations and optimization patterns\n\nFocus on how the business domain is modeled and the key architectural decisions made in the implementation.\")",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(java:*)",
+      "Bash(javap:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)"
     ],
     "deny": [],
     "ask": []

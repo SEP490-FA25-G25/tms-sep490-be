@@ -1,0 +1,4 @@
+Hãy đọc và phân tích codebase này. Sau đó đọc tiếp các file @docs/create-class/create-class-implementation-plan.md và @docs/create-class/create-class-implementation-checklist.md để tìm các source code liên quan đến workflow create-class.
+
+
+Tôi đang gặp vấn đề khi install lifecycle. Tôi đã ghi log trong file @docs/create-class/bug.md hãy đọc và xem lỗi là gì

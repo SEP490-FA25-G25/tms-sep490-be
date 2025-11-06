@@ -29,6 +29,35 @@
 
 ---
 
+## 🚨 TESTING NOTES - IMPLEMENTATION ISSUES RESOLVED
+
+### Critical Fixes Applied Before Testing:
+1. **HQL Syntax Errors**: `EXTRACT(ISODOW FROM s.date)` → `EXTRACT(DOW FROM date)` (native PostgreSQL)
+2. **JPA Entity Navigation**: `cs.course.id` → `cs.phase.course.id`
+3. **Method Naming**: `sequence` → `sequenceNo`
+4. **Schedule Days Format**: ISODOW → PostgreSQL DOW (0=Sunday, 1=Monday, ..., 6=Saturday)
+5. **JaCoCo Version**: 0.8.12 → 0.8.11 (Java 21 compatibility)
+
+### ✅ Testing Environment Status:
+- **Build**: Spring Boot starts successfully (3.558 seconds)
+- **Database**: PostgreSQL queries working correctly
+- **API**: Phase 1.1 & 1.2 endpoints functional
+- **Ready for**: Phase 1.3 testing
+
+### Schedule Days Mapping for Tests:
+```
+Frontend Selection → Backend Validation → Database Query
+Chủ Nhật (Sunday)    → 0                → EXTRACT(DOW FROM date) = 0
+Thứ 2 (Monday)      → 1                → EXTRACT(DOW FROM date) = 1
+Thứ 3 (Tuesday)     → 2                → EXTRACT(DOW FROM date) = 2
+Thứ 4 (Wednesday)   → 3                → EXTRACT(DOW FROM date) = 3
+Thứ 5 (Thursday)    → 4                → EXTRACT(DOW FROM date) = 4
+Thứ 6 (Friday)      → 5                → EXTRACT(DOW FROM date) = 5
+Thứ 7 (Saturday)    → 6                → EXTRACT(DOW FROM date) = 6
+```
+
+---
+
 ## TEST FRAMEWORK & PATTERNS
 
 ### Modern Spring Boot 3.5.7 Testing Approach
@@ -704,11 +733,12 @@ class SessionRepositoryTest extends AbstractRepositoryTest {
     @Autowired private TimeSlotTemplateRepository timeSlotTemplateRepository;
 
     @Test
-    @DisplayName("Should bulk update time slots by day of week (ISODOW)")
+    @DisplayName("Should bulk update time slots by day of week (PostgreSQL DOW)")
     void shouldBulkUpdateTimeSlotsByDayOfWeek() {
         // Given: 36 sessions (12 Mon, 12 Wed, 12 Fri)
         // When: updateTimeSlotByDayOfWeek(classId, dayOfWeek=1, timeSlotId=5)
         // Then: 12 Monday sessions updated, returns 12
+        // Note: Using PostgreSQL DOW format (0=Sunday, 1=Monday, ..., 6=Saturday)
     }
 
     @Test
@@ -744,11 +774,12 @@ class SessionRepositoryTest extends AbstractRepositoryTest {
     }
 
     @Test
-    @DisplayName("Should handle ISODOW extraction correctly (1=Mon, 7=Sun)")
-    void shouldHandleIsodowExtraction() {
+    @DisplayName("Should handle PostgreSQL DOW extraction correctly (0=Sun, 1=Mon, ..., 6=Sat)")
+    void shouldHandlePostgresqlDowExtraction() {
         // Given: Session on 2025-01-06 (Monday)
-        // When: Query EXTRACT(ISODOW FROM date)
-        // Then: Returns 1
+        // When: Query EXTRACT(DOW FROM date)
+        // Then: Returns 1 (Monday)
+        // Note: Using PostgreSQL DOW format (0=Sunday, 1=Monday, ..., 6=Saturday)
     }
 }
 ```

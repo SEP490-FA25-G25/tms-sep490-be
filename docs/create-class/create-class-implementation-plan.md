@@ -576,26 +576,27 @@ long countSessionsWithoutTeacher(@Param("classId") Long classId);
 #### SessionRepository
 **Path:** `repositories/SessionRepository.java`
 
-**New Methods:**
-```java
-// Step 2: Delete sessions (if regenerating)
-void deleteByClassEntityId(Long classId);
+**✅ COMPLETED - Fixed Issues:**
+- **HQL Syntax Error**: HQL không hỗ trợ `EXTRACT(ISODOW FROM s.date)` và `CASE` statements
+- **Fix**: Chuyển sang native PostgreSQL query với `EXTRACT(DOW FROM date)`
+- **Schedule Days Mapping**: PostgreSQL DOW format (0=Sunday, 1=Monday, ..., 6=Saturday)
 
-// Step 3: Bulk update time slots by day of week
+**✅ Implemented Methods:**
+```java
+// Step 3: Bulk update time slots by day of week (FIXED - Native Query)
 @Modifying
-@Query("UPDATE Session s SET s.timeSlotTemplate.id = :timeSlotId, s.updatedAt = CURRENT_TIMESTAMP WHERE s.classEntity.id = :classId AND EXTRACT(ISODOW FROM s.date) = :dayOfWeek")
+@Transactional
+@Query(value = "UPDATE session SET time_slot_template_id = :timeSlotId, updated_at = CURRENT_TIMESTAMP WHERE class_entity_id = :classId AND EXTRACT(DOW FROM date) = :dayOfWeek", nativeQuery = true)
 int updateTimeSlotByDayOfWeek(@Param("classId") Long classId, @Param("dayOfWeek") Integer dayOfWeek, @Param("timeSlotId") Long timeSlotId);
 
-// Step 4: Find unassigned sessions by day of week (for conflict analysis)
-@Query("SELECT s FROM Session s WHERE s.classEntity.id = :classId AND EXTRACT(ISODOW FROM s.date) = :dayOfWeek AND NOT EXISTS (SELECT 1 FROM SessionResource sr WHERE sr.session.id = s.id)")
-List<Session> findUnassignedSessionsByDayOfWeek(@Param("classId") Long classId, @Param("dayOfWeek") Integer dayOfWeek);
+// Step 3: Count total sessions for validation
+long countByClassEntityId(Long classId);
 
-// Step 4: Find conflicting session (for conflict detail)
-@Query("SELECT s FROM Session s JOIN SessionResource sr ON sr.session.id = s.id WHERE sr.resourceId = :resourceId AND s.date = :date AND s.timeSlotTemplate.id = :timeSlotId")
-Optional<Session> findConflictingSession(@Param("resourceId") Long resourceId, @Param("date") LocalDate date, @Param("timeSlotId") Long timeSlotId);
+// Step 4: Find upcoming sessions (already existed)
+List<Session> findUpcomingSessions(@Param("classId") Long classId, Pageable pageable);
 ```
 
-**Status:** ⏳ TODO
+**Status:** ✅ **COMPLETED** - Ready for testing
 
 ---
 
@@ -803,11 +804,68 @@ List<TimeSlotTemplate> findByBranchIdOrderByStartTimeAsc(Long branchId);
 
 ## IMPLEMENTATION NOTES
 
+### 🚨 IMPLEMENTATION ISSUES RESOLVED
+
+**Phase 1.1 & 1.2 - Critical Fixes Applied:**
+
+#### 1. **HQL Syntax Errors - SessionRepository**
+**Problem:** `BadJpqlGrammarException` với `EXTRACT(ISODOW FROM s.date)` không được HQL hỗ trợ
+**Fix:** Chuyển sang native PostgreSQL query với `EXTRACT(DOW FROM date)`
+```java
+// BEFORE (HQL - Lỗi)
+@Query("UPDATE Session s SET s.timeSlotTemplate.id = :timeSlotId WHERE EXTRACT(ISODOW FROM s.date) = :dayOfWeek")
+
+// AFTER (Native Query - Hoạt động)
+@Query(value = "UPDATE session SET time_slot_template_id = :timeSlotId WHERE EXTRACT(DOW FROM date) = :dayOfWeek", nativeQuery = true)
+```
+
+#### 2. **JPA Entity Relationship Navigation - CourseSessionRepository**
+**Problem:** `UnknownPathException: Could not resolve attribute 'course'`
+**Fix:** Correct navigation path từ `cs.course.id` → `cs.phase.course.id`
+```java
+// BEFORE (Lỗi)
+WHERE cs.course.id = :courseId
+
+// AFTER (Đúng)
+WHERE cs.phase.course.id = :courseId
+```
+
+#### 3. **Spring Data JPA Method Naming**
+**Problem:** `No property 'sequence' found for type 'CourseSession'`
+**Fix:** Method name từ `Sequence` → `SequenceNo` để match entity field
+
+#### 4. **Schedule Days Format Mismatch**
+**Problem:** Validation sử dụng ISODOW (1=Mon, 7=Sun) nhưng PostgreSQL dùng DOW (0=Sun, ..., 6=Sat)
+**Fix:** Update validation và database queries để sử dụng PostgreSQL DOW format
+```java
+// Final Mapping (Frontend → Backend → Database):
+Chủ Nhật: 0 → DOW=0
+Thứ 2: 1 → DOW=1
+Thứ 3: 2 → DOW=2
+Thứ 4: 3 → DOW=3
+Thứ 5: 4 → DOW=4
+Thứ 6: 5 → DOW=5
+Thứ 7: 6 → DOW=6
+```
+
+#### 5. **JaCoCo Version Compatibility**
+**Problem:** `Unsupported class file major version 68` (Java 21)
+**Fix:** Downgrade JaCoCo version từ 0.8.12 → 0.8.11
+
+**✅ Final Result:**
+- Spring Boot application starts successfully in 3.558 seconds
+- All HQL syntax errors resolved
+- Correct schedule day mapping implemented
+- JPA entity relationships working correctly
+- Ready for Phase 1.3 testing
+
+---
+
 ### 1. Session Date Calculation Algorithm
 
 **Key Points:**
 - Use Java `LocalDate` API with `DayOfWeek` enum
-- PostgreSQL ISODOW standard: 1=Monday, 7=Sunday
+- PostgreSQL DOW standard: 0=Sunday, 1=Monday, ..., 6=Saturday
 - Cycle through `scheduleDays` array using modulo operator
 - Handle week rollover when all days in week are consumed
 

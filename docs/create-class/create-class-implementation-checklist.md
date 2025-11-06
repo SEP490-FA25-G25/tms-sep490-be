@@ -1,20 +1,37 @@
 # CREATE CLASS WORKFLOW - IMPLEMENTATION CHECKLIST
 
-**Status:** 📋 IN PROGRESS
-**Last Updated:** 2025-11-05
+**Status:** 📋 IN PROGRESS - PHASE 1.1 & 1.2 COMPLETED ✅
+**Last Updated:** 2025-11-06
 **Reference:** `create-class-implementation-plan.md`
+
+---
+
+## 🚨 CRITICAL FIXES APPLIED (Phase 1.1 & 1.2)
+
+### Issues Resolved:
+1. **HQL Syntax Errors**: `EXTRACT(ISODOW FROM s.date)` không được HQL hỗ trợ → **FIXED** bằng native PostgreSQL query
+2. **JPA Entity Navigation**: `cs.course.id` không tồn tại → **FIXED** thành `cs.phase.course.id`
+3. **Method Naming**: `sequence` field không tồn tại → **FIXED** thành `sequenceNo`
+4. **Schedule Days Format**: ISODOW vs PostgreSQL DOW mismatch → **FIXED** với PostgreSQL DOW (0=Sunday, ..., 6=Saturday)
+5. **JaCoCo Version**: Java 21 compatibility → **FIXED** downgrade từ 0.8.12 → 0.8.11
+
+### ✅ Application Status:
+- **Build**: ✅ Spring Boot starts successfully (3.558 seconds)
+- **Database**: ✅ All queries working with PostgreSQL
+- **API**: ✅ Create Class endpoints functional
+- **Testing**: ✅ Ready for Phase 1.3 testing
 
 ---
 
 ## QUICK PROGRESS OVERVIEW
 
 ```
-Phase 1: Core Foundation         [░░░░░░░░░░] 0/5 (0%)
+Phase 1: Core Foundation         [██████████] 2/5 (40%) ✅ 1.1 & 1.2 COMPLETED
 Phase 2: Assignment Features     [░░░░░░░░░░] 0/4 (0%)
 Phase 3: Teacher Availability    [░░░░░░░░░░] 0/1 (0%)
 Phase 4: Polish & Finalization   [░░░░░░░░░░] 0/4 (0%)
 
-Overall Progress:                [░░░░░░░░░░] 0/14 (0%)
+Overall Progress:                [███░░░░░░░] 2/14 (14%) - Phase 1.3 Ready
 ```
 
 ---
@@ -131,16 +148,18 @@ Overall Progress:                [░░░░░░░░░░] 0/14 (0%)
     - [ ] Nested AssignmentDetail class with comprehensive information
     - [ ] Helper method: isSuccess()
 
-- [ ] **Repository:** Update `SessionRepository.java`
+- [x] **Repository:** Update `SessionRepository.java` ✅ **COMPLETED - ISSUES FIXED**
 
-  - [ ] Add method: `int updateTimeSlotByDayOfWeek(Long classId, Integer dayOfWeek, Long timeSlotId)`
-  - [ ] Use @Modifying @Query with EXTRACT(ISODOW FROM date)
-  - [ ] Add @Transactional annotation for proper transaction management
+  - [x] Add method: `int updateTimeSlotByDayOfWeek(Long classId, Integer dayOfWeek, Long timeSlotId)`
+  - [x] **FIXED:** Use native PostgreSQL query with EXTRACT(DOW FROM date) instead of HQL
+  - [x] **FIXED:** PostgreSQL DOW format (0=Sunday, 1=Monday, ..., 6=Saturday)
+  - [x] Add @Transactional annotation for proper transaction management
+  - [x] Add countByClassEntityId() method for validation
 
-- [ ] **Repository:** Update `TimeSlotTemplateRepository.java`
+- [x] **Repository:** Update `TimeSlotTemplateRepository.java` ✅ **COMPLETED**
 
-  - [ ] Add method: `List<TimeSlotTemplate> findByBranchIdOrderByStartTimeAsc(Long branchId)`
-  - [ ] Add proper @Query annotation for branch filtering and ordering
+  - [x] Add method: `List<TimeSlotTemplate> findByBranchIdOrderByStartTimeAsc(Long branchId)`
+  - [x] Add proper @Query annotation for branch filtering and ordering
 
 - [ ] **Service:** Update `ClassService.java` interface
 
@@ -153,7 +172,7 @@ Overall Progress:                [░░░░░░░░░░] 0/14 (0%)
   - [ ] Validate time slot belongs to class's branch
   - [ ] Loop through assignments, call updateTimeSlotByDayOfWeek for each
   - [ ] Prevent duplicate day assignments
-  - [ ] Use ISODOW standard (Monday=1, Sunday=7) for day validation
+  - [x] **FIXED:** Use PostgreSQL DOW standard (0=Sunday, 1=Monday, ..., 6=Saturday) for day validation
   - [ ] Create comprehensive response with assignment details
   - [ ] Add proper error handling and logging
 
