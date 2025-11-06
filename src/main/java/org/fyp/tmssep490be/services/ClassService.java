@@ -1,5 +1,11 @@
 package org.fyp.tmssep490be.services;
 
+import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
+import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
+import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse;
 import org.fyp.tmssep490be.dtos.classmanagement.*;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
@@ -97,4 +103,66 @@ public interface ClassService {
             Pageable pageable,
             Long userId
     );
+
+    // Create Class Workflow methods (STEP 1, 3, 6, 7)
+
+    /**
+     * STEP 1: Create a new class and auto-generate sessions
+     * Creates class with DRAFT status and generates sessions based on course template
+     *
+     * @param request Create class request with all required information
+     * @param userId Current user ID for access control and audit
+     * @return CreateClassResponse with class information and session generation summary
+     */
+    CreateClassResponse createClass(CreateClassRequest request, Long userId);
+
+    /**
+     * STEP 3: Assign time slots to class sessions
+     * Assigns time slots based on day of week patterns
+     *
+     * @param classId Class ID to assign time slots to
+     * @param request Time slot assignment details
+     * @param userId Current user ID for access control and audit
+     * @return AssignTimeSlotsResponse with assignment results
+     */
+    AssignTimeSlotsResponse assignTimeSlots(Long classId, AssignTimeSlotsRequest request, Long userId);
+
+    /**
+     * STEP 6: Validate class completeness before submission
+     * Checks all required assignments (timeslot, resource, teacher)
+     *
+     * @param classId Class ID to validate
+     * @param userId Current user ID for access control
+     * @return ValidateClassResponse with validation results
+     */
+    ValidateClassResponse validateClass(Long classId, Long userId);
+
+    /**
+     * STEP 7: Submit class for approval
+     * Sets submitted_at timestamp and changes status for Center Head review
+     *
+     * @param classId Class ID to submit
+     * @param userId Current user ID for access control and audit
+     * @return SubmitClassResponse with submission results
+     */
+    SubmitClassResponse submitClass(Long classId, Long userId);
+
+    /**
+     * STEP 7: Approve submitted class (Center Head only)
+     * Changes status to SCHEDULED and sets approval details
+     *
+     * @param classId Class ID to approve
+     * @param approverUserId Center Head user ID approving the class
+     */
+    void approveClass(Long classId, Long approverUserId);
+
+    /**
+     * STEP 7: Reject submitted class (Center Head only)
+     * Resets status to DRAFT and stores rejection reason
+     *
+     * @param classId Class ID to reject
+     * @param reason Rejection reason (required)
+     * @param rejecterUserId Center Head user ID rejecting the class
+     */
+    void rejectClass(Long classId, String reason, Long rejecterUserId);
 }

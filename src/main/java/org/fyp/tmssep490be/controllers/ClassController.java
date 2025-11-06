@@ -6,6 +6,13 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
+import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
+import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.RejectClassRequest;
+import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse;
 import org.fyp.tmssep490be.dtos.classmanagement.*;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
@@ -22,6 +29,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 /**
@@ -258,6 +266,188 @@ public class ClassController {
                 .success(true)
                 .message("Available students retrieved successfully")
                 .data(availableStudents)
+                .build());
+    }
+
+    // Create Class Workflow endpoints (STEP 1, 3, 6, 7)
+
+    /**
+     * STEP 1: Create a new class and auto-generate sessions
+     */
+    @PostMapping
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Create new class",
+            description = "Create a new class with DRAFT status and auto-generate sessions based on course template. " +
+                    "This is STEP 1 of the 7-step Create Class workflow. Sessions are automatically generated (STEP 2). " +
+                    "After creation, proceed to assign time slots (STEP 3), resources (STEP 4), teachers (STEP 5), " +
+                    "validate (STEP 6), and submit for approval (STEP 7)."
+    )
+    public ResponseEntity<ResponseObject<CreateClassResponse>> createClass(
+            @Parameter(description = "Class creation request with all required information")
+            @RequestBody @Valid CreateClassRequest request,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} creating new class with code: {}", currentUser.getId(), request.getCode());
+
+        CreateClassResponse response = classService.createClass(request, currentUser.getId());
+
+        String message = response.isSuccess() ?
+                String.format("Class %s created successfully with %d sessions generated",
+                        response.getCode(), response.getSessionSummary().getSessionsGenerated()) :
+                "Failed to create class";
+
+        return ResponseEntity.ok(ResponseObject.<CreateClassResponse>builder()
+                .success(response.isSuccess())
+                .message(message)
+                .data(response)
+                .build());
+    }
+
+    /**
+     * STEP 3: Assign time slots to class sessions
+     */
+    @PostMapping("/{classId}/time-slots")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Assign time slots",
+            description = "Assign time slots to class sessions based on day of week patterns. " +
+                    "This is STEP 3 of the Create Class workflow. All sessions matching the specified day of week " +
+                    "will be assigned the corresponding time slot."
+    )
+    public ResponseEntity<ResponseObject<AssignTimeSlotsResponse>> assignTimeSlots(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @Parameter(description = "Time slot assignment details")
+            @RequestBody @Valid AssignTimeSlotsRequest request,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} assigning time slots to class {}", currentUser.getId(), classId);
+
+        AssignTimeSlotsResponse response = classService.assignTimeSlots(classId, request, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<AssignTimeSlotsResponse>builder()
+                .success(response.isSuccess())
+                .message(response.getMessage())
+                .data(response)
+                .build());
+    }
+
+    /**
+     * STEP 6: Validate class completeness before submission
+     */
+    @PostMapping("/{classId}/validate")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Validate class completeness",
+            description = "Validate that all required assignments are completed before submission. " +
+                    "This is STEP 6 of the Create Class workflow. Checks timeslot, resource, and teacher assignments."
+    )
+    public ResponseEntity<ResponseObject<ValidateClassResponse>> validateClass(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} validating class {}", currentUser.getId(), classId);
+
+        ValidateClassResponse response = classService.validateClass(classId, currentUser.getId());
+
+        String message = response.isReadyForSubmission() ?
+                "Class is complete and ready for submission" :
+                response.getValidationSummary();
+
+        return ResponseEntity.ok(ResponseObject.<ValidateClassResponse>builder()
+                .success(response.isValid())
+                .message(message)
+                .data(response)
+                .build());
+    }
+
+    /**
+     * STEP 7: Submit class for approval
+     */
+    @PostMapping("/{classId}/submit")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Submit class for approval",
+            description = "Submit class for Center Head approval. This is STEP 7 of the Create Class workflow. " +
+                    "Class must be validated before submission. After submission, Center Head can approve or reject."
+    )
+    public ResponseEntity<ResponseObject<SubmitClassResponse>> submitClass(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} submitting class {} for approval", currentUser.getId(), classId);
+
+        SubmitClassResponse response = classService.submitClass(classId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<SubmitClassResponse>builder()
+                .success(response.isSuccess())
+                .message(response.getSubmissionSummary())
+                .data(response)
+                .build());
+    }
+
+    /**
+     * STEP 7: Approve submitted class (Center Head only)
+     */
+    @PostMapping("/{classId}/approve")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(
+            summary = "Approve class",
+            description = "Approve submitted class and change status to SCHEDULED. This is STEP 7 of the workflow. " +
+                    "Only users with CENTER_HEAD role can approve classes."
+    )
+    public ResponseEntity<ResponseObject<String>> approveClass(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("Center Head {} approving class {}", currentUser.getId(), classId);
+
+        classService.approveClass(classId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<String>builder()
+                .success(true)
+                .message("Class approved successfully")
+                .data("Class status changed to SCHEDULED")
+                .build());
+    }
+
+    /**
+     * STEP 7: Reject submitted class (Center Head only)
+     */
+    @PostMapping("/{classId}/reject")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(
+            summary = "Reject class",
+            description = "Reject submitted class and provide rejection reason. This is STEP 7 of the workflow. " +
+                    "Only users with CENTER_HEAD role can reject classes. Class status resets to DRAFT."
+    )
+    public ResponseEntity<ResponseObject<String>> rejectClass(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @Parameter(description = "Rejection reason")
+            @RequestBody RejectClassRequest request,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("Center Head {} rejecting class {} with reason: {}", currentUser.getId(), classId, request.getReason());
+
+        classService.rejectClass(classId, request.getReason(), currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<String>builder()
+                .success(true)
+                .message("Class rejected successfully")
+                .data("Class status reset to DRAFT")
                 .build());
     }
 }

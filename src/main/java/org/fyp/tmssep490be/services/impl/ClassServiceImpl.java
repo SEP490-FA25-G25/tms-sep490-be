@@ -2,6 +2,12 @@ package org.fyp.tmssep490be.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
+import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
+import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse;
 import org.fyp.tmssep490be.dtos.classmanagement.*;
 import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.*;
@@ -9,12 +15,15 @@ import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.ClassService;
+import org.fyp.tmssep490be.services.SessionGenerationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
 
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -36,6 +45,16 @@ public class ClassServiceImpl implements ClassService {
     private final TeachingSlotRepository teachingSlotRepository;
     private final StudentRepository studentRepository;
     private final ReplacementSkillAssessmentRepository skillAssessmentRepository;
+
+    // Additional repositories for Create Class workflow
+    private final BranchRepository branchRepository;
+    private final CourseRepository courseRepository;
+    private final CourseSessionRepository courseSessionRepository;
+    private final TimeSlotTemplateRepository timeSlotTemplateRepository;
+    private final SessionResourceRepository sessionResourceRepository;
+
+    // Services for Create Class workflow
+    private final SessionGenerationService sessionGenerationService;
 
     @Override
     public Page<ClassListItemDTO> getClasses(
@@ -725,5 +744,152 @@ public class ClassServiceImpl implements ClassService {
                 .id(assessor.getId())
                 .fullName(assessor.getFullName())
                 .build();
+    }
+
+    // Create Class Workflow implementations (STEP 1, 3, 6, 7)
+
+    @Override
+    @Transactional
+    public CreateClassResponse createClass(CreateClassRequest request, Long userId) {
+        log.info("Creating new class with code: {} for user ID: {}", request.getCode(), userId);
+
+        // Validate request
+        validateCreateClassRequest(request, userId);
+
+        // Get entities
+        Branch branch = branchRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
+
+        Course course = courseRepository.findById(request.getCourseId())
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        UserAccount createdBy = getUserAccount(userId);
+
+        // Validate business rules
+        validateCreateClassBusinessRules(request, branch, course, userId);
+
+        // Create class entity
+        ClassEntity classEntity = ClassEntity.builder()
+                .branch(branch)
+                .course(course)
+                .code(request.getCode())
+                .name(request.getName())
+                .modality(request.getModality())
+                .startDate(request.getStartDate())
+                .scheduleDays(request.getScheduleDays().toArray(new Short[0]))
+                .maxCapacity(request.getMaxCapacity())
+                .status(ClassStatus.DRAFT)
+                .approvalStatus(ApprovalStatus.PENDING)
+                .createdBy(createdBy)
+                .createdAt(java.time.OffsetDateTime.now())
+                .updatedAt(java.time.OffsetDateTime.now())
+                .build();
+
+        // Save class first to get ID
+        classEntity = classRepository.save(classEntity);
+        log.info("Created class entity with ID: {}", classEntity.getId());
+
+        // Generate sessions (STEP 2 - auto-triggered)
+        List<Session> sessions = sessionGenerationService.generateSessionsForClass(classEntity, course);
+        List<Session> savedSessions = sessionRepository.saveAll(sessions);
+
+        // Calculate end date
+        LocalDate endDate = sessionGenerationService.calculateEndDate(savedSessions);
+        classEntity.setPlannedEndDate(endDate);
+        classEntity = classRepository.save(classEntity);
+
+        log.info("Generated and saved {} sessions for class {}", savedSessions.size(), classEntity.getCode());
+
+        // Build response
+        CreateClassResponse.SessionGenerationSummary sessionSummary = CreateClassResponse.SessionGenerationSummary.builder()
+                .sessionsGenerated(savedSessions.size())
+                .totalSessionsInCourse(sessions.size())
+                .courseCode(course.getCode())
+                .courseName(course.getName())
+                .startDate(classEntity.getStartDate())
+                .endDate(endDate)
+                .scheduleDays(classEntity.getScheduleDays())
+                .build();
+
+        return CreateClassResponse.builder()
+                .classId(classEntity.getId())
+                .code(classEntity.getCode())
+                .name(classEntity.getName())
+                .status(classEntity.getStatus())
+                .approvalStatus(classEntity.getApprovalStatus())
+                .createdAt(classEntity.getCreatedAt())
+                .sessionSummary(sessionSummary)
+                .build();
+    }
+
+    @Override
+    public AssignTimeSlotsResponse assignTimeSlots(Long classId, AssignTimeSlotsRequest request, Long userId) {
+        // TODO: Implement in Phase 1.3
+        throw new UnsupportedOperationException("Time slot assignment not implemented yet");
+    }
+
+    @Override
+    public ValidateClassResponse validateClass(Long classId, Long userId) {
+        // TODO: Implement in Phase 1.4
+        throw new UnsupportedOperationException("Class validation not implemented yet");
+    }
+
+    @Override
+    public SubmitClassResponse submitClass(Long classId, Long userId) {
+        // TODO: Implement in Phase 1.5
+        throw new UnsupportedOperationException("Class submission not implemented yet");
+    }
+
+    @Override
+    public void approveClass(Long classId, Long approverUserId) {
+        // TODO: Implement in Phase 1.5
+        throw new UnsupportedOperationException("Class approval not implemented yet");
+    }
+
+    @Override
+    public void rejectClass(Long classId, String reason, Long rejecterUserId) {
+        // TODO: Implement in Phase 1.5
+        throw new UnsupportedOperationException("Class rejection not implemented yet");
+    }
+
+    // Helper methods for Create Class workflow
+
+    private void validateCreateClassRequest(CreateClassRequest request, Long userId) {
+        if (!request.isValid()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        if (request.hasDuplicateDays()) {
+            throw new CustomException(ErrorCode.INVALID_SCHEDULE_DAYS);
+        }
+
+        if (!request.isStartDateInScheduleDays()) {
+            throw new CustomException(ErrorCode.START_DATE_NOT_IN_SCHEDULE_DAYS);
+        }
+    }
+
+    private void validateCreateClassBusinessRules(CreateClassRequest request, Branch branch, Course course, Long userId) {
+        // Validate user has access to branch
+        List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(userId);
+        if (!userBranchIds.contains(branch.getId())) {
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
+        }
+
+        // Validate course is approved
+        if (course.getStatus() != org.fyp.tmssep490be.entities.enums.CourseStatus.APPROVED) {
+            throw new CustomException(ErrorCode.COURSE_NOT_APPROVED);
+        }
+
+        // Validate class code uniqueness within branch
+        if (classRepository.findByBranchIdAndCode(branch.getId(), request.getCode()).isPresent()) {
+            throw new CustomException(ErrorCode.CLASS_CODE_DUPLICATE);
+        }
+    }
+
+    private UserAccount getUserAccount(Long userId) {
+        // This would typically come from UserRepository
+        // For now, assuming UserAccount can be obtained from context
+        // TODO: Implement proper UserAccount retrieval
+        return null; // Placeholder
     }
 }

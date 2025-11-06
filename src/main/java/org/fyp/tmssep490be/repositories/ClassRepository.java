@@ -67,4 +67,36 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
            "AND s.date >= CURRENT_DATE AND s.status = 'PLANNED' " +
            "ORDER BY s.date ASC")
     List<org.fyp.tmssep490be.entities.Session> findUpcomingSessions(@Param("classId") Long classId, Pageable pageable);
+
+    // Create Class Workflow additional methods
+
+    /**
+     * Find class by branch and code for uniqueness validation
+     */
+    Optional<ClassEntity> findByBranchIdAndCode(Long branchId, String code);
+
+    /**
+     * Count sessions without timeslot assignment for validation
+     */
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.classEntity.id = :classId AND s.timeSlotTemplate IS NULL")
+    long countSessionsWithoutTimeslot(@Param("classId") Long classId);
+
+    /**
+     * Count sessions without resource assignment for validation
+     */
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.classEntity.id = :classId AND NOT EXISTS (SELECT 1 FROM SessionResource sr WHERE sr.session.id = s.id)")
+    long countSessionsWithoutResource(@Param("classId") Long classId);
+
+    /**
+     * Count sessions without teacher assignment for validation
+     */
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.classEntity.id = :classId AND NOT EXISTS (SELECT 1 FROM TeachingSlot ts WHERE ts.session.id = s.id)")
+    long countSessionsWithoutTeacher(@Param("classId") Long classId);
+
+    /**
+     * Check if class exists and user has access to it
+     */
+    @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM ClassEntity c " +
+           "WHERE c.id = :classId AND (:branchIds IS NULL OR c.branch.id IN :branchIds)")
+    boolean existsByIdAndUserHasAccess(@Param("classId") Long classId, @Param("branchIds") List<Long> branchIds);
 }

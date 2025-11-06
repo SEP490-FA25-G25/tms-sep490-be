@@ -130,6 +130,25 @@ public enum ErrorCode {
     CLASS_NO_BRANCH_ACCESS(4004, "User does not have access to any branches"),
     UNAUTHORIZED_ACCESS(4005, "Unauthorized access: Academic staff role required"),
 
+    // Create Class Workflow errors (4010-4099)
+    CLASS_CODE_DUPLICATE(4010, "Class code already exists for this branch"),
+    COURSE_NOT_APPROVED(4011, "Course must be approved before creating class"),
+    START_DATE_NOT_IN_SCHEDULE_DAYS(4012, "Start date must be in schedule_days"),
+    INVALID_SCHEDULE_DAYS(4013, "Invalid schedule_days (must be 1-7)"),
+    TIME_SLOT_ASSIGNMENT_FAILED(4014, "Failed to assign time slots"),
+    RESOURCE_ASSIGNMENT_FAILED(4015, "Failed to assign resources"),
+    TEACHER_ASSIGNMENT_FAILED(4016, "Failed to assign teacher"),
+    CLASS_VALIDATION_FAILED(4017, "Class validation failed"),
+    CLASS_INCOMPLETE_CANNOT_SUBMIT(4018, "Class has incomplete assignments"),
+    CLASS_NOT_SUBMITTED(4019, "Class not submitted for approval"),
+    CLASS_ALREADY_APPROVED(4020, "Class already approved"),
+    CLASS_REJECTION_REASON_REQUIRED(4021, "Rejection reason is required"),
+    INVALID_APPROVAL_STATUS(4022, "Invalid approval status transition"),
+    UNAUTHORIZED_APPROVER(4023, "Only CENTER_HEAD can approve classes"),
+    SESSIONS_MISSING_TIMESLOT(4024, "{count} sessions missing timeslot"),
+    SESSIONS_MISSING_RESOURCE(4025, "{count} sessions missing resource"),
+    SESSIONS_MISSING_TEACHER(4026, "{count} sessions missing teacher"),
+
     // Teacher errors (3000-3099)
     TEACHER_NOT_FOUND(3000, "Teacher not found"),
     TEACHER_EMPLOYEE_CODE_ALREADY_EXISTS(3001, "Teacher employee code already exists"),
