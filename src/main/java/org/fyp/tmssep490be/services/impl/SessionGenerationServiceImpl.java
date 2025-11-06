@@ -35,7 +35,7 @@ public class SessionGenerationServiceImpl implements SessionGenerationService {
 
         // Get course sessions ordered by phase ASC, sequence ASC
         List<CourseSession> courseSessions = courseSessionRepository
-                .findByCourseIdOrderByPhaseAscSequenceAsc(course.getId());
+                .findByPhase_Course_IdOrderByPhaseAscSequenceNoAsc(course.getId());
 
         if (courseSessions.isEmpty()) {
             log.warn("No course sessions found for course {} (ID: {})", course.getCode(), course.getId());

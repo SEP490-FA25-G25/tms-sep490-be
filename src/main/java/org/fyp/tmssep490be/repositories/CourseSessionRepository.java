@@ -15,11 +15,11 @@ public interface CourseSessionRepository extends JpaRepository<CourseSession, Lo
      * Find course sessions by course ID ordered by phase ASC, sequence ASC
      * Used for session generation in Create Class workflow
      */
-    List<CourseSession> findByCourseIdOrderByPhaseAscSequenceAsc(Long courseId);
+    List<CourseSession> findByPhase_Course_IdOrderByPhaseAscSequenceNoAsc(Long courseId);
 
     /**
      * Count course sessions for a course
      */
-    @Query("SELECT COUNT(cs) FROM CourseSession cs WHERE cs.course.id = :courseId")
+    @Query("SELECT COUNT(cs) FROM CourseSession cs WHERE cs.phase.course.id = :courseId")
     long countByCourseId(@Param("courseId") Long courseId);
 }
