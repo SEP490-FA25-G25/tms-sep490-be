@@ -251,7 +251,7 @@ paths:
         - Wednesday: Morning Slot (08:45-10:15)
         - Friday: Afternoon Slot (14:45-16:15)
 
-        **System Logic:** Updates all sessions where `EXTRACT(ISODOW FROM date) = dayOfWeek`
+        **System Logic:** Updates all sessions where `EXTRACT(DOW FROM date) = dayOfWeek`
 
       operationId: assignTimeSlots
       security:
@@ -996,7 +996,7 @@ components:
           example: "2025-01-06"
         scheduleDays:
           type: array
-          description: Days of week for class sessions (PostgreSQL ISODOW - 1=Mon, 7=Sun)
+          description: Days of week for class sessions (PostgreSQL DOW - 0=Sun, 1=Mon, ..., 6=Sat)
           items:
             type: integer
             minimum: 1
@@ -1073,7 +1073,7 @@ components:
                 type: integer
                 minimum: 1
                 maximum: 7
-                description: Day of week (PostgreSQL ISODOW - 1=Mon, 7=Sun)
+                description: Day of week (PostgreSQL DOW - 0=Sun, 1=Mon, ..., 6=Sat)
                 example: 1
               timeSlotTemplateId:
                 type: integer
@@ -1154,7 +1154,7 @@ components:
                 type: integer
                 minimum: 1
                 maximum: 7
-                description: Day of week (ISODOW)
+                description: Day of week (PostgreSQL DOW)
                 example: 1
               resourceId:
                 type: integer
