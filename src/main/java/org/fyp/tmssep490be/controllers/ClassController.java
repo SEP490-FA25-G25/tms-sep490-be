@@ -10,9 +10,9 @@ import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
-import org.fyp.tmssep490be.dtos.createclass.RejectClassRequest;
-import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse;
-import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse;
+// import org.fyp.tmssep490be.dtos.createclass.RejectClassRequest; // Removed - now using classmanagement package
+// import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
+// import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
 import org.fyp.tmssep490be.dtos.classmanagement.*;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
@@ -356,9 +356,9 @@ public class ClassController {
 
         ValidateClassResponse response = classService.validateClass(classId, currentUser.getId());
 
-        String message = response.isReadyForSubmission() ?
+        String message = response.canSubmit() ?
                 "Class is complete and ready for submission" :
-                response.getValidationSummary();
+                response.getMessage();
 
         return ResponseEntity.ok(ResponseObject.<ValidateClassResponse>builder()
                 .success(response.isValid())
@@ -389,7 +389,7 @@ public class ClassController {
 
         return ResponseEntity.ok(ResponseObject.<SubmitClassResponse>builder()
                 .success(response.isSuccess())
-                .message(response.getSubmissionSummary())
+                .message(response.getMessage())
                 .data(response)
                 .build());
     }
@@ -431,7 +431,7 @@ public class ClassController {
             description = "Reject submitted class and provide rejection reason. This is STEP 7 of the workflow. " +
                     "Only users with CENTER_HEAD role can reject classes. Class status resets to DRAFT."
     )
-    public ResponseEntity<ResponseObject<String>> rejectClass(
+    public ResponseEntity<ResponseObject<RejectClassResponse>> rejectClass(
             @Parameter(description = "Class ID")
             @PathVariable Long classId,
 
@@ -442,12 +442,12 @@ public class ClassController {
     ) {
         log.info("Center Head {} rejecting class {} with reason: {}", currentUser.getId(), classId, request.getReason());
 
-        classService.rejectClass(classId, request.getReason(), currentUser.getId());
+        RejectClassResponse response = classService.rejectClass(classId, request.getReason(), currentUser.getId());
 
-        return ResponseEntity.ok(ResponseObject.<String>builder()
-                .success(true)
-                .message("Class rejected successfully")
-                .data("Class status reset to DRAFT")
+        return ResponseEntity.ok(ResponseObject.<RejectClassResponse>builder()
+                .success(response.isSuccess())
+                .message(response.getMessage())
+                .data(response)
                 .build());
     }
 }

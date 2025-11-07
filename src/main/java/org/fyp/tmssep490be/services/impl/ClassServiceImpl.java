@@ -6,20 +6,23 @@ import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
-import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse;
-import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse;
+// import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
+// import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
 import org.fyp.tmssep490be.dtos.classmanagement.*;
 import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.*;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
+import org.fyp.tmssep490be.services.ApprovalService;
 import org.fyp.tmssep490be.services.ClassService;
 import org.fyp.tmssep490be.services.SessionGenerationService;
+import org.fyp.tmssep490be.services.ValidationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +58,8 @@ public class ClassServiceImpl implements ClassService {
 
     // Services for Create Class workflow
     private final SessionGenerationService sessionGenerationService;
+    private final ValidationService validationService;
+    private final ApprovalService approvalService;
 
     @Override
     public Page<ClassListItemDTO> getClasses(
@@ -929,26 +934,105 @@ public class ClassServiceImpl implements ClassService {
 
     @Override
     public ValidateClassResponse validateClass(Long classId, Long userId) {
-        // TODO: Implement in Phase 1.4
-        throw new UnsupportedOperationException("Class validation not implemented yet");
+        log.info("Validating class ID: {} by user ID: {}", classId, userId);
+
+        try {
+            // Validate class exists and user has access
+            ClassEntity classEntity = classRepository.findById(classId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+            // Check user has access to this class's branch
+            validateClassAccess(classEntity, userId);
+
+            // Delegate to validation service for comprehensive validation
+            ValidateClassResponse validationResponse = validationService.validateClassComplete(classId);
+
+            log.info("Class validation completed for class ID: {}. Valid: {}, CanSubmit: {}",
+                    classId, validationResponse.isValid(), validationResponse.canSubmit());
+
+            return validationResponse;
+
+        } catch (CustomException e) {
+            log.error("Validation failed for class ID: {} by user ID: {}. Error: {}",
+                    classId, userId, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during class validation for class ID: {} by user ID: {}",
+                    classId, userId, e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @Override
+    @Transactional
     public SubmitClassResponse submitClass(Long classId, Long userId) {
-        // TODO: Implement in Phase 1.5
-        throw new UnsupportedOperationException("Class submission not implemented yet");
+        log.info("Submitting class ID: {} for approval by user: {}", classId, userId);
+
+        try {
+            // Validate class exists and user has access
+            ClassEntity classEntity = classRepository.findById(classId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+            validateClassBranchAccess(classEntity, userId);
+
+            // Delegate to ApprovalService
+            return approvalService.submitForApproval(classId, userId);
+
+        } catch (CustomException e) {
+            log.error("Error submitting class ID: {} for approval: {}", classId, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error submitting class ID: {} for approval", classId, e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @Override
+    @Transactional
     public void approveClass(Long classId, Long approverUserId) {
-        // TODO: Implement in Phase 1.5
-        throw new UnsupportedOperationException("Class approval not implemented yet");
+        log.info("Approving class ID: {} by user: {}", classId, approverUserId);
+
+        try {
+            // Validate class exists and user has access
+            ClassEntity classEntity = classRepository.findById(classId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+            validateClassBranchAccess(classEntity, approverUserId);
+
+            // Delegate to ApprovalService
+            approvalService.approveClass(classId, approverUserId);
+
+        } catch (CustomException e) {
+            log.error("Error approving class ID: {}: {}", classId, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error approving class ID: {}", classId, e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @Override
-    public void rejectClass(Long classId, String reason, Long rejecterUserId) {
-        // TODO: Implement in Phase 1.5
-        throw new UnsupportedOperationException("Class rejection not implemented yet");
+    @Transactional
+    public RejectClassResponse rejectClass(Long classId, String reason, Long rejecterUserId) {
+        log.info("Rejecting class ID: {} by user: {} with reason: {}", classId, rejecterUserId, reason);
+
+        try {
+            // Validate class exists and user has access
+            ClassEntity classEntity = classRepository.findById(classId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+            validateClassBranchAccess(classEntity, rejecterUserId);
+
+            // Delegate to ApprovalService
+            return approvalService.rejectClass(classId, reason, rejecterUserId);
+
+        } catch (CustomException e) {
+            log.error("Error rejecting class ID: {}: {}", classId, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error rejecting class ID: {}", classId, e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     // Helper methods for Create Class workflow

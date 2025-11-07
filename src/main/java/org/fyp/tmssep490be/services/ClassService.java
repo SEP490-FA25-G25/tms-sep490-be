@@ -4,8 +4,8 @@ import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
-import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse;
-import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse;
+// import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
+// import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
 import org.fyp.tmssep490be.dtos.classmanagement.*;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
@@ -163,6 +163,7 @@ public interface ClassService {
      * @param classId Class ID to reject
      * @param reason Rejection reason (required)
      * @param rejecterUserId Center Head user ID rejecting the class
+     * @return RejectClassResponse with rejection details
      */
-    void rejectClass(Long classId, String reason, Long rejecterUserId);
+    RejectClassResponse rejectClass(Long classId, String reason, Long rejecterUserId);
 }
