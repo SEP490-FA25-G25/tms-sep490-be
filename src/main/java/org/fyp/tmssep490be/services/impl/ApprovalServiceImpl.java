@@ -14,6 +14,7 @@ import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.ClassRepository;
 import org.fyp.tmssep490be.services.ApprovalService;
 import org.fyp.tmssep490be.services.ValidationService;
+import org.fyp.tmssep490be.utils.ValidateClassResponseUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ public class ApprovalServiceImpl implements ApprovalService {
 
     private final ClassRepository classRepository;
     private final ValidationService validationService;
+    private final ValidateClassResponseUtil validateClassResponseUtil;
 
     @Override
     @Transactional
@@ -49,7 +51,7 @@ public class ApprovalServiceImpl implements ApprovalService {
 
             // Validate class is complete using ValidationService
             ValidateClassResponse validationResponse = validationService.validateClassComplete(classId);
-            if (!validationResponse.canSubmit()) {
+            if (!validateClassResponseUtil.canSubmit(validationResponse)) {
                 throw new CustomException(ErrorCode.CLASS_INCOMPLETE_CANNOT_SUBMIT);
             }
 

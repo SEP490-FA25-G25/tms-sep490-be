@@ -21,15 +21,6 @@ public class ValidateClassResponse {
     private List<String> errors;
     private List<String> warnings;
 
-    // Helper methods
-    public boolean isValid() {
-        return valid != null && valid;
-    }
-
-    public boolean canSubmit() {
-        return canSubmit != null && canSubmit;
-    }
-
     @Data
     @Builder
     @NoArgsConstructor
@@ -50,22 +41,5 @@ public class ValidateClassResponse {
         private Boolean startDateInPast;
         private Boolean hasValidationErrors;
         private Boolean hasValidationWarnings;
-
-        // Additional helper methods
-        public boolean isTimeSlotsComplete() {
-            return allSessionsHaveTimeSlots != null && allSessionsHaveTimeSlots;
-        }
-
-        public boolean isResourcesComplete() {
-            return allSessionsHaveResources != null && allSessionsHaveResources;
-        }
-
-        public boolean isTeachersComplete() {
-            return allSessionsHaveTeachers != null && allSessionsHaveTeachers;
-        }
-
-        public boolean isFullyComplete() {
-            return isTimeSlotsComplete() && isResourcesComplete() && isTeachersComplete();
-        }
     }
 }

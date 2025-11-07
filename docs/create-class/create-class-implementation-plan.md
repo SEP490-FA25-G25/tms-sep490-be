@@ -391,30 +391,112 @@ WHERE id = :classId;
 
 ### 3. DTOs (15+ files)
 
-**Path:** `dtos/class/`
+**Path:** `dtos/class/` or `dtos/createclass/` or `dtos/classmanagement/`
+
+---
+
+### ⚠️ DTO ARCHITECTURE BEST PRACTICES (Learned from Phase 1)
+
+**CRITICAL: DTOs MUST NOT contain business logic methods!**
+
+#### ❌ ANTI-PATTERNS (DO NOT DO THIS):
+```java
+// ❌ BAD - Business logic in DTO
+@Data
+public class CreateClassResponse {
+    private Long classId;
+    private String code;
+
+    // ❌ Business logic methods - VIOLATES SRP
+    public boolean isSuccess() {
+        return classId != null && code != null;
+    }
+
+    public double getWorkflowProgress() {
+        return isSuccess() ? 14.3 : 0.0;
+    }
+}
+```
+
+#### ✅ CORRECT PATTERNS (DO THIS):
+```java
+// ✅ GOOD - Pure data container
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CreateClassResponse {
+    private Long classId;
+    private String code;
+    private String name;
+    private SessionGenerationSummary sessionSummary;
+    // NO business logic methods here!
+}
+
+// ✅ GOOD - Business logic in @Component Util class
+@Component
+public class CreateClassResponseUtil {
+    public boolean isSuccess(CreateClassResponse response) {
+        return response != null &&
+               response.getClassId() != null &&
+               response.getCode() != null;
+    }
+
+    public double getWorkflowProgress(CreateClassResponse response) {
+        return isSuccess(response) ? 14.3 : 0.0;
+    }
+}
+```
+
+#### 📋 DTO Design Checklist:
+- [ ] DTO contains **ONLY data fields** (no business logic)
+- [ ] Use **wrapper types** (Boolean, Integer, Long) for nullable fields
+- [ ] Nested classes are **static** and also pure data
+- [ ] All Lombok annotations: `@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`
+- [ ] Create corresponding **Util class** in `utils/` package for response processing
+- [ ] Create corresponding **Validator class** in `validators/` package for input validation
+
+#### 📁 File Organization Pattern:
+```
+src/main/java/org/fyp/tmssep490be/
+├── dtos/
+│   ├── createclass/
+│   │   ├── CreateClassRequest.java          # Pure data
+│   │   └── CreateClassResponse.java         # Pure data with nested class
+├── utils/
+│   └── CreateClassResponseUtil.java         # @Component - Business logic for response
+└── validators/
+    └── CreateClassRequestValidator.java     # @Component - Validation logic for request
+```
+
+#### 🎯 When to Use Nested Classes:
+- **Use nested class** when data is tightly coupled to parent DTO (e.g., `SessionGenerationSummary` inside `CreateClassResponse`)
+- **Use separate DTO** when data is reusable across multiple DTOs (e.g., `TeacherAvailabilityDTO` used in multiple responses)
+
+---
 
 #### Request DTOs
 
-| DTO | Purpose | Fields | Status |
-|-----|---------|--------|--------|
-| `CreateClassRequest` | **STEP 1**: Create class | branchId, courseId, code, name, modality, startDate, scheduleDays, maxCapacity | ⏳ TODO |
-| `AssignTimeSlotsRequest` | **STEP 3**: Assign time slots | assignments: [{dayOfWeek, timeSlotTemplateId}] | ⏳ TODO |
-| `AssignResourcesRequest` | **STEP 4**: Assign resources | pattern: [{dayOfWeek, resourceId}] | ⏳ TODO |
-| `AssignTeacherRequest` | **STEP 5**: Assign teacher | teacherId, role, sessionIds?, skillSet? | ⏳ TODO |
-| `RejectClassRequest` | **STEP 7**: Reject class | reason | ⏳ TODO |
+| DTO | Purpose | Fields | Util Class | Validator | Status |
+|-----|---------|--------|------------|-----------|--------|
+| `CreateClassRequest` | **STEP 1**: Create class | branchId, courseId, code, name, modality, startDate, scheduleDays, maxCapacity | N/A | ✅ `CreateClassRequestValidator` | ✅ DONE |
+| `AssignTimeSlotsRequest` | **STEP 3**: Assign time slots | assignments: [{dayOfWeek, timeSlotTemplateId}] | N/A | ✅ `AssignTimeSlotsRequestValidator` | ✅ DONE |
+| `AssignResourcesRequest` | **STEP 4**: Assign resources | pattern: [{dayOfWeek, resourceId}] | N/A | ⏳ `AssignResourcesRequestValidator` | ⏳ TODO |
+| `AssignTeacherRequest` | **STEP 5**: Assign teacher | teacherId, role, sessionIds?, skillSet? | N/A | ⏳ `AssignTeacherRequestValidator` | ⏳ TODO |
+| `RejectClassRequest` | **STEP 7**: Reject class | reason | N/A | N/A (simple validation) | ✅ DONE |
 
 #### Response DTOs
 
-| DTO | Purpose | Fields | Status |
-|-----|---------|--------|--------|
-| `CreateClassResponse` | Class created + sessions generated | classId, code, sessionsGenerated, status | ⏳ TODO |
-| `AssignTimeSlotsResponse` | Time slots assigned | classId, assignedSessions, assignments | ⏳ TODO |
-| `AssignResourcesResponse` | Resources assigned with conflicts | classId, totalSessions, successCount, conflictCount, conflicts | ⏳ TODO |
-| `AssignTeacherResponse` | Teacher assigned | classId, teacherId, assignedCount, needsSubstitute, remainingSessions | ⏳ TODO |
-| `ValidateClassResponse` | Validation result | isValid, canSubmit, checks, errors, warnings | ⏳ TODO |
-| `SubmitClassResponse` | Class submitted | classId, status, submittedAt, submittedBy | ⏳ TODO |
-| `ApproveClassResponse` | Class approved | classId, status, approvedBy, approvedAt | ⏳ TODO |
-| `RejectClassResponse` | Class rejected | classId, status, rejectionReason, rejectedBy | ⏳ TODO |
+| DTO | Purpose | Fields | Util Class | Validator | Status |
+|-----|---------|--------|------------|-----------|--------|
+| `CreateClassResponse` | Class created + sessions generated | classId, code, sessionSummary, status, approvalStatus | ✅ `CreateClassResponseUtil` | N/A | ✅ DONE |
+| `AssignTimeSlotsResponse` | Time slots assigned | classId, assignedSessions, assignments | ✅ `AssignTimeSlotsResponseUtil` | N/A | ✅ DONE |
+| `AssignResourcesResponse` | Resources assigned with conflicts | classId, totalSessions, successCount, conflictCount, conflicts | ⏳ `AssignResourcesResponseUtil` | N/A | ⏳ TODO |
+| `AssignTeacherResponse` | Teacher assigned | classId, teacherId, assignedCount, needsSubstitute, remainingSessions | ⏳ `AssignTeacherResponseUtil` (if needed) | N/A | ⏳ TODO |
+| `ValidateClassResponse` | Validation result | isValid, canSubmit, checks, errors, warnings | ✅ `ValidateClassResponseUtil` | N/A | ✅ DONE |
+| `SubmitClassResponse` | Class submitted | classId, status, submittedAt, submittedBy | N/A (simple response) | N/A | ✅ DONE |
+| `ApproveClassResponse` | Class approved | classId, status, approvedBy, approvedAt | N/A (simple response) | N/A | ✅ DONE |
+| `RejectClassResponse` | Class rejected | classId, status, rejectionReason, rejectedBy | N/A (simple response) | N/A | ✅ DONE |
 
 #### Utility DTOs
 
@@ -972,7 +1054,56 @@ WHERE (
 
 ---
 
-### 5. Transaction Management
+### 5. DTO Refactoring Best Practices (Phase 1 Lessons)
+
+**Context:** After Phase 1 implementation, we identified DTOs violating Single Responsibility Principle by containing business logic methods. A major refactoring was performed to extract business logic into Util classes.
+
+#### Refactoring Results:
+| Component | Before | After | Change |
+|-----------|--------|-------|--------|
+| **DTOs** | 5 DTOs with business logic | 5 pure data DTOs | -100% business logic |
+| **Utils** | 4 util classes (some with wrapper methods) | 3 util classes (simplified) | -29% code, -59% duplication |
+| **Files** | 273 source files | 271 source files | -2 duplicate files |
+
+#### Key Improvements:
+1. **Removed business logic from DTOs**:
+   - `CreateClassResponse`: removed 5 methods → moved to `CreateClassResponseUtil`
+   - `CreateClassResponse.SessionGenerationSummary`: removed 3 methods → moved to util
+   - `AssignTimeSlotsResponse`: removed all business methods → moved to `AssignTimeSlotsResponseUtil`
+
+2. **Simplified Utils** (removed redundant wrapper methods):
+   - `CreateClassResponseUtil`: 187 → 165 lines (-12%)
+   - `ValidateClassResponseUtil`: 210 → 150 lines (-29%)
+
+3. **Merged Duplicate DTOs**:
+   - `createclass/ValidateClassResponse` + `classmanagement/ValidateClassResponse` → Single unified DTO
+   - **Lesson**: Choose wrapper types (Boolean, Integer, Long) for better null safety
+
+4. **Pattern Established**:
+   ```
+   Request DTO → Validator (validate input)
+   Response DTO → Util (process output)
+   DTOs → Pure data containers only
+   ```
+
+#### Rules for Future Phases:
+✅ **DO:**
+- Keep DTOs as pure data containers with only getters/setters (via Lombok)
+- Use wrapper types (Boolean, Integer, Long) for nullable fields
+- Create Util classes for response processing logic
+- Create Validator classes for request validation logic
+- Use nested classes for tightly coupled data structures
+- Simplify utils by inlining simple null checks instead of creating wrapper methods
+
+❌ **DON'T:**
+- Add business logic methods to DTOs (no `isValid()`, `getProgress()`, etc.)
+- Create wrapper methods in Utils that just delegate to another method
+- Duplicate DTOs across packages
+- Use primitive types (boolean, int) when fields can be null
+
+---
+
+### 6. Transaction Management
 
 **All write operations in single transaction:**
 - **@Transactional(readOnly = true)** at service class level (default)
@@ -1178,7 +1309,11 @@ start target/site/jacoco/index.html  # Windows
 | Date | Version | Changes | Author |
 |------|---------|---------|--------|
 | 2025-11-05 | 1.0.0 | Initial implementation plan created based on workflow v1.1 and OpenAPI spec | Claude |
+| 2025-11-07 | 1.1.0 | **MAJOR UPDATE**: Added DTO Architecture Best Practices section based on Phase 1 refactoring lessons | Claude |
+| 2025-11-07 | 1.1.0 | Updated DTO tables with Util/Validator columns, added status tracking | Claude |
+| 2025-11-07 | 1.1.0 | Added "DTO Refactoring Best Practices" section with Phase 1 lessons learned | Claude |
+| 2025-11-07 | 1.1.0 | Documented architectural decisions: DTOs = Pure Data, Util/Validator patterns | Claude |
 
 ---
 
-**Ready to implement? Let's start with Phase 1! 🚀**
+**✅ Phase 1 Complete with Refactoring! Ready for Phase 2 with Best Practices! 🚀**

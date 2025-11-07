@@ -25,7 +25,9 @@
       "Bash(java:*)",
       "Bash(javap:*)",
       "Bash(lsof:*)",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(gemini:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

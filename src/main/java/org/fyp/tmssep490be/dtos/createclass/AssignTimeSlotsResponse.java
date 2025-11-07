@@ -36,46 +36,4 @@ public class AssignTimeSlotsResponse {
         private String errorMessage;
     }
 
-    // Helper methods
-    public boolean isSuccess() {
-        return success && sessionsUpdated > 0;
-    }
-
-    public double getUpdateProgress() {
-        if (totalSessions == 0) return 0.0;
-        return (double) sessionsUpdated / totalSessions * 100;
-    }
-
-    public boolean isFullyUpdated() {
-        return isSuccess() && sessionsUpdated == totalSessions;
-    }
-
-    /**
-     * Get count of successful assignments
-     */
-    public int getSuccessfulAssignments() {
-        if (assignmentDetails == null) return 0;
-        return (int) assignmentDetails.stream()
-                .filter(AssignmentDetail::isSuccessful)
-                .count();
-    }
-
-    /**
-     * Get count of failed assignments
-     */
-    public int getFailedAssignments() {
-        if (assignmentDetails == null) return 0;
-        return (int) assignmentDetails.stream()
-                .filter(detail -> !detail.isSuccessful())
-                .count();
-    }
-
-    /**
-     * Check if all assignments were successful
-     */
-    public boolean areAllAssignmentsSuccessful() {
-        return assignmentDetails != null &&
-               !assignmentDetails.isEmpty() &&
-               assignmentDetails.stream().allMatch(AssignmentDetail::isSuccessful);
-    }
-}
+  }

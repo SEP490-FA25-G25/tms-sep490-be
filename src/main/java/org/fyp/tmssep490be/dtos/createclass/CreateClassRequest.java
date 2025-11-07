@@ -43,44 +43,4 @@ public class CreateClassRequest {
     @Min(value = 1, message = "Max capacity must be at least 1")
     @Max(value = 1000, message = "Max capacity must not exceed 1000")
     private Integer maxCapacity;
-
-    // Additional validation methods
-    public boolean isValid() {
-        return branchId != null && courseId != null && code != null && !code.isBlank() &&
-               name != null && !name.isBlank() && modality != null && startDate != null &&
-               scheduleDays != null && !scheduleDays.isEmpty() && maxCapacity != null && maxCapacity > 0;
-    }
-
-    public Short getPrimaryScheduleDay() {
-        return scheduleDays != null && !scheduleDays.isEmpty() ? scheduleDays.get(0) : null;
-    }
-
-    public boolean includesWeekends() {
-        if (scheduleDays == null) return false;
-        return scheduleDays.contains((short) 6) || scheduleDays.contains((short) 7); // Saturday or Sunday
-    }
-
-    /**
-     * Validates if start date matches one of the schedule days
-     * @return true if start date day of week is in scheduleDays
-     */
-    public boolean isStartDateInScheduleDays() {
-        if (startDate == null || scheduleDays == null || scheduleDays.isEmpty()) {
-            return false;
-        }
-        // LocalDate.getDayOfWeek() returns 1-7 (Monday-Sunday) matching ISODOW
-        int startDayOfWeek = startDate.getDayOfWeek().getValue();
-        return scheduleDays.contains((short) startDayOfWeek);
-    }
-
-    /**
-     * Check if any duplicate day assignments exist
-     */
-    public boolean hasDuplicateDays() {
-        if (scheduleDays == null || scheduleDays.isEmpty()) return false;
-        long uniqueDays = scheduleDays.stream()
-                .distinct()
-                .count();
-        return uniqueDays != scheduleDays.size();
-    }
 }

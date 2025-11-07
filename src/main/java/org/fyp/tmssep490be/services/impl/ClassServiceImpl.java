@@ -18,6 +18,9 @@ import org.fyp.tmssep490be.services.ApprovalService;
 import org.fyp.tmssep490be.services.ClassService;
 import org.fyp.tmssep490be.services.SessionGenerationService;
 import org.fyp.tmssep490be.services.ValidationService;
+import org.fyp.tmssep490be.validators.CreateClassRequestValidator;
+import org.fyp.tmssep490be.validators.AssignTimeSlotsRequestValidator;
+import org.fyp.tmssep490be.utils.ValidateClassResponseUtil;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -60,6 +63,11 @@ public class ClassServiceImpl implements ClassService {
     private final SessionGenerationService sessionGenerationService;
     private final ValidationService validationService;
     private final ApprovalService approvalService;
+
+    // Validators for Create Class workflow
+    private final CreateClassRequestValidator createClassRequestValidator;
+    private final AssignTimeSlotsRequestValidator assignTimeSlotsRequestValidator;
+    private final ValidateClassResponseUtil validateClassResponseUtil;
 
     @Override
     public Page<ClassListItemDTO> getClasses(
@@ -833,12 +841,12 @@ public class ClassServiceImpl implements ClassService {
         log.info("Assigning time slots for class ID {} by user {}", classId, userId);
 
         // Validate request
-        if (!request.isValid()) {
+        if (!assignTimeSlotsRequestValidator.isValid(request)) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
-        if (request.hasDuplicateDays()) {
-            Short duplicateDay = request.getDuplicateDay();
+        if (assignTimeSlotsRequestValidator.hasDuplicateDays(request)) {
+            Short duplicateDay = assignTimeSlotsRequestValidator.getDuplicateDay(request);
             throw new CustomException(ErrorCode.DUPLICATE_TIME_SLOT_ASSIGNMENT);
         }
 
@@ -948,7 +956,7 @@ public class ClassServiceImpl implements ClassService {
             ValidateClassResponse validationResponse = validationService.validateClassComplete(classId);
 
             log.info("Class validation completed for class ID: {}. Valid: {}, CanSubmit: {}",
-                    classId, validationResponse.isValid(), validationResponse.canSubmit());
+                    classId, validateClassResponseUtil.isValid(validationResponse), validateClassResponseUtil.canSubmit(validationResponse));
 
             return validationResponse;
 
@@ -1038,15 +1046,15 @@ public class ClassServiceImpl implements ClassService {
     // Helper methods for Create Class workflow
 
     private void validateCreateClassRequest(CreateClassRequest request, Long userId) {
-        if (!request.isValid()) {
+        if (!createClassRequestValidator.isValid(request)) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
-        if (request.hasDuplicateDays()) {
+        if (createClassRequestValidator.hasDuplicateDays(request)) {
             throw new CustomException(ErrorCode.INVALID_SCHEDULE_DAYS);
         }
 
-        if (!request.isStartDateInScheduleDays()) {
+        if (!createClassRequestValidator.isStartDateInScheduleDays(request)) {
             throw new CustomException(ErrorCode.START_DATE_NOT_IN_SCHEDULE_DAYS);
         }
     }

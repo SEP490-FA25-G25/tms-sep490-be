@@ -20,6 +20,9 @@ import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.Modality;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.ClassService;
+import org.fyp.tmssep490be.utils.ValidateClassResponseUtil;
+import org.fyp.tmssep490be.utils.CreateClassResponseUtil;
+import org.fyp.tmssep490be.utils.AssignTimeSlotsResponseUtil;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +48,9 @@ import java.util.List;
 public class ClassController {
 
     private final ClassService classService;
+    private final ValidateClassResponseUtil validateClassResponseUtil;
+    private final CreateClassResponseUtil createClassResponseUtil;
+    private final AssignTimeSlotsResponseUtil assignTimeSlotsResponseUtil;
 
     /**
      * Get list of classes accessible to academic affairs user
@@ -293,13 +299,13 @@ public class ClassController {
 
         CreateClassResponse response = classService.createClass(request, currentUser.getId());
 
-        String message = response.isSuccess() ?
+        String message = createClassResponseUtil.isSuccess(response) ?
                 String.format("Class %s created successfully with %d sessions generated",
                         response.getCode(), response.getSessionSummary().getSessionsGenerated()) :
                 "Failed to create class";
 
         return ResponseEntity.ok(ResponseObject.<CreateClassResponse>builder()
-                .success(response.isSuccess())
+                .success(createClassResponseUtil.isSuccess(response))
                 .message(message)
                 .data(response)
                 .build());
@@ -330,7 +336,7 @@ public class ClassController {
         AssignTimeSlotsResponse response = classService.assignTimeSlots(classId, request, currentUser.getId());
 
         return ResponseEntity.ok(ResponseObject.<AssignTimeSlotsResponse>builder()
-                .success(response.isSuccess())
+                .success(assignTimeSlotsResponseUtil.isSuccess(response))
                 .message(response.getMessage())
                 .data(response)
                 .build());
@@ -356,12 +362,12 @@ public class ClassController {
 
         ValidateClassResponse response = classService.validateClass(classId, currentUser.getId());
 
-        String message = response.canSubmit() ?
+        String message = validateClassResponseUtil.canSubmit(response) ?
                 "Class is complete and ready for submission" :
                 response.getMessage();
 
         return ResponseEntity.ok(ResponseObject.<ValidateClassResponse>builder()
-                .success(response.isValid())
+                .success(validateClassResponseUtil.isValid(response))
                 .message(message)
                 .data(response)
                 .build());
