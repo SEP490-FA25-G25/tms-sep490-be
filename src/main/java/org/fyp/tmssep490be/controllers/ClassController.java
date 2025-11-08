@@ -8,10 +8,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesResponse;
+import org.fyp.tmssep490be.dtos.createclass.AssignTeacherRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignTeacherResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
 // import org.fyp.tmssep490be.dtos.createclass.RejectClassRequest; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
@@ -395,6 +398,146 @@ public class ClassController {
 
         return ResponseEntity.ok(ResponseObject.<AssignResourcesResponse>builder()
                 .success(response.getSuccessCount() > 0)
+                .message(message)
+                .data(response)
+                .build());
+    }
+
+    /**
+     * STEP 5A: Get available teachers with PRE-CHECK (Query before assignment)
+     */
+    @GetMapping("/{classId}/available-teachers")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Get available teachers using PRE-CHECK approach",
+            description = """
+                    Query available teachers for class sessions using PRE-CHECK approach.
+                    This is STEP 5A of the Create Class workflow (query before assignment).
+                    
+                    **PRE-CHECK Approach:**
+                    - Execute complex CTE query showing ALL teachers with availability status
+                    - Academic Staff sees detailed conflict breakdown BEFORE selecting teacher
+                    - Direct bulk assignment without re-checking (PRE-CHECK already done)
+                    
+                    **4 Conflict Checks Per Session:**
+                    1. Teacher availability registered (teacher_availability table)
+                    2. No teaching conflict (not teaching another class at same time)
+                    3. No leave conflict (teaching_slot.status != 'ON_LEAVE')
+                    4. No skill mismatch (or has GENERAL skill = universal bypass)
+                    
+                    **Performance:** Target <100ms for 10 teachers × 36 sessions
+                    
+                    **Benefits:**
+                    - Transparency: Show ALL teachers (not just available ones)
+                    - Detailed breakdown: Exactly which sessions conflict and why
+                    - GENERAL skill handling: Universal skill bypasses all skill checks
+                    - No trial-and-error: One query shows everything
+                    
+                    **Response Structure:**
+                    - Teacher details (ID, name, skills, experience)
+                    - Availability status (FULLY_AVAILABLE, PARTIALLY_AVAILABLE, UNAVAILABLE)
+                    - Conflict breakdown (noAvailability, teachingConflict, leaveConflict, skillMismatch)
+                    - Available sessions count and percentage
+                    - Conflicting sessions with reasons
+                    - Sorted by availability percentage (descending)
+                    """
+    )
+    public ResponseEntity<ResponseObject<List<TeacherAvailabilityDTO>>> getAvailableTeachers(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} querying available teachers for class {}", currentUser.getId(), classId);
+
+        List<TeacherAvailabilityDTO> teachers = classService.getAvailableTeachers(classId, currentUser.getId());
+
+        String message = String.format("Found %d teachers. Use POST /classes/{classId}/teachers to assign.", 
+                teachers.size());
+
+        return ResponseEntity.ok(ResponseObject.<List<TeacherAvailabilityDTO>>builder()
+                .success(true)
+                .message(message)
+                .data(teachers)
+                .build());
+    }
+
+    /**
+     * STEP 5B: Assign teacher to class sessions
+     */
+    @PostMapping("/{classId}/teachers")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Assign teacher to class sessions",
+            description = """
+                    Assign a teacher to class sessions using PRE-CHECK approach.
+                    This is STEP 5B of the Create Class workflow (assignment after PRE-CHECK).
+                    
+                    **Assignment Modes:**
+                    
+                    1. **Full Assignment** (sessionIds = null):
+                       - Assign teacher to ALL unassigned sessions
+                       - Example: Assign teacher to entire class
+                    
+                    2. **Partial Assignment** (sessionIds provided):
+                       - Assign teacher only to specified sessions
+                       - Example: Assign teacher to specific weeks or days
+                       - Use case: Handle substitute teachers or split assignments
+                    
+                    **Request Body:**
+                    ```json
+                    {
+                      "teacherId": 123,
+                      "sessionIds": [1, 2, 3] // Optional - null = full assignment
+                    }
+                    ```
+                    
+                    **Validation:**
+                    - Class must be in DRAFT status
+                    - Teacher must exist and have required skills (or GENERAL skill)
+                    - Sessions must exist and belong to the class
+                    - Sessions must not already have teachers assigned
+                    
+                    **Performance:** Target <50ms for 36 sessions (bulk INSERT)
+                    
+                    **Response Structure:**
+                    - Success count and assigned session IDs
+                    - needsSubstitute flag (true if partial assignment)
+                    - remainingSessions count and IDs
+                    - Processing time in milliseconds
+                    
+                    **Example Use Cases:**
+                    - Main teacher for entire class (full assignment)
+                    - Substitute teacher for specific weeks (partial assignment)
+                    - Split teaching between multiple teachers (partial assignment)
+                    """
+    )
+    public ResponseEntity<ResponseObject<AssignTeacherResponse>> assignTeacher(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @Parameter(description = "Teacher assignment request (teacherId + optional sessionIds)")
+            @RequestBody @Valid AssignTeacherRequest request,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} assigning teacher {} to class {}", currentUser.getId(), request.getTeacherId(), classId);
+
+        AssignTeacherResponse response = classService.assignTeacher(classId, request, currentUser.getId());
+
+        // Build success message based on assignment mode
+        String message;
+        if (response.getNeedsSubstitute()) {
+            message = String.format("Teacher assigned to %d sessions. %d sessions still need assignment (%dms)",
+                    response.getAssignedCount(), response.getRemainingSessions(), 
+                    response.getProcessingTimeMs());
+        } else {
+            message = String.format("Teacher assigned to all %d sessions successfully in %dms",
+                    response.getAssignedCount(), response.getProcessingTimeMs());
+        }
+
+        return ResponseEntity.ok(ResponseObject.<AssignTeacherResponse>builder()
+                .success(response.getAssignedCount() > 0)
                 .message(message)
                 .data(response)
                 .build());

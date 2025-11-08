@@ -166,6 +166,10 @@ public enum ErrorCode {
     TEACHER_NOT_ASSIGNED_TO_BRANCH(3006, "Teacher is not assigned to this branch"),
     TEACHER_SCHEDULE_NOT_FOUND(3007, "Teacher schedule not found"),
     TEACHER_WORKLOAD_EXCEEDED(3008, "Teacher workload exceeds maximum capacity"),
+    TEACHER_BRANCH_MISMATCH(3009, "Teacher does not belong to the same branch as the class"),
+    TEACHER_SKILL_MISMATCH(3010, "Teacher does not have required skills for this class"),
+    DUPLICATE_SESSION_IDS(3011, "Duplicate session IDs in assignment list"),
+    SESSION_NOT_IN_CLASS(3012, "Session does not belong to the specified class"),
 
     // Teacher Request errors (5000-5099)
     TEACHER_REQUEST_NOT_FOUND(5000, "Teacher request not found"),

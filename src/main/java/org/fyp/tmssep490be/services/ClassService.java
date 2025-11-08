@@ -2,10 +2,13 @@ package org.fyp.tmssep490be.services;
 
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesResponse;
+import org.fyp.tmssep490be.dtos.createclass.AssignTeacherRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignTeacherResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
 // import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
 import org.fyp.tmssep490be.dtos.classmanagement.*;
@@ -158,6 +161,50 @@ public interface ClassService {
      * @return ValidateClassResponse with validation results
      */
     ValidateClassResponse validateClass(Long classId, Long userId);
+
+    // ==================== CREATE CLASS WORKFLOW - PHASE 2.3: TEACHER ASSIGNMENT (PRE-CHECK) ====================
+
+    /**
+     * STEP 5A: Get available teachers with PRE-CHECK
+     * <p>
+     * Executes complex CTE query to show teachers' availability BEFORE assignment
+     * Shows detailed conflict breakdown for each teacher
+     * </p>
+     * <p>
+     * <b>PRE-CHECK Approach:</b> User sees availability first, then selects teacher
+     * </p>
+     * <p>
+     * Performance Target: <100ms for PRE-CHECK query
+     * </p>
+     *
+     * @param classId Class ID to check teachers for
+     * @param userId Current user ID for access control
+     * @return List of TeacherAvailabilityDTO sorted by availability (best matches first)
+     */
+    List<TeacherAvailabilityDTO> getAvailableTeachers(Long classId, Long userId);
+
+    /**
+     * STEP 5B: Assign teacher to class sessions
+     * <p>
+     * Direct bulk insert without re-checking (PRE-CHECK already done)
+     * Supports two modes:
+     * <ul>
+     *   <li><b>Full Assignment:</b> Assign to ALL sessions (request.sessionIds = null)</li>
+     *   <li><b>Partial Assignment:</b> Assign to specific sessions (request.sessionIds provided)</li>
+     * </ul>
+     * </p>
+     * <p>
+     * Performance Target: <50ms for bulk insert
+     * </p>
+     *
+     * @param classId Class ID to assign teacher to
+     * @param request Assignment request (teacherId + optional sessionIds)
+     * @param userId Current user ID for access control and audit
+     * @return AssignTeacherResponse with assignment results
+     */
+    AssignTeacherResponse assignTeacher(Long classId, AssignTeacherRequest request, Long userId);
+
+    // ==================== APPROVAL WORKFLOW ====================
 
     /**
      * STEP 7: Submit class for approval

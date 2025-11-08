@@ -132,4 +132,47 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
            "LEFT JOIN FETCH s.sessionResources " +
            "WHERE s.id = :sessionId")
     Session findSessionWithResourcesAndTimeSlot(@Param("sessionId") Long sessionId);
+
+    // ==================== CREATE CLASS WORKFLOW - PHASE 2.3: TEACHER ASSIGNMENT (PRE-CHECK) ====================
+
+    /**
+     * Find all distinct skills required by sessions in a class
+     * <p>
+     * Returns all unique skills from skillSet arrays in course_session templates
+     * Used to validate teacher has all required skills before assignment
+     * </p>
+     *
+     * @param classId class ID
+     * @return list of distinct skills required
+     */
+    @Query(value = """
+        SELECT DISTINCT UNNEST(cs.skill_set) as skill
+        FROM session s
+        JOIN course_session cs ON s.course_session_id = cs.id
+        WHERE s.class_id = :classId
+          AND cs.skill_set IS NOT NULL
+        ORDER BY skill
+        """, nativeQuery = true)
+    List<String> findDistinctSkillNamesByClassId(@Param("classId") Long classId);
+
+    /**
+     * Find sessions without any teacher assignment
+     * <p>
+     * Used to identify remaining sessions after teacher assignment
+     * </p>
+     *
+     * @param classId class ID
+     * @return list of session IDs without teacher
+     */
+    @Query(value = """
+        SELECT s.id
+        FROM session s
+        WHERE s.class_id = :classId
+          AND NOT EXISTS (
+            SELECT 1 FROM teaching_slot ts
+            WHERE ts.session_id = s.id
+          )
+        ORDER BY s.date ASC
+        """, nativeQuery = true)
+    List<Long> findSessionsWithoutTeacher(@Param("classId") Long classId);
 }

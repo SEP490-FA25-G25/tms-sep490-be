@@ -4,10 +4,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesResponse;
+import org.fyp.tmssep490be.dtos.createclass.AssignTeacherRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignTeacherResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
 // import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
 import org.fyp.tmssep490be.dtos.classmanagement.*;
@@ -20,8 +23,10 @@ import org.fyp.tmssep490be.services.ApprovalService;
 import org.fyp.tmssep490be.services.ClassService;
 import org.fyp.tmssep490be.services.ResourceAssignmentService;
 import org.fyp.tmssep490be.services.SessionGenerationService;
+import org.fyp.tmssep490be.services.TeacherAssignmentService;
 import org.fyp.tmssep490be.services.ValidationService;
 import org.fyp.tmssep490be.validators.AssignResourcesRequestValidator;
+import org.fyp.tmssep490be.validators.AssignTeacherRequestValidator;
 import org.fyp.tmssep490be.validators.CreateClassRequestValidator;
 import org.fyp.tmssep490be.validators.AssignTimeSlotsRequestValidator;
 import org.fyp.tmssep490be.utils.ValidateClassResponseUtil;
@@ -66,6 +71,7 @@ public class ClassServiceImpl implements ClassService {
     // Services for Create Class workflow
     private final SessionGenerationService sessionGenerationService;
     private final ResourceAssignmentService resourceAssignmentService;
+    private final TeacherAssignmentService teacherAssignmentService;
     private final ValidationService validationService;
     private final ApprovalService approvalService;
 
@@ -73,6 +79,7 @@ public class ClassServiceImpl implements ClassService {
     private final CreateClassRequestValidator createClassRequestValidator;
     private final AssignTimeSlotsRequestValidator assignTimeSlotsRequestValidator;
     private final AssignResourcesRequestValidator assignResourcesRequestValidator;
+    private final AssignTeacherRequestValidator assignTeacherRequestValidator;
     private final ValidateClassResponseUtil validateClassResponseUtil;
 
     @Override
@@ -1148,6 +1155,74 @@ public class ClassServiceImpl implements ClassService {
             case 6: return "Saturday";
             case 7: return "Sunday";
             default: return "Unknown";
+        }
+    }
+
+    // ==================== CREATE CLASS WORKFLOW - PHASE 2.3: TEACHER ASSIGNMENT (PRE-CHECK) ====================
+
+    @Override
+    public List<TeacherAvailabilityDTO> getAvailableTeachers(Long classId, Long userId) {
+        log.info("Getting available teachers for class ID: {} by user ID: {}", classId, userId);
+
+        try {
+            // Validate class exists and user has access
+            ClassEntity classEntity = classRepository.findById(classId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+            List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(userId);
+            if (!userBranchIds.contains(classEntity.getBranch().getId())) {
+                throw new CustomException(ErrorCode.CLASS_ACCESS_DENIED);
+            }
+
+            // Execute PRE-CHECK query via TeacherAssignmentService
+            List<TeacherAvailabilityDTO> teachers = 
+                    teacherAssignmentService.queryAvailableTeachersWithPrecheck(classId);
+
+            log.info("Found {} available teachers for class ID: {}", teachers.size(), classId);
+            return teachers;
+
+        } catch (CustomException e) {
+            log.error("Error getting available teachers for class ID: {}", classId, e);
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error getting available teachers for class ID: {}", classId, e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    @Transactional
+    public AssignTeacherResponse assignTeacher(Long classId, AssignTeacherRequest request, Long userId) {
+        log.info("Assigning teacher for class ID: {} by user ID: {}", classId, userId);
+
+        try {
+            // Validate class exists and user has access
+            ClassEntity classEntity = classRepository.findById(classId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+            List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(userId);
+            if (!userBranchIds.contains(classEntity.getBranch().getId())) {
+                throw new CustomException(ErrorCode.CLASS_ACCESS_DENIED);
+            }
+
+            // Validate request using validator
+            assignTeacherRequestValidator.validate(classId, request);
+
+            // Execute teacher assignment via TeacherAssignmentService
+            AssignTeacherResponse response = 
+                    teacherAssignmentService.assignTeacher(classId, request);
+
+            log.info("Teacher assignment completed for class ID: {}. Assigned: {}, Remaining: {}",
+                    classId, response.getAssignedCount(), response.getRemainingSessions());
+
+            return response;
+
+        } catch (CustomException e) {
+            log.error("Error assigning teacher for class ID: {}", classId, e);
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error assigning teacher for class ID: {}", classId, e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 }
