@@ -1,5 +1,7 @@
 package org.fyp.tmssep490be.services;
 
+import org.fyp.tmssep490be.dtos.createclass.AssignResourcesRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignResourcesResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
@@ -126,6 +128,26 @@ public interface ClassService {
      * @return AssignTimeSlotsResponse with assignment results
      */
     AssignTimeSlotsResponse assignTimeSlots(Long classId, AssignTimeSlotsRequest request, Long userId);
+
+    /**
+     * STEP 4: Assign resources to class sessions using HYBRID approach
+     * <p>
+     * Uses HYBRID approach:
+     * <ul>
+     *   <li>Phase 1: SQL bulk insert for fast assignment (~90% sessions)</li>
+     *   <li>Phase 2: Java conflict analysis for detailed error reporting (~10% conflicts)</li>
+     * </ul>
+     * </p>
+     * <p>
+     * Performance Target: <200ms for 36 sessions
+     * </p>
+     *
+     * @param classId Class ID to assign resources to
+     * @param request Resource assignment pattern (day → resource mapping)
+     * @param userId Current user ID for access control and audit
+     * @return AssignResourcesResponse with success count and conflict details
+     */
+    AssignResourcesResponse assignResources(Long classId, AssignResourcesRequest request, Long userId);
 
     /**
      * STEP 6: Validate class completeness before submission

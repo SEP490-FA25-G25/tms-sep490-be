@@ -6,6 +6,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.fyp.tmssep490be.dtos.createclass.AssignResourcesRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignResourcesResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
@@ -20,6 +22,7 @@ import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.Modality;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.ClassService;
+import org.fyp.tmssep490be.utils.AssignResourcesResponseUtil;
 import org.fyp.tmssep490be.utils.ValidateClassResponseUtil;
 import org.fyp.tmssep490be.utils.CreateClassResponseUtil;
 import org.fyp.tmssep490be.utils.AssignTimeSlotsResponseUtil;
@@ -51,6 +54,7 @@ public class ClassController {
     private final ValidateClassResponseUtil validateClassResponseUtil;
     private final CreateClassResponseUtil createClassResponseUtil;
     private final AssignTimeSlotsResponseUtil assignTimeSlotsResponseUtil;
+    private final AssignResourcesResponseUtil assignResourcesResponseUtil;
 
     /**
      * Get list of classes accessible to academic affairs user
@@ -338,6 +342,60 @@ public class ClassController {
         return ResponseEntity.ok(ResponseObject.<AssignTimeSlotsResponse>builder()
                 .success(assignTimeSlotsResponseUtil.isSuccess(response))
                 .message(response.getMessage())
+                .data(response)
+                .build());
+    }
+
+    /**
+     * STEP 4: Assign resources to class sessions
+     */
+    @PostMapping("/{classId}/resources")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Assign resources using HYBRID approach",
+            description = """
+                    Assign resources (rooms/online accounts) to class sessions using HYBRID approach.
+                    This is STEP 4 of the Create Class workflow.
+                    
+                    **HYBRID Approach:**
+                    - Phase 1 (SQL Bulk Insert): Fast assignment for ~90% of sessions without conflicts
+                    - Phase 2 (Java Analysis): Detailed conflict analysis for remaining ~10% sessions
+                    
+                    **Performance:** Target <200ms for 36 sessions
+                    
+                    **Benefits:**
+                    - Fast execution with detailed conflict reporting
+                    - Academic Staff can resolve conflicts manually
+                    - Shows conflicting class names and reasons
+                    """
+    )
+    public ResponseEntity<ResponseObject<AssignResourcesResponse>> assignResources(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @Parameter(description = "Resource assignment pattern (day of week → resource ID mapping)")
+            @RequestBody @Valid AssignResourcesRequest request,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} assigning resources to class {}", currentUser.getId(), classId);
+
+        AssignResourcesResponse response = classService.assignResources(classId, request, currentUser.getId());
+
+        // Build success message based on conflicts
+        String message;
+        if (assignResourcesResponseUtil.isFullySuccessful(response)) {
+            message = String.format("All %d sessions assigned successfully in %dms",
+                    response.getTotalSessions(), response.getProcessingTimeMs());
+        } else {
+            message = String.format("Resources assigned: %d/%d sessions successful, %d conflicts requiring manual resolution (%dms)",
+                    response.getSuccessCount(), response.getTotalSessions(),
+                    response.getConflictCount(), response.getProcessingTimeMs());
+        }
+
+        return ResponseEntity.ok(ResponseObject.<AssignResourcesResponse>builder()
+                .success(response.getSuccessCount() > 0)
+                .message(message)
                 .data(response)
                 .build());
     }

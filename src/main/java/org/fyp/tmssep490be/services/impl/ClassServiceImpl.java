@@ -2,6 +2,8 @@ package org.fyp.tmssep490be.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.fyp.tmssep490be.dtos.createclass.AssignResourcesRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignResourcesResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
@@ -16,8 +18,10 @@ import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.ApprovalService;
 import org.fyp.tmssep490be.services.ClassService;
+import org.fyp.tmssep490be.services.ResourceAssignmentService;
 import org.fyp.tmssep490be.services.SessionGenerationService;
 import org.fyp.tmssep490be.services.ValidationService;
+import org.fyp.tmssep490be.validators.AssignResourcesRequestValidator;
 import org.fyp.tmssep490be.validators.CreateClassRequestValidator;
 import org.fyp.tmssep490be.validators.AssignTimeSlotsRequestValidator;
 import org.fyp.tmssep490be.utils.ValidateClassResponseUtil;
@@ -61,12 +65,14 @@ public class ClassServiceImpl implements ClassService {
 
     // Services for Create Class workflow
     private final SessionGenerationService sessionGenerationService;
+    private final ResourceAssignmentService resourceAssignmentService;
     private final ValidationService validationService;
     private final ApprovalService approvalService;
 
     // Validators for Create Class workflow
     private final CreateClassRequestValidator createClassRequestValidator;
     private final AssignTimeSlotsRequestValidator assignTimeSlotsRequestValidator;
+    private final AssignResourcesRequestValidator assignResourcesRequestValidator;
     private final ValidateClassResponseUtil validateClassResponseUtil;
 
     @Override
@@ -936,6 +942,49 @@ public class ClassServiceImpl implements ClassService {
 
         log.info("Time slots assignment completed for class {}: {}/{} sessions updated",
                 classEntity.getCode(), totalSessionsUpdated, totalSessions);
+
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public AssignResourcesResponse assignResources(Long classId, AssignResourcesRequest request, Long userId) {
+        log.info("Assigning resources for class ID {} by user {}", classId, userId);
+
+        // Validate request
+        if (!assignResourcesRequestValidator.isValid(request)) {
+            List<String> errors = assignResourcesRequestValidator.getValidationErrors(request);
+            log.error("Invalid resource assignment request: {}", errors);
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        if (assignResourcesRequestValidator.hasDuplicateDays(request)) {
+            Short duplicateDay = assignResourcesRequestValidator.getDuplicateDay(request);
+            log.error("Duplicate day assignment found for day: {}", duplicateDay);
+            throw new CustomException(ErrorCode.DUPLICATE_TIME_SLOT_ASSIGNMENT);
+        }
+
+        // Get class and validate access
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        // Validate user has access to class's branch
+        List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(userId);
+        if (!userBranchIds.contains(classEntity.getBranch().getId())) {
+            log.error("User {} does not have access to class {} in branch {}",
+                    userId, classId, classEntity.getBranch().getId());
+            throw new CustomException(ErrorCode.CLASS_ACCESS_DENIED);
+        }
+
+        log.debug("Delegating resource assignment to ResourceAssignmentService for class {}",
+                classEntity.getCode());
+
+        // Delegate to ResourceAssignmentService for HYBRID implementation
+        AssignResourcesResponse response = resourceAssignmentService.assignResources(classId, request);
+
+        log.info("Resource assignment completed for class {}: {}/{} sessions assigned, {} conflicts",
+                classEntity.getCode(), response.getSuccessCount(), response.getTotalSessions(),
+                response.getConflictCount());
 
         return response;
     }

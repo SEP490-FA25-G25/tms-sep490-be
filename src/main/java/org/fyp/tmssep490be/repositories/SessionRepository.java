@@ -89,4 +89,47 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
      */
     @Query("SELECT COUNT(s) FROM Session s WHERE s.classEntity.id = :classId AND NOT EXISTS (SELECT 1 FROM TeachingSlot ts WHERE ts.session.id = s.id)")
     long countSessionsWithoutTeachers(@Param("classId") Long classId);
+
+    // ==================== CREATE CLASS WORKFLOW - PHASE 2.1: RESOURCE ASSIGNMENT (HYBRID) ====================
+
+    /**
+     * Find sessions on specific day of week without any resource assignment
+     * <p>
+     * Used in Phase 2 (Java Analysis) to identify sessions that need conflict resolution
+     * </p>
+     *
+     * @param classId   class ID
+     * @param dayOfWeek day of week (PostgreSQL DOW: 0=Sunday, 1=Monday, ..., 6=Saturday)
+     * @return list of unassigned sessions
+     */
+    @Query(value = """
+        SELECT s.id, s.date, s.time_slot_template_id, s.class_id
+        FROM session s
+        WHERE s.class_id = :classId
+          AND EXTRACT(DOW FROM s.date) = :dayOfWeek
+          AND NOT EXISTS (
+            SELECT 1 FROM session_resource sr
+            WHERE sr.session_id = s.id
+          )
+        ORDER BY s.date ASC
+        """, nativeQuery = true)
+    List<Object[]> findUnassignedSessionsByDayOfWeek(
+            @Param("classId") Long classId,
+            @Param("dayOfWeek") int dayOfWeek
+    );
+
+    /**
+     * Find session with resource assignment
+     * <p>
+     * Returns full session details with time slot for conflict analysis
+     * </p>
+     *
+     * @param sessionId session ID
+     * @return session details with time slot
+     */
+    @Query("SELECT s FROM Session s " +
+           "LEFT JOIN FETCH s.timeSlotTemplate " +
+           "LEFT JOIN FETCH s.sessionResources " +
+           "WHERE s.id = :sessionId")
+    Session findSessionWithResourcesAndTimeSlot(@Param("sessionId") Long sessionId);
 }
