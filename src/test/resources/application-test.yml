@@ -5,6 +5,14 @@ spring:
   # Testcontainers will provide database configuration via @DynamicPropertySource
   # No hardcoded database configuration - conflicts with Testcontainers
 
+  # HikariCP connection pool configuration for tests
+  datasource:
+    hikari:
+      maximum-pool-size: 5      # Reduced from default 10 to avoid "too many clients" error
+      minimum-idle: 2           # Keep 2 connections ready
+      connection-timeout: 20000 # 20 seconds
+      idle-timeout: 300000      # 5 minutes before closing idle connections
+
   jpa:
     hibernate:
       ddl-auto: create-drop  # Recreate schema for each test run

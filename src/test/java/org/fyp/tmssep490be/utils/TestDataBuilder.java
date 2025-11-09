@@ -97,6 +97,11 @@ public class TestDataBuilder {
             branch.setCity("Test City");
         }
 
+        public BranchBuilder id(Long id) {
+            branch.setId(id);
+            return this;
+        }
+
         public BranchBuilder center(Center center) {
             branch.setCenter(center);
             return this;
@@ -375,6 +380,11 @@ public class TestDataBuilder {
             classEntity.setMaxCapacity(20);
         }
 
+        public ClassEntityBuilder id(Long id) {
+            classEntity.setId(id);
+            return this;
+        }
+
         public ClassEntityBuilder branch(Branch branch) {
             classEntity.setBranch(branch);
             return this;
@@ -412,6 +422,11 @@ public class TestDataBuilder {
 
         public ClassEntityBuilder maxCapacity(Integer maxCapacity) {
             classEntity.setMaxCapacity(maxCapacity);
+            return this;
+        }
+
+        public ClassEntityBuilder status(ClassStatus status) {
+            classEntity.setStatus(status);
             return this;
         }
 
@@ -490,6 +505,11 @@ public class TestDataBuilder {
             session.setStatus(SessionStatus.PLANNED);
         }
 
+        public SessionBuilder id(Long id) {
+            session.setId(id);
+            return this;
+        }
+
         public SessionBuilder classEntity(ClassEntity classEntity) {
             session.setClassEntity(classEntity);
             return this;
@@ -512,6 +532,50 @@ public class TestDataBuilder {
 
         public Session build() {
             return session;
+        }
+    }
+
+    // ClassEntity shorthand (alias for buildClassEntity)
+    public static ClassEntityBuilder buildClass() {
+        return buildClassEntity();
+    }
+
+    // TeacherSkill Builder
+    public static TeacherSkillBuilder buildTeacherSkill() {
+        return new TeacherSkillBuilder();
+    }
+
+    public static class TeacherSkillBuilder {
+        private final TeacherSkill teacherSkill = new TeacherSkill();
+        private Long teacherId;
+        private Skill skill = Skill.GENERAL;
+
+        public TeacherSkillBuilder() {
+            // Set defaults - composite ID will be built in build()
+        }
+
+        public TeacherSkillBuilder teacher(Teacher teacher) {
+            teacherSkill.setTeacher(teacher);
+            if (teacher != null && teacher.getId() != null) {
+                this.teacherId = teacher.getId();
+            }
+            return this;
+        }
+
+        public TeacherSkillBuilder skill(Skill skill) {
+            this.skill = skill;
+            return this;
+        }
+
+        public TeacherSkill build() {
+            // Build composite ID
+            if (teacherId != null) {
+                TeacherSkill.TeacherSkillId id = new TeacherSkill.TeacherSkillId();
+                id.setTeacherId(teacherId);
+                id.setSkill(skill);
+                teacherSkill.setId(id);
+            }
+            return teacherSkill;
         }
     }
 
@@ -575,6 +639,128 @@ public class TestDataBuilder {
 
         public ReplacementSkillAssessment build() {
             return assessment;
+        }
+    }
+
+    // Resource Builder
+    public static ResourceBuilder buildResource() {
+        return new ResourceBuilder();
+    }
+
+    public static class ResourceBuilder {
+        private final Resource resource = new Resource();
+
+        public ResourceBuilder() {
+            // Set defaults
+            resource.setCode("RES001");
+            resource.setName("Test Resource");
+            resource.setResourceType(ResourceType.ROOM);
+            resource.setCapacity(30);
+            resource.setDescription("Test resource for testing");
+        }
+
+        public ResourceBuilder id(Long id) {
+            resource.setId(id);
+            return this;
+        }
+
+        public ResourceBuilder branch(Branch branch) {
+            resource.setBranch(branch);
+            return this;
+        }
+
+        public ResourceBuilder resourceType(ResourceType resourceType) {
+            resource.setResourceType(resourceType);
+            return this;
+        }
+
+        public ResourceBuilder code(String code) {
+            resource.setCode(code);
+            return this;
+        }
+
+        public ResourceBuilder name(String name) {
+            resource.setName(name);
+            return this;
+        }
+
+        public ResourceBuilder description(String description) {
+            resource.setDescription(description);
+            return this;
+        }
+
+        public ResourceBuilder capacity(Integer capacity) {
+            resource.setCapacity(capacity);
+            return this;
+        }
+
+        public ResourceBuilder equipment(String equipment) {
+            resource.setEquipment(equipment);
+            return this;
+        }
+
+        public ResourceBuilder meetingUrl(String meetingUrl) {
+            resource.setMeetingUrl(meetingUrl);
+            return this;
+        }
+
+        public Resource build() {
+            return resource;
+        }
+    }
+
+    // Teacher Builder
+    public static TeacherBuilder buildTeacher() {
+        return new TeacherBuilder();
+    }
+
+    public static class TeacherBuilder {
+        private final Teacher teacher = new Teacher();
+
+        public TeacherBuilder() {
+            // Set defaults with UserAccount
+            UserAccount userAccount = buildUserAccount()
+                    .email("teacher@test.com")
+                    .fullName("Test Teacher")
+                    .build();
+            teacher.setUserAccount(userAccount);
+            teacher.setEmployeeCode("TCH001");
+            teacher.setHireDate(LocalDate.now().minusYears(2));
+            teacher.setContractType("FULL_TIME");
+        }
+
+        public TeacherBuilder id(Long id) {
+            teacher.setId(id);
+            return this;
+        }
+
+        public TeacherBuilder userAccount(UserAccount userAccount) {
+            teacher.setUserAccount(userAccount);
+            return this;
+        }
+
+        public TeacherBuilder employeeCode(String employeeCode) {
+            teacher.setEmployeeCode(employeeCode);
+            return this;
+        }
+
+        public TeacherBuilder hireDate(LocalDate hireDate) {
+            teacher.setHireDate(hireDate);
+            return this;
+        }
+
+        public TeacherBuilder contractType(String contractType) {
+            teacher.setContractType(contractType);
+            return this;
+        }
+
+        public TeacherBuilder note(String note) {
+            teacher.setNote(note);
+            return this;
+        }
+
+        public Teacher build() {
+            return teacher;
         }
     }
 }
