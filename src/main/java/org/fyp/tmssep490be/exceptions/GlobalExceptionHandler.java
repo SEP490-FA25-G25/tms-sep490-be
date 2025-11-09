@@ -60,8 +60,28 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ResponseObject<Void>> handleCustomException(CustomException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        // Map NOT_FOUND error codes to 404
+        HttpStatus status = isNotFoundError(e.getErrorCode()) 
+            ? HttpStatus.NOT_FOUND 
+            : HttpStatus.BAD_REQUEST;
+        
+        return ResponseEntity.status(status)
                 .body(ResponseObject.error(e.getMessage()));
+    }
+    
+    /**
+     * Check if ErrorCode represents a NOT_FOUND scenario
+     */
+    private boolean isNotFoundError(ErrorCode errorCode) {
+        return errorCode == ErrorCode.CLASS_NOT_FOUND 
+            || errorCode == ErrorCode.RESOURCE_NOT_FOUND
+            || errorCode == ErrorCode.TEACHER_NOT_FOUND
+            || errorCode == ErrorCode.SESSION_NOT_FOUND
+            || errorCode == ErrorCode.STUDENT_NOT_FOUND
+            || errorCode == ErrorCode.CENTER_NOT_FOUND
+            || errorCode == ErrorCode.COURSE_NOT_FOUND
+            || errorCode == ErrorCode.SUBJECT_NOT_FOUND
+            || errorCode == ErrorCode.USER_NOT_FOUND;
     }
 
     @ExceptionHandler(EntityNotFoundException.class)

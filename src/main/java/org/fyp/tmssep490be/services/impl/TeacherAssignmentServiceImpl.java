@@ -51,6 +51,26 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
     private final TeachingSlotRepository teachingSlotRepository;
     private final AssignTeacherResponseUtil responseUtil;
 
+    /**
+     * Queries available teachers with PRE-CHECK details using complex CTE query.
+     * <p>
+     * <b>PRE-CHECK approach:</b> Single CTE query returns all teacher availability data:
+     * <ul>
+     *   <li>Teacher basic info (ID, name, email, skills)</li>
+     *   <li>Availability metrics (total/available sessions, percentage)</li>
+     *   <li>Conflict breakdown (no availability, teaching conflict, leave, skill mismatch)</li>
+     *   <li>GENERAL skill detection (universal skill that bypasses skill validation)</li>
+     * </ul>
+     * Results are sorted by availability percentage (descending) for easy selection.
+     * </p>
+     *
+     * @param classId ID of the class to query teachers for
+     * @return List of TeacherAvailabilityDTO with detailed availability and conflict data
+     * @throws CustomException with CLASS_NOT_FOUND if class doesn't exist
+     * @see TeacherAvailabilityDTO
+     * @see TeacherAvailabilityDTO.AvailabilityStatus
+     * @see TeacherAvailabilityDTO.ConflictBreakdown
+     */
     @Override
     public List<TeacherAvailabilityDTO> queryAvailableTeachersWithPrecheck(Long classId) {
         log.info("Executing PRE-CHECK query for class {}", classId);
@@ -74,6 +94,33 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         return teachers;
     }
 
+    /**
+     * Assigns a teacher to class sessions (full or partial assignment).
+     * <p>
+     * <b>Full Assignment Mode</b> (sessionIds = null or empty):
+     * <ul>
+     *   <li>Assigns teacher to ALL sessions in the class</li>
+     *   <li>Uses bulk INSERT for performance</li>
+     *   <li>Response includes remaining sessions if any couldn't be assigned</li>
+     * </ul>
+     * </p>
+     * <p>
+     * <b>Partial Assignment Mode</b> (sessionIds provided):
+     * <ul>
+     *   <li>Assigns teacher to SPECIFIC sessions only</li>
+     *   <li>Used for multi-teacher classes or conflict resolution</li>
+     *   <li>Response includes remaining unassigned sessions</li>
+     * </ul>
+     * </p>
+     *
+     * @param classId ID of the class to assign teacher to
+     * @param request Assignment request with teacherId and optional sessionIds list
+     * @return AssignTeacherResponse with assigned count, remaining sessions, processing time
+     * @throws CustomException with CLASS_NOT_FOUND if class doesn't exist
+     * @throws CustomException with TEACHER_NOT_FOUND if teacher doesn't exist
+     * @see AssignTeacherRequest
+     * @see AssignTeacherResponse
+     */
     @Override
     @Transactional
     public AssignTeacherResponse assignTeacher(Long classId, AssignTeacherRequest request) {

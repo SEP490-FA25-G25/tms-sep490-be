@@ -25,6 +25,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +45,26 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
     private final SessionResourceRepository sessionResourceRepository;
     private final ResourceRepository resourceRepository;
 
+    /**
+     * Assigns resources to class sessions using HYBRID approach.
+     * <p>
+     * <b>Phase 1 (SQL Bulk Insert):</b> Fast assignment for non-conflicting sessions (~90% success rate).
+     * Uses native SQL INSERT to assign resources to sessions matching day of week and having time slots.
+     * </p>
+     * <p>
+     * <b>Phase 2 (Java Conflict Analysis):</b> Detailed analysis of unassigned sessions.
+     * Identifies conflict reasons: CLASS_BOOKING, INSUFFICIENT_CAPACITY, MAINTENANCE, UNAVAILABLE.
+     * </p>
+     *
+     * @param classId ID of the class to assign resources to
+     * @param request Assignment request containing resource-day patterns (e.g., Room A on Mon/Wed/Fri)
+     * @return AssignResourcesResponse with success count, detailed conflicts, and processing time
+     * @throws CustomException with CLASS_NOT_FOUND if class doesn't exist
+     * @throws CustomException with RESOURCE_NOT_FOUND if any resource doesn't exist
+     * @throws CustomException with RESOURCE_BRANCH_MISMATCH if resource belongs to different branch
+     * @see AssignResourcesRequest
+     * @see AssignResourcesResponse
+     */
     @Override
     @Transactional
     public AssignResourcesResponse assignResources(Long classId, AssignResourcesRequest request) {
@@ -97,7 +118,7 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
                 LocalDate sessionDate = (LocalDate) sessionData[1];
                 Long timeSlotId = sessionData[2] != null ? ((Number) sessionData[2]).longValue() : null;
 
-                AssignResourcesResponse.ResourceConflictDetail conflict = analyzeSessionConflict(
+                Optional<AssignResourcesResponse.ResourceConflictDetail> conflict = analyzeSessionConflict(
                         sessionId,
                         sessionDate,
                         timeSlotId,
@@ -107,9 +128,7 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
                         classEntity.getMaxCapacity()
                 );
 
-                if (conflict != null) {
-                    conflicts.add(conflict);
-                }
+                conflict.ifPresent(conflicts::add);
             }
         }
 
@@ -130,6 +149,29 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
                 .build();
     }
 
+    /**
+     * Queries available resources for a specific session (manual resolution).
+     * <p>
+     * Finds resources that:
+     * <ul>
+     *   <li>Belong to the same branch as the class</li>
+     *   <li>Match the requested resource type</li>
+     *   <li>Have sufficient capacity for the class</li>
+     *   <li>Are NOT booked by another class at the same date/time slot</li>
+     * </ul>
+     * Used by Academic Staff to manually resolve resource conflicts.
+     * </p>
+     *
+     * @param classId ID of the class needing resource
+     * @param sessionId ID of the specific session to assign resource to
+     * @param resourceType Type of resource (ROOM, LAB, AUDITORIUM, etc.)
+     * @return List of available resources matching criteria (empty if none available)
+     * @throws CustomException with CLASS_NOT_FOUND if class doesn't exist
+     * @throws CustomException with SESSION_NOT_FOUND if session doesn't exist
+     * @throws CustomException with TIME_SLOT_NOT_ASSIGNED if session has no time slot
+     * @see Resource
+     * @see ResourceType
+     */
     @Override
     @Transactional(readOnly = true)
     public List<Resource> queryAvailableResources(Long classId, Long sessionId, ResourceType resourceType) {
@@ -163,6 +205,28 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
         return availableResources;
     }
 
+    /**
+     * Manually assigns a specific resource to a specific session (conflict resolution).
+     * <p>
+     * <b>Validations performed:</b>
+     * <ul>
+     *   <li>Session exists</li>
+     *   <li>Resource exists</li>
+     *   <li>Resource capacity >= class max capacity</li>
+     *   <li>No booking conflict at same date/time slot</li>
+     * </ul>
+     * Used by Academic Staff to resolve resource conflicts after bulk assignment.
+     * </p>
+     *
+     * @param sessionId ID of the session to assign resource to
+     * @param resourceId ID of the resource to assign
+     * @return true if assignment successful
+     * @throws CustomException with SESSION_NOT_FOUND if session doesn't exist
+     * @throws CustomException with RESOURCE_NOT_FOUND if resource doesn't exist
+     * @throws CustomException with INSUFFICIENT_RESOURCE_CAPACITY if capacity too small
+     * @throws CustomException with RESOURCE_CONFLICT if resource already booked at same time
+     * @see SessionResource
+     */
     @Override
     @Transactional
     public boolean assignResourceToSession(Long sessionId, Long resourceId) {
@@ -206,6 +270,22 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
         return true;
     }
 
+    /**
+     * Removes a resource assignment from a session (undo operation).
+     * <p>
+     * Used when Academic Staff needs to:
+     * <ul>
+     *   <li>Correct an incorrect assignment</li>
+     *   <li>Free up a resource for another class</li>
+     *   <li>Re-assign a different resource to the session</li>
+     * </ul>
+     * </p>
+     *
+     * @param sessionId ID of the session to remove resource from
+     * @param resourceId ID of the resource to remove
+     * @return true if removal successful, false if assignment didn't exist
+     * @see SessionResource
+     */
     @Override
     @Transactional
     public boolean removeResourceFromSession(Long sessionId, Long resourceId) {
@@ -222,12 +302,32 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
         return false;
     }
 
+    /**
+     * Gets the count of sessions that have resources assigned (progress tracking).
+     * <p>
+     * Used to calculate assignment progress: assignedCount / totalSessionCount * 100%
+     * </p>
+     *
+     * @param classId ID of the class
+     * @return Number of sessions with at least one resource assigned
+     * @see #isFullyAssigned(Long)
+     */
     @Override
     @Transactional(readOnly = true)
     public long getResourceAssignmentCount(Long classId) {
         return sessionRepository.countSessionsWithResources(classId);
     }
 
+    /**
+     * Checks if all sessions in the class have resources assigned (completion check).
+     * <p>
+     * Used in class validation (STEP 6) to determine if class is ready for teacher assignment.
+     * </p>
+     *
+     * @param classId ID of the class
+     * @return true if all sessions have resources, false otherwise (or if no sessions exist)
+     * @see #getResourceAssignmentCount(Long)
+     */
     @Override
     @Transactional(readOnly = true)
     public boolean isFullyAssigned(Long classId) {
@@ -268,8 +368,11 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
 
     /**
      * Analyze why a session couldn't be assigned a resource (Phase 2)
+     * 
+     * @return Optional.empty() if session is not ready for resource assignment (e.g., no time slot),
+     *         Optional with conflict details if a conflict prevents assignment
      */
-    private AssignResourcesResponse.ResourceConflictDetail analyzeSessionConflict(
+    private Optional<AssignResourcesResponse.ResourceConflictDetail> analyzeSessionConflict(
             Long sessionId,
             LocalDate sessionDate,
             Long timeSlotId,
@@ -283,7 +386,7 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
         // Check if time slot is assigned
         if (timeSlotId == null) {
             log.debug("Session ID: {} has no time slot assigned", sessionId);
-            return null; // Not a conflict, just not ready for resource assignment
+            return Optional.empty(); // Not a conflict, just not ready for resource assignment
         }
 
         // Check capacity
@@ -291,13 +394,13 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
             log.debug("Session ID: {} - Insufficient capacity (Resource: {}, Required: {})",
                     sessionId, requestedResource.getCapacity(), classMaxCapacity);
 
-            return buildConflictDetail(
+            return Optional.of(buildConflictDetail(
                     sessionId, sessionDate, dayOfWeek, timeSlotId, requestedResource,
                     AssignResourcesResponse.ConflictType.INSUFFICIENT_CAPACITY,
                     String.format("Resource '%s' capacity (%d) is less than class max capacity (%d)",
                             requestedResource.getName(), requestedResource.getCapacity(), classMaxCapacity),
                     null, null
-            );
+            ));
         }
 
         // Check class booking conflict
@@ -318,22 +421,22 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
                     timeEnd != null ? timeEnd.toString() : "N/A"
             );
 
-            return buildConflictDetail(
+            return Optional.of(buildConflictDetail(
                     sessionId, sessionDate, dayOfWeek, timeSlotId, requestedResource,
                     AssignResourcesResponse.ConflictType.CLASS_BOOKING,
                     conflictReason,
                     conflictingClassId, conflictingClassName
-            );
+            ));
         }
 
         // Unknown conflict reason
         log.warn("Session ID: {} - Unknown conflict reason", sessionId);
-        return buildConflictDetail(
+        return Optional.of(buildConflictDetail(
                 sessionId, sessionDate, dayOfWeek, timeSlotId, requestedResource,
                 AssignResourcesResponse.ConflictType.UNAVAILABLE,
                 "Resource is unavailable for unknown reason",
                 null, null
-        );
+        ));
     }
 
     /**
@@ -354,8 +457,8 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
         LocalTime timeStart = null;
         LocalTime timeEnd = null;
 
-        // In real implementation, you might want to fetch TimeSlotTemplate details
-        // For now, we'll leave them null or fetch if needed
+        // TODO(Phase 3.6): Fetch TimeSlotTemplate details for complete conflict reporting
+        // Currently null - acceptable for MVP, will enhance in next iteration
 
         return AssignResourcesResponse.ResourceConflictDetail.builder()
                 .sessionId(sessionId)

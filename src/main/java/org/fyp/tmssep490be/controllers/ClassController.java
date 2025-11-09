@@ -2,6 +2,11 @@ package org.fyp.tmssep490be.controllers;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -372,6 +377,169 @@ public class ClassController {
                     - Shows conflicting class names and reasons
                     """
     )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Resources assigned successfully (with or without conflicts)",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ResponseObject.class),
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Full Success",
+                                            description = "All sessions assigned without conflicts",
+                                            value = """
+                                                    {
+                                                      "success": true,
+                                                      "message": "All 36 sessions assigned successfully in 142ms",
+                                                      "data": {
+                                                        "successCount": 36,
+                                                        "conflictCount": 0,
+                                                        "totalSessions": 36,
+                                                        "conflicts": [],
+                                                        "processingTimeMs": 142
+                                                      }
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Partial Success with Conflicts",
+                                            description = "Some sessions assigned, some have conflicts requiring manual resolution",
+                                            value = """
+                                                    {
+                                                      "success": true,
+                                                      "message": "Resources assigned: 32/36 sessions successful, 4 conflicts requiring manual resolution (158ms)",
+                                                      "data": {
+                                                        "successCount": 32,
+                                                        "conflictCount": 4,
+                                                        "totalSessions": 36,
+                                                        "conflicts": [
+                                                          {
+                                                            "sessionId": 5,
+                                                            "sessionDate": "2025-01-15",
+                                                            "dayOfWeek": "MONDAY",
+                                                            "conflictReason": "CAPACITY_EXCEEDED",
+                                                            "requestedCapacity": 30,
+                                                            "availableCapacity": 25,
+                                                            "resourceId": 101,
+                                                            "resourceName": "Room A101",
+                                                            "conflictingClasses": ["CS102-B", "CS103-A"]
+                                                          }
+                                                        ],
+                                                        "processingTimeMs": 158
+                                                      }
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Class or Resource not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Class Not Found",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Class with ID 999 not found",
+                                                      "data": null
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Resource Not Found",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Resource with ID 123 not found",
+                                                      "data": null
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Bad request - Validation error or business logic error",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Validation Error",
+                                            description = "Request body validation failed",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Validation failed",
+                                                      "data": {
+                                                        "resourceAssignments": "must not be empty"
+                                                      }
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Invalid Status",
+                                            description = "Class not in DRAFT status",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Cannot assign resources: class status must be DRAFT",
+                                                      "data": null
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Branch Mismatch",
+                                            description = "Resource does not belong to class's branch",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Resource 123 does not belong to class's branch",
+                                                      "data": null
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Missing or invalid JWT token",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "success": false,
+                                              "message": "Invalid username or password",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden - Insufficient permissions (requires ACADEMIC_AFFAIR role)",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "success": false,
+                                              "message": "Access denied - insufficient permissions",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
     public ResponseEntity<ResponseObject<AssignResourcesResponse>> assignResources(
             @Parameter(description = "Class ID")
             @PathVariable Long classId,
@@ -442,6 +610,133 @@ public class ClassController {
                     - Sorted by availability percentage (descending)
                     """
     )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Successfully retrieved teacher availability data",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ResponseObject.class),
+                            examples = @ExampleObject(
+                                    name = "Teachers with Availability Breakdown",
+                                    description = "List of all teachers with detailed availability metrics",
+                                    value = """
+                                            {
+                                              "success": true,
+                                              "message": "Found 5 teachers. Use POST /classes/{classId}/teachers to assign.",
+                                              "data": [
+                                                {
+                                                  "teacherId": 101,
+                                                  "teacherName": "John Smith",
+                                                  "skills": ["JAVA", "SPRING_BOOT"],
+                                                  "yearsExperience": 5,
+                                                  "availabilityStatus": "FULLY_AVAILABLE",
+                                                  "availableSessions": 36,
+                                                  "totalSessions": 36,
+                                                  "availabilityPercentage": 100.0,
+                                                  "conflictBreakdown": {
+                                                    "noAvailability": 0,
+                                                    "teachingConflict": 0,
+                                                    "leaveConflict": 0,
+                                                    "skillMismatch": 0
+                                                  },
+                                                  "conflictingSessions": []
+                                                },
+                                                {
+                                                  "teacherId": 102,
+                                                  "teacherName": "Jane Doe",
+                                                  "skills": ["GENERAL"],
+                                                  "yearsExperience": 8,
+                                                  "availabilityStatus": "PARTIALLY_AVAILABLE",
+                                                  "availableSessions": 32,
+                                                  "totalSessions": 36,
+                                                  "availabilityPercentage": 88.9,
+                                                  "conflictBreakdown": {
+                                                    "noAvailability": 0,
+                                                    "teachingConflict": 4,
+                                                    "leaveConflict": 0,
+                                                    "skillMismatch": 0
+                                                  },
+                                                  "conflictingSessions": [
+                                                    {
+                                                      "sessionId": 5,
+                                                      "sessionDate": "2025-01-15",
+                                                      "conflictReason": "TEACHING_CONFLICT",
+                                                      "conflictDetails": "Teaching CS102-B"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Class not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "success": false,
+                                              "message": "Class with ID 999 not found",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Bad request - Invalid class status",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "success": false,
+                                              "message": "Cannot query teachers: class status must be DRAFT",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Missing or invalid JWT token",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "success": false,
+                                              "message": "Invalid username or password",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden - Insufficient permissions (requires ACADEMIC_AFFAIR role)",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "success": false,
+                                              "message": "Access denied - insufficient permissions",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
     public ResponseEntity<ResponseObject<List<TeacherAvailabilityDTO>>> getAvailableTeachers(
             @Parameter(description = "Class ID")
             @PathVariable Long classId,
@@ -512,6 +807,170 @@ public class ClassController {
                     - Split teaching between multiple teachers (partial assignment)
                     """
     )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Teacher assigned successfully (full or partial)",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ResponseObject.class),
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Full Assignment",
+                                            description = "Teacher assigned to all sessions",
+                                            value = """
+                                                    {
+                                                      "success": true,
+                                                      "message": "Teacher assigned to all 36 sessions successfully in 42ms",
+                                                      "data": {
+                                                        "assignedCount": 36,
+                                                        "assignedSessionIds": [1, 2, 3, 4, 5, "..."],
+                                                        "needsSubstitute": false,
+                                                        "remainingSessions": 0,
+                                                        "remainingSessionIds": [],
+                                                        "processingTimeMs": 42
+                                                      }
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Partial Assignment",
+                                            description = "Teacher assigned to specific sessions only",
+                                            value = """
+                                                    {
+                                                      "success": true,
+                                                      "message": "Teacher assigned to 12 sessions. 24 sessions still need assignment (38ms)",
+                                                      "data": {
+                                                        "assignedCount": 12,
+                                                        "assignedSessionIds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                                                        "needsSubstitute": true,
+                                                        "remainingSessions": 24,
+                                                        "remainingSessionIds": [13, 14, 15, "..."],
+                                                        "processingTimeMs": 38
+                                                      }
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Class or Teacher not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Class Not Found",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Class with ID 999 not found",
+                                                      "data": null
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Teacher Not Found",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Teacher with ID 123 not found",
+                                                      "data": null
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Bad request - Validation error or business logic error",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Validation Error",
+                                            description = "Request body validation failed",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Validation failed",
+                                                      "data": {
+                                                        "teacherId": "must not be null"
+                                                      }
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Invalid Status",
+                                            description = "Class not in DRAFT status",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Cannot assign teacher: class status must be DRAFT",
+                                                      "data": null
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Skill Mismatch",
+                                            description = "Teacher does not have required skills",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Teacher does not have required skills for this class",
+                                                      "data": null
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Session Already Assigned",
+                                            description = "Some sessions already have teachers",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Session 5 already has a teacher assigned",
+                                                      "data": null
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Missing or invalid JWT token",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "success": false,
+                                              "message": "Invalid username or password",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden - Insufficient permissions (requires ACADEMIC_AFFAIR role)",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "success": false,
+                                              "message": "Access denied - insufficient permissions",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
     public ResponseEntity<ResponseObject<AssignTeacherResponse>> assignTeacher(
             @Parameter(description = "Class ID")
             @PathVariable Long classId,

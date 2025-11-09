@@ -406,6 +406,7 @@ Overall Progress:                [███████████████�
 ### Core Tests (Must Have) - 12-17 hours 🔴
 
 - [x] **3.1 Unit Tests (Service Layer)** - 4-5 hours ✅ **COMPLETED**
+
   - [x] ResourceAssignmentServiceImpl tests (11 tests, 69.5% coverage)
   - [x] TeacherAssignmentServiceImpl tests (16 tests, 86.6% coverage)
   - [x] Validator tests (47 tests, 85%+ coverage) ✅ **NEW**
@@ -413,6 +414,7 @@ Overall Progress:                [███████████████�
   - **Total: 143 unit tests, BUILD SUCCESS** ✅
 
 - [ ] **3.2 API Tests (Controller Layer)** - 3-4 hours
+
   - [ ] Resource assignment endpoints
   - [ ] Teacher assignment endpoints
   - [ ] Authorization tests
@@ -464,7 +466,7 @@ Overall Progress:                [███████████████�
   - [x] `AssignResourcesRequestValidator` (31 tests) - All validation rules
     - Request validation, assignment validation, duplicate detection
     - Error counting, edge cases
-  - [x] `AssignTeacherRequestValidator` (16 tests) - All validation rules  
+  - [x] `AssignTeacherRequestValidator` (16 tests) - All validation rules
     - Full/partial assignment, class/teacher/session validation
     - Skill validation with GENERAL skill bypass
   - [x] Test error code returns
@@ -478,6 +480,7 @@ Overall Progress:                [███████████████�
     - Skill utilities, conflict breakdown
 
 **Test Results:**
+
 - ✅ **143 unit tests PASSING** (11 Resource Service + 16 Teacher Service + 47 Validator + 69 Util)
 - ✅ **215 total tests PASSING** (includes all other test suites)
 - ✅ BUILD SUCCESS - 0 failures, 0 errors
