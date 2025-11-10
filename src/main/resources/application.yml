@@ -27,6 +27,8 @@ spring:
 
     # optional chay ca schema và seed data
     #Get-Content "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/schema.sql", "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/seed-data.sql" | docker exec -i tms-postgres psql -U postgres -d tms
+
+    # cat /Users/tatanh/Documents/Code/SEP490-Capstone/tms-sep490-be/src/main/resources/schema.sql \ /Users/tatanh/Documents/Code/SEP490-Capstone/tms-sep490-be/src/main/resources/seed-data.sql | \ docker exec -i some-postgres psql -U postgres -d tms
     username: postgres
     url: jdbc:postgresql://localhost:5432/tms 
     password: 979712

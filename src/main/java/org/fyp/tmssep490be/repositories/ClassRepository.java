@@ -99,4 +99,38 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
     @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM ClassEntity c " +
            "WHERE c.id = :classId AND (:branchIds IS NULL OR c.branch.id IN :branchIds)")
     boolean existsByIdAndUserHasAccess(@Param("classId") Long classId, @Param("branchIds") List<Long> branchIds);
+
+    /**
+     * Find highest class code by prefix pattern for sequence generation
+     * Uses regex to match exact format and ORDER BY to get highest
+     * 
+     * @param branchId Branch ID to filter
+     * @param regex    Regex pattern to match code format (e.g., "^IELTSFOUND-HN01-25-[0-9]{3}$")
+     * @return Optional containing the highest code, or empty if none found
+     */
+    @Query(value = """
+        SELECT c.code FROM class c
+        WHERE c.branch_id = :branchId
+          AND c.code ~ :regex
+        ORDER BY c.code DESC
+        LIMIT 1
+        """, nativeQuery = true)
+    Optional<String> findHighestCodeByPrefix(@Param("branchId") Long branchId, @Param("regex") String regex);
+
+    /**
+     * Find highest class code by prefix pattern (read-only, without lock)
+     * Used for preview functionality
+     * 
+     * @param branchId Branch ID to filter
+     * @param regex    Regex pattern to match code format
+     * @return Optional containing the highest code, or empty if none found
+     */
+    @Query(value = """
+        SELECT c.code FROM class c
+        WHERE c.branch_id = :branchId
+          AND c.code ~ :regex
+        ORDER BY c.code DESC
+        LIMIT 1
+        """, nativeQuery = true)
+    Optional<String> findHighestCodeByPrefixReadOnly(@Param("branchId") Long branchId, @Param("regex") String regex);
 }

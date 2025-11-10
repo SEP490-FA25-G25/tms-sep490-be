@@ -19,6 +19,8 @@ import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.PreviewClassCodeRequest;
+import org.fyp.tmssep490be.dtos.createclass.PreviewClassCodeResponse;
 import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
 // import org.fyp.tmssep490be.dtos.createclass.RejectClassRequest; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
@@ -29,6 +31,7 @@ import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.Modality;
 import org.fyp.tmssep490be.security.UserPrincipal;
+import org.fyp.tmssep490be.services.ClassCodeGeneratorService;
 import org.fyp.tmssep490be.services.ClassService;
 import org.fyp.tmssep490be.utils.AssignResourcesResponseUtil;
 import org.fyp.tmssep490be.utils.ValidateClassResponseUtil;
@@ -38,12 +41,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -59,6 +64,7 @@ import java.util.List;
 public class ClassController {
 
     private final ClassService classService;
+    private final ClassCodeGeneratorService classCodeGeneratorService;
     private final ValidateClassResponseUtil validateClassResponseUtil;
     private final CreateClassResponseUtil createClassResponseUtil;
     private final AssignTimeSlotsResponseUtil assignTimeSlotsResponseUtil;
@@ -318,6 +324,115 @@ public class ClassController {
 
         return ResponseEntity.ok(ResponseObject.<CreateClassResponse>builder()
                 .success(createClassResponseUtil.isSuccess(response))
+                .message(message)
+                .data(response)
+                .build());
+    }
+
+    /**
+     * STEP 0 (Optional): Preview class code before creation
+     * This endpoint allows users to preview what the class code will be without actually creating the class
+     * Supports both GET (with query params) and POST (with request body)
+     */
+    @GetMapping("/preview-code")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Preview class code (GET)",
+            description = "Preview the next class code that will be generated based on branch, course, and start date. " +
+                    "Note: The previewed code may change if another class is created in the meantime. " +
+                    "This is an optional helper endpoint before STEP 1 (Create Class). " +
+                    "Use GET with query params or POST with request body."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Preview generated successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ResponseObject.class),
+                            examples = @ExampleObject(
+                                    name = "Preview Success",
+                                    value = """
+                                            {
+                                              "success": true,
+                                              "message": "Class code preview generated successfully",
+                                              "data": {
+                                                "previewCode": "IELTSFOUND-HN01-25-005",
+                                                "prefix": "IELTSFOUND-HN01-25",
+                                                "nextSequence": 5,
+                                                "warning": null
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid request or sequence limit reached",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Validation Error",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Validation failed",
+                                                      "data": {
+                                                        "branchId": "must not be null",
+                                                        "courseId": "must not be null"
+                                                      }
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Sequence Limit Warning",
+                                            value = """
+                                                    {
+                                                      "success": true,
+                                                      "message": "Class code preview generated successfully",
+                                                      "data": {
+                                                        "previewCode": "IELTSFOUND-HN01-25-999",
+                                                        "prefix": "IELTSFOUND-HN01-25",
+                                                        "nextSequence": 999,
+                                                        "warning": "Sequence limit reached (999). Cannot create more classes with this prefix."
+                                                      }
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            )
+    })
+    public ResponseEntity<ResponseObject<PreviewClassCodeResponse>> previewClassCode(
+            @Parameter(description = "Branch ID", required = true)
+            @RequestParam Long branchId,
+
+            @Parameter(description = "Course ID", required = true)
+            @RequestParam Long courseId,
+
+            @Parameter(description = "Start date (YYYY-MM-DD)", required = true)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} previewing class code for branchId={}, courseId={}, startDate={}", 
+                currentUser.getId(), branchId, courseId, startDate);
+        
+        PreviewClassCodeResponse response = classService.previewClassCode(
+                branchId,
+                courseId,
+                startDate,
+                currentUser.getId()
+        );
+
+        String message = response.getWarning() != null ?
+                "Class code preview generated with warning" :
+                "Class code preview generated successfully";
+
+        return ResponseEntity.ok(ResponseObject.<PreviewClassCodeResponse>builder()
+                .success(true)
                 .message(message)
                 .data(response)
                 .build());

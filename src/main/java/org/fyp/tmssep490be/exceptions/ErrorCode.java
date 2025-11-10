@@ -138,6 +138,12 @@ public enum ErrorCode {
     START_DATE_NOT_IN_SCHEDULE_DAYS(4012, "Start date must be in schedule_days"),
     INVALID_SCHEDULE_DAYS(4013, "Invalid schedule_days (must be 1-7)"),
     TIME_SLOT_ASSIGNMENT_FAILED(4014, "Failed to assign time slots"),
+    
+    // Class Code Generation errors (4032-4039)
+    CLASS_CODE_GENERATION_FAILED(4032, "Failed to generate class code"),
+    CLASS_CODE_SEQUENCE_LIMIT_REACHED(4033, "Class code sequence limit reached (999) for prefix"),
+    CLASS_CODE_INVALID_FORMAT(4034, "Invalid class code format"),
+    CLASS_CODE_PARSE_ERROR(4035, "Failed to parse class code"),
     RESOURCE_ASSIGNMENT_FAILED(4015, "Failed to assign resources"),
     TEACHER_ASSIGNMENT_FAILED(4016, "Failed to assign teacher"),
     CLASS_VALIDATION_FAILED(4017, "Class validation failed"),

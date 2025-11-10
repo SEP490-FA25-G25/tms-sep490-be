@@ -10,6 +10,7 @@ import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
+import org.fyp.tmssep490be.dtos.createclass.PreviewClassCodeResponse;
 import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
 // import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
@@ -20,6 +21,7 @@ import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.ApprovalService;
+import org.fyp.tmssep490be.services.ClassCodeGeneratorService;
 import org.fyp.tmssep490be.services.ClassService;
 import org.fyp.tmssep490be.services.ResourceAssignmentService;
 import org.fyp.tmssep490be.services.SessionGenerationService;
@@ -70,6 +72,7 @@ public class ClassServiceImpl implements ClassService {
 
     // Services for Create Class workflow
     private final SessionGenerationService sessionGenerationService;
+    private final ClassCodeGeneratorService classCodeGeneratorService;
     private final ResourceAssignmentService resourceAssignmentService;
     private final TeacherAssignmentService teacherAssignmentService;
     private final ValidationService validationService;
@@ -772,7 +775,54 @@ public class ClassServiceImpl implements ClassService {
                 .build();
     }
 
-    // Create Class Workflow implementations (STEP 1, 3, 6, 7)
+    // Create Class Workflow implementations (STEP 0 - Optional, STEP 1, 3, 6, 7)
+
+    @Override
+    @Transactional(readOnly = true)
+    public PreviewClassCodeResponse previewClassCode(Long branchId, Long courseId, LocalDate startDate, Long userId) {
+        log.info("Previewing class code for branchId: {}, courseId: {}, startDate: {}", branchId, courseId, startDate);
+
+        // Validate inputs
+        if (branchId == null || courseId == null || startDate == null || userId == null) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+
+        // Get entities
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        // Call the code generator service to preview
+        String previewCode = classCodeGeneratorService.previewClassCode(
+                branchId, 
+                branch.getCode(), 
+                course.getCode(), 
+                startDate
+        );
+        
+        // Extract prefix and sequence from preview code
+        String normalizedCourseCode = classCodeGeneratorService.normalizeCourseCode(course.getCode());
+        int year = startDate.getYear();
+        String prefix = classCodeGeneratorService.buildPrefix(normalizedCourseCode, branch.getCode(), year);
+        
+        // Extract sequence number
+        int sequence = Integer.parseInt(previewCode.substring(previewCode.lastIndexOf('-') + 1));
+        
+        // Build response with warning if sequence is getting high
+        String warning = null;
+        if (sequence >= 990) {
+            warning = "Sequence number is approaching limit (999). Consider using a different course or branch.";
+        }
+        
+        return PreviewClassCodeResponse.builder()
+                .previewCode(previewCode)
+                .prefix(prefix)
+                .nextSequence(sequence)
+                .warning(warning)
+                .build();
+    }
 
     @Override
     @Transactional
@@ -794,11 +844,24 @@ public class ClassServiceImpl implements ClassService {
         // Validate business rules
         validateCreateClassBusinessRules(request, branch, course, userId);
 
+        // Auto-generate class code if not provided
+        String classCode = request.getCode();
+        if (classCode == null || classCode.trim().isEmpty()) {
+            log.info("Class code not provided - auto-generating");
+            classCode = classCodeGeneratorService.generateClassCode(
+                    branch.getId(), 
+                    branch.getCode(), 
+                    course.getCode(), 
+                    request.getStartDate()
+            );
+            log.info("Auto-generated class code: {}", classCode);
+        }
+
         // Create class entity
         ClassEntity classEntity = ClassEntity.builder()
                 .branch(branch)
                 .course(course)
-                .code(request.getCode())
+                .code(classCode)
                 .name(request.getName())
                 .modality(request.getModality())
                 .startDate(request.getStartDate())

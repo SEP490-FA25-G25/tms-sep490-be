@@ -438,19 +438,24 @@ INSERT INTO course_assessment_clo_mapping (course_assessment_id, clo_id, status)
 -- Classes (Test scenarios: completed, ongoing, scheduled)
 INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
 -- HN Branch - Class 1: COMPLETED (to test historical data)
-(1, 1, 1, 'HN-FOUND-C1', 'HN Foundation 1 (Completed)', 'OFFLINE', '2025-07-07', '2025-09-01', '2025-09-01', ARRAY[1,3,5]::smallint[], 20, 'COMPLETED', 'APPROVED', 6, 3, '2025-07-01 10:00:00+07', '2025-07-02 14:00:00+07', '2025-07-01 10:00:00+07', '2025-09-01 18:00:00+07'),
+-- Pattern: IELTSFOUND-HN01-25-001 (Course: IELTS-FOUND, Branch: HN01, Year: 25, Seq: 001)
+(1, 1, 1, 'IELTSFOUND-HN01-25-001', 'HN Foundation 1 (Completed)', 'OFFLINE', '2025-07-07', '2025-09-01', '2025-09-01', ARRAY[1,3,5]::smallint[], 20, 'COMPLETED', 'APPROVED', 6, 3, '2025-07-01 10:00:00+07', '2025-07-02 14:00:00+07', '2025-07-01 10:00:00+07', '2025-09-01 18:00:00+07'),
 
 -- HN Branch - Class 2: ONGOING (main testing class - today is 2025-11-02, started Oct 6)
-(2, 1, 1, 'HN-FOUND-O1', 'HN Foundation 1 (Ongoing)', 'OFFLINE', '2025-10-06', '2025-11-28', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, '2025-09-30 10:00:00+07', '2025-10-01 14:00:00+07', '2025-09-30 10:00:00+07', '2025-10-06 08:00:00+07'),
+-- Pattern: IELTSFOUND-HN01-25-002 (Started after Class 1, so sequence 002)
+(2, 1, 1, 'IELTSFOUND-HN01-25-002', 'HN Foundation 1 (Ongoing)', 'OFFLINE', '2025-10-06', '2025-11-28', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, '2025-09-30 10:00:00+07', '2025-10-01 14:00:00+07', '2025-09-30 10:00:00+07', '2025-10-06 08:00:00+07'),
 
 -- HN Branch - Class 3: ONGOING (for transfer/makeup scenarios)
-(3, 1, 1, 'HN-FOUND-O2', 'HN Foundation 2 (Ongoing)', 'ONLINE', '2025-10-07', '2025-11-29', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', 6, 3, '2025-10-01 10:00:00+07', '2025-10-02 14:00:00+07', '2025-10-01 10:00:00+07', '2025-10-07 08:00:00+07'),
+-- Pattern: IELTSFOUND-HN01-25-003 (Started after Class 2, so sequence 003)
+(3, 1, 1, 'IELTSFOUND-HN01-25-003', 'HN Foundation 2 (Ongoing)', 'ONLINE', '2025-10-07', '2025-11-29', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', 6, 3, '2025-10-01 10:00:00+07', '2025-10-02 14:00:00+07', '2025-10-01 10:00:00+07', '2025-10-07 08:00:00+07'),
 
 -- HN Branch - Class 4: SCHEDULED (for future enrollments)
-(4, 1, 1, 'HN-FOUND-S1', 'HN Foundation 3 (Scheduled)', 'HYBRID', '2025-11-18', '2026-01-10', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 7, 3, '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07', '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07'),
+-- Pattern: IELTSFOUND-HN01-25-004 (Started after Class 3, so sequence 004)
+(4, 1, 1, 'IELTSFOUND-HN01-25-004', 'HN Foundation 3 (Scheduled)', 'HYBRID', '2025-11-18', '2026-01-10', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 7, 3, '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07', '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07'),
 
 -- HCM Branch - Class 5: ONGOING
-(5, 2, 1, 'HCM-FOUND-O1', 'HCM Foundation 1 (Ongoing)', 'OFFLINE', '2025-10-13', '2025-12-05', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 8, 4, '2025-10-06 10:00:00+07', '2025-10-07 14:00:00+07', '2025-10-06 10:00:00+07', '2025-10-13 08:00:00+07');
+-- Pattern: IELTSFOUND-HCM01-25-001 (First class in HCM01 branch for this course/year)
+(5, 2, 1, 'IELTSFOUND-HCM01-25-001', 'HCM Foundation 1 (Ongoing)', 'OFFLINE', '2025-10-13', '2025-12-05', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 8, 4, '2025-10-06 10:00:00+07', '2025-10-07 14:00:00+07', '2025-10-06 10:00:00+07', '2025-10-13 08:00:00+07');
 
 -- Generate Sessions for Class 1 (HN-FOUND-C1) - COMPLETED
 -- Start: 2025-07-07 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks

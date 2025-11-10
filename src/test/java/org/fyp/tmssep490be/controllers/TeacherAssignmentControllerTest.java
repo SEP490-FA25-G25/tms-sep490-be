@@ -86,6 +86,9 @@ class TeacherAssignmentControllerTest {
     @MockitoBean
     private AssignResourcesResponseUtil assignResourcesResponseUtil;
 
+    @MockitoBean
+    private org.fyp.tmssep490be.services.ClassCodeGeneratorService classCodeGeneratorService;
+
     private List<TeacherAvailabilityDTO> availableTeachers;
     private AssignTeacherRequest fullAssignmentRequest;
     private AssignTeacherRequest partialAssignmentRequest;

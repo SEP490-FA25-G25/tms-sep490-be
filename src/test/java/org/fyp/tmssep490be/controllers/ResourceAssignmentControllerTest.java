@@ -83,6 +83,9 @@ class ResourceAssignmentControllerTest {
     @MockitoBean
     private AssignResourcesResponseUtil assignResourcesResponseUtil;
 
+    @MockitoBean
+    private org.fyp.tmssep490be.services.ClassCodeGeneratorService classCodeGeneratorService;
+
     private AssignResourcesRequest validRequest;
     private AssignResourcesResponse fullSuccessResponse;
     private AssignResourcesResponse partialSuccessResponse;

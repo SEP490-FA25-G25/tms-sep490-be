@@ -19,7 +19,7 @@ public class CreateClassRequest {
     @NotNull(message = "Course ID is required")
     private Long courseId;
 
-    @NotBlank(message = "Class code is required")
+    // Class code is optional - if not provided, it will be auto-generated
     @Size(max = 50, message = "Class code must not exceed 50 characters")
     @Pattern(regexp = "^[A-Z0-9\\-]+$", message = "Class code must contain only uppercase letters, numbers, and hyphens")
     private String code;

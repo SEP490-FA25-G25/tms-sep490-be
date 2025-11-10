@@ -112,6 +112,23 @@ public interface ClassService {
     // Create Class Workflow methods (STEP 1, 3, 6, 7)
 
     /**
+     * STEP 0 (Optional): Preview class code before creation
+     * Generates a preview of what the next class code will be without creating the class
+     *
+     * @param branchId Branch ID where the class will be created
+     * @param courseId Course ID for the class
+     * @param startDate Start date of the class (for year extraction)
+     * @param userId Current user ID for access control
+     * @return PreviewClassCodeResponse with preview code and metadata
+     */
+    org.fyp.tmssep490be.dtos.createclass.PreviewClassCodeResponse previewClassCode(
+            Long branchId, 
+            Long courseId, 
+            java.time.LocalDate startDate, 
+            Long userId
+    );
+
+    /**
      * STEP 1: Create a new class and auto-generate sessions
      * Creates class with DRAFT status and generates sessions based on course template
      *
