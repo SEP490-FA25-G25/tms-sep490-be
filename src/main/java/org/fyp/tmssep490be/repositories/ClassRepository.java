@@ -120,17 +120,18 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
     /**
      * Find highest class code by prefix pattern (read-only, without lock)
      * Used for preview functionality
+     * Uses LIKE for better performance than regex
      * 
      * @param branchId Branch ID to filter
-     * @param regex    Regex pattern to match code format
+     * @param prefix   Prefix pattern to match (e.g., "IELTSFOUND-HN01-25")
      * @return Optional containing the highest code, or empty if none found
      */
     @Query(value = """
         SELECT c.code FROM class c
         WHERE c.branch_id = :branchId
-          AND c.code ~ :regex
+          AND c.code LIKE :prefix || '-%'
         ORDER BY c.code DESC
         LIMIT 1
         """, nativeQuery = true)
-    Optional<String> findHighestCodeByPrefixReadOnly(@Param("branchId") Long branchId, @Param("regex") String regex);
+    Optional<String> findHighestCodeByPrefixReadOnly(@Param("branchId") Long branchId, @Param("prefix") String prefix);
 }

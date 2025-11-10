@@ -26,7 +26,7 @@ Hệ thống tự động tạo mã lớp học theo pattern: `COURSECODE-BRANCH
 #### Query Parameters
 
 - `branchId` (required): ID chi nhánh - Long
-- `courseId` (required): ID khóa học - Long  
+- `courseId` (required): ID khóa học - Long
 - `startDate` (required): Ngày bắt đầu - Date (format: YYYY-MM-DD)
 
 #### Example Request
@@ -40,27 +40,27 @@ Authorization: Bearer <access_token>
 
 ```typescript
 // Axios
-const response = await axios.get('/api/v1/classes/preview-code', {
+const response = await axios.get("/api/v1/classes/preview-code", {
   params: {
     branchId: 1,
     courseId: 5,
-    startDate: '2025-01-15'
+    startDate: "2025-01-15",
   },
   headers: {
-    'Authorization': `Bearer ${accessToken}`
-  }
+    Authorization: `Bearer ${accessToken}`,
+  },
 });
 
 // Fetch API
 const params = new URLSearchParams({
-  branchId: '1',
-  courseId: '5',
-  startDate: '2025-01-15'
+  branchId: "1",
+  courseId: "5",
+  startDate: "2025-01-15",
 });
 const response = await fetch(`/api/v1/classes/preview-code?${params}`, {
   headers: {
-    'Authorization': `Bearer ${accessToken}`
-  }
+    Authorization: `Bearer ${accessToken}`,
+  },
 });
 ```
 

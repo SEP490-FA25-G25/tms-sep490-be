@@ -16,6 +16,18 @@ import java.util.List;
 @Repository
 public interface SessionRepository extends JpaRepository<Session, Long> {
     /**
+     * Tìm tất cả sessions của class, ordered by date ascending
+     * Dùng cho STEP 2: Review sessions (Xem lại buổi học)
+     * Fetch courseSession và timeSlotTemplate để tránh lazy loading issues
+     */
+    @Query("SELECT s FROM Session s " +
+           "LEFT JOIN FETCH s.courseSession " +
+           "LEFT JOIN FETCH s.timeSlotTemplate " +
+           "WHERE s.classEntity.id = :classId " +
+           "ORDER BY s.date ASC")
+    List<Session> findByClassEntityIdOrderByDateAsc(@Param("classId") Long classId);
+
+    /**
      * Tìm tất cả future sessions của class (date >= today, status = PLANNED)
      * Dùng để auto-generate student_session khi enroll
      */

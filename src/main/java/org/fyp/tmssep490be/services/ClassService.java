@@ -129,14 +129,25 @@ public interface ClassService {
     );
 
     /**
-     * STEP 1: Create a new class and auto-generate sessions
-     * Creates class with DRAFT status and generates sessions based on course template
+     * STEP 1: Create new class and auto-generate sessions
+     * Creates a new class entity and automatically generates sessions based on course template
      *
      * @param request Create class request with all required information
      * @param userId Current user ID for access control and audit
      * @return CreateClassResponse with class information and session generation summary
      */
     CreateClassResponse createClass(CreateClassRequest request, Long userId);
+
+    /**
+     * STEP 2: Get list of generated sessions for review
+     * Returns all sessions that were auto-generated for the class
+     * Used for "Xem lại buổi học" step in frontend
+     *
+     * @param classId Class ID to get sessions for
+     * @param userId Current user ID for access control
+     * @return SessionListResponse with all session details grouped by week
+     */
+    org.fyp.tmssep490be.dtos.createclass.SessionListResponse listSessions(Long classId, Long userId);
 
     /**
      * STEP 3: Assign time slots to class sessions

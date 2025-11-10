@@ -59,13 +59,16 @@ public class SessionGenerationServiceImpl implements SessionGenerationService {
             // Find next occurrence of target day
             LocalDate sessionDate = findNextDateForDayOfWeek(currentDate, targetDayOfWeek);
 
-            // Create session entity
+            // Create session entity with timestamps
+            java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
             Session session = Session.builder()
                     .classEntity(classEntity)
                     .courseSession(courseSession)
                     .date(sessionDate)
                     .type(SessionType.CLASS)
                     .status(SessionStatus.PLANNED)
+                    .createdAt(now)
+                    .updatedAt(now)
                     .build();
 
             sessions.add(session);

@@ -15,6 +15,13 @@ import java.util.List;
 public interface SessionResourceRepository extends JpaRepository<SessionResource, SessionResource.SessionResourceId> {
     
     /**
+     * Check if a session has any resource assignment
+     * Used for STEP 2: Review sessions status check
+     */
+    @Query("SELECT COUNT(sr) > 0 FROM SessionResource sr WHERE sr.session.id = :sessionId")
+    boolean existsBySessionId(@Param("sessionId") Long sessionId);
+    
+    /**
      * Check if resource is booked at a specific date and time slot
      * Used for validation before approving MODALITY_CHANGE or RESCHEDULE
      * @param excludeSessionId Session ID to exclude from check (when updating existing session)

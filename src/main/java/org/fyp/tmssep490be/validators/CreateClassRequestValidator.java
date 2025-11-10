@@ -11,12 +11,13 @@ public class CreateClassRequestValidator {
 
     /**
      * Validates if all required fields are present and valid
+     * Note: code is OPTIONAL - will be auto-generated if not provided
      */
     public boolean isValid(CreateClassRequest request) {
         return request != null &&
                request.getBranchId() != null &&
                request.getCourseId() != null &&
-               request.getCode() != null && !request.getCode().isBlank() &&
+               // code is OPTIONAL - removed from validation
                request.getName() != null && !request.getName().isBlank() &&
                request.getModality() != null &&
                request.getStartDate() != null &&

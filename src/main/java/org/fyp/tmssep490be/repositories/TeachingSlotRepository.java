@@ -17,6 +17,13 @@ import java.util.List;
 @Repository
 public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, TeachingSlot.TeachingSlotId> {
 
+    /**
+     * Check if a session has any teacher assignment
+     * Used for STEP 2: Review sessions status check
+     */
+    @Query("SELECT COUNT(ts) > 0 FROM TeachingSlot ts WHERE ts.session.id = :sessionId")
+    boolean existsBySessionId(@Param("sessionId") Long sessionId);
+
     @Query("SELECT ts FROM TeachingSlot ts WHERE ts.session.classEntity.id = :classId AND ts.status = :status")
     List<TeachingSlot> findByClassEntityIdAndStatus(@Param("classId") Long classId, @Param("status") TeachingSlotStatus status);
     

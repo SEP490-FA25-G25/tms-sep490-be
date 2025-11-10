@@ -31,7 +31,6 @@ public class ClassCodeGeneratorServiceImpl implements ClassCodeGeneratorService 
     private final EntityManager entityManager;
 
     @Override
-    @Transactional
     public String generateClassCode(Long branchId, String branchCode, String courseCode, LocalDate startDate) {
         log.info("Generating class code for branchId={}, courseCode={}, startDate={}", 
                 branchId, courseCode, startDate);
@@ -68,21 +67,32 @@ public class ClassCodeGeneratorServiceImpl implements ClassCodeGeneratorService 
     @Override
     @Transactional(readOnly = true)
     public String previewClassCode(Long branchId, String branchCode, String courseCode, LocalDate startDate) {
-        log.debug("Preview class code for branchId={}, courseCode={}, startDate={}", 
-                branchId, courseCode, startDate);
+        log.info("Preview class code - branchId={}, branchCode={}, courseCode={}, startDate={}", 
+                branchId, branchCode, courseCode, startDate);
         
         try {
             // Same logic as generate but without locking (read-only)
             String normalizedCourseCode = normalizeCourseCode(courseCode);
+            log.debug("Normalized course code: {} -> {}", courseCode, normalizedCourseCode);
+            
             int year = startDate.getYear();
             String prefix = buildPrefix(normalizedCourseCode, branchCode, year);
+            log.debug("Built prefix: {}", prefix);
             
             int nextSeq = findNextSequenceReadOnly(branchId, prefix);
+            log.debug("Next sequence: {}", nextSeq);
             
-            return String.format("%s-%03d", prefix, nextSeq);
+            String previewCode = String.format("%s-%03d", prefix, nextSeq);
+            log.info("Preview code generated successfully: {}", previewCode);
             
+            return previewCode;
+            
+        } catch (CustomException e) {
+            log.error("CustomException in previewClassCode: code={}, message={}", 
+                    e.getErrorCode(), e.getMessage());
+            throw e;
         } catch (Exception e) {
-            log.error("Failed to preview class code for branchId={}, courseCode={}", 
+            log.error("Unexpected error in previewClassCode for branchId={}, courseCode={}", 
                     branchId, courseCode, e);
             throw new CustomException(ErrorCode.CLASS_CODE_GENERATION_FAILED);
         }
@@ -144,14 +154,12 @@ public class ClassCodeGeneratorServiceImpl implements ClassCodeGeneratorService 
 
     /**
      * Find next sequence number with lock (for actual generation)
+     * Uses LIKE pattern for better performance
      */
     private int findNextSequence(Long branchId, String prefix) {
-        // Build regex pattern to match exact format: PREFIX-XXX where XXX is 3 digits
-        String regex = "^" + Pattern.quote(prefix) + "-[0-9]{3}$";
+        log.debug("Finding highest sequence for prefix: {}", prefix);
         
-        log.debug("Finding highest sequence with regex: {}", regex);
-        
-        String lastCode = classRepository.findHighestCodeByPrefix(branchId, regex)
+        String lastCode = classRepository.findHighestCodeByPrefixReadOnly(branchId, prefix)
                 .orElse(null);
         
         if (lastCode == null) {
@@ -174,20 +182,25 @@ public class ClassCodeGeneratorServiceImpl implements ClassCodeGeneratorService 
 
     /**
      * Find next sequence number without lock (for preview)
+     * Uses LIKE pattern instead of regex for better performance
      */
     private int findNextSequenceReadOnly(Long branchId, String prefix) {
-        String regex = "^" + Pattern.quote(prefix) + "-[0-9]{3}$";
+        log.debug("Finding next sequence (read-only) for prefix: {}", prefix);
         
-        String lastCode = classRepository.findHighestCodeByPrefixReadOnly(branchId, regex)
+        String lastCode = classRepository.findHighestCodeByPrefixReadOnly(branchId, prefix)
                 .orElse(null);
         
         if (lastCode == null) {
+            log.debug("No existing code found for prefix: {}, starting from 001", prefix);
             return 1;
         }
+        
+        log.debug("Found last code: {}", lastCode);
         
         int lastSeq = extractSequence(lastCode);
         
         if (lastSeq >= MAX_SEQUENCE) {
+            log.warn("Sequence limit reached for prefix: {} (seq={})", prefix, lastSeq);
             return MAX_SEQUENCE; // Preview shows limit reached
         }
         

@@ -784,15 +784,25 @@ public class ClassServiceImpl implements ClassService {
 
         // Validate inputs
         if (branchId == null || courseId == null || startDate == null || userId == null) {
+            log.error("Invalid input: branchId={}, courseId={}, startDate={}, userId={}", 
+                    branchId, courseId, startDate, userId);
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
 
         // Get entities
         Branch branch = branchRepository.findById(branchId)
-                .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
+                .orElseThrow(() -> {
+                    log.error("Branch not found with ID: {}", branchId);
+                    return new CustomException(ErrorCode.BRANCH_NOT_FOUND);
+                });
 
         Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+                .orElseThrow(() -> {
+                    log.error("Course not found with ID: {}", courseId);
+                    return new CustomException(ErrorCode.COURSE_NOT_FOUND);
+                });
+
+        log.debug("Found branch: code={}, course: code={}", branch.getCode(), course.getCode());
 
         // Call the code generator service to preview
         String previewCode = classCodeGeneratorService.previewClassCode(
@@ -909,6 +919,177 @@ public class ClassServiceImpl implements ClassService {
                 .createdAt(classEntity.getCreatedAt())
                 .sessionSummary(sessionSummary)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public org.fyp.tmssep490be.dtos.createclass.SessionListResponse listSessions(Long classId, Long userId) {
+        log.info("Listing sessions for class ID {} by user {}", classId, userId);
+
+        // Get class and validate access
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        // Validate user has access to class's branch (skip if userId is null - authentication disabled)
+        if (userId != null) {
+            List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(userId);
+            if (!userBranchIds.contains(classEntity.getBranch().getId())) {
+                throw new CustomException(ErrorCode.CLASS_ACCESS_DENIED);
+            }
+        }
+
+        // Get all sessions ordered by date
+        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
+
+        if (sessions.isEmpty()) {
+            log.warn("No sessions found for class ID {}", classId);
+            return org.fyp.tmssep490be.dtos.createclass.SessionListResponse.builder()
+                    .classId(classId)
+                    .classCode(classEntity.getCode())
+                    .totalSessions(0)
+                    .sessions(List.of())
+                    .groupedByWeek(List.of())
+                    .warnings(List.of())
+                    .build();
+        }
+
+        // Calculate date range
+        LocalDate startDate = sessions.get(0).getDate();
+        LocalDate endDate = sessions.get(sessions.size() - 1).getDate();
+
+        // Build session DTOs
+        List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.SessionDTO> sessionDTOs = new java.util.ArrayList<>();
+        int sequenceNumber = 1;
+
+        for (Session session : sessions) {
+            // Check if session has assignments
+            boolean hasTimeSlot = session.getTimeSlotTemplate() != null;
+            boolean hasResource = sessionResourceRepository.existsBySessionId(session.getId());
+            boolean hasTeacher = teachingSlotRepository.existsBySessionId(session.getId());
+
+            // Build time slot info if available
+            org.fyp.tmssep490be.dtos.createclass.SessionListResponse.TimeSlotInfoDTO timeSlotInfo = null;
+            if (hasTimeSlot && session.getTimeSlotTemplate() != null) {
+                TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
+                if (timeSlot.getStartTime() != null && timeSlot.getEndTime() != null) {
+                    timeSlotInfo = org.fyp.tmssep490be.dtos.createclass.SessionListResponse.TimeSlotInfoDTO.builder()
+                            .startTime(timeSlot.getStartTime().toString())
+                            .endTime(timeSlot.getEndTime().toString())
+                            .displayName(timeSlot.getStartTime() + " - " + timeSlot.getEndTime())
+                            .build();
+                }
+            }
+
+            // Get day of week name
+            String dayOfWeek = getDayName(session.getDate().getDayOfWeek().getValue());
+
+            sessionDTOs.add(org.fyp.tmssep490be.dtos.createclass.SessionListResponse.SessionDTO.builder()
+                    .sessionId(session.getId())
+                    .sequenceNumber(sequenceNumber++)
+                    .date(session.getDate())
+                    .dayOfWeek(dayOfWeek)
+                    .dayOfWeekNumber((short) session.getDate().getDayOfWeek().getValue())
+                    .courseSessionName(session.getCourseSession() != null ? session.getCourseSession().getTopic() : "Unknown")
+                    .status(session.getStatus().name())
+                    .hasTimeSlot(hasTimeSlot)
+                    .hasResource(hasResource)
+                    .hasTeacher(hasTeacher)
+                    .timeSlotInfo(timeSlotInfo)
+                    .build());
+        }
+
+        // Group sessions by week
+        List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.WeekGroupDTO> weekGroups = groupSessionsByWeek(sessions);
+
+        // Build response
+        return org.fyp.tmssep490be.dtos.createclass.SessionListResponse.builder()
+                .classId(classId)
+                .classCode(classEntity.getCode())
+                .totalSessions(sessions.size())
+                .dateRange(org.fyp.tmssep490be.dtos.createclass.SessionListResponse.DateRangeDTO.builder()
+                        .startDate(startDate)
+                        .endDate(endDate)
+                        .build())
+                .sessions(sessionDTOs)
+                .groupedByWeek(weekGroups)
+                .warnings(List.of()) // Future: add holiday warnings
+                .build();
+    }
+
+    /**
+     * Group sessions by week for better frontend display
+     */
+    private List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.WeekGroupDTO> groupSessionsByWeek(List<Session> sessions) {
+        List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.WeekGroupDTO> weekGroups = new java.util.ArrayList<>();
+        
+        if (sessions.isEmpty()) {
+            return weekGroups;
+        }
+
+        LocalDate firstDate = sessions.get(0).getDate();
+        int weekNumber = 1;
+        LocalDate currentWeekStart = firstDate;
+        List<Long> currentWeekSessionIds = new java.util.ArrayList<>();
+
+        for (Session session : sessions) {
+            LocalDate sessionDate = session.getDate();
+            
+            // Check if session is in next week (7+ days from current week start)
+            if (sessionDate.isAfter(currentWeekStart.plusDays(6))) {
+                // Save current week group
+                if (!currentWeekSessionIds.isEmpty()) {
+                    LocalDate weekEnd = currentWeekStart.plusDays(6);
+                    weekGroups.add(org.fyp.tmssep490be.dtos.createclass.SessionListResponse.WeekGroupDTO.builder()
+                            .weekNumber(weekNumber++)
+                            .weekRange(formatDateRange(currentWeekStart, weekEnd))
+                            .sessionCount(currentWeekSessionIds.size())
+                            .sessionIds(new java.util.ArrayList<>(currentWeekSessionIds))
+                            .build());
+                }
+
+                // Start new week
+                currentWeekStart = sessionDate;
+                currentWeekSessionIds = new java.util.ArrayList<>();
+            }
+
+            currentWeekSessionIds.add(session.getId());
+        }
+
+        // Add last week group
+        if (!currentWeekSessionIds.isEmpty()) {
+            LocalDate weekEnd = sessions.get(sessions.size() - 1).getDate();
+            weekGroups.add(org.fyp.tmssep490be.dtos.createclass.SessionListResponse.WeekGroupDTO.builder()
+                    .weekNumber(weekNumber)
+                    .weekRange(formatDateRange(currentWeekStart, weekEnd))
+                    .sessionCount(currentWeekSessionIds.size())
+                    .sessionIds(currentWeekSessionIds)
+                    .build());
+        }
+
+        return weekGroups;
+    }
+
+    /**
+     * Format date range for display
+     */
+    private String formatDateRange(LocalDate start, LocalDate end) {
+        return start.toString() + " - " + end.toString();
+    }
+
+    /**
+     * Get Vietnamese day name from day of week number
+     */
+    private String getDayName(int dayOfWeek) {
+        return switch (dayOfWeek) {
+            case 1 -> "Thứ Hai";
+            case 2 -> "Thứ Ba";
+            case 3 -> "Thứ Tư";
+            case 4 -> "Thứ Năm";
+            case 5 -> "Thứ Sáu";
+            case 6 -> "Thứ Bảy";
+            case 7 -> "Chủ Nhật";
+            default -> "Unknown";
+        };
     }
 
     @Override
@@ -1185,14 +1366,16 @@ public class ClassServiceImpl implements ClassService {
             throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
         }
 
-        // Validate course is approved
-        if (course.getStatus() != org.fyp.tmssep490be.entities.enums.CourseStatus.APPROVED) {
+        // Validate course approval status (not course status)
+        if (course.getApprovalStatus() != ApprovalStatus.APPROVED) {
             throw new CustomException(ErrorCode.COURSE_NOT_APPROVED);
         }
 
-        // Validate class code uniqueness within branch
-        if (classRepository.findByBranchIdAndCode(branch.getId(), request.getCode()).isPresent()) {
-            throw new CustomException(ErrorCode.CLASS_CODE_DUPLICATE);
+        // Validate class code uniqueness within branch (only if code is provided)
+        if (request.getCode() != null && !request.getCode().isBlank()) {
+            if (classRepository.findByBranchIdAndCode(branch.getId(), request.getCode()).isPresent()) {
+                throw new CustomException(ErrorCode.CLASS_CODE_DUPLICATE);
+            }
         }
     }
 

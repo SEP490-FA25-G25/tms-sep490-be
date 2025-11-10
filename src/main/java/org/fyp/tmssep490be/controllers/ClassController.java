@@ -21,6 +21,7 @@ import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
 import org.fyp.tmssep490be.dtos.createclass.PreviewClassCodeRequest;
 import org.fyp.tmssep490be.dtos.createclass.PreviewClassCodeResponse;
+import org.fyp.tmssep490be.dtos.createclass.SessionListResponse;
 import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
 // import org.fyp.tmssep490be.dtos.createclass.RejectClassRequest; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
@@ -129,6 +130,256 @@ public class ClassController {
                 .success(true)
                 .message("Classes retrieved successfully")
                 .data(classes)
+                .build());
+    }
+
+    /**
+     * STEP 0 (Optional): Preview class code before creation
+     * This endpoint allows users to preview what the class code will be without actually creating the class
+     * Supports both GET (with query params) and POST (with request body)
+     * IMPORTANT: This endpoint MUST be defined BEFORE /{classId} to avoid routing conflicts
+     */
+    @GetMapping("/preview-code")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Preview class code (GET)",
+            description = "Preview the next class code that will be generated based on branch, course, and start date. " +
+                    "Note: The previewed code may change if another class is created in the meantime. " +
+                    "This is an optional helper endpoint before STEP 1 (Create Class). " +
+                    "Use GET with query params or POST with request body."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Preview generated successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ResponseObject.class),
+                            examples = @ExampleObject(
+                                    name = "Preview Success",
+                                    value = """
+                                            {
+                                              "success": true,
+                                              "message": "Class code preview generated successfully",
+                                              "data": {
+                                                "previewCode": "IELTSFOUND-HN01-25-005",
+                                                "prefix": "IELTSFOUND-HN01-25",
+                                                "nextSequence": 5,
+                                                "warning": null
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid request or sequence limit reached",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Validation Error",
+                                            value = """
+                                                    {
+                                                      "success": false,
+                                                      "message": "Validation failed",
+                                                      "data": {
+                                                        "branchId": "must not be null",
+                                                        "courseId": "must not be null"
+                                                      }
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Sequence Limit Warning",
+                                            value = """
+                                                    {
+                                                      "success": true,
+                                                      "message": "Class code preview generated successfully",
+                                                      "data": {
+                                                        "previewCode": "IELTSFOUND-HN01-25-999",
+                                                        "prefix": "IELTSFOUND-HN01-25",
+                                                        "nextSequence": 999,
+                                                        "warning": "Sequence limit reached (999). Cannot create more classes with this prefix."
+                                                      }
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            )
+    })
+    public ResponseEntity<ResponseObject<PreviewClassCodeResponse>> previewClassCode(
+            @Parameter(description = "Branch ID", required = true)
+            @RequestParam Long branchId,
+
+            @Parameter(description = "Course ID", required = true)
+            @RequestParam Long courseId,
+
+            @Parameter(description = "Start date (YYYY-MM-DD)", required = true)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} previewing class code for branchId={}, courseId={}, startDate={}", 
+                currentUser.getId(), branchId, courseId, startDate);
+        
+        PreviewClassCodeResponse response = classService.previewClassCode(
+                branchId,
+                courseId,
+                startDate,
+                currentUser.getId()
+        );
+
+        String message = response.getWarning() != null ?
+                "Class code preview generated with warning" :
+                "Class code preview generated successfully";
+
+        return ResponseEntity.ok(ResponseObject.<PreviewClassCodeResponse>builder()
+                .success(true)
+                .message(message)
+                .data(response)
+                .build());
+    }
+
+    /**
+     * STEP 2: Get list of generated sessions for review
+     * Used for "Xem lại buổi học" step in frontend
+     */
+    @GetMapping("/{classId}/sessions")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Get list of sessions for review",
+            description = """
+                    Retrieve all generated sessions for a class after creation (STEP 2).
+                    This endpoint is used for the "Xem lại buổi học" (Review Sessions) step in the frontend.
+                    
+                    **Response Structure:**
+                    - Class information (ID, code)
+                    - Total sessions count
+                    - Date range (first to last session)
+                    - Flat list of all sessions with details
+                    - Week-grouped view for better visualization
+                    - Assignment status per session (time slot, resource, teacher)
+                    
+                    **Session Details Include:**
+                    - Session ID, sequence number, date
+                    - Vietnamese day name (Thứ Hai, Thứ Ba, etc.)
+                    - Course session name from template
+                    - Assignment status flags (hasTimeSlot, hasResource, hasTeacher)
+                    - Time slot information (if assigned)
+                    
+                    **Week Grouping:**
+                    - Sessions grouped into 7-day week periods
+                    - Week number, date range, session count per week
+                    - Useful for timeline/calendar displays
+                    
+                    **Use Cases:**
+                    - Review sessions after creation before assigning time slots
+                    - Display session timeline/calendar in frontend
+                    - Show assignment progress overview
+                    - Verify session generation correctness
+                    """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Sessions retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ResponseObject.class),
+                            examples = @ExampleObject(
+                                    name = "Sessions List",
+                                    value = """
+                                            {
+                                              "success": true,
+                                              "message": "Sessions retrieved successfully",
+                                              "data": {
+                                                "classId": 6,
+                                                "classCode": "IELTSFOUND-HN01-25-005",
+                                                "totalSessions": 24,
+                                                "dateRange": {
+                                                  "startDate": "2025-01-06",
+                                                  "endDate": "2025-03-31"
+                                                },
+                                                "sessions": [
+                                                  {
+                                                    "sessionId": 101,
+                                                    "sequenceNumber": 1,
+                                                    "date": "2025-01-06",
+                                                    "dayOfWeek": "Thứ Hai",
+                                                    "courseSessionName": "Introduction to IELTS",
+                                                    "status": "PLANNED",
+                                                    "hasTimeSlot": false,
+                                                    "hasResource": false,
+                                                    "hasTeacher": false,
+                                                    "timeSlotInfo": null
+                                                  }
+                                                ],
+                                                "groupedByWeek": [
+                                                  {
+                                                    "weekNumber": 1,
+                                                    "weekRange": "2025-01-06 - 2025-01-12",
+                                                    "sessionCount": 3,
+                                                    "sessionIds": [101, 102, 103]
+                                                  }
+                                                ],
+                                                "warnings": []
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Class not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "success": false,
+                                              "message": "Class with ID 999 not found",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden - User does not have access to this class's branch",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "success": false,
+                                              "message": "Access denied - user does not have access to this class's branch",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
+    public ResponseEntity<ResponseObject<SessionListResponse>> listSessions(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        Long userId = currentUser != null ? currentUser.getId() : null;
+        log.info("User {} requesting session list for class {}", userId, classId);
+
+        SessionListResponse response = classService.listSessions(classId, userId);
+
+        return ResponseEntity.ok(ResponseObject.<SessionListResponse>builder()
+                .success(true)
+                .message("Sessions retrieved successfully")
+                .data(response)
                 .build());
     }
 
@@ -324,115 +575,6 @@ public class ClassController {
 
         return ResponseEntity.ok(ResponseObject.<CreateClassResponse>builder()
                 .success(createClassResponseUtil.isSuccess(response))
-                .message(message)
-                .data(response)
-                .build());
-    }
-
-    /**
-     * STEP 0 (Optional): Preview class code before creation
-     * This endpoint allows users to preview what the class code will be without actually creating the class
-     * Supports both GET (with query params) and POST (with request body)
-     */
-    @GetMapping("/preview-code")
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
-    @Operation(
-            summary = "Preview class code (GET)",
-            description = "Preview the next class code that will be generated based on branch, course, and start date. " +
-                    "Note: The previewed code may change if another class is created in the meantime. " +
-                    "This is an optional helper endpoint before STEP 1 (Create Class). " +
-                    "Use GET with query params or POST with request body."
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Preview generated successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ResponseObject.class),
-                            examples = @ExampleObject(
-                                    name = "Preview Success",
-                                    value = """
-                                            {
-                                              "success": true,
-                                              "message": "Class code preview generated successfully",
-                                              "data": {
-                                                "previewCode": "IELTSFOUND-HN01-25-005",
-                                                "prefix": "IELTSFOUND-HN01-25",
-                                                "nextSequence": 5,
-                                                "warning": null
-                                              }
-                                            }
-                                            """
-                            )
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid request or sequence limit reached",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = {
-                                    @ExampleObject(
-                                            name = "Validation Error",
-                                            value = """
-                                                    {
-                                                      "success": false,
-                                                      "message": "Validation failed",
-                                                      "data": {
-                                                        "branchId": "must not be null",
-                                                        "courseId": "must not be null"
-                                                      }
-                                                    }
-                                                    """
-                                    ),
-                                    @ExampleObject(
-                                            name = "Sequence Limit Warning",
-                                            value = """
-                                                    {
-                                                      "success": true,
-                                                      "message": "Class code preview generated successfully",
-                                                      "data": {
-                                                        "previewCode": "IELTSFOUND-HN01-25-999",
-                                                        "prefix": "IELTSFOUND-HN01-25",
-                                                        "nextSequence": 999,
-                                                        "warning": "Sequence limit reached (999). Cannot create more classes with this prefix."
-                                                      }
-                                                    }
-                                                    """
-                                    )
-                            }
-                    )
-            )
-    })
-    public ResponseEntity<ResponseObject<PreviewClassCodeResponse>> previewClassCode(
-            @Parameter(description = "Branch ID", required = true)
-            @RequestParam Long branchId,
-
-            @Parameter(description = "Course ID", required = true)
-            @RequestParam Long courseId,
-
-            @Parameter(description = "Start date (YYYY-MM-DD)", required = true)
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-
-            @AuthenticationPrincipal UserPrincipal currentUser
-    ) {
-        log.info("User {} previewing class code for branchId={}, courseId={}, startDate={}", 
-                currentUser.getId(), branchId, courseId, startDate);
-        
-        PreviewClassCodeResponse response = classService.previewClassCode(
-                branchId,
-                courseId,
-                startDate,
-                currentUser.getId()
-        );
-
-        String message = response.getWarning() != null ?
-                "Class code preview generated with warning" :
-                "Class code preview generated successfully";
-
-        return ResponseEntity.ok(ResponseObject.<PreviewClassCodeResponse>builder()
-                .success(true)
                 .message(message)
                 .data(response)
                 .build());
