@@ -1,6 +1,7 @@
 # Class Code Auto-Generation - Frontend Handoff
 
 ## Overview
+
 Backend now supports **automatic class code generation** when creating a class. The `code` field is now **optional** in the create class request. If not provided, the system will automatically generate a unique code based on course, branch, and start date.
 
 ## Auto-Generated Code Format
@@ -10,6 +11,7 @@ Backend now supports **automatic class code generation** when creating a class. 
 **Example:** `IELTSFOUND-HN01-25-005`
 
 **Components:**
+
 - **Course Code** (`IELTSFOUND`) - Extracted and normalized from the course code (uppercase alphanumeric only)
 - **Branch Code** (`HN01`) - The branch code where the class is held
 - **Year** (`25`) - Last 2 digits of the class start date year
@@ -22,12 +24,14 @@ Backend now supports **automatic class code generation** when creating a class. 
 **Endpoint:** `POST /api/v1/classes`
 
 **Request Body Changes:**
+
 - The `code` field is now **OPTIONAL**
 - If `code` is null or empty, backend will auto-generate it
 - If `code` is provided, it must follow the format pattern and be unique within the branch
 - All other fields remain required: `branchId`, `courseId`, `name`, `startDate`, `modality`, `scheduleDays`, `maxCapacity`
 
 **Important Validation Rules:**
+
 - `startDate` MUST be a future date (not today or past)
 - `scheduleDays` is an array of numbers 0-6 representing days of week (0=Sunday, 1=Monday, etc.)
 - `maxCapacity` must be between 1 and 1000
@@ -39,12 +43,13 @@ The response now includes the auto-generated `code` in the data object, along wi
 
 **Endpoint:** `GET /api/v1/classes/preview-code`
 
-**Purpose:** 
+**Purpose:**
 Allows frontend to preview what the auto-generated class code will be BEFORE the user submits the form. This helps users understand the naming convention and verify the code looks correct.
 
 **Query Parameters:**
+
 - `branchId` (required) - The selected branch ID
-- `courseId` (required) - The selected course ID  
+- `courseId` (required) - The selected course ID
 - `startDate` (required) - The selected start date in YYYY-MM-DD format
 
 **Response:**
@@ -58,6 +63,7 @@ Call this endpoint whenever the user changes branch, course, or start date in th
 ### Option 1: Pure Auto-Generation (Recommended)
 
 **User Experience:**
+
 - Remove the class code input field entirely from the create form
 - Show a read-only preview of the auto-generated code as user fills out other fields
 - Display the preview below or near the form with clear labeling (e.g., "Class Code (Auto-generated)")
@@ -65,6 +71,7 @@ Call this endpoint whenever the user changes branch, course, or start date in th
 - Include a small note explaining the code will be automatically assigned
 
 **Benefits:**
+
 - Simpler user experience - one less field to worry about
 - No validation errors related to code format or uniqueness
 - Consistent naming convention across all classes
@@ -72,6 +79,7 @@ Call this endpoint whenever the user changes branch, course, or start date in th
 ### Option 2: Auto-Generate with Manual Override
 
 **User Experience:**
+
 - Provide a checkbox or toggle: "Auto-generate class code"
 - When checked (default): Show preview code (read-only), don't send code field in request
 - When unchecked: Show text input for manual entry, validate format before submit
@@ -83,6 +91,7 @@ For advanced users or special cases where a custom code is needed, while still e
 ## Preview Behavior
 
 **When to Fetch Preview:**
+
 - When form loads (if branch, course, start date are pre-selected)
 - When user changes branch selection
 - When user changes course selection
@@ -92,8 +101,9 @@ For advanced users or special cases where a custom code is needed, while still e
 Recommend debouncing API calls by 500ms to avoid excessive requests while user is typing or selecting dates.
 
 **Loading States:**
+
 - Show loading indicator while fetching preview
-- Display placeholder text like "Generating preview..." 
+- Display placeholder text like "Generating preview..."
 - Handle error states gracefully (e.g., if course has no sessions)
 
 **Error Handling:**
@@ -102,6 +112,7 @@ If preview fails (e.g., sequence limit reached), show a clear message to the use
 ## Validation Changes
 
 **Backend Validation (Automatic):**
+
 - Branch ID must exist and user must have access
 - Course ID must exist and be in APPROVED status
 - Start date must be in the future
@@ -110,6 +121,7 @@ If preview fails (e.g., sequence limit reached), show a clear message to the use
 - If code is provided manually, it must be unique within the branch
 
 **Frontend Validation (Recommended):**
+
 - Validate start date is future before allowing submit
 - Ensure at least one schedule day is selected
 - Validate max capacity range (1-1000)
@@ -118,18 +130,22 @@ If preview fails (e.g., sequence limit reached), show a clear message to the use
 ## Common Error Scenarios
 
 **Error: "Course must be approved before creating class"**
+
 - Occurs when selected course is not in APPROVED approval status
 - Frontend should filter course dropdown to only show approved courses
 
 **Error: "Start date must be in the future"**
+
 - User selected today's date or a past date
 - Frontend date picker should disable past dates
 
 **Error: "Sequence limit reached for prefix [PREFIX] (999 classes)"**
-- Very rare - means 999 classes already exist for this branch/course/year combination  
+
+- Very rare - means 999 classes already exist for this branch/course/year combination
 - User may need to change start year or contact administrator
 
 **Error: "Start date must fall on one of the scheduled days"**
+
 - Start date's day of week doesn't match any selected schedule days
 - Example: Start date is Monday but only Tuesday and Thursday are scheduled
 - Frontend should validate this before submit or guide user to compatible dates
@@ -137,17 +153,20 @@ If preview fails (e.g., sequence limit reached), show a clear message to the use
 ## Sequence Behavior
 
 **How Sequences Work:**
+
 - Sequences are unique per **prefix combination** (course code + branch code + year)
 - First class created: gets sequence 001
 - Second class created: gets sequence 002
 - Sequences continue incrementing up to 999 per prefix
 
 **Independent Sequences:**
+
 - Different branch = new sequence starts at 001
-- Different year = new sequence starts at 001  
+- Different year = new sequence starts at 001
 - Same branch and year = sequence continues incrementing
 
 **Example Scenarios:**
+
 - `IELTSFOUND-HN01-25-001` → First IELTS Foundation class at HN01 branch in 2025
 - `IELTSFOUND-HN01-25-002` → Second IELTS Foundation class at HN01 branch in 2025
 - `IELTSFOUND-HCM01-25-001` → First IELTS Foundation class at HCM01 branch in 2025 (different branch)
@@ -157,6 +176,7 @@ If preview fails (e.g., sequence limit reached), show a clear message to the use
 
 **Backend Implementation:**
 The system uses PostgreSQL advisory locks to ensure thread-safe sequence generation. This means:
+
 - Multiple users can create classes simultaneously
 - Each will receive a unique sequence number
 - No risk of duplicate codes
@@ -181,14 +201,16 @@ The API still accepts manual codes if provided, so existing implementations will
 ## Testing Checklist
 
 **Preview Functionality:**
+
 - [ ] Preview displays when all required fields (branch, course, start date) are filled
 - [ ] Preview updates correctly when branch changes
-- [ ] Preview updates correctly when course changes  
+- [ ] Preview updates correctly when course changes
 - [ ] Preview updates correctly when start date changes
 - [ ] Loading state shows during preview fetch
 - [ ] Error state handled gracefully if preview fails
 
 **Create Class Functionality:**
+
 - [ ] Class can be created without providing code field
 - [ ] Auto-generated code appears in success response
 - [ ] Auto-generated code matches the preview shown before submit
@@ -196,6 +218,7 @@ The API still accepts manual codes if provided, so existing implementations will
 - [ ] New class has DRAFT status and PENDING approval status
 
 **Validation Testing:**
+
 - [ ] Error shown if start date is today or in past
 - [ ] Error shown if course is not approved
 - [ ] Error shown if schedule days array is empty
@@ -203,6 +226,7 @@ The API still accepts manual codes if provided, so existing implementations will
 - [ ] Error shown if start date doesn't match schedule days
 
 **Sequence Testing:**
+
 - [ ] Creating multiple classes increments sequence correctly (001, 002, 003...)
 - [ ] Different branches start at 001 independently
 - [ ] Different years start at 001 independently
@@ -210,17 +234,20 @@ The API still accepts manual codes if provided, so existing implementations will
 ## Technical Notes
 
 **Date Format:**
+
 - All dates should be in `YYYY-MM-DD` format (ISO 8601)
 - Example: `2025-12-01` for December 1, 2025
 
 **Schedule Days Format:**
+
 - Array of integers 0-6
 - 0 = Sunday, 1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday
 - Example: `[2, 4, 6]` means Tuesday, Thursday, Saturday
 
 **Modality Values:**
+
 - `ONLINE` - Virtual classes only
-- `OFFLINE` - In-person classes only  
+- `OFFLINE` - In-person classes only
 - `HYBRID` - Mix of online and offline sessions
 
 ## Support & Resources
@@ -232,6 +259,6 @@ Contact the backend team for clarification on implementation details or edge cas
 Full API specs available at: `http://localhost:8080/swagger-ui.html`
 
 **Related Documentation:**
+
 - Create Class Workflow: `/docs/create-class/create-class-workflow-final.md`
 - Implementation Checklist: `/docs/create-class/create-class-implementation-checklist-v2.md`
-

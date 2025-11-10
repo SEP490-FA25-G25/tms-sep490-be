@@ -1,6 +1,7 @@
 # Step 2: Session List API - Frontend Handoff
 
 ## API Endpoint
+
 ```
 GET /api/v1/classes/{classId}/sessions
 ```
@@ -55,7 +56,7 @@ GET /api/v1/classes/{classId}/sessions
 ## Key Fields
 
 - **sessions**: Flat list của tất cả sessions - dùng cho table/list view
-- **groupedByWeek**: Sessions đã nhóm theo tuần - dùng cho timeline view  
+- **groupedByWeek**: Sessions đã nhóm theo tuần - dùng cho timeline view
 - **dayOfWeek**: Tên thứ tiếng Việt đã format sẵn ("Thứ Hai", "Thứ Ba", ...)
 - **hasTimeSlot/hasResource/hasTeacher**: Boolean flags để show trạng thái gán (✓/✗)
 - **timeSlotInfo**: Có giá trị khi đã gán khung giờ, null khi chưa gán
@@ -65,34 +66,41 @@ GET /api/v1/classes/{classId}/sessions
 ## Frontend Usage
 
 ### 1. Timeline View (Recommended)
+
 ```typescript
-{data.groupedByWeek.map(week => (
-  <WeekSection key={week.weekNumber}>
-    <h3>Tuần {week.weekNumber}: {week.weekRange}</h3>
-    {week.sessionIds.map(id => {
-      const session = data.sessions.find(s => s.sessionId === id);
-      return <SessionCard session={session} />;
-    })}
-  </WeekSection>
-))}
+{
+  data.groupedByWeek.map((week) => (
+    <WeekSection key={week.weekNumber}>
+      <h3>
+        Tuần {week.weekNumber}: {week.weekRange}
+      </h3>
+      {week.sessionIds.map((id) => {
+        const session = data.sessions.find((s) => s.sessionId === id);
+        return <SessionCard session={session} />;
+      })}
+    </WeekSection>
+  ));
+}
 ```
 
 ### 2. Table View
+
 ```typescript
 <Table>
-  {data.sessions.map(session => (
+  {data.sessions.map((session) => (
     <tr key={session.sessionId}>
       <td>{session.sequenceNumber}</td>
       <td>{session.date}</td>
       <td>{session.dayOfWeek}</td>
       <td>{session.courseSessionName}</td>
-      <td>{session.hasTimeSlot ? '✓' : '✗'}</td>
+      <td>{session.hasTimeSlot ? "✓" : "✗"}</td>
     </tr>
   ))}
 </Table>
 ```
 
 ### 3. Header Summary
+
 ```typescript
 <h2>Tự động tạo {data.totalSessions} buổi học</h2>
 <p>Từ {data.dateRange.startDate} đến {data.dateRange.endDate}</p>
@@ -116,12 +124,16 @@ interface Session {
   sessionId: number;
   sequenceNumber: number;
   date: string;
-  dayOfWeek: string;  // "Thứ Hai", "Thứ Ba", ...
+  dayOfWeek: string; // "Thứ Hai", "Thứ Ba", ...
   courseSessionName: string;
   hasTimeSlot: boolean;
   hasResource: boolean;
   hasTeacher: boolean;
-  timeSlotInfo: { startTime: string; endTime: string; displayName: string } | null;
+  timeSlotInfo: {
+    startTime: string;
+    endTime: string;
+    displayName: string;
+  } | null;
 }
 
 interface WeekGroup {
