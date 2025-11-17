@@ -4,14 +4,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesResponse;
+import org.fyp.tmssep490be.dtos.createclass.AssignSessionResourceRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignSessionResourceResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTeacherRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTeacherResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
+import org.fyp.tmssep490be.dtos.createclass.AvailableResourceDTO;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
 import org.fyp.tmssep490be.dtos.createclass.PreviewClassCodeResponse;
 import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
+import org.fyp.tmssep490be.dtos.createclass.TeacherDayAvailabilityDTO;
 // import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
 import org.fyp.tmssep490be.dtos.classmanagement.*;
@@ -69,6 +73,8 @@ public class ClassServiceImpl implements ClassService {
     private final CourseSessionRepository courseSessionRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
     private final SessionResourceRepository sessionResourceRepository;
+    private final ResourceRepository resourceRepository;
+    private final TeacherAvailabilityRepository teacherAvailabilityRepository;
 
     // Services for Create Class workflow
     private final SessionGenerationService sessionGenerationService;
@@ -980,6 +986,47 @@ public class ClassServiceImpl implements ClassService {
                 }
             }
 
+            // Get resource name
+            String resourceName = null;
+            if (hasResource) {
+                List<SessionResource> sessionResources = sessionResourceRepository.findBySessionId(session.getId());
+                if (!sessionResources.isEmpty()) {
+                    // Get first resource name (usually only one resource per session)
+                    Resource resource = sessionResources.get(0).getResource();
+                    if (resource != null) {
+                        resourceName = resource.getName();
+                    }
+                }
+            }
+            
+            // Get teachers assigned to this session
+            List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.TeacherInfoDTO> teacherInfos = new java.util.ArrayList<>();
+            String teacherName = null;
+            if (hasTeacher) {
+                List<TeachingSlot> teachingSlots = teachingSlotRepository.findBySessionIdAndStatus(
+                        session.getId(), TeachingSlotStatus.SCHEDULED
+                );
+                
+                teacherInfos = teachingSlots.stream()
+                        .filter(slot -> slot.getTeacher() != null)
+                        .map(slot -> {
+                            Teacher teacher = slot.getTeacher();
+                            return org.fyp.tmssep490be.dtos.createclass.SessionListResponse.TeacherInfoDTO.builder()
+                                    .teacherId(teacher.getId())
+                                    .fullName(teacher.getUserAccount().getFullName())
+                                    .employeeCode(teacher.getEmployeeCode())
+                                    .build();
+                        })
+                        .collect(Collectors.toList());
+                
+                // Create comma-separated teacher name string
+                if (!teacherInfos.isEmpty()) {
+                    teacherName = teacherInfos.stream()
+                            .map(org.fyp.tmssep490be.dtos.createclass.SessionListResponse.TeacherInfoDTO::getFullName)
+                            .collect(Collectors.joining(", "));
+                }
+            }
+
             // Get day of week name
             String dayOfWeek = getDayName(session.getDate().getDayOfWeek().getValue());
 
@@ -995,6 +1042,9 @@ public class ClassServiceImpl implements ClassService {
                     .hasResource(hasResource)
                     .hasTeacher(hasTeacher)
                     .timeSlotInfo(timeSlotInfo)
+                    .resourceName(resourceName)
+                    .teacherName(teacherName)
+                    .teachers(teacherInfos)
                     .build());
         }
 
@@ -1241,6 +1291,76 @@ public class ClassServiceImpl implements ClassService {
     }
 
     @Override
+    @Transactional
+    public AssignSessionResourceResponse assignResourceToSession(
+            Long classId,
+            Long sessionId,
+            AssignSessionResourceRequest request,
+            Long userId
+    ) {
+        log.info("Quick fix assign resource {} -> session {} (class {}) by user {}", request.getResourceId(), sessionId, classId, userId);
+
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        validateClassBranchAccess(classEntity, userId);
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SESSION_NOT_FOUND));
+
+        if (!session.getClassEntity().getId().equals(classId)) {
+            throw new CustomException(ErrorCode.SESSION_NOT_FOUND);
+        }
+
+        resourceAssignmentService.assignResourceToSession(sessionId, request.getResourceId());
+
+        Resource resource = resourceRepository.findById(request.getResourceId())
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        return AssignSessionResourceResponse.builder()
+                .classId(classId)
+                .sessionId(sessionId)
+                .sessionDate(session.getDate() != null ? session.getDate().toString() : null)
+                .resourceId(resource.getId())
+                .resourceCode(resource.getCode())
+                .resourceName(resource.getName())
+                .resolved(true)
+                .message("Resource assigned successfully")
+                .build();
+    }
+
+    @Override
+    public List<AvailableResourceDTO> getAvailableResourcesForSession(Long classId, Long sessionId, Long userId) {
+        log.info("Fetching resource suggestions for session {} in class {}", sessionId, classId);
+
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        validateClassBranchAccess(classEntity, userId);
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SESSION_NOT_FOUND));
+
+        if (!session.getClassEntity().getId().equals(classId)) {
+            throw new CustomException(ErrorCode.SESSION_NOT_FOUND);
+        }
+
+        ResourceType resourceType = classEntity.getModality() == Modality.ONLINE
+                ? ResourceType.VIRTUAL
+                : ResourceType.ROOM;
+
+        List<Resource> availableResources = resourceAssignmentService.queryAvailableResources(
+                classId,
+                sessionId,
+                resourceType
+        );
+
+        return availableResources.stream()
+                .map(AvailableResourceDTO::basic)
+                .toList();
+    }
+
+    @Override
     public ValidateClassResponse validateClass(Long classId, Long userId) {
         log.info("Validating class ID: {} by user ID: {}", classId, userId);
 
@@ -1249,8 +1369,8 @@ public class ClassServiceImpl implements ClassService {
             ClassEntity classEntity = classRepository.findById(classId)
                     .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
 
-            // Check user has access to this class's branch
-            validateClassAccess(classEntity, userId);
+            // Check user has access to this class's branch (without approval status check)
+            validateClassBranchAccess(classEntity, userId);
 
             // Delegate to validation service for comprehensive validation
             ValidateClassResponse validationResponse = validationService.validateClassComplete(classId);
@@ -1424,7 +1544,40 @@ public class ClassServiceImpl implements ClassService {
             List<TeacherAvailabilityDTO> teachers = 
                     teacherAssignmentService.queryAvailableTeachersWithPrecheck(classId);
 
+            // Populate schedule information for UNAVAILABLE teachers
+            populateScheduleInformation(teachers, classId);
+
             log.info("Found {} available teachers for class ID: {}", teachers.size(), classId);
+            return teachers;
+
+        } catch (CustomException e) {
+            log.error("Failed to get available teachers: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error getting available teachers for class ID: {}", classId, e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public List<TeacherDayAvailabilityDTO> getTeachersAvailableByDay(Long classId, Long userId) {
+        log.info("Getting teachers available by day for class ID: {} by user ID: {}", classId, userId);
+
+        try {
+            // Validate class exists and user has access
+            ClassEntity classEntity = classRepository.findById(classId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+            List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(userId);
+            if (!userBranchIds.contains(classEntity.getBranch().getId())) {
+                throw new CustomException(ErrorCode.CLASS_ACCESS_DENIED);
+            }
+
+            // Execute day-level availability query via TeacherAssignmentService
+            List<TeacherDayAvailabilityDTO> teachers = 
+                    teacherAssignmentService.queryTeachersAvailableByDay(classId);
+
+            log.info("Found {} teachers with day-level availability for class ID: {}", teachers.size(), classId);
             return teachers;
 
         } catch (CustomException e) {
@@ -1434,6 +1587,136 @@ public class ClassServiceImpl implements ClassService {
             log.error("Unexpected error getting available teachers for class ID: {}", classId, e);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Populate schedule information for UNAVAILABLE teachers to show detailed mismatch message
+     * <p>
+     * For teachers with noAvailability = totalSessions, populate:
+     * - teacherSchedule: What teacher registered (e.g., "T3/T5/T7 Chiều")
+     * - classSchedule: What class needs (e.g., "T2/T4/T6 Sáng")
+     * </p>
+     */
+    private void populateScheduleInformation(List<TeacherAvailabilityDTO> teachers, Long classId) {
+        // Get class schedule once (reuse for all teachers)
+        TeacherAvailabilityDTO.ScheduleInfo classSchedule = getClassSchedule(classId);
+        
+        for (TeacherAvailabilityDTO teacher : teachers) {
+            // Populate for ANY teacher with noAvailability conflicts (partial or full)
+            // This includes:
+            // - UNAVAILABLE (0% availability) with full noAvailability
+            // - PARTIALLY_AVAILABLE (1-99%) with some noAvailability (e.g., missing Friday)
+            if (teacher.getConflicts().getNoAvailability() > 0) {
+                
+                // Get teacher's registered schedule
+                TeacherAvailabilityDTO.ScheduleInfo teacherSchedule = getTeacherSchedule(teacher.getTeacherId());
+                
+                if (teacherSchedule != null && classSchedule != null) {
+                    teacher.setTeacherSchedule(teacherSchedule);
+                    teacher.setClassSchedule(classSchedule);
+                }
+            }
+        }
+    }
+
+    /**
+     * Get teacher's registered availability schedule
+     */
+    private TeacherAvailabilityDTO.ScheduleInfo getTeacherSchedule(Long teacherId) {
+        List<TeacherAvailability> availabilities = teacherAvailabilityRepository.findByTeacherId(teacherId);
+        
+        if (availabilities.isEmpty()) {
+            return null;
+        }
+
+        // Extract unique days and time slot from teacher's availability
+        List<String> days = availabilities.stream()
+                .map(a -> getDayAbbreviation(a.getId().getDayOfWeek().intValue()))
+                .distinct()
+                .sorted(Comparator.comparingInt(this::getDayOrder))
+                .collect(Collectors.toList());
+
+        // Assume all availabilities have same time slot (teacher registers for one shift)
+        TimeSlotTemplate timeSlot = availabilities.get(0).getTimeSlotTemplate();
+        
+        return TeacherAvailabilityDTO.ScheduleInfo.builder()
+                .days(days)
+                .timeSlot(timeSlot.getName())
+                .location(extractLocationFromTimeSlot(timeSlot.getName()))
+                .build();
+    }
+
+    /**
+     * Get class required schedule from sessions
+     */
+    private TeacherAvailabilityDTO.ScheduleInfo getClassSchedule(Long classId) {
+        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
+        
+        if (sessions.isEmpty()) {
+            return null;
+        }
+
+        // Extract unique days from sessions
+        List<String> days = sessions.stream()
+                .map(s -> getDayAbbreviation(s.getDate().getDayOfWeek().getValue()))
+                .distinct()
+                .sorted(Comparator.comparingInt(this::getDayOrder))
+                .collect(Collectors.toList());
+
+        // Assume all sessions have same time slot
+        TimeSlotTemplate timeSlot = sessions.get(0).getTimeSlotTemplate();
+        
+        return TeacherAvailabilityDTO.ScheduleInfo.builder()
+                .days(days)
+                .timeSlot(timeSlot.getName())
+                .location(extractLocationFromTimeSlot(timeSlot.getName()))
+                .build();
+    }
+
+    /**
+     * Convert day of week number to Vietnamese abbreviation
+     * @param dayOfWeek 1=Monday, 2=Tuesday, ..., 7=Sunday, 0=Sunday (PostgreSQL format)
+     */
+    private String getDayAbbreviation(Integer dayOfWeek) {
+        Map<Integer, String> dayMap = Map.of(
+                0, "CN",  // Sunday (PostgreSQL format)
+                1, "T2",  // Monday
+                2, "T3",  // Tuesday
+                3, "T4",  // Wednesday
+                4, "T5",  // Thursday
+                5, "T6",  // Friday
+                6, "T7",  // Saturday
+                7, "CN"   // Sunday (alternative)
+        );
+        return dayMap.getOrDefault(dayOfWeek, "T" + dayOfWeek);
+    }
+
+    /**
+     * Get day order for sorting (Monday first)
+     */
+    private Integer getDayOrder(String dayAbbr) {
+        Map<String, Integer> orderMap = Map.of(
+                "T2", 1,
+                "T3", 2,
+                "T4", 3,
+                "T5", 4,
+                "T6", 5,
+                "T7", 6,
+                "CN", 7
+        );
+        return orderMap.getOrDefault(dayAbbr, 99);
+    }
+
+    /**
+     * Extract location from time slot name (e.g., "HN Morning 1" → "HN")
+     */
+    private String extractLocationFromTimeSlot(String timeSlotName) {
+        if (timeSlotName == null) {
+            return "";
+        }
+        // Time slot format: "HN Morning 1", "HCM Afternoon 1"
+        String[] parts = timeSlotName.split(" ");
+        return parts.length > 0 ? parts[0] : "";
     }
 
     @Override

@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.createclass.AssignTeacherRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTeacherResponse;
 import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
+import org.fyp.tmssep490be.dtos.createclass.TeacherDayAvailabilityDTO;
 import org.fyp.tmssep490be.entities.ClassEntity;
 import org.fyp.tmssep490be.entities.Teacher;
 import org.fyp.tmssep490be.entities.enums.Skill;
@@ -21,9 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -315,4 +318,133 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         }
         return Integer.valueOf(value.toString());
     }
+
+    /**
+     * Query teachers available by specific days of week (for multi-teacher assignment)
+     * <p>
+     * Returns teachers who are available for AT LEAST ONE FULL DAY (all sessions on that day).
+     * A teacher is only included for a day if they can teach ALL sessions on that day from start to end.
+     * </p>
+     * <p>
+     * <b>Use Case:</b> "Phân công nhiều giáo viên" mode where:
+     * <ul>
+     *   <li>John Smith teaches all Mondays (8 sessions)</li>
+     *   <li>Lisa Chen teaches all Wednesdays (8 sessions)</li>
+     *   <li>Anna Martinez teaches all Fridays (8 sessions)</li>
+     * </ul>
+     * </p>
+     * 
+     * @param classId Class ID
+     * @return List of teachers with available days (only fully available days)
+     */
+    @Override
+    public List<TeacherDayAvailabilityDTO> queryTeachersAvailableByDay(Long classId) {
+        log.info("Querying teachers available by day for class {}", classId);
+        long startTime = System.currentTimeMillis();
+
+        // Validate class exists
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        // Execute query
+        List<Object[]> rawResults = teacherRepository.findAvailableTeachersByDay(classId);
+
+        // Group results by teacher ID
+        Map<Long, List<Object[]>> groupedByTeacher = rawResults.stream()
+                .collect(Collectors.groupingBy(row -> convertToLong(row[0])));
+
+        // Get total sessions for percentage calculation
+        long totalSessions = sessionRepository.countByClassEntityId(classId);
+
+        // Map to DTOs
+        List<TeacherDayAvailabilityDTO> teachers = groupedByTeacher.entrySet().stream()
+                .map(entry -> mapToTeacherDayAvailabilityDTO(entry.getValue(), totalSessions))
+                .filter(teacher -> !teacher.getAvailableDays().isEmpty()) // Only include teachers with at least 1 available day
+                .collect(Collectors.toList());
+
+        long processingTime = System.currentTimeMillis() - startTime;
+        log.info("Query completed in {}ms. Found {} teachers with day availability", processingTime, teachers.size());
+
+        return teachers;
+    }
+
+    /**
+     * Map raw SQL result rows to TeacherDayAvailabilityDTO
+     * <p>
+     * Expected row format from SQL query:
+     * [0] teacher_id, [1] full_name, [2] email, [3] employee_code, [4] skills (comma-separated),
+     * [5] has_general_skill, [6] day_of_week, [7] day_name, [8] total_sessions, [9] available_sessions,
+     * [10] first_date, [11] last_date, [12] time_slot_display
+     * </p>
+     */
+    private TeacherDayAvailabilityDTO mapToTeacherDayAvailabilityDTO(List<Object[]> rows, long totalClassSessions) {
+        if (rows.isEmpty()) {
+            return null;
+        }
+
+        // First row contains teacher basic info (same across all rows)
+        Object[] firstRow = rows.get(0);
+        Long teacherId = convertToLong(firstRow[0]);
+        String fullName = (String) firstRow[1];
+        String email = (String) firstRow[2];
+        String employeeCode = (String) firstRow[3];
+        String skillsStr = (String) firstRow[4];
+        Boolean hasGeneralSkill = (Boolean) firstRow[5];
+
+        // Parse skills
+        List<Skill> skills = parseSkills(skillsStr);
+
+        // Build day availability list from all rows
+        List<TeacherDayAvailabilityDTO.DayAvailability> availableDays = rows.stream()
+                .map(row -> {
+                    Short dayOfWeek = ((Number) row[6]).shortValue();
+                    String dayName = (String) row[7];
+                    Integer totalSessions = convertToInteger(row[8]);
+                    Integer availableSessions = convertToInteger(row[9]);
+                    LocalDate firstDate = row[10] != null ? ((java.sql.Date) row[10]).toLocalDate() : null;
+                    LocalDate lastDate = row[11] != null ? ((java.sql.Date) row[11]).toLocalDate() : null;
+                    String timeSlotDisplay = (String) row[12];
+
+                    return TeacherDayAvailabilityDTO.DayAvailability.builder()
+                            .dayOfWeek(dayOfWeek)
+                            .dayName(dayName)
+                            .totalSessions(totalSessions)
+                            .availableSessions(availableSessions)
+                            .firstDate(firstDate)
+                            .lastDate(lastDate)
+                            .isFullyAvailable(availableSessions.equals(totalSessions))
+                            .timeSlotDisplay(timeSlotDisplay)
+                            .build();
+                })
+                .filter(day -> day.getIsFullyAvailable()) // Only include fully available days
+                .collect(Collectors.toList());
+
+        return TeacherDayAvailabilityDTO.builder()
+                .teacherId(teacherId)
+                .fullName(fullName)
+                .email(email)
+                .employeeCode(employeeCode)
+                .skills(skills)
+                .hasGeneralSkill(hasGeneralSkill != null && hasGeneralSkill)
+                .availableDays(availableDays)
+                .totalClassSessions((int) totalClassSessions)
+                .build();
+    }
+
+    /**
+     * Get day name in Vietnamese from day of week number
+     */
+    private String getDayName(int dayOfWeek) {
+        return switch (dayOfWeek) {
+            case 1 -> "Thứ Hai";
+            case 2 -> "Thứ Ba";
+            case 3 -> "Thứ Tư";
+            case 4 -> "Thứ Năm";
+            case 5 -> "Thứ Sáu";
+            case 6 -> "Thứ Bảy";
+            case 7 -> "Chủ Nhật";
+            default -> "Unknown";
+        };
+    }
 }
+

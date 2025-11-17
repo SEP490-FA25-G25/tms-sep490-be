@@ -78,4 +78,27 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
            "LEFT JOIN FETCH r.branch " +
            "WHERE r.id = :resourceId")
     Resource findByIdWithBranch(@Param("resourceId") Long resourceId);
+
+    /**
+     * Find resources by branch, type, and minimum capacity (for Step 4 query)
+     * <p>
+     * Returns all resources that match basic criteria without checking conflicts.
+     * Conflicts are checked separately in the service layer.
+     * </p>
+     *
+     * @param branchId     branch ID
+     * @param resourceType resource type filter
+     * @param minCapacity  minimum capacity required
+     * @return list of matching resources ordered by capacity
+     */
+    @Query("SELECT r FROM Resource r " +
+           "WHERE r.branch.id = :branchId " +
+           "AND r.resourceType = :resourceType " +
+           "AND r.capacity >= :minCapacity " +
+           "ORDER BY r.capacity ASC, r.name ASC")
+    List<Resource> findByBranchAndTypeAndCapacity(
+            @Param("branchId") Long branchId,
+            @Param("resourceType") ResourceType resourceType,
+            @Param("minCapacity") Integer minCapacity
+    );
 }

@@ -231,58 +231,230 @@ SELECT (id - 100), id, 'STD-' || LPAD((id - 100)::text, 4, '0'),
 '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'
 FROM user_account WHERE id >= 101;
 
--- Teacher Skills
-INSERT INTO teacher_skill (teacher_id, skill, specialization, language, level) VALUES
--- HN Teachers
-(1, 'GENERAL', 'IELTS', 'English', 5),
-(1, 'SPEAKING', 'IELTS Speaking', 'English', 5),
-(1, 'LISTENING', 'IELTS Listening', 'English', 5),
-(2, 'WRITING', 'IELTS Writing', 'English', 5),
-(2, 'READING', 'IELTS Reading', 'English', 5),
-(3, 'GENERAL', 'IELTS', 'English', 4),
-(3, 'SPEAKING', 'IELTS Speaking', 'English', 5),
-(4, 'WRITING', 'IELTS Writing', 'English', 4),
-(4, 'GENERAL', 'IELTS', 'English', 4),
-(5, 'LISTENING', 'IELTS Listening', 'English', 5),
-(5, 'SPEAKING', 'IELTS Speaking', 'English', 4),
-(6, 'READING', 'IELTS Reading', 'English', 5),
-(6, 'GENERAL', 'IELTS', 'English', 4),
-(7, 'GENERAL', 'IELTS', 'English', 5),
-(7, 'WRITING', 'IELTS Writing', 'English', 4),
-(8, 'SPEAKING', 'IELTS Speaking', 'English', 5),
-(8, 'LISTENING', 'IELTS Listening', 'English', 4),
--- HCM Teachers
-(9, 'GENERAL', 'IELTS', 'English', 5),
-(9, 'SPEAKING', 'IELTS Speaking', 'English', 5),
-(10, 'WRITING', 'IELTS Writing', 'English', 5),
-(10, 'READING', 'IELTS Reading', 'English', 5),
-(11, 'GENERAL', 'IELTS', 'English', 4),
-(11, 'LISTENING', 'IELTS Listening', 'English', 5),
-(12, 'SPEAKING', 'IELTS Speaking', 'English', 5),
-(12, 'GENERAL', 'IELTS', 'English', 4),
-(13, 'WRITING', 'IELTS Writing', 'English', 4),
-(13, 'READING', 'IELTS Reading', 'English', 5),
-(14, 'GENERAL', 'IELTS', 'English', 5),
-(14, 'LISTENING', 'IELTS Listening', 'English', 5),
-(15, 'SPEAKING', 'IELTS Speaking', 'English', 4),
-(15, 'WRITING', 'IELTS Writing', 'English', 4),
-(16, 'GENERAL', 'IELTS', 'English', 5),
-(16, 'READING', 'IELTS Reading', 'English', 5);
+-- ========== TEACHER SKILLS (Complete profiles with IELTS band scores) ==========
+-- Each teacher has all 5 skills: GENERAL, LISTENING, READING, WRITING, SPEAKING
+-- Level represents IELTS band scores: 6.5-9.0 scale
 
--- Teacher Availability (Sample for key teachers)
+INSERT INTO teacher_skill (teacher_id, skill, specialization, language, level) VALUES
+
+-- ===== HANOI TEACHERS (1-8) =====
+
+-- Teacher 1 (John Smith): GENERAL EXCELLENCE (Band 9.0 overall)
+(1, 'GENERAL', 'IELTS', 'English', 9.0),
+(1, 'LISTENING', 'IELTS Listening', 'English', 9.0),
+(1, 'READING', 'IELTS Reading', 'English', 8.5),
+(1, 'WRITING', 'IELTS Writing', 'English', 8.5),
+(1, 'SPEAKING', 'IELTS Speaking', 'English', 9.0),
+
+-- Teacher 2 (Emma Wilson): WRITING & READING SPECIALIST (Band 8.5 overall)
+(2, 'GENERAL', 'IELTS', 'English', 8.0),
+(2, 'LISTENING', 'IELTS Listening', 'English', 8.0),
+(2, 'READING', 'IELTS Reading', 'English', 9.0),
+(2, 'WRITING', 'IELTS Writing', 'English', 9.0),
+(2, 'SPEAKING', 'IELTS Speaking', 'English', 7.5),
+
+-- Teacher 3 (David Lee): SPEAKING SPECIALIST (Band 8.0 overall)
+(3, 'GENERAL', 'IELTS', 'English', 8.0),
+(3, 'LISTENING', 'IELTS Listening', 'English', 8.0),
+(3, 'READING', 'IELTS Reading', 'English', 7.5),
+(3, 'WRITING', 'IELTS Writing', 'English', 7.5),
+(3, 'SPEAKING', 'IELTS Speaking', 'English', 9.0),
+
+-- Teacher 4 (Sarah Johnson): BALANCED PROFILE (Band 8.0 overall)
+(4, 'GENERAL', 'IELTS', 'English', 8.0),
+(4, 'LISTENING', 'IELTS Listening', 'English', 8.0),
+(4, 'READING', 'IELTS Reading', 'English', 8.0),
+(4, 'WRITING', 'IELTS Writing', 'English', 8.0),
+(4, 'SPEAKING', 'IELTS Speaking', 'English', 8.0),
+
+-- Teacher 5 (Michael Brown): LISTENING & SPEAKING FOCUS (Band 7.5 overall)
+(5, 'GENERAL', 'IELTS', 'English', 7.5),
+(5, 'LISTENING', 'IELTS Listening', 'English', 8.5),
+(5, 'READING', 'IELTS Reading', 'English', 7.0),
+(5, 'WRITING', 'IELTS Writing', 'English', 7.0),
+(5, 'SPEAKING', 'IELTS Speaking', 'English', 8.5),
+
+-- Teacher 6 (Lisa Chen): READING SPECIALIST (Band 8.5 overall)
+(6, 'GENERAL', 'IELTS', 'English', 8.5),
+(6, 'LISTENING', 'IELTS Listening', 'English', 8.0),
+(6, 'READING', 'IELTS Reading', 'English', 9.0),
+(6, 'WRITING', 'IELTS Writing', 'English', 8.0),
+(6, 'SPEAKING', 'IELTS Speaking', 'English', 8.5),
+
+-- Teacher 7 (James Taylor): WRITING FOCUS (Band 7.5 overall)
+(7, 'GENERAL', 'IELTS', 'English', 7.5),
+(7, 'LISTENING', 'IELTS Listening', 'English', 7.5),
+(7, 'READING', 'IELTS Reading', 'English', 7.5),
+(7, 'WRITING', 'IELTS Writing', 'English', 8.5),
+(7, 'SPEAKING', 'IELTS Speaking', 'English', 7.0),
+
+-- Teacher 8 (Anna Martinez): ALL-ROUNDER (Band 8.0 overall)
+(8, 'GENERAL', 'IELTS', 'English', 8.0),
+(8, 'LISTENING', 'IELTS Listening', 'English', 8.0),
+(8, 'READING', 'IELTS Reading', 'English', 8.0),
+(8, 'WRITING', 'IELTS Writing', 'English', 8.0),
+(8, 'SPEAKING', 'IELTS Speaking', 'English', 8.5),
+
+-- ===== HO CHI MINH TEACHERS (9-16) =====
+
+-- Teacher 9 (Chris Evans): SPEAKING & LISTENING EXPERT (Band 9.0 overall)
+(9, 'GENERAL', 'IELTS', 'English', 9.0),
+(9, 'LISTENING', 'IELTS Listening', 'English', 9.0),
+(9, 'READING', 'IELTS Reading', 'English', 8.5),
+(9, 'WRITING', 'IELTS Writing', 'English', 8.5),
+(9, 'SPEAKING', 'IELTS Speaking', 'English', 9.0),
+
+-- Teacher 10 (Olivia White): WRITING SPECIALIST (Band 8.5 overall)
+(10, 'GENERAL', 'IELTS', 'English', 8.5),
+(10, 'LISTENING', 'IELTS Listening', 'English', 8.0),
+(10, 'READING', 'IELTS Reading', 'English', 8.5),
+(10, 'WRITING', 'IELTS Writing', 'English', 9.0),
+(10, 'SPEAKING', 'IELTS Speaking', 'English', 8.0),
+
+-- Teacher 11 (Daniel Harris): READING FOCUS (Band 8.0 overall)
+(11, 'GENERAL', 'IELTS', 'English', 8.0),
+(11, 'LISTENING', 'IELTS Listening', 'English', 7.5),
+(11, 'READING', 'IELTS Reading', 'English', 9.0),
+(11, 'WRITING', 'IELTS Writing', 'English', 7.5),
+(11, 'SPEAKING', 'IELTS Speaking', 'English', 8.0),
+
+-- Teacher 12 (Sophia Clark): BALANCED HIGH PERFORMER (Band 8.5 overall)
+(12, 'GENERAL', 'IELTS', 'English', 8.5),
+(12, 'LISTENING', 'IELTS Listening', 'English', 8.5),
+(12, 'READING', 'IELTS Reading', 'English', 8.5),
+(12, 'WRITING', 'IELTS Writing', 'English', 8.5),
+(12, 'SPEAKING', 'IELTS Speaking', 'English', 8.5),
+
+-- Teacher 13 (Matthew Lewis): LISTENING SPECIALIST (Band 7.5 overall)
+(13, 'GENERAL', 'IELTS', 'English', 7.5),
+(13, 'LISTENING', 'IELTS Listening', 'English', 9.0),
+(13, 'READING', 'IELTS Reading', 'English', 7.0),
+(13, 'WRITING', 'IELTS Writing', 'English', 7.0),
+(13, 'SPEAKING', 'IELTS Speaking', 'English', 7.5),
+
+-- Teacher 14 (Ava Robinson): SPEAKING EXPERT (Band 8.5 overall)
+(14, 'GENERAL', 'IELTS', 'English', 8.5),
+(14, 'LISTENING', 'IELTS Listening', 'English', 8.5),
+(14, 'READING', 'IELTS Reading', 'English', 8.0),
+(14, 'WRITING', 'IELTS Writing', 'English', 8.0),
+(14, 'SPEAKING', 'IELTS Speaking', 'English', 9.0),
+
+-- Teacher 15 (Andrew Walker): WRITING & READING (Band 7.5 overall)
+(15, 'GENERAL', 'IELTS', 'English', 7.5),
+(15, 'LISTENING', 'IELTS Listening', 'English', 7.0),
+(15, 'READING', 'IELTS Reading', 'English', 8.0),
+(15, 'WRITING', 'IELTS Writing', 'English', 8.5),
+(15, 'SPEAKING', 'IELTS Speaking', 'English', 7.0),
+
+-- Teacher 16 (Isabella Young): ALL-ROUNDER (Band 8.0 overall)
+(16, 'GENERAL', 'IELTS', 'English', 8.0),
+(16, 'LISTENING', 'IELTS Listening', 'English', 8.0),
+(16, 'READING', 'IELTS Reading', 'English', 8.5),
+(16, 'WRITING', 'IELTS Writing', 'English', 8.0),
+(16, 'SPEAKING', 'IELTS Speaking', 'English', 7.5);
+
+-- ========== TEACHER AVAILABILITY (Organized by Test Scenarios) ==========
+-- Class Schedule Reference for Testing:
+-- - Class 6 (HN): Mon/Wed/Fri (T2/T4/T6) - Morning 1 (08:00-10:00) - time_slot_id = 1
+-- - Class 5 (HCM): Mon/Wed/Fri (T2/T4/T6) - Morning (08:30-10:30) - time_slot_id = 6
+-- Day mapping: 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday, 0=Sunday
+
 INSERT INTO teacher_availability (teacher_id, time_slot_template_id, day_of_week, effective_date, created_at, updated_at) VALUES
--- Teacher 1 (HN) - Available Mon/Wed/Fri mornings
-(1, 1, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday
-(1, 1, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday
-(1, 1, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Friday
--- Teacher 2 (HN) - Available Tue/Thu/Sat afternoons
-(2, 3, 2, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Tuesday
-(2, 3, 4, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Thursday
-(2, 3, 6, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Saturday
--- Teacher 9 (HCM) - Available Mon/Wed/Fri
-(9, 6, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'),
-(9, 6, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'),
-(9, 6, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07');
+
+-- ===== HANOI TEACHERS (1-8) =====
+
+-- Teacher 1 (John Smith): PERFECT MATCH for Class 6
+-- Available: Mon/Wed/Fri Morning 1 → Matches Class 6 exactly
+(1, 1, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday Morning 1
+(1, 1, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday Morning 1
+(1, 1, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Friday Morning 1
+
+-- Teacher 2 (Emma Wilson): SCHEDULE MISMATCH - Different days, different time
+-- Available: Tue/Thu/Sat Afternoon 1 → Days don't match Class 6
+(2, 3, 2, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Tuesday Afternoon 1
+(2, 3, 4, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Thursday Afternoon 1
+(2, 3, 6, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Saturday Afternoon 1
+
+-- Teacher 3 (David Lee): NO AVAILABILITY REGISTERED
+-- Use case: Test "Chưa đăng ký lịch làm việc" message
+
+-- Teacher 4 (Sarah Johnson): PARTIAL MATCH - Same days, different time
+-- Available: Mon/Wed/Fri Morning 2 → Days match but time doesn't
+(4, 2, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday Morning 2
+(4, 2, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday Morning 2
+(4, 2, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Friday Morning 2
+
+-- Teacher 5 (Michael Brown): PARTIAL MATCH - Only 2 of 3 days available
+-- Available: Mon/Wed Morning 1 → Missing Friday
+(5, 1, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday Morning 1
+(5, 1, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday Morning 1
+
+-- Teacher 6 (Lisa Chen): PERFECT MATCH for Class 6
+-- Available: Mon/Wed/Fri Morning 1
+(6, 1, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday Morning 1
+(6, 1, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday Morning 1
+(6, 1, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Friday Morning 1
+
+-- Teacher 7 (James Taylor): SCHEDULE MISMATCH - Same time, different days
+-- Available: Tue/Thu Evening → Neither days nor time match
+(7, 5, 2, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Tuesday Evening
+(7, 5, 4, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Thursday Evening
+
+-- Teacher 8 (Anna Martinez): OVER-AVAILABLE - Available more days than needed
+-- Available: Mon/Tue/Wed/Thu/Fri Morning 1 → Includes all Class 6 days + extras
+(8, 1, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday Morning 1
+(8, 1, 2, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Tuesday Morning 1
+(8, 1, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday Morning 1
+(8, 1, 4, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Thursday Morning 1
+(8, 1, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Friday Morning 1
+
+-- ===== HO CHI MINH TEACHERS (9-16) =====
+
+-- Teacher 9 (Chris Evans): PERFECT MATCH for Class 5
+-- Available: Mon/Wed/Fri HCM Morning → Matches Class 5 exactly
+(9, 6, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday HCM Morning
+(9, 6, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday HCM Morning
+(9, 6, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Friday HCM Morning
+
+-- Teacher 10 (Olivia White): SCHEDULE MISMATCH - Different time slot
+-- Available: Mon/Wed/Fri HCM Afternoon → Days match but time doesn't
+(10, 7, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday HCM Afternoon
+(10, 7, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday HCM Afternoon
+(10, 7, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Friday HCM Afternoon
+
+-- Teacher 11 (Daniel Harris): NO AVAILABILITY REGISTERED
+-- Use case: Test "Chưa đăng ký lịch làm việc" message
+
+-- Teacher 12 (Sophia Clark): PARTIAL MATCH - Only 2 of 3 days
+-- Available: Mon/Fri HCM Morning → Missing Wednesday
+(12, 6, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday HCM Morning
+(12, 6, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Friday HCM Morning
+
+-- Teacher 13 (Matthew Lewis): SCHEDULE MISMATCH - Different days
+-- Available: Tue/Thu/Sat HCM Morning → Days don't match
+(13, 6, 2, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Tuesday HCM Morning
+(13, 6, 4, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Thursday HCM Morning
+(13, 6, 6, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Saturday HCM Morning
+
+-- Teacher 14 (Ava Robinson): PERFECT MATCH for Class 5
+-- Available: Mon/Wed/Fri HCM Morning
+(14, 6, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday HCM Morning
+(14, 6, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday HCM Morning
+(14, 6, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Friday HCM Morning
+
+-- Teacher 15 (Andrew Walker): SCHEDULE MISMATCH - Different time
+-- Available: Mon/Wed/Fri HCM Evening → Days match but time doesn't
+(15, 8, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday HCM Evening
+(15, 8, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday HCM Evening
+(15, 8, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Friday HCM Evening
+
+-- Teacher 16 (Isabella Young): OVER-AVAILABLE - Available all weekdays
+-- Available: Mon-Fri HCM Morning → Includes all Class 5 days + extras
+(16, 6, 1, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Monday HCM Morning
+(16, 6, 2, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Tuesday HCM Morning
+(16, 6, 3, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Wednesday HCM Morning
+(16, 6, 4, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'), -- Thursday HCM Morning
+(16, 6, 5, '2024-02-01', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'); -- Friday HCM Morning
 
 -- ========== TIER 3: CURRICULUM (Complete Definition) ==========
 

@@ -28,6 +28,16 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
     List<TeachingSlot> findByClassEntityIdAndStatus(@Param("classId") Long classId, @Param("status") TeachingSlotStatus status);
     
     /**
+     * Get all teaching slots for a specific session with given status
+     * Used for STEP 2 & STEP 5: Show which teachers are assigned to each session
+     */
+    @Query("SELECT ts FROM TeachingSlot ts " +
+           "LEFT JOIN FETCH ts.teacher t " +
+           "LEFT JOIN FETCH t.userAccount " +
+           "WHERE ts.session.id = :sessionId AND ts.status = :status")
+    List<TeachingSlot> findBySessionIdAndStatus(@Param("sessionId") Long sessionId, @Param("status") TeachingSlotStatus status);
+    
+    /**
      * Check if teacher owns (is assigned to) a session
      * Teacher owns session if there's a teaching_slot with status SCHEDULED or SUBSTITUTED
      */

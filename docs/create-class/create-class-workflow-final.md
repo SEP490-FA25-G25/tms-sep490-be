@@ -413,11 +413,13 @@ END FUNCTION
 **SessionResourceRepository:**
 
 - `bulkAssignResource(classId, dayOfWeek, resourceId, resourceType)`: Bulk insert using SQL (see Phase 1 above)
+- `batchCountConflictsByResourcesAcrossAllClasses(resourceIds, dates, timeSlotIds, excludeClassId)`: **NEW** - Batch count conflicts for multiple resources in single query
 
 **SessionRepository:**
 
 - `findUnassignedSessionsByDayOfWeek(classId, dayOfWeek)`: Find sessions without resource
 - `findConflictingSession(resourceId, date, timeslotId)`: Find which session is blocking the resource
+- `findByClassIdAndDayOfWeek(classId, dayOfWeek)`: **NEW** - Get all sessions for a specific day of week
 
 #### Result Example
 
@@ -434,13 +436,21 @@ AutoPropagateResult:
 
 #### Performance Comparison
 
-| Approach             | Sessions | DB Queries                        | Time         |
-| -------------------- | -------- | --------------------------------- | ------------ |
-| **Pure Java (loop)** | 36       | ~144 queries (4 per session)      | ~2-3 seconds |
-| **Pure SQL (bulk)**  | 36       | 3 queries (1 per day)             | ~50-100ms    |
-| **Hybrid**           | 36       | 6 queries (bulk + find conflicts) | ~100-200ms   |
+| Approach             | Sessions | DB Queries                        | Time         | Conflict Check Scope   |
+| -------------------- | -------- | --------------------------------- | ------------ | ---------------------- |
+| **Pure Java (loop)** | 36       | ~144 queries (4 per session)      | ~2-3 seconds | Current class only ❌  |
+| **Pure SQL (bulk)**  | 36       | 3 queries (1 per day)             | ~50-100ms    | No conflict details ❌ |
+| **Hybrid (Old)**     | 36       | 6 queries (bulk + find conflicts) | ~100-200ms   | Current class only ❌  |
+| **Hybrid (New)** ⚡  | 36       | 6 queries (bulk + find conflicts) | ~100-200ms   | **ALL classes** ✅     |
 
-**✅ Hybrid wins:** Fast + Detailed conflict report
+**✅ Hybrid (New) wins:** Fast + Detailed conflict report + **Cross-class conflict detection**
+
+**Key Improvements:**
+
+- ✅ Detects conflicts with OTHER classes (not just current class)
+- ✅ Batch query: 1 query for N resources instead of N queries (6-25x faster)
+- ✅ Accurate availability rate calculation
+- ✅ Prevents double-booking across entire system
 
 **Conflict Report:**
 
@@ -498,17 +508,60 @@ END FOR
 // Group 3: ['writing'] → 8 sessions
 ```
 
+**🔑 IMPORTANT: Specialization Filtering**
+
+Trước khi query teachers, system get specialization từ subject:
+
+```pseudocode
+// Get specialization from subject.code (source of truth)
+// logical_course_code is GENERATED FROM subject.code
+course = getClass(classId).getCourse()
+subject = course.getSubject()
+courseSpecialization = subject.code
+// Example: subject.code = 'IELTS' (used to generate logical_course_code = 'IELTS-FOUND-2025')
+//          subject.code = 'TOEFL' (used to generate logical_course_code = 'TOEFL-INTER-2025')
+//          subject.code = 'HSK3' (used to generate logical_course_code = 'HSK3-2024')
+//          subject.code = 'JLPT' (used to generate logical_course_code = 'JLPT-N3-2025')
+
+// Only query teachers with matching specialization
+// This prevents wrong-language teachers from appearing!
+```
+
+**Real-world scenario:**
+
+- Trung tâm dạy cả IELTS, TOEFL, HSK, JLPT
+- Teacher A: specialization = 'IELTS Writing'
+- Teacher B: specialization = 'TOEFL Speaking'
+- Teacher C: specialization = 'HSK3'
+- Class được tạo với course = 'IELTS-FOUND-2025'
+- System CHỈ show Teacher A (IELTS), KHÔNG show Teacher B (TOEFL) hay Teacher C (HSK3)
+
 ### 5.2. System Query Available Teachers with PRE-CHECK (3 Conditions) ⚡ UPDATED!
 
 **🔑 KEY IMPROVEMENT:** Query kiểm tra availability TRƯỚC khi Academic Staff chọn → Tránh trial-and-error!
 
 **⚡ FIXED:** Skill 'general' = UNIVERSAL SKILL, có thể teach BẤT KỲ session nào!
 
+**⚡ NEW:** Check `specialization` matching - Teacher phải có specialization phù hợp với course!
+
 ```sql
 -- Pre-check 3 điều kiện: Availability, Teaching Conflict, Leave
 -- ⚡ NEW: 'general' skill can teach ANY session
+-- ⚡ NEW: Specialization must match course specialization
 
-WITH skill_matched_teachers AS (
+WITH course_info AS (
+  -- Get course specialization from subject.code
+  -- This is the source of truth since logical_course_code is generated FROM subject.code
+  -- Example: subject.code = 'IELTS' is used in logical_course_code = 'IELTS-FOUND-2025'
+  SELECT
+    c.id,
+    s.code as course_specialization
+  FROM course c
+  JOIN subject s ON c.subject_id = s.id
+  JOIN class cl ON cl.course_id = c.id
+  WHERE cl.id = :classId
+),
+skill_matched_teachers AS (
   -- Find teachers with matching skills
   -- Logic: 'general' skill can teach ANY session, other skills must match exactly
   SELECT
@@ -528,6 +581,13 @@ WITH skill_matched_teachers AS (
   FROM teacher t
   JOIN user_account ua ON t.user_account_id = ua.id
   JOIN teacher_skill ts ON t.id = ts.teacher_id
+  CROSS JOIN course_info ci  -- ⚡ NEW: Get course specialization
+  -- ⚡ NEW: Filter teachers by specialization match
+  WHERE ts.specialization ILIKE ci.course_specialization || '%'
+    -- Example matches:
+    -- Course specialization: 'IELTS' matches teacher specialization: 'IELTS', 'IELTS Writing', 'IELTS Speaking'
+    -- Course specialization: 'TOEFL' matches teacher specialization: 'TOEFL', 'TOEFL Reading'
+    -- Course specialization: 'HSK3' matches teacher specialization: 'HSK3'
   GROUP BY t.id, ua.full_name, ua.email, t.employee_code, t.contract_type
   -- Only include teachers that have at least one skill
   HAVING COUNT(ts.skill) > 0
@@ -690,6 +750,7 @@ ORDER BY
 - ✅ No trial-and-error (no failed assignment attempts)
 - ✅ Clear visibility into conflicts
 - ✅ Can make informed decisions
+- ✅ **Only shows teachers with matching specialization** (prevents IELTS teacher from teaching TOEFL class)
 
 ### 5.3. Academic Staff Selects Teacher & System Assigns (SIMPLIFIED) ⚡
 
@@ -700,7 +761,15 @@ ORDER BY
 **Academic Staff selects:** Jane Doe (10/10 available)
 
 ```sql
--- ⚡ FIXED: Direct INSERT with proper skill validation
+-- ⚡ FIXED: Direct INSERT with proper skill validation AND specialization check
+WITH course_info AS (
+  -- Get course specialization from subject.code (source of truth)
+  SELECT s.code as course_specialization
+  FROM course c
+  JOIN subject s ON c.subject_id = s.id
+  JOIN class cl ON cl.course_id = c.id
+  WHERE cl.id = :classId
+)
 INSERT INTO teaching_slot (session_id, teacher_id, status)
 SELECT
     s.id,
@@ -708,9 +777,16 @@ SELECT
     'scheduled'::teaching_slot_status_enum
 FROM session s
 JOIN course_session cs ON s.course_session_id = cs.id
+CROSS JOIN course_info ci
 WHERE s.class_id = :classId
-  -- ⚡ FIXED: Only assign sessions that match teacher's skills
-  -- Teacher can teach session if:
+  -- ⚡ FIXED: Only assign sessions that match teacher's skills AND specialization
+  -- Check 1: Teacher must have matching specialization
+  AND EXISTS (
+    SELECT 1 FROM teacher_skill ts_spec
+    WHERE ts_spec.teacher_id = :teacherId
+      AND ts_spec.specialization ILIKE ci.course_specialization || '%'
+  )
+  -- Check 2: Teacher can teach session if:
   -- 1. They have 'general' skill (can teach anything), OR
   -- 2. Their specific skills overlap with session's skill_set
   AND (
@@ -718,11 +794,13 @@ WHERE s.class_id = :classId
       SELECT 1 FROM teacher_skill ts
       WHERE ts.teacher_id = :teacherId
         AND ts.skill = 'general'  -- Teacher with 'general' can teach any session
+        AND ts.specialization ILIKE ci.course_specialization || '%'  -- Must match specialization
     )
     OR EXISTS (
       SELECT 1 FROM teacher_skill ts
       WHERE ts.teacher_id = :teacherId
         AND ts.skill = ANY(cs.skill_set)  -- Teacher skill matches session skill
+        AND ts.specialization ILIKE ci.course_specialization || '%'  -- Must match specialization
     )
   )
 RETURNING session_id, teacher_id, status;
@@ -735,16 +813,24 @@ FUNCTION assignTeacher(classId, teacherId):
     // Input: Pre-validated teacher ID from step 5.2
     // No need to re-check conflicts - already done in step 5.2!
 
-    // Direct insert with skill validation
+    // Get course specialization from subject.code
+    course ← getClass(classId).getCourse()
+    subject ← course.getSubject()
+    courseSpecialization ← subject.code
+
+    // Direct insert with skill AND specialization validation
     assignedSessions ← EXECUTE SQL:
         INSERT INTO teaching_slot (session_id, teacher_id, status)
         SELECT s.id, teacherId, 'scheduled'
         FROM session s
         JOIN course_session cs ON s.course_session_id = cs.id
         WHERE s.class_id = classId
+          -- Check specialization match
+          AND teacher_has_matching_specialization(teacherId, courseSpecialization)
+          -- Check skill match
           AND (
-            teacher_has_general_skill(teacherId)
-            OR teacher_skill_matches_session(teacherId, cs.skill_set)
+            teacher_has_general_skill(teacherId, courseSpecialization)
+            OR teacher_skill_matches_session(teacherId, cs.skill_set, courseSpecialization)
           )
         RETURNING session_id
 
@@ -798,26 +884,43 @@ END FUNCTION
 
 **Step 2: Find substitute for remaining sessions**
 
-System re-runs query with proper skill validation for ONLY the remaining conflict sessions:
+System re-runs query with proper skill validation AND specialization check for ONLY the remaining conflict sessions:
 
 ```sql
--- ⚡ FIXED: Find teachers available for specific sessions with skill validation
-WITH teacher_conflicts AS (
+-- ⚡ FIXED: Find teachers available for specific sessions with skill AND specialization validation
+WITH course_info AS (
+  -- Get course specialization from subject.code (source of truth)
+  SELECT s.code as course_specialization
+  FROM course c
+  JOIN subject s ON c.subject_id = s.id
+  JOIN class cl ON cl.course_id = c.id
+  WHERE cl.id = :classId
+),
+teacher_conflicts AS (
   SELECT s.id as session_id
   FROM session s
   JOIN course_session cs ON s.course_session_id = cs.id
+  CROSS JOIN course_info ci
   WHERE s.id IN (15, 22, 18)  -- The 3 conflict sessions
+    -- ⚡ NEW: Check specialization match FIRST
+    AND EXISTS (
+      SELECT 1 FROM teacher_skill ts_spec
+      WHERE ts_spec.teacher_id = :substituteTeacherId
+        AND ts_spec.specialization ILIKE ci.course_specialization || '%'
+    )
     -- ⚡ FIXED: Check if teacher's skills match session requirements
     AND (
       EXISTS (
         SELECT 1 FROM teacher_skill ts
         WHERE ts.teacher_id = :substituteTeacherId
           AND ts.skill = 'general'  -- Teacher with 'general' can teach any session
+          AND ts.specialization ILIKE ci.course_specialization || '%'
       )
       OR EXISTS (
         SELECT 1 FROM teacher_skill ts
         WHERE ts.teacher_id = :substituteTeacherId
           AND ts.skill = ANY(cs.skill_set)  -- Teacher skill matches session skill
+          AND ts.specialization ILIKE ci.course_specialization || '%'
       )
     )
     AND (
@@ -885,7 +988,9 @@ Result: All 10 sessions now covered!
 ```
 
 **Key Points:**
+
 - ✅ Same CTE logic as SCENARIO B Step B1
+- ✅ **Validates specialization match FIRST** (prevents wrong-language teachers)
 - ✅ Validates skill match ('general' OR specific skills)
 - ✅ Checks all 3 conditions (availability, teaching conflict, leave)
 - ✅ Only inserts sessions that pass ALL checks
@@ -1370,6 +1475,27 @@ Filter: **[All Sessions ▼] [Show Conflicts Only]**
 - ✅ **Phase 2 (Direct insert):** No re-checking needed, just INSERT available sessions
 - ✅ **Result:** No trial-and-error + Faster assignment + Better UX
 - ✅ **Difference from Resource:** Teachers need pre-check because user must make informed decision (skill match + availability)
+
+### 3c. **Specialization Filtering: PREVENT Wrong-Language Teachers** 🌏
+
+- ✅ **Why:** Multi-language training centers (IELTS, TOEFL, HSK, JLPT) must prevent teacher mismatches
+- ✅ **How:** Use `subject.code` directly (source of truth for specialization)
+- ✅ **Relationship:** `subject.code` → generates `course.logical_course_code` → matches `teacher_skill.specialization`
+- ✅ **Filter:** `teacher_skill.specialization ILIKE subject.code || '%'` matches 'IELTS', 'IELTS Writing', 'IELTS Speaking'
+- ✅ **Result:** IELTS teachers only see IELTS classes, TOEFL teachers only see TOEFL classes
+- ✅ **Real-world:** Prevents Japanese teacher from appearing in Chinese class assignment UI
+
+**Data Flow:**
+
+```sql
+-- subject.code = 'IELTS' (source of truth)
+--   ↓ (used to generate)
+-- course.logical_course_code = 'IELTS-FOUND-2025'
+--   ↓ (matches against)
+-- teacher_skill.specialization = 'IELTS Writing' → ✅ MATCH
+-- teacher_skill.specialization = 'TOEFL Speaking' → ❌ FILTERED OUT
+-- teacher_skill.specialization = 'HSK3' → ❌ FILTERED OUT
+```
 
 ### 4. **Conflict Detection: SQL NOT EXISTS**
 

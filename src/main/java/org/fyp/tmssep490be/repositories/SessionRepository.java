@@ -49,10 +49,38 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
      * Update time slot for sessions by day of week
      * Used in Phase 1.3: Assign Time Slots (STEP 3)
      */
+        @Query(value = """
+            UPDATE session
+            SET time_slot_template_id = :timeSlotTemplateId
+            WHERE class_id = :classId
+              AND EXTRACT(DOW FROM date) = :dayOfWeek
+            """, nativeQuery = true)
     @Modifying
-    @Transactional
-    @Query(value = "UPDATE session SET time_slot_template_id = :timeSlotId, updated_at = CURRENT_TIMESTAMP WHERE class_entity_id = :classId AND EXTRACT(DOW FROM date) = :dayOfWeek", nativeQuery = true)
-    int updateTimeSlotByDayOfWeek(@Param("classId") Long classId, @Param("dayOfWeek") Integer dayOfWeek, @Param("timeSlotId") Long timeSlotId);
+    int updateTimeSlotByDayOfWeek(
+            @Param("classId") Long classId,
+            @Param("dayOfWeek") int dayOfWeek,
+            @Param("timeSlotTemplateId") Long timeSlotTemplateId
+    );
+
+    /**
+     * Find sessions by class ID and day of week (for Step 4 resource availability check)
+     * <p>
+     * Uses PostgreSQL DOW format: 0=Sunday, 1=Monday, ..., 6=Saturday
+     * </p>
+     *
+     * @param classId   class ID
+     * @param dayOfWeek day of week (0-6)
+     * @return list of sessions matching the criteria
+     */
+    @Query(value = """
+            SELECT s.* FROM session s
+            WHERE s.class_id = :classId
+            AND EXTRACT(DOW FROM s.date) = :dayOfWeek
+            """, nativeQuery = true)
+    List<Session> findByClassIdAndDayOfWeek(
+            @Param("classId") Long classId,
+            @Param("dayOfWeek") int dayOfWeek
+    );
 
     /**
      * Count total sessions for a class
@@ -130,6 +158,9 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("dayOfWeek") int dayOfWeek
     );
 
+    /**
+     * Find sessions for a specific day of week with time slot info
+     * <p>
     /**
      * Find session with resource assignment
      * <p>

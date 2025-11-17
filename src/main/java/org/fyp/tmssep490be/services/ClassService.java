@@ -2,6 +2,8 @@ package org.fyp.tmssep490be.services;
 
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesResponse;
+import org.fyp.tmssep490be.dtos.createclass.AssignSessionResourceRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignSessionResourceResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTeacherRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTeacherResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
@@ -9,6 +11,8 @@ import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
 import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
+import org.fyp.tmssep490be.dtos.createclass.TeacherDayAvailabilityDTO;
+import org.fyp.tmssep490be.dtos.createclass.AvailableResourceDTO;
 // import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
 import org.fyp.tmssep490be.dtos.classmanagement.*;
@@ -181,6 +185,21 @@ public interface ClassService {
     AssignResourcesResponse assignResources(Long classId, AssignResourcesRequest request, Long userId);
 
     /**
+     * STEP 4C: Assign a specific resource to a single session (Quick Fix)
+     */
+    AssignSessionResourceResponse assignResourceToSession(
+            Long classId,
+            Long sessionId,
+            AssignSessionResourceRequest request,
+            Long userId
+    );
+
+    /**
+     * STEP 4C: Query available resources for a specific session (Quick Fix suggestions)
+     */
+    List<AvailableResourceDTO> getAvailableResourcesForSession(Long classId, Long sessionId, Long userId);
+
+    /**
      * STEP 6: Validate class completeness before submission
      * Checks all required assignments (timeslot, resource, teacher)
      *
@@ -210,6 +229,44 @@ public interface ClassService {
      * @return List of TeacherAvailabilityDTO sorted by availability (best matches first)
      */
     List<TeacherAvailabilityDTO> getAvailableTeachers(Long classId, Long userId);
+
+    /**
+     * STEP 5A-ALTERNATE: Get teachers available by specific days of week (multi-teacher mode)
+     * <p>
+     * This method returns teachers who are available for at least ONE FULL DAY of the week.
+     * Unlike getAvailableTeachers() which requires 100% availability for all sessions,
+     * this method allows teachers who can only teach specific days (e.g., Mondays only).
+     * </p>
+     * <p>
+     * <b>Use Case:</b> "Phân công nhiều giáo viên" mode where different teachers teach
+     * different days (e.g., John on Mondays, Lisa on Wednesdays).
+     * </p>
+     * <p>
+     * <b>Availability Criteria (per day):</b>
+     * <ul>
+     *   <li>Teacher must be available for ALL sessions on that day of week</li>
+     *   <li>No teaching conflicts (not teaching another class at same time)</li>
+     *   <li>No leave conflicts (not on approved leave on any session date)</li>
+     *   <li>Has required skills or GENERAL skill</li>
+     *   <li>Covers from first session to last session on that day (consistency check)</li>
+     * </ul>
+     * </p>
+     * <p>
+     * <b>Example:</b><br>
+     * Class has 24 sessions (8 Mondays, 8 Wednesdays, 8 Fridays)<br>
+     * - John Smith: Available all 8 Mondays → Returned with Monday availability<br>
+     * - Lisa Chen: Available all 8 Wednesdays → Returned with Wednesday availability<br>
+     * - Anna Martinez: Available 7/8 Fridays → NOT returned (partial availability rejected)
+     * </p>
+     * <p>
+     * Performance Target: <200ms (complex CTE query with day-level grouping)
+     * </p>
+     *
+     * @param classId Class ID to check teachers for
+     * @param userId Current user ID for access control
+     * @return List of TeacherDayAvailabilityDTO with day-level availability breakdown
+     */
+    List<TeacherDayAvailabilityDTO> getTeachersAvailableByDay(Long classId, Long userId);
 
     /**
      * STEP 5B: Assign teacher to class sessions

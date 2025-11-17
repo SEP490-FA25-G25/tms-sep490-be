@@ -7,6 +7,7 @@ import org.fyp.tmssep490be.entities.enums.ResourceType;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Service interface for assigning resources to class sessions (STEP 4 of Create Class workflow)
@@ -69,6 +70,52 @@ public interface ResourceAssignmentService {
      * @return list of available resources sorted by capacity
      */
     List<Resource> queryAvailableResources(Long classId, Long sessionId, ResourceType resourceType);
+
+    /**
+     * Query available resources for Step 4 by time slot and day of week
+     * <p>
+     * Used in Step 4 UI where Academic Staff selects resource for each day of week.
+     * Returns resources with availability metadata (conflict count, availability rate).
+     * </p>
+     * <p>
+     * Filters resources by:
+     * <ul>
+     *   <li>Branch match (resource belongs to same branch as class)</li>
+     *   <li>Resource type based on modality (ROOM for OFFLINE, VIRTUAL for ONLINE)</li>
+     *   <li>Capacity >= class max capacity</li>
+     *   <li>Checks conflicts for the given time slot and day of week</li>
+     * </ul>
+     * </p>
+     *
+     * @param classId       class ID
+     * @param timeSlotId    time slot template ID from Step 3
+     * @param dayOfWeek     day of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+     * @return list of available resources with conflict metadata
+     */
+    List<Resource> queryAvailableResourcesByTimeSlotAndDay(Long classId, Long timeSlotId, Short dayOfWeek);
+
+    /**
+     * Query available resources with conflict counts for Step 4
+     * <p>
+     * Returns a map of Resource to conflict count, where conflict count is the number of
+     * sessions on the specified day that already have this resource assigned.
+     * </p>
+     *
+     * @param classId    class ID
+     * @param timeSlotId time slot template ID from Step 3
+     * @param dayOfWeek  day of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+     * @return map of resources to their conflict counts
+     */
+    Map<Resource, Integer> queryAvailableResourcesWithConflicts(Long classId, Long timeSlotId, Short dayOfWeek);
+
+    /**
+     * Get total number of sessions for a specific day of week
+     *
+     * @param classId   class ID
+     * @param dayOfWeek day of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+     * @return total number of sessions
+     */
+    int getTotalSessionsForDayOfWeek(Long classId, Short dayOfWeek);
 
     /**
      * Manually assign resource to a specific session (conflict resolution)

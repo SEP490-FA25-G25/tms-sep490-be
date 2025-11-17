@@ -100,6 +100,43 @@ public class TeacherAvailabilityDTO {
     private ConflictBreakdown conflicts;
 
     /**
+     * Teacher's registered availability schedule (populated when noAvailability > 0)
+     * <p>
+     * Used by frontend to display detailed mismatch message
+     * </p>
+     */
+    private ScheduleInfo teacherSchedule;
+
+    /**
+     * Class required schedule (populated when noAvailability > 0)
+     */
+    private ScheduleInfo classSchedule;
+
+    /**
+     * Schedule information for mismatch comparison
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ScheduleInfo {
+        /**
+         * Days of week (e.g., ["T2", "T4", "T6"] or ["MONDAY", "WEDNESDAY", "FRIDAY"])
+         */
+        private List<String> days;
+
+        /**
+         * Time slot name (e.g., "HN Morning 1", "HN Afternoon 1")
+         */
+        private String timeSlot;
+
+        /**
+         * Location (e.g., "HN", "HCM")
+         */
+        private String location;
+    }
+
+    /**
      * Availability status enum
      */
     public enum AvailabilityStatus {

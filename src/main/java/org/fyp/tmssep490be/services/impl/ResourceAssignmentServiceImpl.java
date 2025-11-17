@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesResponse;
+import org.fyp.tmssep490be.dtos.createclass.AvailableResourceDTO;
 import org.fyp.tmssep490be.entities.ClassEntity;
 import org.fyp.tmssep490be.entities.Resource;
 import org.fyp.tmssep490be.entities.Session;
@@ -44,6 +45,147 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
     private final SessionRepository sessionRepository;
     private final SessionResourceRepository sessionResourceRepository;
     private final ResourceRepository resourceRepository;
+
+    /**
+     * Query available resources for Step 4 by time slot and day of week.
+     * Returns resources with conflict count for availability calculation.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Resource> queryAvailableResourcesByTimeSlotAndDay(Long classId, Long timeSlotId, Short dayOfWeek) {
+        log.info("Querying available resources for class ID: {}, timeSlot ID: {}, dayOfWeek: {}",
+                classId, timeSlotId, dayOfWeek);
+
+        // Get class details
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        // Determine resource type based on modality
+        ResourceType resourceType = classEntity.getModality() == org.fyp.tmssep490be.entities.enums.Modality.ONLINE
+                ? ResourceType.VIRTUAL
+                : ResourceType.ROOM;
+
+        // Get sessions for this day of week to check conflicts
+        List<Session> sessionsForDay = sessionRepository.findByClassIdAndDayOfWeek(classId, dayOfWeek.intValue());
+        
+        if (sessionsForDay.isEmpty()) {
+            log.warn("No sessions found for class {} on day of week {}", classId, dayOfWeek);
+            return List.of();
+        }
+
+        // Query resources that match criteria (branch, type, capacity)
+        List<Resource> candidateResources = resourceRepository.findByBranchAndTypeAndCapacity(
+                classEntity.getBranch().getId(),
+                resourceType,
+                classEntity.getMaxCapacity()
+        );
+
+        log.info("Found {} candidate resources for branch {} with type {} and capacity >= {}",
+                candidateResources.size(), classEntity.getBranch().getId(), resourceType, classEntity.getMaxCapacity());
+
+        return candidateResources;
+    }
+
+    /**
+     * Query available resources with conflict counts for Step 4.
+     * Calculates how many sessions each resource conflicts with.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Resource, Integer> queryAvailableResourcesWithConflicts(Long classId, Long timeSlotId, Short dayOfWeek) {
+        log.info("Querying available resources with conflicts for class ID: {}, timeSlot ID: {}, dayOfWeek: {}",
+                classId, timeSlotId, dayOfWeek);
+
+        // Get class details
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        // Determine resource type based on modality
+        ResourceType resourceType = classEntity.getModality() == org.fyp.tmssep490be.entities.enums.Modality.ONLINE
+                ? ResourceType.VIRTUAL
+                : ResourceType.ROOM;
+
+        // Get sessions for this day of week
+        List<Session> sessionsForDay = sessionRepository.findByClassIdAndDayOfWeek(classId, dayOfWeek.intValue());
+        
+        if (sessionsForDay.isEmpty()) {
+            log.warn("No sessions found for class {} on day of week {}", classId, dayOfWeek);
+            return Map.of();
+        }
+
+        // Extract dates and time slot IDs from sessions for conflict checking
+        List<java.time.LocalDate> dates = sessionsForDay.stream()
+                .map(Session::getDate)
+                .distinct()
+                .toList();
+
+        List<Long> timeSlotIds = sessionsForDay.stream()
+                .map(s -> s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getId() : null)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+
+        if (timeSlotIds.isEmpty()) {
+            log.warn("No time slots assigned for sessions on day {} in class {}", dayOfWeek, classId);
+            return Map.of();
+        }
+
+        // Query resources that match criteria (branch, type, capacity)
+        List<Resource> candidateResources = resourceRepository.findByBranchAndTypeAndCapacity(
+                classEntity.getBranch().getId(),
+                resourceType,
+                classEntity.getMaxCapacity()
+        );
+
+        if (candidateResources.isEmpty()) {
+            log.warn("No candidate resources found for branch {} with type {} and capacity >= {}",
+                    classEntity.getBranch().getId(), resourceType, classEntity.getMaxCapacity());
+            return Map.of();
+        }
+
+        // OPTIMIZED: Batch query for all resources at once (1 query instead of N queries)
+        List<Long> resourceIds = candidateResources.stream()
+                .map(Resource::getId)
+                .toList();
+
+        List<Object[]> conflictResults = sessionResourceRepository
+                .batchCountConflictsByResourcesAcrossAllClasses(
+                        resourceIds,
+                        dates,
+                        timeSlotIds,
+                        classId  // Exclude current class from conflict check
+                );
+
+        // Convert results to map: resourceId -> conflictCount
+        Map<Long, Integer> conflictMap = new java.util.HashMap<>();
+        for (Object[] row : conflictResults) {
+            Long resourceId = ((Number) row[0]).longValue();
+            Integer conflictCount = ((Number) row[1]).intValue();
+            conflictMap.put(resourceId, conflictCount);
+        }
+
+        // Build final map: Resource -> conflictCount (default 0 if no conflicts)
+        Map<Resource, Integer> resourceConflicts = new java.util.HashMap<>();
+        for (Resource resource : candidateResources) {
+            Integer conflictCount = conflictMap.getOrDefault(resource.getId(), 0);
+            resourceConflicts.put(resource, conflictCount);
+        }
+
+        log.info("Found {} candidate resources with conflict data for class {} (checked against all classes in 1 query)", 
+                candidateResources.size(), classId);
+
+        return resourceConflicts;
+    }
+
+    /**
+     * Get total number of sessions for a specific day of week
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public int getTotalSessionsForDayOfWeek(Long classId, Short dayOfWeek) {
+        List<Session> sessions = sessionRepository.findByClassIdAndDayOfWeek(classId, dayOfWeek.intValue());
+        return sessions.size();
+    }
 
     /**
      * Assigns resources to class sessions using HYBRID approach.
@@ -115,17 +257,18 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
             // Analyze each unassigned session for conflict reason
             for (Object[] sessionData : unassignedSessions) {
                 Long sessionId = ((Number) sessionData[0]).longValue();
-                LocalDate sessionDate = (LocalDate) sessionData[1];
+                // Convert java.sql.Date from native query to LocalDate
+                LocalDate sessionDate = sessionData[1] instanceof java.sql.Date
+                    ? ((java.sql.Date) sessionData[1]).toLocalDate()
+                    : (LocalDate) sessionData[1];
                 Long timeSlotId = sessionData[2] != null ? ((Number) sessionData[2]).longValue() : null;
 
                 Optional<AssignResourcesResponse.ResourceConflictDetail> conflict = analyzeSessionConflict(
                         sessionId,
-                        sessionDate,
-                        timeSlotId,
                         assignment.getDayOfWeek(),
                         assignment.getResourceId(),
                         resourceMap.get(assignment.getResourceId()),
-                        classEntity.getMaxCapacity()
+                        classEntity
                 );
 
                 conflict.ifPresent(conflicts::add);
@@ -366,6 +509,29 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
         return resourceMap;
     }
 
+    private List<AvailableResourceDTO> buildResourceSuggestions(ClassEntity classEntity, Session session) {
+        if (session.getTimeSlotTemplate() == null) {
+            return List.of();
+        }
+
+        ResourceType resourceType = classEntity.getModality() == org.fyp.tmssep490be.entities.enums.Modality.ONLINE
+                ? ResourceType.VIRTUAL
+                : ResourceType.ROOM;
+
+        List<Resource> available = resourceRepository.findAvailableResourcesForSession(
+                classEntity.getBranch().getId(),
+                resourceType,
+                classEntity.getMaxCapacity(),
+                session.getDate(),
+                session.getTimeSlotTemplate().getId()
+        );
+
+        return available.stream()
+                .limit(10)
+                .map(AvailableResourceDTO::basic)
+                .toList();
+    }
+
     /**
      * Analyze why a session couldn't be assigned a resource (Phase 2)
      * 
@@ -374,20 +540,26 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
      */
     private Optional<AssignResourcesResponse.ResourceConflictDetail> analyzeSessionConflict(
             Long sessionId,
-            LocalDate sessionDate,
-            Long timeSlotId,
             Short dayOfWeek,
             Long requestedResourceId,
             Resource requestedResource,
-            Integer classMaxCapacity
+            ClassEntity classEntity
     ) {
         log.debug("Analyzing conflict for Session ID: {}", sessionId);
 
-        // Check if time slot is assigned
-        if (timeSlotId == null) {
-            log.debug("Session ID: {} has no time slot assigned", sessionId);
-            return Optional.empty(); // Not a conflict, just not ready for resource assignment
+        Session session = sessionRepository.findSessionWithResourcesAndTimeSlot(sessionId);
+        if (session == null) {
+            log.warn("Session ID: {} not found during conflict analysis", sessionId);
+            return Optional.empty();
         }
+
+        TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
+        if (timeSlot == null) {
+            log.debug("Session ID: {} has no time slot assigned", sessionId);
+            return Optional.empty();
+        }
+
+        int classMaxCapacity = classEntity.getMaxCapacity() != null ? classEntity.getMaxCapacity() : 0;
 
         // Check capacity
         if (requestedResource.getCapacity() < classMaxCapacity) {
@@ -395,18 +567,22 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
                     sessionId, requestedResource.getCapacity(), classMaxCapacity);
 
             return Optional.of(buildConflictDetail(
-                    sessionId, sessionDate, dayOfWeek, timeSlotId, requestedResource,
+                    session,
+                    dayOfWeek,
+                    timeSlot,
+                    requestedResource,
                     AssignResourcesResponse.ConflictType.INSUFFICIENT_CAPACITY,
                     String.format("Resource '%s' capacity (%d) is less than class max capacity (%d)",
                             requestedResource.getName(), requestedResource.getCapacity(), classMaxCapacity),
-                    null, null
+                    null,
+                    null,
+                    buildResourceSuggestions(classEntity, session)
             ));
         }
 
         // Check class booking conflict
         Object[] conflictDetails = sessionResourceRepository.findConflictingSessionDetails(sessionId, requestedResourceId);
         if (conflictDetails != null && conflictDetails.length >= 3) {
-            Long conflictingSessionId = ((Number) conflictDetails[0]).longValue();
             Long conflictingClassId = ((Number) conflictDetails[1]).longValue();
             String conflictingClassName = (String) conflictDetails[2];
             LocalTime timeStart = conflictDetails.length > 4 ? (LocalTime) conflictDetails[4] : null;
@@ -416,55 +592,66 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
 
             String conflictReason = String.format(
                     "Resource '%s' is already booked by class '%s' on %s at %s-%s",
-                    requestedResource.getName(), conflictingClassName, sessionDate,
-                    timeStart != null ? timeStart.toString() : "N/A",
-                    timeEnd != null ? timeEnd.toString() : "N/A"
+                    requestedResource.getName(), conflictingClassName, session.getDate(),
+                    timeStart != null ? timeStart : "N/A",
+                    timeEnd != null ? timeEnd : "N/A"
             );
 
             return Optional.of(buildConflictDetail(
-                    sessionId, sessionDate, dayOfWeek, timeSlotId, requestedResource,
+                    session,
+                    dayOfWeek,
+                    timeSlot,
+                    requestedResource,
                     AssignResourcesResponse.ConflictType.CLASS_BOOKING,
                     conflictReason,
-                    conflictingClassId, conflictingClassName
+                    conflictingClassId,
+                    conflictingClassName,
+                    buildResourceSuggestions(classEntity, session)
             ));
         }
 
         // Unknown conflict reason
         log.warn("Session ID: {} - Unknown conflict reason", sessionId);
         return Optional.of(buildConflictDetail(
-                sessionId, sessionDate, dayOfWeek, timeSlotId, requestedResource,
+                session,
+                dayOfWeek,
+                timeSlot,
+                requestedResource,
                 AssignResourcesResponse.ConflictType.UNAVAILABLE,
                 "Resource is unavailable for unknown reason",
-                null, null
+                null,
+                null,
+                buildResourceSuggestions(classEntity, session)
         ));
     }
 
     /**
-     * Build conflict detail object
+     * Build conflict detail object with optional suggestions.
      */
     private AssignResourcesResponse.ResourceConflictDetail buildConflictDetail(
-            Long sessionId,
-            LocalDate sessionDate,
+            Session session,
             Short dayOfWeek,
-            Long timeSlotId,
+            TimeSlotTemplate timeSlot,
             Resource requestedResource,
             AssignResourcesResponse.ConflictType conflictType,
             String conflictReason,
             Long conflictingClassId,
-            String conflictingClassName
+            String conflictingClassName,
+            List<AvailableResourceDTO> suggestions
     ) {
-        // Get time slot details (if available)
-        LocalTime timeStart = null;
-        LocalTime timeEnd = null;
-
-        // TODO(Phase 3.6): Fetch TimeSlotTemplate details for complete conflict reporting
-        // Currently null - acceptable for MVP, will enhance in next iteration
+        LocalTime timeStart = timeSlot != null ? timeSlot.getStartTime() : null;
+        LocalTime timeEnd = timeSlot != null ? timeSlot.getEndTime() : null;
+        String timeSlotName = timeStart != null && timeEnd != null
+                ? timeStart + " - " + timeEnd
+                : null;
 
         return AssignResourcesResponse.ResourceConflictDetail.builder()
-                .sessionId(sessionId)
-                .sessionNumber(null) // Could be calculated if needed
-                .date(sessionDate)
+                .sessionId(session.getId())
+                .sessionNumber(session.getCourseSession() != null ? session.getCourseSession().getSequenceNo() : null)
+                .date(session.getDate())
                 .dayOfWeek(dayOfWeek)
+                .timeSlotTemplateId(timeSlot != null ? timeSlot.getId() : null)
+                .timeSlotName(timeSlotName)
                 .timeSlotStart(timeStart)
                 .timeSlotEnd(timeEnd)
                 .requestedResourceId(requestedResource.getId())
@@ -473,6 +660,7 @@ public class ResourceAssignmentServiceImpl implements ResourceAssignmentService 
                 .conflictReason(conflictReason)
                 .conflictingClassId(conflictingClassId)
                 .conflictingClassName(conflictingClassName)
+                .suggestions(suggestions)
                 .build();
     }
 }

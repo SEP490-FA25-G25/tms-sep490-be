@@ -13,27 +13,35 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignResourcesResponse;
+import org.fyp.tmssep490be.dtos.createclass.AssignSessionResourceRequest;
+import org.fyp.tmssep490be.dtos.createclass.AssignSessionResourceResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTeacherRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTeacherResponse;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsRequest;
 import org.fyp.tmssep490be.dtos.createclass.AssignTimeSlotsResponse;
+import org.fyp.tmssep490be.dtos.createclass.AvailableResourceDTO;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassRequest;
 import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
 import org.fyp.tmssep490be.dtos.createclass.PreviewClassCodeRequest;
 import org.fyp.tmssep490be.dtos.createclass.PreviewClassCodeResponse;
 import org.fyp.tmssep490be.dtos.createclass.SessionListResponse;
 import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
+import org.fyp.tmssep490be.dtos.createclass.TeacherDayAvailabilityDTO;
 // import org.fyp.tmssep490be.dtos.createclass.RejectClassRequest; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
 import org.fyp.tmssep490be.dtos.classmanagement.*;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.entities.Resource;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.Modality;
+import org.fyp.tmssep490be.exceptions.CustomException;
+import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.ClassCodeGeneratorService;
 import org.fyp.tmssep490be.services.ClassService;
+import org.fyp.tmssep490be.services.ResourceAssignmentService;
 import org.fyp.tmssep490be.utils.AssignResourcesResponseUtil;
 import org.fyp.tmssep490be.utils.ValidateClassResponseUtil;
 import org.fyp.tmssep490be.utils.CreateClassResponseUtil;
@@ -51,6 +59,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controller for class management operations
@@ -65,6 +74,7 @@ import java.util.List;
 public class ClassController {
 
     private final ClassService classService;
+    private final ResourceAssignmentService resourceAssignmentService;
     private final ClassCodeGeneratorService classCodeGeneratorService;
     private final ValidateClassResponseUtil validateClassResponseUtil;
     private final CreateClassResponseUtil createClassResponseUtil;
@@ -612,7 +622,93 @@ public class ClassController {
     }
 
     /**
-     * STEP 4: Assign resources to class sessions
+     * STEP 4A: Get available resources for time slot and day of week
+     */
+    @GetMapping("/{classId}/resources")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Get available resources for Step 4",
+            description = """
+                    Query available resources (rooms/online accounts) for a specific time slot and day of week.
+                    Used in Step 4 of Create Class workflow before resource assignment.
+                    
+                    Returns resources with:
+                    - Basic info (id, code, name, capacity)
+                    - Availability metadata (conflict count, availability rate)
+                    - Recommendation flag based on suitability
+                    
+                    Frontend expects:
+                    - timeSlotId: Time slot template ID from Step 3
+                    - dayOfWeek: Day of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+                    """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Successfully retrieved available resources",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ResponseObject.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Class not found",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
+    public ResponseEntity<ResponseObject<List<AvailableResourceDTO>>> getAvailableResources(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @Parameter(description = "Time slot template ID from Step 3", required = true)
+            @RequestParam Long timeSlotId,
+
+            @Parameter(description = "Day of week (0=Sunday, 1=Monday, ..., 6=Saturday)", required = true)
+            @RequestParam Short dayOfWeek,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} requesting available resources for class {} on day {} at timeSlot {}",
+                currentUser.getId(), classId, dayOfWeek, timeSlotId);
+
+        // Query available resources with conflict metadata
+        Map<Resource, Integer> resourceConflicts = resourceAssignmentService
+                .queryAvailableResourcesWithConflicts(classId, timeSlotId, dayOfWeek);
+
+        // Get total sessions for this day of week
+        int totalSessions = resourceAssignmentService.getTotalSessionsForDayOfWeek(classId, dayOfWeek);
+        
+        if (totalSessions == 0) {
+            log.warn("No sessions found for class {} on day {}", classId, dayOfWeek);
+            return ResponseEntity.ok(ResponseObject.<List<AvailableResourceDTO>>builder()
+                    .success(true)
+                    .message("No sessions found for this day")
+                    .data(List.of())
+                    .build());
+        }
+
+        // Convert to DTOs with real conflict counts
+        List<AvailableResourceDTO> resourceDTOs = resourceConflicts.entrySet().stream()
+                .map(entry -> AvailableResourceDTO.fromEntity(
+                        entry.getKey(), 
+                        entry.getValue(), 
+                        totalSessions
+                ))
+                .toList();
+
+        log.info("Found {} available resources for class {} on day {} (total {} sessions)", 
+                resourceDTOs.size(), classId, dayOfWeek, totalSessions);
+
+        return ResponseEntity.ok(ResponseObject.<List<AvailableResourceDTO>>builder()
+                .success(true)
+                .message("Available resources retrieved successfully")
+                .data(resourceDTOs)
+                .build());
+    }
+
+    /**
+     * STEP 4B: Assign resources to class sessions
      */
     @PostMapping("/{classId}/resources")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
@@ -829,6 +925,54 @@ public class ClassController {
     }
 
     /**
+     * STEP 4C: Assign resource manually to a single session (Quick Fix)
+     */
+    @PostMapping("/{classId}/sessions/{sessionId}/resource")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<AssignSessionResourceResponse>> assignResourceToSession(
+            @PathVariable Long classId,
+            @PathVariable Long sessionId,
+            @RequestBody @Valid AssignSessionResourceRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        AssignSessionResourceResponse response = classService.assignResourceToSession(
+                classId,
+                sessionId,
+                request,
+                currentUser.getId()
+        );
+
+        return ResponseEntity.ok(ResponseObject.<AssignSessionResourceResponse>builder()
+                .success(Boolean.TRUE.equals(response.getResolved()))
+                .message(response.getMessage())
+                .data(response)
+                .build());
+    }
+
+    /**
+     * STEP 4C: Get available resources for a specific session (Quick Fix suggestions)
+     */
+    @GetMapping("/{classId}/sessions/{sessionId}/resources")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<AvailableResourceDTO>>> getSessionResources(
+            @PathVariable Long classId,
+            @PathVariable Long sessionId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        List<AvailableResourceDTO> resources = classService.getAvailableResourcesForSession(
+                classId,
+                sessionId,
+                currentUser.getId()
+        );
+
+        return ResponseEntity.ok(ResponseObject.<List<AvailableResourceDTO>>builder()
+                .success(true)
+                .message("Available resources retrieved successfully")
+                .data(resources)
+                .build());
+    }
+
+    /**
      * STEP 5A: Get available teachers with PRE-CHECK (Query before assignment)
      */
     @GetMapping("/{classId}/available-teachers")
@@ -1000,14 +1144,87 @@ public class ClassController {
 
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        log.info("User {} querying available teachers for class {}", currentUser.getId(), classId);
+        // Handle null currentUser when security is disabled
+        Long userId = (currentUser != null) ? currentUser.getId() : 1L; // Default to user ID 1 for testing
+        log.info("User {} querying available teachers for class {}", userId, classId);
 
-        List<TeacherAvailabilityDTO> teachers = classService.getAvailableTeachers(classId, currentUser.getId());
+        List<TeacherAvailabilityDTO> teachers = classService.getAvailableTeachers(classId, userId);
 
         String message = String.format("Found %d teachers. Use POST /classes/{classId}/teachers to assign.", 
                 teachers.size());
 
         return ResponseEntity.ok(ResponseObject.<List<TeacherAvailabilityDTO>>builder()
+                .success(true)
+                .message(message)
+                .data(teachers)
+                .build());
+    }
+
+    /**
+     * STEP 5A-ALTERNATE: Get teachers available by day of week (for multi-teacher mode)
+     */
+    @GetMapping("/{classId}/teachers/available-by-day")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Get teachers available by specific days of week",
+            description = """
+                    Query teachers who are available for at least ONE FULL DAY of the week consistently.
+                    This endpoint is used for "Phân công nhiều giáo viên" mode where different
+                    teachers teach different days (e.g., John on Mondays, Lisa on Wednesdays).
+                    
+                    **Use Case:**
+                    - User selects "Phân công nhiều giáo viên cho lớp học" option
+                    - Frontend calls this endpoint instead of regular /teachers endpoint
+                    - Returns teachers with day-level availability breakdown
+                    
+                    **Availability Criteria (per day):**
+                    - Teacher must be available for ALL sessions on that day of week
+                    - No teaching conflicts (not teaching another class at same time)
+                    - No leave conflicts (not on approved leave on any session date)
+                    - Has required skills or GENERAL skill
+                    - Covers from first session to last session on that day (consistency check)
+                    
+                    **Difference from regular /teachers endpoint:**
+                    - Regular: Returns teachers available for ALL 24 sessions (100% availability)
+                    - This: Returns teachers available for specific days (e.g., 8/24 sessions = 33% but 100% on Mondays)
+                    
+                    **Frontend Usage:**
+                    1. Display teachers grouped by available days
+                    2. Show "Có thể dạy: Thứ Hai (8 buổi)" for each teacher
+                    3. Allow user to select teacher + specific days to assign
+                    4. Call POST /teachers with sessionIds filtered by selected days
+                    """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Teachers with day availability retrieved successfully"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Class not found"
+            )
+    })
+    public ResponseEntity<ResponseObject<List<TeacherDayAvailabilityDTO>>> getTeachersAvailableByDay(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        Long userId = (currentUser != null) ? currentUser.getId() : 1L;
+        log.info("User {} querying teachers available by day for class {}", userId, classId);
+
+        List<TeacherDayAvailabilityDTO> teachers = classService.getTeachersAvailableByDay(classId, userId);
+
+        int teacherCount = teachers.size();
+        int totalDays = teachers.stream()
+                .mapToInt(t -> t.getAvailableDays().size())
+                .sum();
+
+        String message = String.format("Found %d teachers with availability on %d day(s)", 
+                teacherCount, totalDays);
+
+        return ResponseEntity.ok(ResponseObject.<List<TeacherDayAvailabilityDTO>>builder()
                 .success(true)
                 .message(message)
                 .data(teachers)

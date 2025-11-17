@@ -92,6 +92,16 @@ public class AssignResourcesResponse {
         private Short dayOfWeek;
 
         /**
+         * Time slot template id for this session
+         */
+        private Long timeSlotTemplateId;
+
+        /**
+         * Time slot display name (e.g. "18:00 - 20:00")
+         */
+        private String timeSlotName;
+
+        /**
          * Time slot start time
          */
         private LocalTime timeSlotStart;
@@ -138,6 +148,12 @@ public class AssignResourcesResponse {
          * Name of the conflicting class (if conflict type is CLASS_BOOKING)
          */
         private String conflictingClassName;
+
+        /**
+         * Suggested alternative resources for quick fix resolution
+         */
+        @Builder.Default
+        private List<AvailableResourceDTO> suggestions = List.of();
     }
 
     /**

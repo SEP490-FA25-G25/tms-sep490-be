@@ -46,6 +46,28 @@ public class SessionListResponse {
         private Boolean hasResource;
         private Boolean hasTeacher;
         private TimeSlotInfoDTO timeSlotInfo;
+        
+        /**
+         * Resource name assigned to this session (e.g., "Room 101", "Lab A")
+         * Null if no resource assigned
+         */
+        private String resourceName;
+        
+        /**
+         * Comma-separated teacher names (e.g., "John Smith, Lisa Chen")
+         * Null if no teachers assigned
+         * For quick display in session list
+         */
+        private String teacherName;
+        
+        /**
+         * List of teachers assigned to this session
+         * Used by frontend to:
+         * - Show which teachers are assigned to each session
+         * - Disable/lock days that are already assigned in teacher selection modal
+         * - Display "Đã phân công: John Smith" message
+         */
+        private List<TeacherInfoDTO> teachers;
     }
 
     @Data
@@ -67,5 +89,18 @@ public class SessionListResponse {
         private String weekRange;
         private Integer sessionCount;
         private List<Long> sessionIds;
+    }
+    
+    /**
+     * Teacher information for session assignment tracking
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TeacherInfoDTO {
+        private Long teacherId;
+        private String fullName;
+        private String employeeCode;
     }
 }
