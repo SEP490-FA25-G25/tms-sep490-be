@@ -91,7 +91,7 @@ public class ClassController {
             description = "Retrieve paginated list of classes accessible to the user with filtering options. " +
                     "By default, returns all classes regardless of status."
     )
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<Page<ClassListItemDTO>>> getClasses(
             @Parameter(description = "Filter by branch ID(s). If not provided, uses user's accessible branches")
             @RequestParam(required = false) List<Long> branchIds,
@@ -402,7 +402,7 @@ public class ClassController {
             summary = "Get class details",
             description = "Retrieve comprehensive information about a specific class including enrollment summary and upcoming sessions"
     )
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR') or hasRole('STUDENT')")
     public ResponseEntity<ResponseObject<ClassDetailDTO>> getClassDetail(
             @Parameter(description = "Class ID")
             @PathVariable Long classId,
@@ -429,7 +429,7 @@ public class ClassController {
             summary = "Get class students",
             description = "Retrieve paginated list of students currently enrolled in a specific class with search functionality"
     )
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<Page<ClassStudentDTO>>> getClassStudents(
             @Parameter(description = "Class ID")
             @PathVariable Long classId,
@@ -477,7 +477,7 @@ public class ClassController {
             summary = "Get class enrollment summary",
             description = "Retrieve lightweight enrollment summary with capacity information for quick checks and list views"
     )
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<ClassEnrollmentSummaryDTO>> getClassEnrollmentSummary(
             @Parameter(description = "Class ID")
             @PathVariable Long classId,
@@ -514,7 +514,7 @@ public class ClassController {
                     "- Level information with subject context and duration expectations\n" +
                     "- Class match analysis with detailed reasoning for recommendations"
     )
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<Page<AvailableStudentDTO>>> getAvailableStudentsForClass(
             @Parameter(description = "Class ID to enroll students into")
             @PathVariable Long classId,

@@ -627,7 +627,13 @@ INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date,
 
 -- HCM Branch - Class 5: ONGOING
 -- Pattern: IELTSFOUND-HCM01-25-001 (First class in HCM01 branch for this course/year)
-(5, 2, 1, 'IELTSFOUND-HCM01-25-001', 'HCM Foundation 1 (Ongoing)', 'OFFLINE', '2025-10-13', '2025-12-05', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 8, 4, '2025-10-06 10:00:00+07', '2025-10-07 14:00:00+07', '2025-10-06 10:00:00+07', '2025-10-13 08:00:00+07');
+(5, 2, 1, 'IELTSFOUND-HCM01-25-001', 'HCM Foundation 1 (Ongoing)', 'OFFLINE', '2025-10-13', '2025-12-05', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 8, 4, '2025-10-06 10:00:00+07', '2025-10-07 14:00:00+07', '2025-10-06 10:00:00+07', '2025-10-13 08:00:00+07'),
+
+-- HCM Branch - Class 6: ONGOING (evening cohort for self-service transfers)
+(6, 2, 1, 'HCM-FOUND-E1', 'HCM Foundation 2 (Evening)', 'OFFLINE', '2025-10-14', '2025-12-06', NULL, ARRAY[2,4,6]::smallint[], 18, 'ONGOING', 'APPROVED', 8, 4, '2025-10-08 10:00:00+07', '2025-10-09 14:00:00+07', '2025-10-08 10:00:00+07', '2025-10-14 08:00:00+07'),
+
+-- HCM Branch - Class 7: ONGOING (micro cohort kept at capacity for negative cases)
+(7, 2, 1, 'HCM-FOUND-M1', 'HCM Foundation Micro Cohort', 'OFFLINE', '2025-10-20', '2025-12-12', NULL, ARRAY[1,3,5]::smallint[], 5, 'ONGOING', 'APPROVED', 8, 4, '2025-10-10 10:00:00+07', '2025-10-11 14:00:00+07', '2025-10-10 10:00:00+07', '2025-10-20 08:00:00+07');
 
 -- Generate Sessions for Class 1 (HN-FOUND-C1) - COMPLETED
 -- Start: 2025-07-07 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
@@ -844,6 +850,150 @@ SELECT id, 3 FROM session WHERE class_id = 4;
 INSERT INTO teaching_slot (session_id, teacher_id, status)
 SELECT id, 3, 'SCHEDULED' FROM session WHERE class_id = 4;
 
+-- Generate Sessions for Class 6 (HCM-FOUND-E1) - ONGOING evening class
+-- Start: 2025-10-14 (Tue), Schedule: Tue/Thu/Sat, Evening slot
+DO $$
+DECLARE
+    v_class_id BIGINT := 6;
+    v_start_date DATE := '2025-10-14';
+    v_session_count INT := 24;
+    v_course_session_id INT;
+    v_date DATE;
+    v_week INT;
+    v_day_idx INT;
+    v_session_idx INT := 1;
+    v_status VARCHAR(20);
+BEGIN
+    FOR v_week IN 0..7 LOOP
+        FOR v_day_idx IN 1..3 LOOP
+            EXIT WHEN v_session_idx > v_session_count;
+
+            v_course_session_id := v_session_idx;
+            v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
+
+            IF v_date < '2025-11-02' THEN
+                v_status := 'DONE';
+            ELSE
+                v_status := 'PLANNED';
+            END IF;
+
+            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+            VALUES (500 + v_session_idx, v_class_id, v_course_session_id, 8, v_date, 'CLASS', v_status, '2025-10-08 10:00:00+07', CURRENT_TIMESTAMP);
+
+            v_session_idx := v_session_idx + 1;
+        END LOOP;
+    END LOOP;
+END $$;
+
+-- Session Resources for Class 6 (assign HCM Room 102)
+INSERT INTO session_resource (session_id, resource_id)
+SELECT id, 6 FROM session WHERE class_id = 6;
+
+-- Teaching Slots for Class 6 (assign Teacher 10 - Olivia White)
+INSERT INTO teaching_slot (session_id, teacher_id, status)
+SELECT id, 10, 'SCHEDULED' FROM session WHERE class_id = 6;
+
+-- Generate Sessions for Class 7 (HCM-FOUND-M1) - Micro cohort kept at capacity
+-- Start: 2025-10-20 (Mon), Schedule: Mon/Wed/Fri, Afternoon slot
+DO $$
+DECLARE
+    v_class_id BIGINT := 7;
+    v_start_date DATE := '2025-10-20';
+    v_session_count INT := 24;
+    v_course_session_id INT;
+    v_date DATE;
+    v_week INT;
+    v_day_idx INT;
+    v_session_idx INT := 1;
+    v_status VARCHAR(20);
+BEGIN
+    FOR v_week IN 0..7 LOOP
+        FOR v_day_idx IN 1..3 LOOP
+            EXIT WHEN v_session_idx > v_session_count;
+
+            v_course_session_id := v_session_idx;
+            v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
+
+            IF v_date < '2025-11-02' THEN
+                v_status := 'DONE';
+            ELSE
+                v_status := 'PLANNED';
+            END IF;
+
+            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+            VALUES (600 + v_session_idx, v_class_id, v_course_session_id, 7, v_date, 'CLASS', v_status, '2025-10-10 10:00:00+07', CURRENT_TIMESTAMP);
+
+            v_session_idx := v_session_idx + 1;
+        END LOOP;
+    END LOOP;
+END $$;
+
+-- Session Resources for Class 7 (assign HCM Room 201)
+INSERT INTO session_resource (session_id, resource_id)
+SELECT id, 7 FROM session WHERE class_id = 7;
+
+-- Teaching Slots for Class 7 (assign Teacher 11 - Daniel Harris)
+INSERT INTO teaching_slot (session_id, teacher_id, status)
+SELECT id, 11, 'SCHEDULED' FROM session WHERE class_id = 7;
+
+
+-- ========== MAKEUP OPTIONS TEST DATA ==========
+-- Generate makeup sessions for student 1's absences (2025-11-03 to 2025-11-16)
+
+-- Scenario A: OFFLINE class same branch (HN) - PERFECT MATCH
+INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, schedule_days, max_capacity, status, approval_status, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+(8, 1, 1, 'HN-FOUND-MAKEUP-O', 'HN Foundation Makeup (Offline)', 'OFFLINE', '2025-11-05', '2025-12-21', ARRAY[3,5]::smallint[], 15, 'ONGOING', 'APPROVED', 6, 3, '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07', '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07');
+
+-- Scenario B: ONLINE class different branch (HCM) - CROSS-BRANCH MATCH
+INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, schedule_days, max_capacity, status, approval_status, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+(9, 2, 1, 'HCM-FOUND-MAKEUP-ON', 'HCM Foundation Makeup (Online)', 'ONLINE', '2025-11-06', '2025-12-22', ARRAY[4,6]::smallint[], 25, 'ONGOING', 'APPROVED', 8, 4, '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07', '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07');
+
+-- Scenario C: OFFLINE class different branch (HCM) - SHOULD BE FILTERED
+INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, schedule_days, max_capacity, status, approval_status, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+(10, 2, 1, 'HCM-FOUND-MAKEUP-OFF', 'HCM Foundation Makeup (Offline)', 'OFFLINE', '2025-11-04', '2025-12-20', ARRAY[2,4]::smallint[], 15, 'ONGOING', 'APPROVED', 8, 4, '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07', '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07');
+
+-- Sessions for makeup classes
+DO $$
+DECLARE
+    -- Course session IDs corresponding to student 1's recent absences
+    v_absent_course_session_ids INT[] := ARRAY[10, 11, 12, 16]; -- Added 16 for the user's test case
+    v_session_id_counter INT := 700;
+BEGIN
+    -- Class 8 Sessions (HN, OFFLINE) - Wed, Fri
+    INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at) VALUES
+    (v_session_id_counter + 1, 8, v_absent_course_session_ids[1], 3, '2025-11-05', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (v_session_id_counter + 2, 8, v_absent_course_session_ids[2], 3, '2025-11-07', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (v_session_id_counter + 3, 8, v_absent_course_session_ids[3], 3, '2025-11-12', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (v_session_id_counter + 10, 8, v_absent_course_session_ids[4], 3, '2025-11-14', 'CLASS', 'PLANNED', NOW(), NOW()); -- Makeup for session 116 (course_session_id 16)
+
+    -- Class 9 Sessions (HCM, ONLINE) - Thu, Sat
+    INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at) VALUES
+    (v_session_id_counter + 4, 9, v_absent_course_session_ids[1], 7, '2025-11-06', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (v_session_id_counter + 5, 9, v_absent_course_session_ids[2], 7, '2025-11-08', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (v_session_id_counter + 6, 9, v_absent_course_session_ids[3], 7, '2025-11-13', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (v_session_id_counter + 11, 9, v_absent_course_session_ids[4], 7, '2025-11-15', 'CLASS', 'PLANNED', NOW(), NOW()); -- Makeup for session 116 (course_session_id 16)
+
+    -- Class 10 Sessions (HCM, OFFLINE) - Tue, Thu
+    INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at) VALUES
+    (v_session_id_counter + 7, 10, v_absent_course_session_ids[1], 7, '2025-11-04', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (v_session_id_counter + 8, 10, v_absent_course_session_ids[2], 7, '2025-11-06', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (v_session_id_counter + 9, 10, v_absent_course_session_ids[3], 7, '2025-11-11', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (v_session_id_counter + 12, 10, v_absent_course_session_ids[4], 7, '2025-11-13', 'CLASS', 'PLANNED', NOW(), NOW()); -- Makeup for session 116 (course_session_id 16)
+END $$;
+
+-- Assign resources and teachers for makeup classes
+-- Class 8 (HN Offline) -> Room 102, Teacher 4
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 2 FROM session WHERE class_id = 8;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 4, 'SCHEDULED' FROM session WHERE class_id = 8;
+
+-- Class 9 (HCM Online) -> Zoom 01, Teacher 12
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 8 FROM session WHERE class_id = 9;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 12, 'SCHEDULED' FROM session WHERE class_id = 9;
+
+-- Class 10 (HCM Offline) -> Room 101, Teacher 13
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 5 FROM session WHERE class_id = 10;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 13, 'SCHEDULED' FROM session WHERE class_id = 10;
+
 -- ========== TIER 5: ENROLLMENTS & ATTENDANCE ==========
 
 -- Enrollments for Class 1 (HN-FOUND-C1) - 15 students, all completed
@@ -961,6 +1111,21 @@ WHERE e.class_id = 2
   AND s.class_id = 2
   AND (e.join_session_id IS NULL OR s.id >= e.join_session_id);
 
+-- MAKEUP FLOW TEST DATA: Create recent absences for student 1
+-- Mark student 1 as ABSENT for 3 recent sessions (last week of Oct 2025)
+UPDATE student_session 
+SET attendance_status = 'ABSENT', note = 'Missed session, eligible for makeup.'
+WHERE student_id = 1 
+  AND session_id IN (
+    SELECT id FROM session 
+    WHERE class_id = 2 
+      AND status = 'DONE'
+      AND date >= '2025-10-27'  -- Last week
+      AND date <= '2025-11-01'  -- Before reference date
+    ORDER BY date DESC
+    LIMIT 3
+  );
+
 -- Student Sessions for Class 3
 INSERT INTO student_session (student_id, session_id, is_makeup, attendance_status, homework_status, recorded_at, created_at, updated_at)
 SELECT 
@@ -1026,6 +1191,85 @@ LEFT JOIN course_session cs ON s.course_session_id = cs.id
 WHERE e.class_id = 5 
   AND s.class_id = 5;
 
+-- Enrollments for Class 6 (HCM-FOUND-E1) - Evening cohort (10 students, slots available)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT 
+    (400 + s.id),
+    6,
+    (45 + s.id), -- Students 46-55 (HCM cohort 2)
+    'ENROLLED',
+    '2025-10-12 19:00:00+07',
+    8,
+    501,
+    '2025-10-12 19:00:00+07',
+    '2025-10-12 19:00:00+07'
+FROM generate_series(1, 10) AS s(id);
+
+-- Student Sessions for Class 6
+INSERT INTO student_session (student_id, session_id, is_makeup, attendance_status, homework_status, recorded_at, created_at, updated_at)
+SELECT 
+    e.student_id,
+    s.id,
+    false,
+    CASE 
+        WHEN s.status = 'DONE' THEN 
+            CASE WHEN random() < 0.88 THEN 'PRESENT' ELSE 'ABSENT' END
+        ELSE 'PLANNED'
+    END,
+    CASE 
+        WHEN s.status = 'DONE' AND cs.student_task IS NOT NULL THEN
+            CASE WHEN random() < 0.8 THEN 'COMPLETED' ELSE 'INCOMPLETE' END
+        ELSE NULL
+    END,
+    CASE WHEN s.status = 'DONE' THEN s.date ELSE NULL END,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+FROM enrollment e
+CROSS JOIN session s
+LEFT JOIN course_session cs ON s.course_session_id = cs.id
+WHERE e.class_id = 6
+  AND s.class_id = 6
+  AND (e.join_session_id IS NULL OR s.id >= e.join_session_id);
+
+-- Enrollments for Class 7 (HCM-FOUND-M1) - Micro cohort (hard cap at 5 to simulate full class)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT 
+    (420 + s.id),
+    7,
+    (55 + s.id), -- Students 56-60
+    'ENROLLED',
+    '2025-10-18 14:00:00+07',
+    8,
+    601,
+    '2025-10-18 14:00:00+07',
+    '2025-10-18 14:00:00+07'
+FROM generate_series(1, 5) AS s(id);
+
+-- Student Sessions for Class 7
+INSERT INTO student_session (student_id, session_id, is_makeup, attendance_status, homework_status, recorded_at, created_at, updated_at)
+SELECT 
+    e.student_id,
+    s.id,
+    false,
+    CASE 
+        WHEN s.status = 'DONE' THEN 
+            CASE WHEN random() < 0.92 THEN 'PRESENT' ELSE 'ABSENT' END
+        ELSE 'PLANNED'
+    END,
+    CASE 
+        WHEN s.status = 'DONE' AND cs.student_task IS NOT NULL THEN
+            CASE WHEN random() < 0.82 THEN 'COMPLETED' ELSE 'INCOMPLETE' END
+        ELSE NULL
+    END,
+    CASE WHEN s.status = 'DONE' THEN s.date ELSE NULL END,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+FROM enrollment e
+CROSS JOIN session s
+LEFT JOIN course_session cs ON s.course_session_id = cs.id
+WHERE e.class_id = 7
+  AND s.class_id = 7;
+
 -- ========== TIER 6: REQUESTS (Test all scenarios) ==========
 
 -- SCENARIO 1: Approved Absence Request
@@ -1064,7 +1308,7 @@ INSERT INTO student_request (id, student_id, current_class_id, request_type, tar
 
 -- SCENARIO 6: Approved Transfer Request
 INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
-(6, 18, 2, 3, 'TRANSFER', '2025-11-04', 214, 'APPROVED', 'Need to change to online class due to work schedule conflict', 118, '2025-10-27 10:00:00+07', 6, '2025-10-28 14:00:00+07');
+(6, 18, 2, 3, 'TRANSFER', '2025-11-04', 214, 'APPROVED', 'Need to change to online class due to work schedule conflict', 6, '2025-10-27 10:00:00+07', 6, '2025-10-28 14:00:00+07');
 
 -- Execute transfer: Update old enrollment
 UPDATE enrollment 
@@ -1087,6 +1331,74 @@ INSERT INTO student_session (student_id, session_id, is_makeup, attendance_statu
 SELECT 18, s.id, false, 'PLANNED', 'Transferred from class #2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM session s
 WHERE s.class_id = 3 AND s.date >= '2025-11-04';
+
+-- Additional Transfer Scenarios to cover Tier 1, Tier 2, and error cases
+
+-- SCENARIO 6A: Historical transfer (counts toward quota) - Student 1 moved from Class 1 -> Class 2
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
+(8, 1, 1, 2, 'TRANSFER', '2025-10-06', 101, 'APPROVED', 'Move to new weekday class after completing previous cohort', 101, '2025-09-28 09:00:00+07', 6, '2025-09-29 10:00:00+07', 'Historical transfer counted toward quota');
+
+-- SCENARIO 6B: Tier 2 on-behalf transfer awaiting student confirmation (modality change)
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
+(9, 12, 2, 3, 'TRANSFER', '2025-11-06', 214, 'WAITING_CONFIRM', 'Needs online sessions while caring for family member', 6, '2025-11-01 08:30:00+07', 'Awaiting guardian confirmation of switch');
+
+-- SCENARIO 6C: Tier 2 branch change (HN -> HCM) created by Academic Affairs, pending approval
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
+(10, 9, 2, 5, 'TRANSFER', '2025-11-10', 313, 'PENDING', 'Family relocation to Ho Chi Minh City - needs branch transfer', 6, '2025-11-02 10:00:00+07', 'Tier 2 branch change - requires center head approval');
+
+-- SCENARIO 6D: Tier 1 self-service request (same branch + modality) - pending
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
+(11, 33, 5, 6, 'TRANSFER', '2025-11-06', 511, 'PENDING', 'Need later evening slot due to new work shift', 133, '2025-11-02 20:00:00+07', 'Tier 1 self-service request, awaiting AA review');
+
+-- SCENARIO 6E: Tier 1 request cancelled by student before approval
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
+(12, 35, 5, 6, 'TRANSFER', '2025-11-08', 512, 'CANCELLED', 'Shift change reverted, will stay with current class', 135, '2025-10-30 07:30:00+07', 'Student cancelled before AA review was completed');
+
+-- SCENARIO 6F: Rejected because target class is full (uses Class 7 micro cohort)
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
+(13, 34, 5, 7, 'TRANSFER', '2025-11-05', 608, 'REJECTED', 'Prefers smaller micro cohort for extra coaching', 134, '2025-11-01 19:00:00+07', 8, '2025-11-02 09:00:00+07', 'Rejected - target class is full (TRF_CLASS_FULL)');
+
+-- SCENARIO 6G: Rejected because target class is the same as current (TRF_SAME_CLASS)
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
+(14, 14, 2, 2, 'TRANSFER', '2025-11-03', 113, 'REJECTED', 'Accidentally selected current class while testing feature', 114, '2025-10-31 09:00:00+07', 6, '2025-10-31 15:00:00+07', 'Rejected - cannot transfer to the same class (TRF_SAME_CLASS)');
+
+-- SCENARIO 6H: Tier violation - student tried to change modality via Tier 1
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
+(15, 11, 2, 3, 'TRANSFER', '2025-11-06', 214, 'REJECTED', 'Wants to switch to online but used Tier 1 flow', 111, '2025-11-01 07:00:00+07', 6, '2025-11-01 12:00:00+07', 'Rejected - Tier 1 only allows schedule changes (TRF_TIER_VIOLATION)');
+
+-- SCENARIO 6I: Rejected because effective date is in the past
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
+(16, 10, 2, 3, 'TRANSFER', '2025-10-25', 209, 'REJECTED', 'Attempted to backdate transfer after missing classes', 110, '2025-11-02 11:00:00+07', 6, '2025-11-02 16:00:00+07', 'Rejected - effective date must be a future session (TRF_PAST_DATE)');
+
+-- SCENARIO 6J: Approved HCM transfer executed (Class 5 -> Class 6) for Student 40
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
+(17, 40, 5, 6, 'TRANSFER', '2025-11-08', 512, 'APPROVED', 'Switching to evening cohort due to job relocation downtown', 8, '2025-11-05 11:00:00+07', 4, '2025-11-05 15:00:00+07', 'AA executed branch-internal transfer for HCM');
+
+-- Execute HCM transfer: Update old enrollment for Student 40
+UPDATE enrollment
+SET status = 'TRANSFERRED',
+    left_at = '2025-11-08 00:00:00+07',
+    left_session_id = 312
+WHERE class_id = 5 AND student_id = 40;
+
+-- Execute HCM transfer: Create new enrollment in Class 6
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+VALUES (450, 6, 40, 'ENROLLED', '2025-11-08 00:00:00+07', 8, 512, '2025-11-08 00:00:00+07', '2025-11-08 00:00:00+07');
+
+-- Execute HCM transfer: Mark future sessions in Class 5 as absent
+UPDATE student_session
+SET attendance_status = 'ABSENT',
+    note = 'Transferred to class #6'
+WHERE student_id = 40
+  AND session_id IN (
+      SELECT id FROM session WHERE class_id = 5 AND date >= '2025-11-08'
+  );
+
+-- Execute HCM transfer: Generate student_sessions in Class 6 for Student 40
+INSERT INTO student_session (student_id, session_id, is_makeup, attendance_status, note, created_at, updated_at)
+SELECT 40, s.id, false, 'PLANNED', 'Transferred from class #5', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM session s
+WHERE s.class_id = 6 AND s.date >= '2025-11-08';
 
 -- SCENARIO 7: Teacher Swap Request - Approved
 INSERT INTO teacher_request (id, teacher_id, session_id, request_type, replacement_teacher_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES

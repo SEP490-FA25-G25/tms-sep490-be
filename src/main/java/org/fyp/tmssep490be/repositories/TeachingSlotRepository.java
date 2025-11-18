@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -110,4 +111,77 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
             @Param("sessionIds") List<Long> sessionIds,
             @Param("teacherId") Long teacherId
     );
+
+    // ==================== TEACHER SCHEDULE & REQUEST WORKFLOW METHODS ====================
+
+    @Query("""
+            SELECT ts FROM TeachingSlot ts
+            JOIN FETCH ts.session s
+            JOIN FETCH s.timeSlotTemplate tst
+            JOIN FETCH s.classEntity c
+            JOIN FETCH c.course course
+            LEFT JOIN FETCH s.courseSession cs
+            WHERE ts.teacher.id = :teacherId
+              AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
+              AND s.date = :date
+              AND s.status <> 'CANCELLED'
+            ORDER BY tst.startTime ASC
+            """)
+    List<TeachingSlot> findByTeacherIdAndDate(
+            @Param("teacherId") Long teacherId,
+            @Param("date") LocalDate date
+    );
+
+    /**
+     * Find teacher's future sessions within date range
+     * Returns sessions with status PLANNED, within 7 days from today (or specific date range)
+     */
+    @Query("""
+            SELECT ts FROM TeachingSlot ts
+            JOIN FETCH ts.session s
+            JOIN FETCH s.timeSlotTemplate tst
+            JOIN FETCH s.classEntity c
+            JOIN FETCH c.course course
+            LEFT JOIN FETCH s.courseSession cs
+            WHERE ts.teacher.id = :teacherId
+              AND ts.status = 'SCHEDULED'
+              AND s.status = 'PLANNED'
+              AND s.date >= :fromDate
+              AND s.date <= :toDate
+            ORDER BY s.date ASC, tst.startTime ASC
+            """)
+    List<TeachingSlot> findByTeacherIdAndDateRange(
+            @Param("teacherId") Long teacherId,
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate
+    );
+
+    /**
+     * Find teaching slot by session ID with teacher loaded
+     * Used to get teacher from session when request.teacher is null
+     */
+    @Query("""
+            SELECT ts FROM TeachingSlot ts
+            JOIN FETCH ts.teacher t
+            JOIN FETCH t.userAccount ua
+            WHERE ts.session.id = :sessionId
+              AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
+            """)
+    List<TeachingSlot> findBySessionIdWithTeacher(@Param("sessionId") Long sessionId);
+
+    /**
+     * Find distinct classes that a teacher is teaching
+     * Returns classes where teacher has at least one teaching slot with status SCHEDULED or SUBSTITUTED
+     */
+    @Query("""
+            SELECT DISTINCT c FROM TeachingSlot ts
+            JOIN ts.session s
+            JOIN s.classEntity c
+            JOIN FETCH c.course
+            JOIN FETCH c.branch
+            WHERE ts.teacher.id = :teacherId
+              AND ts.status = 'SCHEDULED'
+            ORDER BY c.code ASC
+            """)
+    List<org.fyp.tmssep490be.entities.ClassEntity> findDistinctClassesByTeacherId(@Param("teacherId") Long teacherId);
 }

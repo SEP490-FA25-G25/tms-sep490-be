@@ -26,6 +26,12 @@ public class StudentEnrollmentHistoryDTO {
     private OffsetDateTime leftAt;
     private String enrolledByName;
 
+    // Session Boundary Information (for tracking transfer/enrollment periods)
+    private Long joinSessionId;
+    private LocalDate joinSessionDate;
+    private Long leftSessionId;
+    private LocalDate leftSessionDate;
+
     // Class Period Information
     private LocalDate classStartDate;
     private LocalDate classEndDate;

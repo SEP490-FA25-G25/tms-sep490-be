@@ -20,6 +20,26 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
     List<TeacherRequest> findByTeacherIdOrderBySubmittedAtDesc(Long teacherId);
     
     /**
+     * Find requests where teacher is replacement teacher, ordered by submitted date descending
+     */
+    List<TeacherRequest> findByReplacementTeacherIdOrderBySubmittedAtDesc(Long replacementTeacherId);
+    
+    /**
+     * Find all requests for a teacher (both created by teacher and where teacher is replacement)
+     * Ordered by submitted date descending
+     */
+    @Query("SELECT tr FROM TeacherRequest tr " +
+           "LEFT JOIN FETCH tr.teacher t " +
+           "LEFT JOIN FETCH t.userAccount ua " +
+           "LEFT JOIN FETCH tr.replacementTeacher rt " +
+           "LEFT JOIN FETCH rt.userAccount rua " +
+           "LEFT JOIN FETCH tr.session s " +
+           "LEFT JOIN FETCH s.classEntity c " +
+           "WHERE tr.teacher.id = :teacherId OR tr.replacementTeacher.id = :teacherId " +
+           "ORDER BY tr.submittedAt DESC")
+    List<TeacherRequest> findByTeacherIdOrReplacementTeacherIdOrderBySubmittedAtDesc(@Param("teacherId") Long teacherId);
+    
+    /**
      * Check if a pending request exists for the same session and request type
      * Used to prevent duplicate requests
      */
@@ -39,11 +59,20 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
     );
     
     /**
-     * Find request by ID with teacher and session loaded
+     * Find request by ID with all relationships loaded for detail view
      */
     @Query("SELECT tr FROM TeacherRequest tr " +
            "LEFT JOIN FETCH tr.teacher t " +
+           "LEFT JOIN FETCH t.userAccount ua " +
+           "LEFT JOIN FETCH tr.replacementTeacher rt " +
+           "LEFT JOIN FETCH rt.userAccount rua " +
            "LEFT JOIN FETCH tr.session s " +
+           "LEFT JOIN FETCH s.classEntity c " +
+           "LEFT JOIN FETCH s.courseSession cs " +
+           "LEFT JOIN FETCH s.timeSlotTemplate tst " +
+           "LEFT JOIN FETCH tr.newResource nr " +
+           "LEFT JOIN FETCH tr.newTimeSlot nts " +
+           "LEFT JOIN FETCH tr.decidedBy db " +
            "WHERE tr.id = :id")
     Optional<TeacherRequest> findByIdWithTeacherAndSession(@Param("id") Long id);
     
@@ -54,4 +83,37 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
             Long teacherId, 
             RequestStatus status
     );
+
+    /**
+     * Find all requests ordered by submitted time (newest first)
+     * With teacher and userAccount loaded for staff view
+     */
+    @Query("SELECT tr FROM TeacherRequest tr " +
+           "LEFT JOIN FETCH tr.teacher t " +
+           "LEFT JOIN FETCH t.userAccount ua " +
+           "LEFT JOIN FETCH tr.session s " +
+           "LEFT JOIN FETCH s.classEntity c " +
+           "LEFT JOIN FETCH tr.decidedBy db " +
+           "ORDER BY tr.submittedAt DESC")
+    List<TeacherRequest> findAllByOrderBySubmittedAtDesc();
+
+    /**
+     * Find requests by status ordered by submitted time (newest first)
+     * With teacher and userAccount loaded for staff view
+     */
+    @Query("SELECT tr FROM TeacherRequest tr " +
+           "LEFT JOIN FETCH tr.teacher t " +
+           "LEFT JOIN FETCH t.userAccount ua " +
+           "LEFT JOIN FETCH tr.session s " +
+           "LEFT JOIN FETCH s.classEntity c " +
+           "LEFT JOIN FETCH tr.decidedBy db " +
+           "WHERE tr.status = :status " +
+           "ORDER BY tr.submittedAt DESC")
+    List<TeacherRequest> findByStatusOrderBySubmittedAtDesc(@Param("status") RequestStatus status);
+
+    /**
+     * Find requests by session IDs and statuses
+     * Used to check if sessions have pending requests
+     */
+    List<TeacherRequest> findBySessionIdInAndStatusIn(List<Long> sessionIds, List<RequestStatus> statuses);
 }

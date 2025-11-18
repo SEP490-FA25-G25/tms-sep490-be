@@ -1,17 +1,14 @@
 package org.fyp.tmssep490be.services;
 
-import org.fyp.tmssep490be.dtos.common.BranchDTO;
+import org.fyp.tmssep490be.dtos.branch.BranchDTO;
+import org.fyp.tmssep490be.entities.Branch;
+
 import java.util.List;
 
-/**
- * Service interface for branch operations
- */
 public interface BranchService {
-    
     /**
-     * Get all active branches for dropdown selection
-     * 
-     * @return List of BranchDTO containing id, name, and code
+     * Get all active branches
+     * @return List of all active branches
      */
     List<BranchDTO> getAllBranches();
 }

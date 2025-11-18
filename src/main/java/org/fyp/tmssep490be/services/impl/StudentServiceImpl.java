@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -419,6 +420,7 @@ public class StudentServiceImpl implements StudentService {
                 .branchId(branchId)
                 .activeEnrollments((long) activeEnrollments)
                 .lastEnrollmentDate(latestEnrollment
+                        .filter(e -> e.getEnrolledAt() != null)
                         .map(e -> e.getEnrolledAt().toLocalDate())
                         .orElse(null))
                 .canEnroll(activeEnrollments < 3) // Example max concurrent enrollments
@@ -447,12 +449,16 @@ public class StudentServiceImpl implements StudentService {
 
         // Get first and last enrollment dates
         LocalDate firstEnrollmentDate = student.getEnrollments().stream()
-                .map(e -> e.getEnrolledAt().toLocalDate())
+                .map(Enrollment::getEnrolledAt)
+                .filter(Objects::nonNull)
+                .map(OffsetDateTime::toLocalDate)
                 .min(LocalDate::compareTo)
                 .orElse(null);
 
         LocalDate lastEnrollmentDate = student.getEnrollments().stream()
-                .map(e -> e.getEnrolledAt().toLocalDate())
+                .map(Enrollment::getEnrolledAt)
+                .filter(Objects::nonNull)
+                .map(OffsetDateTime::toLocalDate)
                 .max(LocalDate::compareTo)
                 .orElse(null);
 
@@ -505,6 +511,19 @@ public class StudentServiceImpl implements StudentService {
         ClassEntity classEntity = enrollment.getClassEntity();
         UserAccount studentUser = student.getUserAccount();
 
+        // Get session boundary information
+        Long joinSessionId = enrollment.getJoinSessionId();
+        LocalDate joinSessionDate = null;
+        if (enrollment.getJoinSession() != null) {
+            joinSessionDate = enrollment.getJoinSession().getDate();
+        }
+
+        Long leftSessionId = enrollment.getLeftSessionId();
+        LocalDate leftSessionDate = null;
+        if (enrollment.getLeftSession() != null) {
+            leftSessionDate = enrollment.getLeftSession().getDate();
+        }
+
         return StudentEnrollmentHistoryDTO.builder()
                 .id(enrollment.getId())
                 .studentId(student.getId())
@@ -520,6 +539,10 @@ public class StudentServiceImpl implements StudentService {
                 .leftAt(enrollment.getLeftAt())
                 .enrolledByName(enrollment.getEnrolledByUser() != null ?
                         enrollment.getEnrolledByUser().getFullName() : null)
+                .joinSessionId(joinSessionId)
+                .joinSessionDate(joinSessionDate)
+                .leftSessionId(leftSessionId)
+                .leftSessionDate(leftSessionDate)
                 .classStartDate(classEntity.getStartDate())
                 .classEndDate(classEntity.getPlannedEndDate())
                 .modality(classEntity.getModality().name())

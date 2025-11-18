@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+*.iml
+.vscode
+*.swp
+*.swo
+
+# Build outputs
+target/
+!target/tms-sep490-be-*.jar
+build/
+out/
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+
+# Logs
+*.log
+logs/
+
+# OS generated
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+
+# Documentation
+*.md
+docs/
+CLAUDE.md
+AGENTS.md
+
+# Test data
+src/test/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Serena
+.serena/
+
+# Claude
+.claude/
+
+# Local environment
+*.env.local
+*.env.*.local

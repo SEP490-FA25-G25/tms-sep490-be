@@ -42,6 +42,10 @@ public class StudentSession implements Serializable {
     @JoinColumn(name = "original_session_id")
     private Session originalSession;
 
+    @Column(name = "is_transferred_out")
+    @Builder.Default
+    private Boolean isTransferredOut = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "attendance_status", nullable = false)
     @Builder.Default

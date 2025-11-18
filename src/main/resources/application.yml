@@ -13,22 +13,12 @@ spring:
 
   datasource:
     driver-class-name: org.postgresql.Driver
-    # docker run --name some-postgres -e POSTGRES_PASSWORD=979712 -p 5432:5432 -d postgres 
-    # docker exec -it some-postgres psql -U postgres
+    # docker run --name tms-postgres -e POSTGRES_PASSWORD=979712 -p 5432:5432 -d postgres 
+    # docker exec -it tms-postgres psql -U postgres
     # CREATE DATABASE tms;
-    # 1. Tạo enums
-    #Get-Content "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/enum-init.sql" | docker exec -i tms-postgres psql -U postgres -d tms
 
-    # 2. Tạo schema và tables
-    #Get-Content "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/schema.sql" | docker exec -i tms-postgres psql -U postgres -d tms
-
-    # 3. Import seed data
-    #Get-Content "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/schema.sql" | docker exec -i tms-postgres psql -U postgres -d tms
-
-    # optional chay ca schema và seed data
-    #Get-Content "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/schema.sql", "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/seed-data.sql" | docker exec -i tms-postgres psql -U postgres -d tms
-
-    # cat /Users/tatanh/Documents/Code/SEP490-Capstone/tms-sep490-be/src/main/resources/schema.sql \ /Users/tatanh/Documents/Code/SEP490-Capstone/tms-sep490-be/src/main/resources/seed-data.sql | \ docker exec -i some-postgres psql -U postgres -d tms
+    # Run init schema and seed data
+    # Get-Content "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/schema.sql", "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/seed-data.sql" | docker exec -i tms-postgres psql -U postgres -d tms username: postgres
     username: postgres
     url: jdbc:postgresql://localhost:5432/tms 
     password: 979712

@@ -50,7 +50,7 @@ public class EnrollmentController {
      * Simplified 7-column format: full_name, email, phone, facebook_url, address, gender, dob
      */
     @GetMapping("/template")
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     @Operation(
             summary = "Download Excel enrollment template",
             description = "Download a generic Excel template with 7 columns for student enrollment"
@@ -76,7 +76,7 @@ public class EnrollmentController {
      * Includes class information and sample data in the template
      */
     @GetMapping("/classes/{classId}/template")
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     @Operation(
             summary = "Download class-specific Excel template",
             description = "Download a class-specific Excel template with class information and sample data"
@@ -111,7 +111,7 @@ public class EnrollmentController {
      * 4. Return preview với recommendation
      */
     @PostMapping(value = "/classes/{classId}/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     @Operation(
             summary = "Preview Excel import for class enrollment",
             description = "Parse Excel file, resolve students, calculate capacity, and provide recommendations"
@@ -160,7 +160,7 @@ public class EnrollmentController {
      * 6. Send welcome emails (async) - commented out
      */
     @PostMapping("/classes/{classId}/import/execute")
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     @Operation(
             summary = "Execute enrollment import",
             description = "Create enrollments and auto-generate student sessions based on strategy"
@@ -208,7 +208,7 @@ public class EnrollmentController {
      * 6. Auto-generate student_session records
      */
     @PostMapping("/classes/{classId}/students")
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     @Operation(
             summary = "Enroll existing students into class",
             description = "Multi-select enrollment for existing students. Supports capacity override with reason."

@@ -27,9 +27,9 @@ public class JwtTokenProvider {
     private final long refreshTokenValidityInMs;
 
     public JwtTokenProvider(
-            @Value("${spring.security.jwt.secret}") String secret,
-            @Value("${spring.security.jwt.access-token-expiration}") long accessTokenValidityInMs,
-            @Value("${spring.security.jwt.refresh-token-expiration}") long refreshTokenValidityInMs) {
+            @Value("${spring.security.jwt.secret:ThisIsAVerySecretKeyForJWTTokenGenerationPleaseChangeInProduction123456789}") String secret,
+            @Value("${spring.security.jwt.access-token-expiration:900000}") long accessTokenValidityInMs,
+            @Value("${spring.security.jwt.refresh-token-expiration:604800000}") long refreshTokenValidityInMs) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTokenValidityInMs = accessTokenValidityInMs;
         this.refreshTokenValidityInMs = refreshTokenValidityInMs;
@@ -45,6 +45,7 @@ public class JwtTokenProvider {
 
         String roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
+                .map(role -> role.replace("ROLE_", ""))
                 .collect(Collectors.joining(","));
 
         return Jwts.builder()

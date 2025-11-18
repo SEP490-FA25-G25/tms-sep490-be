@@ -22,8 +22,9 @@ public enum ErrorCode {
     RESOURCE_NAME_ALREADY_EXISTS(2201, "Resource name already exists for this branch"),
     RESOURCE_CONFLICT(2202, "Resource is already booked for the specified time"),
     RESOURCE_INVALID_TYPE(2203, "Invalid resource type"),
-    INSUFFICIENT_RESOURCE_CAPACITY(2204, "Resource capacity is insufficient for class size"),
+    RESOURCE_CAPACITY_INSUFFICIENT(2204, "Resource capacity is insufficient"),
     RESOURCE_BRANCH_MISMATCH(2205, "Resource does not belong to the same branch as the class"),
+    INSUFFICIENT_RESOURCE_CAPACITY(2206, "Resource capacity is insufficient for class size"),
 
     // Subject errors (1200-1219)
     SUBJECT_NOT_FOUND(1201, "Subject not found"),
@@ -64,6 +65,7 @@ public enum ErrorCode {
     SESSION_IN_USE(1292, "Cannot delete course session that is being used in actual sessions"),
     INVALID_SKILL_SET(1293, "Invalid skill set value(s)"),
     COURSE_SESSION_NOT_FOUND(1294, "Course session not found"),
+    SESSION_ALREADY_DONE(1295, "Cannot modify attendance for a session that has already been completed"),
 
     // PLO errors (1310-1329)
     PLO_NOT_FOUND(1310, "PLO not found"),

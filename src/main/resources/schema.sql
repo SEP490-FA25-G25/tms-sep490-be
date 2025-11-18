@@ -543,6 +543,7 @@ CREATE TABLE student_session (
   is_makeup BOOLEAN DEFAULT false,
   makeup_session_id BIGINT, -- nếu là buổi học bù thì lưu session bù
   original_session_id BIGINT, -- nếu là buổi học bù thì lưu session gốc
+  is_transferred_out BOOLEAN DEFAULT false, -- true nếu học sinh chuyển lớp và không còn tham gia session này
   attendance_status VARCHAR(20) NOT NULL DEFAULT 'PLANNED',
   homework_status VARCHAR(20),
   note TEXT,
@@ -668,7 +669,13 @@ CREATE TABLE student_request (
   CONSTRAINT fk_student_request_submitted_by FOREIGN KEY(submitted_by) REFERENCES user_account(id) ON DELETE SET NULL,
   CONSTRAINT fk_student_request_decided_by FOREIGN KEY(decided_by) REFERENCES user_account(id) ON DELETE SET NULL,
   CONSTRAINT chk_student_request_type CHECK (request_type IN ('ABSENCE', 'MAKEUP', 'TRANSFER')),
-  CONSTRAINT chk_student_request_status CHECK (status IN ('PENDING', 'WAITING_CONFIRM', 'APPROVED', 'REJECTED'))
+  CONSTRAINT chk_student_request_status CHECK (status IN ('PENDING', 'WAITING_CONFIRM', 'APPROVED', 'REJECTED', 'CANCELLED')),
+  CONSTRAINT chk_makeup_valid CHECK (
+    request_type != 'MAKEUP' OR (
+      target_session_id IS NOT NULL AND
+      makeup_session_id IS NOT NULL
+    )
+  )
 );
 
 CREATE TABLE teacher_request (

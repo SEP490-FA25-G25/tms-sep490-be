@@ -9,9 +9,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.studentmanagement.*;
+import org.fyp.tmssep490be.dtos.studentrequest.StudentClassDTO;
+import org.fyp.tmssep490be.entities.Student;
 import org.fyp.tmssep490be.entities.enums.UserStatus;
+import org.fyp.tmssep490be.exceptions.BusinessRuleException;
+import org.fyp.tmssep490be.repositories.StudentRepository;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentService;
+import org.fyp.tmssep490be.services.StudentRequestService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +42,8 @@ import java.util.List;
 public class StudentController {
 
     private final StudentService studentService;
+    private final StudentRequestService studentRequestService;
+    private final StudentRepository studentRepository;
 
     /**
      * Create a new student with auto-generated student code
@@ -47,7 +54,7 @@ public class StudentController {
             summary = "Create a new student",
             description = "Create a new student with auto-generated student code. Academic Affairs can add students to their accessible branches."
     )
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<CreateStudentResponse>> createStudent(
             @Valid @RequestBody CreateStudentRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
@@ -78,7 +85,7 @@ public class StudentController {
             summary = "Get students list",
             description = "Retrieve paginated list of students accessible to the user with filtering options"
     )
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<Page<StudentListItemDTO>>> getStudents(
             @Parameter(description = "Filter by branch ID(s). If not provided, uses user's accessible branches")
             @RequestParam(required = false) List<Long> branchIds,
@@ -133,7 +140,7 @@ public class StudentController {
             summary = "Get student details",
             description = "Retrieve comprehensive information about a specific student including enrollment history and current classes"
     )
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentDetailDTO>> getStudentDetail(
             @Parameter(description = "Student ID")
             @PathVariable Long studentId,
@@ -160,7 +167,7 @@ public class StudentController {
             summary = "Get student enrollment history",
             description = "Retrieve comprehensive enrollment history for a specific student including current and past enrollments"
     )
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<Page<StudentEnrollmentHistoryDTO>>> getStudentEnrollmentHistory(
             @Parameter(description = "Student ID")
             @PathVariable Long studentId,
@@ -196,6 +203,50 @@ public class StudentController {
                 .success(true)
                 .message("Student enrollment history retrieved successfully")
                 .data(enrollmentHistory)
+                .build());
+    }
+
+    /**
+     * Get classes for a specific student
+     * Both students and academic affairs can access this endpoint
+     * Students can only view their own classes
+     */
+    @GetMapping("/{studentId}/classes")
+    @Operation(
+            summary = "Get student classes",
+            description = "Retrieve all active classes that a student is currently enrolled in"
+    )
+    @PreAuthorize("hasRole('STUDENT') or hasRole('ROLE_ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<StudentClassDTO>>> getStudentClasses(
+            @Parameter(description = "Student ID")
+            @PathVariable Long studentId,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        // For testing when security is disabled
+        Long currentUserId = currentUser != null ? currentUser.getId() : 1L;
+        boolean isStudent = currentUser != null &&
+            currentUser.getAuthorities().stream().anyMatch(auth -> auth.getAuthority().equals("ROLE_STUDENT"));
+
+        log.info("User {} requesting classes for student {}", currentUserId, studentId);
+
+        // Students can only view their own classes (only enforced when security is enabled)
+        if (currentUser != null && isStudent) {
+            Student student = studentRepository.findByUserAccountId(currentUserId)
+                    .orElseThrow(() -> new BusinessRuleException("ACCESS_DENIED", "Student not found"));
+
+            if (!student.getId().equals(studentId)) {
+                throw new BusinessRuleException("ACCESS_DENIED", "Students can only view their own classes");
+            }
+        }
+
+        // Get classes for the studentId
+        List<StudentClassDTO> classes = studentRequestService.getMyClassesForStudent(studentId);
+
+        return ResponseEntity.ok(ResponseObject.<List<StudentClassDTO>>builder()
+                .success(true)
+                .message("Student classes retrieved successfully")
+                .data(classes)
                 .build());
     }
 }

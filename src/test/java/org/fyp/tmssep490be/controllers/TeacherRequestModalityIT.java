@@ -37,6 +37,7 @@ class TeacherRequestModalityIT {
     @Autowired private BranchRepository branchRepository;
     @Autowired private SubjectRepository subjectRepository;
     @Autowired private CourseRepository courseRepository;
+    @Autowired private StudentSessionRepository studentSessionRepository;
 
     private UserAccount staff;
     private Teacher teacher;
@@ -144,7 +145,12 @@ class TeacherRequestModalityIT {
         zoom.setCode("Z-" + uniqueSuffix);
         zoom.setName("Zoom-1");
         zoom.setResourceType(ResourceType.VIRTUAL);
+        zoom.setCapacity(50); // Set capacity for testing
         zoom = resourceRepository.save(zoom);
+
+        // Create some student sessions for the session (to test capacity validation)
+        // Note: In real scenario, student sessions are created when students enroll
+        // For testing, we'll create minimal student sessions
 
         // Create pending teacher request (modality change)
         TeacherRequest req = TeacherRequest.builder()
