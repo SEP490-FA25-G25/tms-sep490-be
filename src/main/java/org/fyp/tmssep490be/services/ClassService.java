@@ -320,4 +320,15 @@ public interface ClassService {
      * @return RejectClassResponse with rejection details
      */
     RejectClassResponse rejectClass(Long classId, String reason, Long rejecterUserId);
+
+    /**
+     * Delete a DRAFT class
+     * Only classes with status = DRAFT can be deleted
+     * Cascades delete to sessions, teaching_slots, session_resources
+     *
+     * @param classId Class ID to delete
+     * @param userId User ID for access control
+     * @throws CustomException if class not found, not DRAFT, or user has no access
+     */
+    void deleteClass(Long classId, Long userId);
 }

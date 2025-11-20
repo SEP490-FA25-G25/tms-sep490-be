@@ -82,16 +82,18 @@ public class ClassController {
     private final AssignResourcesResponseUtil assignResourcesResponseUtil;
 
     /**
-     * Get list of classes accessible to academic affairs user
+     * Get list of classes accessible to user
      * Filters by user's branch assignments and applies search/filter criteria
+     * Accessible by: ACADEMIC_AFFAIR (create/manage classes), CENTER_HEAD (review/approve classes)
      */
     @GetMapping
     @Operation(
             summary = "Get classes list",
             description = "Retrieve paginated list of classes accessible to the user with filtering options. " +
-                    "By default, returns all classes regardless of status."
+                    "By default, returns all classes regardless of status. " +
+                    "Academic Affairs can create and manage classes. Center Head can review and approve classes."
     )
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD')")
     public ResponseEntity<ResponseObject<Page<ClassListItemDTO>>> getClasses(
             @Parameter(description = "Filter by branch ID(s). If not provided, uses user's accessible branches")
             @RequestParam(required = false) List<Long> branchIds,
@@ -256,9 +258,10 @@ public class ClassController {
     /**
      * STEP 2: Get list of generated sessions for review
      * Used for "Xem lại buổi học" step in frontend
+     * Accessible by: ACADEMIC_AFFAIR (manage sessions), CENTER_HEAD (review for approval)
      */
     @GetMapping("/{classId}/sessions")
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD')")
     @Operation(
             summary = "Get list of sessions for review",
             description = """
@@ -396,13 +399,15 @@ public class ClassController {
     /**
      * Get detailed information about a specific class
      * Includes enrollment summary and upcoming sessions
+     * Accessible by: ACADEMIC_AFFAIR, CENTER_HEAD (for approval review), STUDENT
      */
     @GetMapping("/{classId}")
     @Operation(
             summary = "Get class details",
-            description = "Retrieve comprehensive information about a specific class including enrollment summary and upcoming sessions"
+            description = "Retrieve comprehensive information about a specific class including enrollment summary and upcoming sessions. " +
+                    "Center Head can access this to review class details before approval."
     )
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR') or hasRole('STUDENT')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('STUDENT')")
     public ResponseEntity<ResponseObject<ClassDetailDTO>> getClassDetail(
             @Parameter(description = "Class ID")
             @PathVariable Long classId,
@@ -429,7 +434,7 @@ public class ClassController {
             summary = "Get class students",
             description = "Retrieve paginated list of students currently enrolled in a specific class with search functionality"
     )
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<Page<ClassStudentDTO>>> getClassStudents(
             @Parameter(description = "Class ID")
             @PathVariable Long classId,
@@ -477,7 +482,7 @@ public class ClassController {
             summary = "Get class enrollment summary",
             description = "Retrieve lightweight enrollment summary with capacity information for quick checks and list views"
     )
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<ClassEnrollmentSummaryDTO>> getClassEnrollmentSummary(
             @Parameter(description = "Class ID")
             @PathVariable Long classId,
@@ -514,7 +519,7 @@ public class ClassController {
                     "- Level information with subject context and duration expectations\n" +
                     "- Class match analysis with detailed reasoning for recommendations"
     )
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<Page<AvailableStudentDTO>>> getAvailableStudentsForClass(
             @Parameter(description = "Class ID to enroll students into")
             @PathVariable Long classId,
@@ -1588,6 +1593,35 @@ public class ClassController {
                 .success(response.isSuccess())
                 .message(response.getMessage())
                 .data(response)
+                .build());
+    }
+
+    /**
+     * DELETE a DRAFT class
+     * Only classes in DRAFT status can be deleted
+     */
+    @DeleteMapping("/{classId}")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(
+            summary = "Delete DRAFT class",
+            description = "Delete a class that is in DRAFT status. " +
+                    "Only classes that have not been submitted for approval can be deleted. " +
+                    "Cascades delete to sessions, teaching slots, and session resources."
+    )
+    public ResponseEntity<ResponseObject<String>> deleteClass(
+            @Parameter(description = "Class ID")
+            @PathVariable Long classId,
+
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} deleting class {}", currentUser.getId(), classId);
+
+        classService.deleteClass(classId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<String>builder()
+                .success(true)
+                .message("Class deleted successfully")
+                .data("Class and all related data removed")
                 .build());
     }
 }

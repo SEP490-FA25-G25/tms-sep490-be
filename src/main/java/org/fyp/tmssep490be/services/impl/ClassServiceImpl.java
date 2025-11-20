@@ -1463,6 +1463,39 @@ public class ClassServiceImpl implements ClassService {
         }
     }
 
+    @Override
+    @Transactional
+    public void deleteClass(Long classId, Long userId) {
+        log.info("Deleting class ID: {} by user: {}", classId, userId);
+
+        // Validate class exists
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        // Validate user has access to this class's branch
+        validateClassBranchAccess(classEntity, userId);
+
+        // Validate class is in DRAFT status (only DRAFT classes can be deleted)
+        if (classEntity.getStatus() != ClassStatus.DRAFT) {
+            throw new CustomException(ErrorCode.CLASS_CANNOT_DELETE_NON_DRAFT);
+        }
+
+        // Check if class has any enrollments (shouldn't happen for DRAFT, but safety check)
+        Integer enrolledCount = classRepository.countEnrolledStudents(classId);
+        if (enrolledCount != null && enrolledCount > 0) {
+            throw new CustomException(ErrorCode.CLASS_HAS_ENROLLMENTS);
+        }
+
+        try {
+            // Cascade delete: sessions → teaching_slots, session_resources (handled by DB constraints)
+            classRepository.delete(classEntity);
+            log.info("Successfully deleted class ID: {} (code: {})", classId, classEntity.getCode());
+        } catch (Exception e) {
+            log.error("Error deleting class ID: {}", classId, e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     // Helper methods for Create Class workflow
 
     private void validateCreateClassRequest(CreateClassRequest request, Long userId) {

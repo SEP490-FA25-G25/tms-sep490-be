@@ -29,8 +29,10 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
      * Find classes accessible to academic affairs user with filters
      * Filters by user's branch assignments, approval status, and class status
      * If approvalStatus or status is null, returns all classes regardless of that filter
+     * 
+     * Note: Using explicit entity reference to avoid PostgreSQL bytea cast issues with schedule_days
      */
-    @Query("SELECT DISTINCT c FROM ClassEntity c " +
+    @Query("SELECT c FROM ClassEntity c " +
            "INNER JOIN c.branch b " +
            "INNER JOIN c.course co " +
            "WHERE (:branchIds IS NULL OR b.id IN :branchIds) " +
@@ -38,7 +40,7 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
            "AND (:status IS NULL OR c.status = :status) " +
            "AND (:courseId IS NULL OR co.id = :courseId) " +
            "AND (:modality IS NULL OR c.modality = :modality) " +
-           "AND (:search IS NULL OR " +
+           "AND (:search IS NULL OR :search = '' OR " +
            "  LOWER(c.code) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "  LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "  LOWER(co.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +

@@ -133,6 +133,8 @@ public enum ErrorCode {
     CLASS_NOT_SCHEDULED(4003, "Class must be in scheduled status to be accessible"),
     CLASS_NO_BRANCH_ACCESS(4004, "User does not have access to any branches"),
     UNAUTHORIZED_ACCESS(4005, "Unauthorized access: Academic staff role required"),
+    CLASS_CANNOT_DELETE_NON_DRAFT(4006, "Only DRAFT classes can be deleted"),
+    CLASS_HAS_ENROLLMENTS(4007, "Cannot delete class with enrolled students"),
 
     // Create Class Workflow errors (4010-4099)
     CLASS_CODE_DUPLICATE(4010, "Class code already exists for this branch"),
