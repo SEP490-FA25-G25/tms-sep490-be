@@ -14,17 +14,22 @@ import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.StudentRequestService;
 import org.fyp.tmssep490be.services.StudentScheduleService;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import static org.fyp.tmssep490be.repositories.StudentRequestRepository.*;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -56,16 +61,100 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         Student student = studentRepository.findByUserAccountId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
 
-        List<RequestStatus> statuses = filter.getStatus() != null ?
-                List.of(RequestStatus.valueOf(filter.getStatus())) :
-                List.of(RequestStatus.values());
+        // Build dynamic specification
+        Specification<StudentRequest> spec = Specification.where(null);
 
-        Sort sort = Sort.by(Sort.Direction.fromString(filter.getSort().split(",")[1]),
-                filter.getSort().split(",")[0]);
+        // Always filter by student ID
+        spec = spec.and(hasStudentId(student.getId()));
+
+        // Add search filter if provided
+        if (filter.getSearch() != null && !filter.getSearch().trim().isEmpty()) {
+            spec = spec.and(hasSearchTerm(filter.getSearch()));
+        }
+
+        // Use new multi-value filters if available, otherwise fall back to single values
+        if (filter.getRequestTypeFilters() != null && !filter.getRequestTypeFilters().isEmpty()) {
+            spec = spec.and(hasRequestTypes(filter.getRequestTypeFilters()));
+        } else if (filter.getRequestType() != null) {
+            try {
+                StudentRequestType requestType = StudentRequestType.valueOf(filter.getRequestType());
+                spec = spec.and(hasRequestType(requestType));
+            } catch (IllegalArgumentException e) {
+                // Invalid enum value, ignore the filter
+            }
+        }
+
+        if (filter.getStatusFilters() != null && !filter.getStatusFilters().isEmpty()) {
+            spec = spec.and(hasStatuses(filter.getStatusFilters()));
+        } else if (filter.getStatus() != null) {
+            try {
+                RequestStatus status = RequestStatus.valueOf(filter.getStatus());
+                spec = spec.and(hasStatus(status));
+            } catch (IllegalArgumentException e) {
+                // Invalid enum value, ignore the filter
+            }
+        }
+
+        // Check if no status filters are applied
+        boolean hasStatusFilter = (filter.getStatusFilters() != null && !filter.getStatusFilters().isEmpty()) ||
+                                 (filter.getStatus() != null);
+
+        // Parse sort criteria - use pending-first sorting when no status filter
+        Sort sort;
+        if (!hasStatusFilter) {
+            // Use pending-first sorting when no status filters
+            try {
+                String[] sortParts = filter.getSort().split(",");
+                String field = sortParts[0];
+                String direction = sortParts.length > 1 ? sortParts[1] : "desc";
+                sort = Sort.by(
+                    Sort.Order.asc("status"), // PENDING (0) comes before others
+                    new Sort.Order(Sort.Direction.fromString(direction), field)
+                );
+            } catch (Exception e) {
+                // Default pending-first sort if parsing fails
+                sort = Sort.by(
+                    Sort.Order.asc("status"),
+                    Sort.Order.desc("submittedAt")
+                );
+            }
+        } else {
+            // Use regular sorting when status filters are applied
+            try {
+                String[] sortParts = filter.getSort().split(",");
+                String field = sortParts[0];
+                String direction = sortParts.length > 1 ? sortParts[1] : "desc";
+                sort = Sort.by(Sort.Direction.fromString(direction), field);
+            } catch (Exception e) {
+                // Default sort if parsing fails
+                sort = Sort.by(Sort.Direction.DESC, "submittedAt");
+            }
+        }
+
         Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
 
-        Page<StudentRequest> requests = studentRequestRepository.findByStudentIdAndStatusIn(
-                student.getId(), statuses, pageable);
+        // Execute dynamic query
+        Page<StudentRequest> requests;
+        if (!hasStatusFilter) {
+            // For pending-first sorting when no status filters
+            // Use a custom specification to add database-level ordering
+            Specification<StudentRequest> pendingFirstSpec = spec.and((root, query, criteriaBuilder) -> {
+                // Add custom ORDER BY clause using CASE WHEN
+                query.orderBy(
+                    criteriaBuilder.asc(
+                        criteriaBuilder.selectCase()
+                            .when(criteriaBuilder.equal(root.get("status"), RequestStatus.PENDING), 0)
+                            .otherwise(1)
+                    ),
+                    criteriaBuilder.desc(root.get("submittedAt"))
+                );
+                return criteriaBuilder.conjunction();
+            });
+            requests = studentRequestRepository.findAll(pendingFirstSpec, pageable);
+        } else {
+            // Use standard repository query when status filters are applied
+            requests = studentRequestRepository.findAll(spec, pageable);
+        }
 
         return requests.map(this::mapToStudentResponseDTO);
     }
