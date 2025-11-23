@@ -178,6 +178,11 @@ public enum ErrorCode {
     NO_AVAILABLE_MAKEUP_SESSIONS(4118, "No available makeup sessions found for this content"),
     INVALID_ATTENDANCE_STATUS_FOR_MAKEUP(4119, "Student must be absent or have planned status to request makeup"),
 
+    // Attendance errors (1300-1399)
+    ATTENDANCE_RECORDS_EMPTY(1300, "Attendance records must not be empty"),
+    HOMEWORK_STATUS_INVALID_NO_PREVIOUS_HOMEWORK(1301, "Cannot set homework status because previous session has no homework assignment"),
+    HOMEWORK_STATUS_INVALID_HAS_PREVIOUS_HOMEWORK(1302, "Cannot set homework status to NO_HOMEWORK because previous session has homework assignment"),
+
     // Common errors (9000-9999)
     INVALID_INPUT(9000, "Invalid input provided"),
     INVALID_REQUEST(9001, "Invalid request"),

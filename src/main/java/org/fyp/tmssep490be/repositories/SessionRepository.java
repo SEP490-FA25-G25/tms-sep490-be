@@ -158,4 +158,10 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
      * Count total number of sessions for a class
      */
     long countByClassEntityId(Long classId);
+
+    /**
+     * Count total number of sessions for a class excluding CANCELLED sessions
+     */
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.classEntity.id = :classId AND s.status != 'CANCELLED'")
+    long countByClassEntityIdExcludingCancelled(@Param("classId") Long classId);
 }

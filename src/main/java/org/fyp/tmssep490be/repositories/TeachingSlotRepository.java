@@ -96,4 +96,86 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
             ORDER BY c.code ASC
             """)
     List<org.fyp.tmssep490be.entities.ClassEntity> findDistinctClassesByTeacherId(@Param("teacherId") Long teacherId);
+
+    /**
+     * Find weekly schedule for a teacher with all related data
+     * Uses JOIN FETCH to prevent N+1 queries
+     * Includes sessions with status SCHEDULED or SUBSTITUTED
+     * Includes all session statuses (PLANNED, DONE) but excludes CANCELLED
+     */
+    @Query("""
+            SELECT ts FROM TeachingSlot ts
+            JOIN FETCH ts.session s
+            JOIN FETCH s.timeSlotTemplate tst
+            JOIN FETCH s.classEntity c
+            JOIN FETCH c.course course
+            JOIN FETCH c.branch branch
+            LEFT JOIN FETCH s.courseSession cs
+            LEFT JOIN FETCH cs.courseMaterials
+            LEFT JOIN FETCH s.sessionResources sr
+            LEFT JOIN FETCH sr.resource
+            WHERE ts.teacher.id = :teacherId
+              AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
+              AND s.date BETWEEN :startDate AND :endDate
+              AND s.status <> 'CANCELLED'
+            ORDER BY s.date ASC, tst.startTime ASC
+            """)
+    List<TeachingSlot> findWeeklyScheduleByTeacherId(
+            @Param("teacherId") Long teacherId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    /**
+     * Find weekly schedule for a teacher filtered by specific class
+     * Uses JOIN FETCH to prevent N+1 queries
+     */
+    @Query("""
+            SELECT ts FROM TeachingSlot ts
+            JOIN FETCH ts.session s
+            JOIN FETCH s.timeSlotTemplate tst
+            JOIN FETCH s.classEntity c
+            JOIN FETCH c.course course
+            JOIN FETCH c.branch branch
+            LEFT JOIN FETCH s.courseSession cs
+            LEFT JOIN FETCH cs.courseMaterials
+            LEFT JOIN FETCH s.sessionResources sr
+            LEFT JOIN FETCH sr.resource
+            WHERE ts.teacher.id = :teacherId
+              AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
+              AND s.classEntity.id = :classId
+              AND s.date BETWEEN :startDate AND :endDate
+              AND s.status <> 'CANCELLED'
+            ORDER BY s.date ASC, tst.startTime ASC
+            """)
+    List<TeachingSlot> findWeeklyScheduleByTeacherIdAndClassId(
+            @Param("teacherId") Long teacherId,
+            @Param("classId") Long classId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    /**
+     * Find teaching slot by teacher ID and session ID
+     * Used for authorization check and detail retrieval
+     */
+    @Query("""
+            SELECT ts FROM TeachingSlot ts
+            JOIN FETCH ts.session s
+            JOIN FETCH s.timeSlotTemplate tst
+            JOIN FETCH s.classEntity c
+            JOIN FETCH c.course course
+            JOIN FETCH c.branch branch
+            LEFT JOIN FETCH s.courseSession cs
+            LEFT JOIN FETCH cs.courseMaterials
+            LEFT JOIN FETCH s.sessionResources sr
+            LEFT JOIN FETCH sr.resource
+            WHERE ts.teacher.id = :teacherId
+              AND ts.session.id = :sessionId
+              AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
+            """)
+    java.util.Optional<TeachingSlot> findByTeacherIdAndSessionId(
+            @Param("teacherId") Long teacherId,
+            @Param("sessionId") Long sessionId
+    );
 }
