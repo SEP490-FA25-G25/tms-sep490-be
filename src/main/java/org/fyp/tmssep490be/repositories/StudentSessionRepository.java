@@ -145,6 +145,17 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
     );
 
     /**
+     * Fetch all student sessions for a class (used for attendance aggregation)
+     */
+    @Query("""
+            SELECT ss FROM StudentSession ss
+            JOIN FETCH ss.session s
+            JOIN FETCH ss.student st
+            WHERE s.classEntity.id = :classId
+            """)
+    List<StudentSession> findByClassId(@Param("classId") Long classId);
+
+    /**
      * Find sessions for a student on a specific date (for conflict checking)
      */
     @Query("SELECT s FROM Session s " +
