@@ -244,6 +244,7 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
         return SessionSummaryDTO.builder()
                 .sessionId(session.getId())
                 .studentSessionId(studentSession.getId().getSessionId())
+                .classId(classEntity.getId())
                 .date(session.getDate())
                 .dayOfWeek(session.getDate().getDayOfWeek())
                 .timeSlotTemplateId(timeSlot != null ? timeSlot.getId() : null)
