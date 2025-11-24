@@ -307,10 +307,12 @@ public class StudentPortalServiceImpl implements StudentPortalService {
         ClassEntity classEntity = enrollment.getClassEntity();
         Student student = enrollment.getStudent();
 
-        // Get instructor names from teaching slots
-        List<String> instructorNames = teachingSlotRepository.findByClassEntityIdAndStatus(classEntity.getId(), TeachingSlotStatus.SCHEDULED)
-                .stream()
+        // Get instructor names from teaching slots with proper lazy loading handling
+        List<TeachingSlot> teachingSlots = teachingSlotRepository.findByClassEntityIdAndStatus(classEntity.getId(), TeachingSlotStatus.SCHEDULED);
+        List<String> instructorNames = teachingSlots.stream()
+                .filter(ts -> ts.getTeacher() != null && ts.getTeacher().getUserAccount() != null)
                 .map(teachingSlot -> teachingSlot.getTeacher().getUserAccount().getFullName())
+                .filter(name -> name != null && !name.trim().isEmpty())
                 .distinct()
                 .collect(Collectors.toList());
 
@@ -346,26 +348,44 @@ public class StudentPortalServiceImpl implements StudentPortalService {
     }
 
     private ClassDetailDTO convertToClassDetailDTO(ClassEntity classEntity) {
-        // Get teachers from teaching slots
-        List<ClassDetailDTO.TeacherSummary> teachers = teachingSlotRepository
-                .findByClassEntityIdAndStatus(classEntity.getId(), TeachingSlotStatus.SCHEDULED)
-                .stream()
-                .collect(Collectors.groupingBy(ts -> ts.getTeacher().getId()))
-                .values()
-                .stream()
-                .map(teachingSlots -> {
-                    Teacher teacher = teachingSlots.get(0).getTeacher();
-                    boolean isPrimary = teachingSlots.size() >
-                            teachingSlots.stream().collect(Collectors.groupingBy(ts -> ts.getTeacher().getId()))
-                                    .values().stream()
-                                    .mapToInt(List::size)
-                                    .max()
-                                    .orElse(0) / 2; // Simple heuristic for primary instructor
+        // Get teachers from teaching slots with proper lazy loading handling
+        List<TeachingSlot> teachingSlots = teachingSlotRepository.findByClassEntityIdAndStatus(classEntity.getId(), TeachingSlotStatus.SCHEDULED);
+
+        // Group by teacher and process each teacher
+        Map<Long, List<TeachingSlot>> slotsByTeacher = teachingSlots.stream()
+                .filter(ts -> ts.getTeacher() != null)
+                .collect(Collectors.groupingBy(ts -> ts.getTeacher().getId()));
+
+        // Calculate max sessions for any teacher to determine primary instructor
+        int maxSessionsPerTeacher = slotsByTeacher.values().stream()
+                .mapToInt(List::size)
+                .max()
+                .orElse(0);
+
+        List<ClassDetailDTO.TeacherSummary> teachers = slotsByTeacher.values().stream()
+                .map(slotsForTeacher -> {
+                    Teacher teacher = slotsForTeacher.get(0).getTeacher();
+                    boolean isPrimary = maxSessionsPerTeacher > 0 &&
+                            slotsForTeacher.size() > maxSessionsPerTeacher / 2; // Simple heuristic for primary instructor
+
+                    // Safe access to user account with null checks
+                    String teacherName = "N/A";
+                    String teacherEmail = "N/A";
+                    if (teacher != null && teacher.getUserAccount() != null) {
+                        teacherName = teacher.getUserAccount().getFullName();
+                        teacherEmail = teacher.getUserAccount().getEmail();
+                        if (teacherName == null || teacherName.trim().isEmpty()) {
+                            teacherName = "N/A";
+                        }
+                        if (teacherEmail == null || teacherEmail.trim().isEmpty()) {
+                            teacherEmail = "N/A";
+                        }
+                    }
 
                     return ClassDetailDTO.TeacherSummary.builder()
                             .teacherId(teacher.getId())
-                            .teacherName(teacher.getUserAccount().getFullName())
-                            .teacherEmail(teacher.getUserAccount().getEmail())
+                            .teacherName(teacherName)
+                            .teacherEmail(teacherEmail)
                             .isPrimaryInstructor(isPrimary)
                             .build();
                 })
@@ -414,11 +434,16 @@ public class StudentPortalServiceImpl implements StudentPortalService {
     }
 
     private SessionDTO convertToSessionDTO(Session session) {
-        // Get teachers from teaching slots
-        List<String> teachers = teachingSlotRepository.findByClassEntityIdAndStatus(
-                session.getClassEntity().getId(), TeachingSlotStatus.SCHEDULED)
-                .stream()
-                .filter(ts -> ts.getSession().getId().equals(session.getId()))
+        // Get teachers from teaching slots with proper lazy loading handling
+        List<TeachingSlot> teachingSlots = teachingSlotRepository.findByClassEntityIdAndStatus(
+                session.getClassEntity().getId(), TeachingSlotStatus.SCHEDULED);
+
+        List<String> teachers = teachingSlots.stream()
+                .filter(ts -> ts.getSession().getId().equals(session.getId())
+                        && ts.getTeacher() != null
+                        && ts.getTeacher().getUserAccount() != null
+                        && ts.getTeacher().getUserAccount().getFullName() != null
+                        && !ts.getTeacher().getUserAccount().getFullName().trim().isEmpty())
                 .map(ts -> ts.getTeacher().getUserAccount().getFullName())
                 .collect(Collectors.toList());
 
