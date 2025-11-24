@@ -14,4 +14,6 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
      * Find subjects by status, ordered by code
      */
     List<Subject> findByStatusOrderByCode(SubjectStatus status);
+
+    boolean existsByCode(String code);
 }

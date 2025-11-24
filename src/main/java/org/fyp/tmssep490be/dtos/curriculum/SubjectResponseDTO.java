@@ -1,21 +1,20 @@
-package org.fyp.tmssep490be.dtos.common;
+package org.fyp.tmssep490be.dtos.curriculum;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO for Course information used in dropdowns and selects
- */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CourseDTO {
-
-    private Long id;
-    private String name;
+public class SubjectResponseDTO {
+    private String id;
     private String code;
+    private String name;
+    private String description;
+    private int levelCount;
     private String status;
+    private String createdAt;
 }

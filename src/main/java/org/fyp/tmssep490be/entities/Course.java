@@ -5,6 +5,10 @@ import lombok.*;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
 import org.fyp.tmssep490be.entities.enums.CourseStatus;
 
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -18,6 +22,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EntityListeners(AuditingEntityListener.class)
 public class Course {
 
     @Id
@@ -120,9 +125,11 @@ public class Course {
     @Builder.Default
     private Set<ClassEntity> classes = new HashSet<>();
 
+    @CreatedDate
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @LastModifiedDate
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 }

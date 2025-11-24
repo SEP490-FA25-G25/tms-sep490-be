@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.fyp.tmssep490be.entities.enums.SubjectStatus;
 
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -15,6 +19,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EntityListeners(AuditingEntityListener.class)
 public class Subject {
 
     @Id
@@ -51,9 +56,11 @@ public class Subject {
     @Builder.Default
     private Set<PLO> plos = new HashSet<>();
 
+    @CreatedDate
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @LastModifiedDate
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 }

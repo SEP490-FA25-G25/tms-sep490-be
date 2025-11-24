@@ -2,19 +2,24 @@ package org.fyp.tmssep490be.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Table(name = "level", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_level_subject_code", columnNames = {"subject_id", "code"})
+        @UniqueConstraint(name = "uq_level_subject_code", columnNames = { "subject_id", "code" })
 })
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EntityListeners(AuditingEntityListener.class)
 public class Level {
 
     @Id
@@ -48,9 +53,11 @@ public class Level {
     @Builder.Default
     private Set<ReplacementSkillAssessment> replacementSkillAssessments = new HashSet<>();
 
+    @CreatedDate
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @LastModifiedDate
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 }
