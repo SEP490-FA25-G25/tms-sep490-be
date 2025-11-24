@@ -40,7 +40,7 @@ public class ApprovalServiceImpl implements ApprovalService {
                     .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
 
             // Validate class is not already submitted
-            if (classEntity.getSubmittedAt() != null) {
+            if (classEntity.getSubmittedAt() != null || classEntity.getStatus() == ClassStatus.SUBMITTED) {
                 throw new CustomException(ErrorCode.CLASS_NOT_SUBMITTED);
             }
 
@@ -64,6 +64,7 @@ public class ApprovalServiceImpl implements ApprovalService {
 
             // Update class submission details
             classEntity.setSubmittedAt(OffsetDateTime.now());
+            classEntity.setStatus(ClassStatus.SUBMITTED);
             classEntity.setApprovalStatus(ApprovalStatus.PENDING);
 
             ClassEntity savedClass = classRepository.save(classEntity);
@@ -99,7 +100,7 @@ public class ApprovalServiceImpl implements ApprovalService {
                     .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
 
             // Validate class is submitted
-            if (classEntity.getSubmittedAt() == null) {
+            if (classEntity.getSubmittedAt() == null || classEntity.getStatus() != ClassStatus.SUBMITTED) {
                 throw new CustomException(ErrorCode.CLASS_NOT_SUBMITTED);
             }
 

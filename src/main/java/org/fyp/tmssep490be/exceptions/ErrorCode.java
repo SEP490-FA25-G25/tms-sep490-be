@@ -135,6 +135,8 @@ public enum ErrorCode {
     UNAUTHORIZED_ACCESS(4005, "Unauthorized access: Academic staff role required"),
     CLASS_CANNOT_DELETE_NON_DRAFT(4006, "Only DRAFT classes can be deleted"),
     CLASS_HAS_ENROLLMENTS(4007, "Cannot delete class with enrolled students"),
+    CLASS_NOT_EDITABLE(4008, "Class cannot be updated in its current status"),
+    CLASS_CAPACITY_TOO_LOW(4009, "Max capacity cannot be lower than current enrollments"),
 
     // Create Class Workflow errors (4010-4099)
     CLASS_CODE_DUPLICATE(4010, "Class code already exists for this branch"),
@@ -220,6 +222,7 @@ public enum ErrorCode {
     INVALID_INPUT(9000, "Invalid input provided"),
     INVALID_REQUEST(9001, "Invalid request"),
     INVALID_STATUS(9002, "Invalid status value"),
+    INVALID_DATE_RANGE(9003, "Start date must be on or before planned end date"),
     UNAUTHORIZED(9401, "Unauthorized access"),
     FORBIDDEN(9403, "Access forbidden"),
     INTERNAL_SERVER_ERROR(9500, "Internal server error");

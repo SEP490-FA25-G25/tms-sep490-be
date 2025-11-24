@@ -436,8 +436,8 @@ CREATE TABLE "class" (
   actual_end_date DATE, -- ngày kết thúc thực tế
   schedule_days SMALLINT[], -- mảng các ngày trong tuần (1-7) lớp học (ví dụ: [2,4,6] cho thứ 3,5,7)
   max_capacity integer, -- policy về sức chứa tối đa của lớp
-  status VARCHAR(20) NOT NULL DEFAULT 'DRAFT', -- draft -> scheduled -> ongoing -> completed
-  approval_status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- pending -> academic affair submit -> centerhead duyệt -> approved/rejected
+  status VARCHAR(20) NOT NULL DEFAULT 'DRAFT', -- draft -> submitted -> scheduled -> ongoing -> completed
+  approval_status VARCHAR(20), -- chỉ set PENDING khi submit để duyệt; trước đó có thể NULL hoặc REJECTED
   created_by BIGINT, -- tạo bởi giáo vụ nào
   submitted_at TIMESTAMPTZ, -- thời gian giáo vụ submit để duyệt
   decided_by BIGINT, -- duyệt bởi centerhead nào
@@ -451,7 +451,7 @@ CREATE TABLE "class" (
   CONSTRAINT fk_class_decided_by FOREIGN KEY(decided_by) REFERENCES user_account(id) ON DELETE SET NULL,
   CONSTRAINT uq_class_branch_code UNIQUE(branch_id,code),
   CONSTRAINT chk_class_modality CHECK (modality IN ('OFFLINE', 'ONLINE', 'HYBRID')),
-  CONSTRAINT chk_class_status CHECK (status IN ('DRAFT', 'SCHEDULED', 'ONGOING', 'COMPLETED', 'CANCELLED')),
+  CONSTRAINT chk_class_status CHECK (status IN ('DRAFT', 'SUBMITTED', 'SCHEDULED', 'ONGOING', 'COMPLETED', 'CANCELLED')),
   CONSTRAINT chk_class_approval_status CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED'))
 );
 

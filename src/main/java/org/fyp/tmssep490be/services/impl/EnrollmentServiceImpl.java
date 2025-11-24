@@ -603,7 +603,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new EntityNotFoundException("Class not found: " + classId));
 
-        if (!classEntity.getApprovalStatus().equals(ApprovalStatus.APPROVED)) {
+        if (classEntity.getApprovalStatus() != ApprovalStatus.APPROVED) {
             throw new CustomException(ErrorCode.CLASS_NOT_APPROVED);
         }
 
@@ -811,4 +811,3 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         return result;
     }
 }
-

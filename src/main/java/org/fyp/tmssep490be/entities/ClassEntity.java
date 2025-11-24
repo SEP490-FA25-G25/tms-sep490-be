@@ -65,9 +65,8 @@ public class ClassEntity {
     private ClassStatus status = ClassStatus.DRAFT;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "approval_status", nullable = false)
-    @Builder.Default
-    private ApprovalStatus approvalStatus = ApprovalStatus.PENDING;
+    @Column(name = "approval_status")
+    private ApprovalStatus approvalStatus;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

@@ -16,6 +16,7 @@ import org.fyp.tmssep490be.dtos.createclass.CreateClassResponse;
 import org.fyp.tmssep490be.dtos.createclass.PreviewClassCodeResponse;
 import org.fyp.tmssep490be.dtos.createclass.TeacherAvailabilityDTO;
 import org.fyp.tmssep490be.dtos.createclass.TeacherDayAvailabilityDTO;
+import org.fyp.tmssep490be.dtos.createclass.UpdateClassRequest;
 // import org.fyp.tmssep490be.dtos.createclass.SubmitClassResponse; // Removed - now using classmanagement package
 // import org.fyp.tmssep490be.dtos.createclass.ValidateClassResponse; // Removed - now using classmanagement package
 import org.fyp.tmssep490be.dtos.classmanagement.*;
@@ -48,6 +49,7 @@ import java.time.LocalDate;
 
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -100,9 +102,9 @@ public class ClassServiceImpl implements ClassService {
             Modality modality,
             String search,
             Pageable pageable,
-            Long userId
-    ) {
-        log.debug("Getting classes for user {} with filters: branchIds={}, courseId={}, status={}, approvalStatus={}, modality={}, search={}",
+            Long userId) {
+        log.debug(
+                "Getting classes for user {} with filters: branchIds={}, courseId={}, status={}, approvalStatus={}, modality={}, search={}",
                 userId, branchIds, courseId, status, approvalStatus, modality, search);
 
         // Get user's branch access
@@ -117,13 +119,12 @@ public class ClassServiceImpl implements ClassService {
         // Query classes with filters (null status/approvalStatus = all)
         Page<ClassEntity> classes = classRepository.findClassesForAcademicAffairs(
                 finalBranchIds,
-                approvalStatus,  // null = all approval statuses
-                status,          // null = all class statuses
+                approvalStatus, // null = all approval statuses
+                status, // null = all class statuses
                 courseId,
                 modality,
                 search,
-                pageable
-        );
+                pageable);
 
         return classes.map(this::convertToClassListItemDTO);
     }
@@ -135,19 +136,18 @@ public class ClassServiceImpl implements ClassService {
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
 
-        // Validate user has access to this class's branch (no status restrictions for detail view)
+        // Validate user has access to this class's branch (no status restrictions for
+        // detail view)
         validateClassBranchAccess(classEntity, userId);
 
         // Get enrollment summary
         Integer currentEnrolled = enrollmentRepository.countByClassIdAndStatus(classId, EnrollmentStatus.ENROLLED);
         ClassDetailDTO.EnrollmentSummary enrollmentSummary = calculateEnrollmentSummary(
-                currentEnrolled, classEntity.getMaxCapacity()
-        );
+                currentEnrolled, classEntity.getMaxCapacity());
 
         // Get upcoming sessions (next 5)
         List<Session> upcomingSessions = sessionRepository.findUpcomingSessions(
-                classId, PageRequest.of(0, 5)
-        );
+                classId, PageRequest.of(0, 5));
         List<ClassDetailDTO.SessionDTO> sessionDTOs = upcomingSessions.stream()
                 .map(this::convertToSessionDTO)
                 .collect(Collectors.toList());
@@ -170,12 +170,9 @@ public class ClassServiceImpl implements ClassService {
                 .status(classEntity.getStatus())
                 .approvalStatus(classEntity.getApprovalStatus())
                 .rejectionReason(classEntity.getRejectionReason())
-                .submittedAt(classEntity.getSubmittedAt() != null ?
-                        classEntity.getSubmittedAt().toLocalDate() : null)
-                .decidedAt(classEntity.getDecidedAt() != null ?
-                        classEntity.getDecidedAt().toLocalDate() : null)
-                .decidedByName(classEntity.getDecidedBy() != null ?
-                        classEntity.getDecidedBy().getFullName() : null)
+                .submittedAt(classEntity.getSubmittedAt() != null ? classEntity.getSubmittedAt().toLocalDate() : null)
+                .decidedAt(classEntity.getDecidedAt() != null ? classEntity.getDecidedAt().toLocalDate() : null)
+                .decidedByName(classEntity.getDecidedBy() != null ? classEntity.getDecidedBy().getFullName() : null)
                 .teachers(teachers)
                 .scheduleSummary(formatScheduleSummary(classEntity.getScheduleDays()))
                 .enrollmentSummary(enrollmentSummary)
@@ -188,25 +185,24 @@ public class ClassServiceImpl implements ClassService {
             Long classId,
             String search,
             Pageable pageable,
-            Long userId
-    ) {
+            Long userId) {
         log.debug("Getting students for class {} by user {} with search: {}", classId, userId, search);
 
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
 
-        // Validate user has access to this class's branch (with status restrictions for enrollment operations)
+        // Validate user has access to this class's branch (with status restrictions for
+        // enrollment operations)
         validateClassAccess(classEntity, userId);
 
         // Prepare search parameter with wildcards for LIKE query
-        String searchPattern = (search != null && !search.isBlank()) 
-                ? "%" + search + "%" 
+        String searchPattern = (search != null && !search.isBlank())
+                ? "%" + search + "%"
                 : null;
 
         // Get enrolled students
         Page<Enrollment> enrollments = enrollmentRepository.findEnrolledStudentsByClass(
-                classId, EnrollmentStatus.ENROLLED, searchPattern, pageable
-        );
+                classId, EnrollmentStatus.ENROLLED, searchPattern, pageable);
 
         return enrollments.map(this::convertToClassStudentDTO);
     }
@@ -229,7 +225,7 @@ public class ClassServiceImpl implements ClassService {
 
         // Determine if enrollment is possible
         boolean canEnroll = (classEntity.getStatus() == ClassStatus.SCHEDULED
-                     || classEntity.getStatus() == ClassStatus.ONGOING)
+                || classEntity.getStatus() == ClassStatus.ONGOING)
                 && classEntity.getApprovalStatus() == ApprovalStatus.APPROVED
                 && availableSlots > 0;
 
@@ -260,7 +256,9 @@ public class ClassServiceImpl implements ClassService {
                 .canEnrollStudents(canEnroll)
                 .enrollmentRestrictionReason(restrictionReason)
                 .status(classEntity.getStatus().name())
-                .approvalStatus(classEntity.getApprovalStatus().name())
+                .approvalStatus(classEntity.getApprovalStatus() != null
+                        ? classEntity.getApprovalStatus().name()
+                        : null)
                 .startDate(classEntity.getStartDate())
                 .build();
     }
@@ -270,11 +268,11 @@ public class ClassServiceImpl implements ClassService {
             Long classId,
             String search,
             Pageable pageable,
-            Long userId
-    ) {
+            Long userId) {
         log.debug("Getting available students for class {} by user {} with search: {}", classId, userId, search);
 
-        // Validate class exists and user has access (with status restrictions for enrollment operations)
+        // Validate class exists and user has access (with status restrictions for
+        // enrollment operations)
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
         validateClassAccess(classEntity, userId);
@@ -284,19 +282,18 @@ public class ClassServiceImpl implements ClassService {
         Long classSubjectId = classEntity.getCourse().getLevel().getSubject().getId();
         Long classLevelId = classEntity.getCourse().getLevel().getId();
 
-        // Hybrid approach: Get ALL available students without pagination for proper sorting
+        // Hybrid approach: Get ALL available students without pagination for proper
+        // sorting
         List<Student> allAvailableStudents = studentRepository.findAllAvailableStudentsForClass(
-                classId, branchId, search
-        );
+                classId, branchId, search);
 
         // Batch fetch ALL skill assessments for all students
         List<Long> studentIds = allAvailableStudents.stream()
                 .map(Student::getId)
                 .collect(Collectors.toList());
 
-        List<ReplacementSkillAssessment> allAssessments = studentIds.isEmpty() ?
-                List.of() :
-                skillAssessmentRepository.findByStudentIdIn(studentIds);
+        List<ReplacementSkillAssessment> allAssessments = studentIds.isEmpty() ? List.of()
+                : skillAssessmentRepository.findByStudentIdIn(studentIds);
 
         // Group assessments by student ID
         Map<Long, List<ReplacementSkillAssessment>> assessmentsByStudent = allAssessments.stream()
@@ -308,8 +305,7 @@ public class ClassServiceImpl implements ClassService {
                         student,
                         assessmentsByStudent.get(student.getId()),
                         classSubjectId,
-                        classLevelId
-                ))
+                        classLevelId))
                 .sorted((dto1, dto2) -> {
                     // Sort by matchPriority (ascending: 1, 2, 3)
                     // Then by student name if same priority
@@ -325,15 +321,13 @@ public class ClassServiceImpl implements ClassService {
         // Apply pagination manually on sorted list
         int start = pageable.getPageNumber() * pageable.getPageSize();
         int end = Math.min(start + pageable.getPageSize(), allDtos.size());
-        List<AvailableStudentDTO> paginatedDtos = start < allDtos.size() ?
-                allDtos.subList(start, end) : List.of();
+        List<AvailableStudentDTO> paginatedDtos = start < allDtos.size() ? allDtos.subList(start, end) : List.of();
 
         // Create Page with correct pagination metadata
         return new org.springframework.data.domain.PageImpl<>(
                 paginatedDtos,
                 pageable,
-                allDtos.size()
-        );
+                allDtos.size());
     }
 
     // Helper methods
@@ -343,7 +337,8 @@ public class ClassServiceImpl implements ClassService {
     }
 
     /**
-     * Validate user can access class from their branch only (no status restrictions)
+     * Validate user can access class from their branch only (no status
+     * restrictions)
      * Used for read-only operations like viewing class details
      */
     private void validateClassBranchAccess(ClassEntity classEntity, Long userId) {
@@ -356,7 +351,8 @@ public class ClassServiceImpl implements ClassService {
 
     /**
      * Validate user can access class with status restrictions
-     * Used for enrollment-related operations (viewing students, enrolling new students)
+     * Used for enrollment-related operations (viewing students, enrolling new
+     * students)
      */
     private void validateClassAccess(ClassEntity classEntity, Long userId) {
         List<Long> accessibleBranchIds = getUserAccessibleBranches(userId);
@@ -379,8 +375,7 @@ public class ClassServiceImpl implements ClassService {
     private ClassListItemDTO convertToClassListItemDTO(ClassEntity classEntity) {
         // Get enrollment data
         Integer currentEnrolled = enrollmentRepository.countByClassIdAndStatus(
-                classEntity.getId(), EnrollmentStatus.ENROLLED
-        );
+                classEntity.getId(), EnrollmentStatus.ENROLLED);
         Integer maxCapacity = classEntity.getMaxCapacity();
         Integer availableSlots = maxCapacity - currentEnrolled;
         Double utilizationRate = maxCapacity > 0 ? (double) currentEnrolled / maxCapacity * 100 : 0.0;
@@ -391,7 +386,7 @@ public class ClassServiceImpl implements ClassService {
         // Determine if enrollment is possible
         boolean canEnroll = availableSlots > 0
                 && (classEntity.getStatus() == ClassStatus.SCHEDULED
-                     || classEntity.getStatus() == ClassStatus.ONGOING)
+                        || classEntity.getStatus() == ClassStatus.ONGOING)
                 && classEntity.getApprovalStatus() == ApprovalStatus.APPROVED;
 
         return ClassListItemDTO.builder()
@@ -414,11 +409,11 @@ public class ClassServiceImpl implements ClassService {
                 .teachers(teachers)
                 .scheduleSummary(formatScheduleSummary(classEntity.getScheduleDays()))
                 .canEnrollStudents(canEnroll)
-                .enrollmentRestrictionReason(canEnroll ? null :
-                        availableSlots <= 0 ? "Class is full" :
-                        classEntity.getStatus() == ClassStatus.COMPLETED ? "Class has completed" :
-                        classEntity.getStatus() == ClassStatus.CANCELLED ? "Class was cancelled" :
-                        "Class not available for enrollment")
+                .enrollmentRestrictionReason(canEnroll ? null
+                        : availableSlots <= 0 ? "Class is full"
+                                : classEntity.getStatus() == ClassStatus.COMPLETED ? "Class has completed"
+                                        : classEntity.getStatus() == ClassStatus.CANCELLED ? "Class was cancelled"
+                                                : "Class not available for enrollment")
                 .build();
     }
 
@@ -435,13 +430,13 @@ public class ClassServiceImpl implements ClassService {
                 .phone(userAccount.getPhone())
                 .branchName(student.getUserAccount().getUserBranches().iterator().next().getBranch().getName())
                 .enrolledAt(enrollment.getEnrolledAt())
-                .enrolledBy(enrollment.getEnrolledByUser() != null ?
-                        enrollment.getEnrolledByUser().getFullName() : "System")
+                .enrolledBy(enrollment.getEnrolledByUser() != null ? enrollment.getEnrolledByUser().getFullName()
+                        : "System")
                 .enrolledById(enrollment.getEnrolledBy())
                 .status(enrollment.getStatus())
                 .joinSessionId(enrollment.getJoinSessionId())
-                .joinSessionDate(enrollment.getJoinSession() != null ?
-                        enrollment.getJoinSession().getDate().toString() : null)
+                .joinSessionDate(
+                        enrollment.getJoinSession() != null ? enrollment.getJoinSession().getDate().toString() : null)
                 .capacityOverride(enrollment.getCapacityOverride())
                 .overrideReason(enrollment.getOverrideReason())
                 .build();
@@ -474,10 +469,11 @@ public class ClassServiceImpl implements ClassService {
         return ClassDetailDTO.SessionDTO.builder()
                 .id(session.getId())
                 .date(session.getDate())
-                .startTime(session.getTimeSlotTemplate() != null ?
-                        session.getTimeSlotTemplate().getStartTime().toString() : null)
-                .endTime(session.getTimeSlotTemplate() != null ?
-                        session.getTimeSlotTemplate().getEndTime().toString() : null)
+                .startTime(
+                        session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getStartTime().toString()
+                                : null)
+                .endTime(session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getEndTime().toString()
+                        : null)
                 .teachers(getTeachersForSession(session))
                 .room(null) // Room info not available in current entity structure
                 .status(session.getStatus().name())
@@ -515,8 +511,7 @@ public class ClassServiceImpl implements ClassService {
                 .filter(slot -> slot.getTeacher() != null)
                 .collect(Collectors.groupingBy(
                         TeachingSlot::getTeacher,
-                        Collectors.counting()
-                ));
+                        Collectors.counting()));
 
         // Convert to DTOs sorted by session count (descending)
         return teacherSessionCounts.entrySet().stream()
@@ -565,7 +560,7 @@ public class ClassServiceImpl implements ClassService {
             return "Not specified";
         }
 
-        String[] dayNames = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+        String[] dayNames = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
         return Arrays.stream(scheduleDays)
                 .filter(day -> day != null && day >= 1 && day <= 7)
                 .map(day -> dayNames[day - 1])
@@ -576,14 +571,14 @@ public class ClassServiceImpl implements ClassService {
             Student student,
             List<ReplacementSkillAssessment> assessments,
             Long classSubjectId,
-            Long classLevelId
-    ) {
+            Long classLevelId) {
         return convertToAvailableStudentDTO(student, assessments, classSubjectId, classLevelId, null, null);
     }
 
     /**
      * Convert Student to AvailableStudentDTO with assessment data
-     * Overloaded method that accepts pre-computed match priority for database-first approach
+     * Overloaded method that accepts pre-computed match priority for database-first
+     * approach
      */
     private AvailableStudentDTO convertToAvailableStudentDTO(
             Student student,
@@ -591,8 +586,7 @@ public class ClassServiceImpl implements ClassService {
             Long classSubjectId,
             Long classLevelId,
             Integer preComputedMatchPriority,
-            String preComputedMatchingSkill
-    ) {
+            String preComputedMatchingSkill) {
         UserAccount userAccount = student.getUserAccount();
 
         // Get branch info (take first branch)
@@ -604,35 +598,35 @@ public class ClassServiceImpl implements ClassService {
         }
 
         // Convert all assessments to DTOs
-        List<AvailableStudentDTO.SkillAssessmentDTO> assessmentDTOs = assessments != null ?
-                assessments.stream()
-                        .map(this::convertToSkillAssessmentDTO)
-                        .sorted((a1, a2) -> a2.getAssessmentDate().compareTo(a1.getAssessmentDate())) // Most recent first
-                        .collect(Collectors.toList()) :
-                List.of();
+        List<AvailableStudentDTO.SkillAssessmentDTO> assessmentDTOs = assessments != null ? assessments.stream()
+                .map(this::convertToSkillAssessmentDTO)
+                .sorted((a1, a2) -> a2.getAssessmentDate().compareTo(a1.getAssessmentDate())) // Most recent first
+                .collect(Collectors.toList()) : List.of();
 
         // Use pre-computed match priority if provided, otherwise calculate it
         AvailableStudentDTO.ClassMatchInfoDTO classMatchInfo;
         if (preComputedMatchPriority != null) {
             // Use database-computed values for better performance and consistency
-            ReplacementSkillAssessment matchingAssessment = findMatchingAssessment(assessments, classSubjectId, classLevelId);
+            ReplacementSkillAssessment matchingAssessment = findMatchingAssessment(assessments, classSubjectId,
+                    classLevelId);
             classMatchInfo = AvailableStudentDTO.ClassMatchInfoDTO.builder()
                     .matchPriority(preComputedMatchPriority)
                     .matchingSkill(preComputedMatchingSkill)
-                    .matchingLevel(matchingAssessment != null && matchingAssessment.getLevel() != null ?
-                            convertToLevelInfoDTO(matchingAssessment.getLevel()) : null)
+                    .matchingLevel(matchingAssessment != null && matchingAssessment.getLevel() != null
+                            ? convertToLevelInfoDTO(matchingAssessment.getLevel())
+                            : null)
                     .matchReason(getMatchReason(preComputedMatchPriority))
                     .build();
         } else {
             // Legacy calculation method (kept for backward compatibility)
-            ReplacementSkillAssessment matchingAssessment = findMatchingAssessment(assessments, classSubjectId, classLevelId);
+            ReplacementSkillAssessment matchingAssessment = findMatchingAssessment(assessments, classSubjectId,
+                    classLevelId);
             classMatchInfo = calculateClassMatchInfo(matchingAssessment, classSubjectId, classLevelId);
         }
 
         // Get active enrollments count
         int activeEnrollments = enrollmentRepository.countByStudentIdAndStatus(
-                student.getId(), EnrollmentStatus.ENROLLED
-        );
+                student.getId(), EnrollmentStatus.ENROLLED);
         boolean canEnroll = activeEnrollments < 3; // Max concurrent enrollments
 
         return AvailableStudentDTO.builder()
@@ -653,8 +647,7 @@ public class ClassServiceImpl implements ClassService {
     private ReplacementSkillAssessment findMatchingAssessment(
             List<ReplacementSkillAssessment> assessments,
             Long classSubjectId,
-            Long classLevelId
-    ) {
+            Long classLevelId) {
         if (assessments == null || assessments.isEmpty()) {
             return null;
         }
@@ -662,8 +655,8 @@ public class ClassServiceImpl implements ClassService {
         // Find assessments matching the class subject
         List<ReplacementSkillAssessment> subjectMatches = assessments.stream()
                 .filter(a -> a.getLevel() != null &&
-                            a.getLevel().getSubject() != null &&
-                            a.getLevel().getSubject().getId().equals(classSubjectId))
+                        a.getLevel().getSubject() != null &&
+                        a.getLevel().getSubject().getId().equals(classSubjectId))
                 .collect(Collectors.toList());
 
         if (subjectMatches.isEmpty()) {
@@ -684,8 +677,7 @@ public class ClassServiceImpl implements ClassService {
     private AvailableStudentDTO.ClassMatchInfoDTO calculateClassMatchInfo(
             ReplacementSkillAssessment matchingAssessment,
             Long classSubjectId,
-            Long classLevelId
-    ) {
+            Long classLevelId) {
         Integer matchPriority = 3; // Default: No match
         String matchingSkill = null;
         AvailableStudentDTO.LevelInfoDTO matchingLevel = null;
@@ -790,7 +782,7 @@ public class ClassServiceImpl implements ClassService {
 
         // Validate inputs
         if (branchId == null || courseId == null || startDate == null || userId == null) {
-            log.error("Invalid input: branchId={}, courseId={}, startDate={}, userId={}", 
+            log.error("Invalid input: branchId={}, courseId={}, startDate={}, userId={}",
                     branchId, courseId, startDate, userId);
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
@@ -812,26 +804,25 @@ public class ClassServiceImpl implements ClassService {
 
         // Call the code generator service to preview
         String previewCode = classCodeGeneratorService.previewClassCode(
-                branchId, 
-                branch.getCode(), 
-                course.getCode(), 
-                startDate
-        );
-        
+                branchId,
+                branch.getCode(),
+                course.getCode(),
+                startDate);
+
         // Extract prefix and sequence from preview code
         String normalizedCourseCode = classCodeGeneratorService.normalizeCourseCode(course.getCode());
         int year = startDate.getYear();
         String prefix = classCodeGeneratorService.buildPrefix(normalizedCourseCode, branch.getCode(), year);
-        
+
         // Extract sequence number
         int sequence = Integer.parseInt(previewCode.substring(previewCode.lastIndexOf('-') + 1));
-        
+
         // Build response with warning if sequence is getting high
         String warning = null;
         if (sequence >= 990) {
             warning = "Sequence number is approaching limit (999). Consider using a different course or branch.";
         }
-        
+
         return PreviewClassCodeResponse.builder()
                 .previewCode(previewCode)
                 .prefix(prefix)
@@ -865,11 +856,10 @@ public class ClassServiceImpl implements ClassService {
         if (classCode == null || classCode.trim().isEmpty()) {
             log.info("Class code not provided - auto-generating");
             classCode = classCodeGeneratorService.generateClassCode(
-                    branch.getId(), 
-                    branch.getCode(), 
-                    course.getCode(), 
-                    request.getStartDate()
-            );
+                    branch.getId(),
+                    branch.getCode(),
+                    course.getCode(),
+                    request.getStartDate());
             log.info("Auto-generated class code: {}", classCode);
         }
 
@@ -884,7 +874,7 @@ public class ClassServiceImpl implements ClassService {
                 .scheduleDays(request.getScheduleDays().toArray(new Short[0]))
                 .maxCapacity(request.getMaxCapacity())
                 .status(ClassStatus.DRAFT)
-                .approvalStatus(ApprovalStatus.PENDING)
+                .approvalStatus(null) // chỉ đặt PENDING khi submit
                 .createdBy(createdBy)
                 .createdAt(java.time.OffsetDateTime.now())
                 .updatedAt(java.time.OffsetDateTime.now())
@@ -906,7 +896,8 @@ public class ClassServiceImpl implements ClassService {
         log.info("Generated and saved {} sessions for class {}", savedSessions.size(), classEntity.getCode());
 
         // Build response
-        CreateClassResponse.SessionGenerationSummary sessionSummary = CreateClassResponse.SessionGenerationSummary.builder()
+        CreateClassResponse.SessionGenerationSummary sessionSummary = CreateClassResponse.SessionGenerationSummary
+                .builder()
                 .sessionsGenerated(savedSessions.size())
                 .totalSessionsInCourse(sessions.size())
                 .courseCode(course.getCode())
@@ -928,6 +919,131 @@ public class ClassServiceImpl implements ClassService {
     }
 
     @Override
+    @Transactional
+    public CreateClassResponse updateClass(Long classId, UpdateClassRequest request, Long userId) {
+        log.info("Updating class {} by user {}", classId, userId);
+
+        // Fetch existing class with access check
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(userId);
+        if (!userBranchIds.contains(classEntity.getBranch().getId())) {
+            throw new CustomException(ErrorCode.CLASS_ACCESS_DENIED);
+        }
+
+        if (classEntity.getApprovalStatus() == ApprovalStatus.APPROVED) {
+            throw new CustomException(ErrorCode.CLASS_ALREADY_APPROVED);
+        }
+
+        boolean isSubmittedPendingDraft = classEntity.getStatus() == ClassStatus.DRAFT
+                && classEntity.getApprovalStatus() == ApprovalStatus.PENDING;
+        if (isSubmittedPendingDraft) {
+            throw new CustomException(ErrorCode.CLASS_NOT_EDITABLE);
+        }
+        if (classEntity.getStatus() == ClassStatus.SUBMITTED) {
+            throw new CustomException(ErrorCode.CLASS_NOT_EDITABLE);
+        }
+
+        boolean editable = (classEntity.getStatus() == ClassStatus.DRAFT
+                && classEntity.getApprovalStatus() != ApprovalStatus.PENDING)
+                || classEntity.getApprovalStatus() == ApprovalStatus.REJECTED;
+        if (!editable) {
+            throw new CustomException(ErrorCode.CLASS_NOT_EDITABLE);
+        }
+
+        // Tự động bật regenerate nếu dữ liệu lịch thay đổi
+        boolean scheduleChanged = !Objects.equals(request.getBranchId(), classEntity.getBranch().getId())
+                || !Objects.equals(request.getCourseId(), classEntity.getCourse().getId())
+                || request.getStartDate() != null && !request.getStartDate().equals(classEntity.getStartDate())
+                || request.getScheduleDays() != null && !Arrays.equals(
+                        request.getScheduleDays().toArray(new Short[0]),
+                        classEntity.getScheduleDays())
+                || request.getModality() != null && request.getModality() != classEntity.getModality();
+        if (scheduleChanged) {
+            request.setRegenerateSessions(true);
+        }
+
+        // Default plannedEndDate nếu không gửi lên:
+        // - nếu scheduleChanged/regenerate: cho phép null, sẽ tính lại sau khi regenerate
+        // - nếu không đổi lịch: dùng giá trị hiện có
+        if (request.getPlannedEndDate() == null) {
+            if (scheduleChanged || Boolean.TRUE.equals(request.getRegenerateSessions())) {
+                request.setPlannedEndDate(classEntity.getStartDate()); // placeholder để qua validation
+            } else {
+                request.setPlannedEndDate(classEntity.getPlannedEndDate());
+            }
+        }
+
+        // Basic validation reuse (sau khi đã set plannedEndDate placeholder nếu cần)
+        validateCreateClassRequest(mapToCreateRequest(request), userId);
+
+        if (request.getPlannedEndDate() != null && request.getStartDate().isAfter(request.getPlannedEndDate())) {
+            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
+        }
+
+        Branch branch = branchRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
+        if (!userBranchIds.contains(branch.getId())) {
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
+        }
+        if (branch.getStatus() == BranchStatus.INACTIVE) {
+            throw new CustomException(ErrorCode.BRANCH_NOT_FOUND);
+        }
+
+        Course course = courseRepository.findById(request.getCourseId())
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+        if (course.getApprovalStatus() != ApprovalStatus.APPROVED || course.getStatus() == CourseStatus.INACTIVE) {
+            throw new CustomException(ErrorCode.COURSE_NOT_APPROVED);
+        }
+
+        // Capacity guard
+        int enrolledCount = Optional.ofNullable(classRepository.countEnrolledStudents(classId)).orElse(0);
+        if (request.getMaxCapacity() < enrolledCount) {
+            throw new CustomException(ErrorCode.CLASS_CAPACITY_TOO_LOW);
+        }
+
+        // Code uniqueness check (skip if unchanged or blank)
+        String newCode = request.getCode() != null && !request.getCode().isBlank()
+                ? request.getCode()
+                : classEntity.getCode();
+        Optional<ClassEntity> conflictingClass = classRepository.findByBranchIdAndCode(branch.getId(), newCode);
+        if (conflictingClass.isPresent() && !conflictingClass.get().getId().equals(classEntity.getId())) {
+            throw new CustomException(ErrorCode.CLASS_CODE_DUPLICATE);
+        }
+
+        // Apply updates
+        classEntity.setBranch(branch);
+        classEntity.setCourse(course);
+        classEntity.setCode(newCode);
+        classEntity.setName(request.getName());
+        classEntity.setModality(request.getModality());
+        classEntity.setStartDate(request.getStartDate());
+        classEntity.setPlannedEndDate(request.getPlannedEndDate());
+        classEntity.setMaxCapacity(request.getMaxCapacity());
+        classEntity.setScheduleDays(request.getScheduleDays().toArray(new Short[0]));
+        classEntity.setUpdatedAt(java.time.OffsetDateTime.now());
+
+        CreateClassResponse.SessionGenerationSummary sessionSummary;
+        if (Boolean.TRUE.equals(request.getRegenerateSessions())) {
+            sessionSummary = regenerateSessions(classEntity, course);
+        } else {
+            classRepository.save(classEntity);
+            sessionSummary = buildSessionSummary(classEntity, course);
+        }
+
+        return CreateClassResponse.builder()
+                .classId(classEntity.getId())
+                .code(classEntity.getCode())
+                .name(classEntity.getName())
+                .status(classEntity.getStatus())
+                .approvalStatus(classEntity.getApprovalStatus())
+                .createdAt(classEntity.getCreatedAt())
+                .sessionSummary(sessionSummary)
+                .build();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public org.fyp.tmssep490be.dtos.createclass.SessionListResponse listSessions(Long classId, Long userId) {
         log.info("Listing sessions for class ID {} by user {}", classId, userId);
@@ -936,7 +1052,8 @@ public class ClassServiceImpl implements ClassService {
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
 
-        // Validate user has access to class's branch (skip if userId is null - authentication disabled)
+        // Validate user has access to class's branch (skip if userId is null -
+        // authentication disabled)
         if (userId != null) {
             List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(userId);
             if (!userBranchIds.contains(classEntity.getBranch().getId())) {
@@ -975,8 +1092,10 @@ public class ClassServiceImpl implements ClassService {
 
             // Build time slot info if available
             org.fyp.tmssep490be.dtos.createclass.SessionListResponse.TimeSlotInfoDTO timeSlotInfo = null;
+            Long timeSlotTemplateId = null;
             if (hasTimeSlot && session.getTimeSlotTemplate() != null) {
                 TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
+                timeSlotTemplateId = timeSlot.getId();
                 if (timeSlot.getStartTime() != null && timeSlot.getEndTime() != null) {
                     timeSlotInfo = org.fyp.tmssep490be.dtos.createclass.SessionListResponse.TimeSlotInfoDTO.builder()
                             .startTime(timeSlot.getStartTime().toString())
@@ -988,6 +1107,7 @@ public class ClassServiceImpl implements ClassService {
 
             // Get resource name
             String resourceName = null;
+            Long resourceId = null;
             if (hasResource) {
                 List<SessionResource> sessionResources = sessionResourceRepository.findBySessionId(session.getId());
                 if (!sessionResources.isEmpty()) {
@@ -995,18 +1115,18 @@ public class ClassServiceImpl implements ClassService {
                     Resource resource = sessionResources.get(0).getResource();
                     if (resource != null) {
                         resourceName = resource.getName();
+                        resourceId = resource.getId();
                     }
                 }
             }
-            
+
             // Get teachers assigned to this session
             List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.TeacherInfoDTO> teacherInfos = new java.util.ArrayList<>();
             String teacherName = null;
             if (hasTeacher) {
                 List<TeachingSlot> teachingSlots = teachingSlotRepository.findBySessionIdAndStatus(
-                        session.getId(), TeachingSlotStatus.SCHEDULED
-                );
-                
+                        session.getId(), TeachingSlotStatus.SCHEDULED);
+
                 teacherInfos = teachingSlots.stream()
                         .filter(slot -> slot.getTeacher() != null)
                         .map(slot -> {
@@ -1018,7 +1138,7 @@ public class ClassServiceImpl implements ClassService {
                                     .build();
                         })
                         .collect(Collectors.toList());
-                
+
                 // Create comma-separated teacher name string
                 if (!teacherInfos.isEmpty()) {
                     teacherName = teacherInfos.stream()
@@ -1036,20 +1156,28 @@ public class ClassServiceImpl implements ClassService {
                     .date(session.getDate())
                     .dayOfWeek(dayOfWeek)
                     .dayOfWeekNumber((short) session.getDate().getDayOfWeek().getValue())
-                    .courseSessionName(session.getCourseSession() != null ? session.getCourseSession().getTopic() : "Unknown")
+                    .courseSessionName(
+                            session.getCourseSession() != null ? session.getCourseSession().getTopic() : "Unknown")
                     .status(session.getStatus().name())
                     .hasTimeSlot(hasTimeSlot)
                     .hasResource(hasResource)
                     .hasTeacher(hasTeacher)
+                    .timeSlotTemplateId(timeSlotTemplateId)
                     .timeSlotInfo(timeSlotInfo)
+                    .resourceId(resourceId)
                     .resourceName(resourceName)
                     .teacherName(teacherName)
                     .teachers(teacherInfos)
+                    .teacherIds(teacherInfos.stream()
+                            .map(org.fyp.tmssep490be.dtos.createclass.SessionListResponse.TeacherInfoDTO::getTeacherId)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toList()))
                     .build());
         }
 
         // Group sessions by week
-        List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.WeekGroupDTO> weekGroups = groupSessionsByWeek(sessions);
+        List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.WeekGroupDTO> weekGroups = groupSessionsByWeek(
+                sessions);
 
         // Build response
         return org.fyp.tmssep490be.dtos.createclass.SessionListResponse.builder()
@@ -1069,9 +1197,10 @@ public class ClassServiceImpl implements ClassService {
     /**
      * Group sessions by week for better frontend display
      */
-    private List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.WeekGroupDTO> groupSessionsByWeek(List<Session> sessions) {
+    private List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.WeekGroupDTO> groupSessionsByWeek(
+            List<Session> sessions) {
         List<org.fyp.tmssep490be.dtos.createclass.SessionListResponse.WeekGroupDTO> weekGroups = new java.util.ArrayList<>();
-        
+
         if (sessions.isEmpty()) {
             return weekGroups;
         }
@@ -1083,7 +1212,7 @@ public class ClassServiceImpl implements ClassService {
 
         for (Session session : sessions) {
             LocalDate sessionDate = session.getDate();
-            
+
             // Check if session is in next week (7+ days from current week start)
             if (sessionDate.isAfter(currentWeekStart.plusDays(6))) {
                 // Save current week group
@@ -1191,8 +1320,7 @@ public class ClassServiceImpl implements ClassService {
                 int sessionsUpdated = sessionRepository.updateTimeSlotByDayOfWeek(
                         classId,
                         assignment.getDayOfWeek().intValue(),
-                        assignment.getTimeSlotTemplateId()
-                );
+                        assignment.getTimeSlotTemplateId());
 
                 // Create assignment detail
                 AssignTimeSlotsResponse.AssignmentDetail detail = AssignTimeSlotsResponse.AssignmentDetail.builder()
@@ -1296,9 +1424,9 @@ public class ClassServiceImpl implements ClassService {
             Long classId,
             Long sessionId,
             AssignSessionResourceRequest request,
-            Long userId
-    ) {
-        log.info("Quick fix assign resource {} -> session {} (class {}) by user {}", request.getResourceId(), sessionId, classId, userId);
+            Long userId) {
+        log.info("Quick fix assign resource {} -> session {} (class {}) by user {}", request.getResourceId(), sessionId,
+                classId, userId);
 
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
@@ -1352,8 +1480,7 @@ public class ClassServiceImpl implements ClassService {
         List<Resource> availableResources = resourceAssignmentService.queryAvailableResources(
                 classId,
                 sessionId,
-                resourceType
-        );
+                resourceType);
 
         return availableResources.stream()
                 .map(AvailableResourceDTO::basic)
@@ -1376,7 +1503,8 @@ public class ClassServiceImpl implements ClassService {
             ValidateClassResponse validationResponse = validationService.validateClassComplete(classId);
 
             log.info("Class validation completed for class ID: {}. Valid: {}, CanSubmit: {}",
-                    classId, validateClassResponseUtil.isValid(validationResponse), validateClassResponseUtil.canSubmit(validationResponse));
+                    classId, validateClassResponseUtil.isValid(validationResponse),
+                    validateClassResponseUtil.canSubmit(validationResponse));
 
             return validationResponse;
 
@@ -1480,14 +1608,16 @@ public class ClassServiceImpl implements ClassService {
             throw new CustomException(ErrorCode.CLASS_CANNOT_DELETE_NON_DRAFT);
         }
 
-        // Check if class has any enrollments (shouldn't happen for DRAFT, but safety check)
+        // Check if class has any enrollments (shouldn't happen for DRAFT, but safety
+        // check)
         Integer enrolledCount = classRepository.countEnrolledStudents(classId);
         if (enrolledCount != null && enrolledCount > 0) {
             throw new CustomException(ErrorCode.CLASS_HAS_ENROLLMENTS);
         }
 
         try {
-            // Cascade delete: sessions → teaching_slots, session_resources (handled by DB constraints)
+            // Cascade delete: sessions → teaching_slots, session_resources (handled by DB
+            // constraints)
             classRepository.delete(classEntity);
             log.info("Successfully deleted class ID: {} (code: {})", classId, classEntity.getCode());
         } catch (Exception e) {
@@ -1512,7 +1642,8 @@ public class ClassServiceImpl implements ClassService {
         }
     }
 
-    private void validateCreateClassBusinessRules(CreateClassRequest request, Branch branch, Course course, Long userId) {
+    private void validateCreateClassBusinessRules(CreateClassRequest request, Branch branch, Course course,
+            Long userId) {
         // Validate user has access to branch
         List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(userId);
         if (!userBranchIds.contains(branch.getId())) {
@@ -1532,6 +1663,66 @@ public class ClassServiceImpl implements ClassService {
         }
     }
 
+    private CreateClassRequest mapToCreateRequest(UpdateClassRequest request) {
+        return CreateClassRequest.builder()
+                .branchId(request.getBranchId())
+                .courseId(request.getCourseId())
+                .code(request.getCode())
+                .name(request.getName())
+                .modality(request.getModality())
+                .startDate(request.getStartDate())
+                .scheduleDays(request.getScheduleDays())
+                .maxCapacity(request.getMaxCapacity())
+                .build();
+    }
+
+    private CreateClassResponse.SessionGenerationSummary regenerateSessions(ClassEntity classEntity, Course course) {
+        List<Session> existingSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
+        if (!existingSessions.isEmpty()) {
+            sessionRepository.deleteAll(existingSessions);
+            classEntity.getSessions().clear();
+        }
+
+        List<Session> sessions = sessionGenerationService.generateSessionsForClass(classEntity, course);
+        List<Session> savedSessions = sessionRepository.saveAll(sessions);
+
+        LocalDate endDate = sessionGenerationService.calculateEndDate(savedSessions);
+        classEntity.setPlannedEndDate(endDate);
+        classRepository.save(classEntity);
+
+        return CreateClassResponse.SessionGenerationSummary.builder()
+                .sessionsGenerated(savedSessions.size())
+                .totalSessionsInCourse(savedSessions.size())
+                .courseCode(course.getCode())
+                .courseName(course.getName())
+                .startDate(classEntity.getStartDate())
+                .endDate(endDate)
+                .scheduleDays(classEntity.getScheduleDays())
+                .build();
+    }
+
+    private CreateClassResponse.SessionGenerationSummary buildSessionSummary(ClassEntity classEntity, Course course) {
+        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
+        int sessionCount = sessions.size();
+
+        LocalDate startDate = classEntity.getStartDate();
+        LocalDate endDate = classEntity.getPlannedEndDate();
+        if (!sessions.isEmpty()) {
+            startDate = sessions.get(0).getDate();
+            endDate = sessions.get(sessionCount - 1).getDate();
+        }
+
+        return CreateClassResponse.SessionGenerationSummary.builder()
+                .sessionsGenerated(sessionCount)
+                .totalSessionsInCourse(sessionCount)
+                .courseCode(course.getCode())
+                .courseName(course.getName())
+                .startDate(startDate)
+                .endDate(endDate)
+                .scheduleDays(classEntity.getScheduleDays())
+                .build();
+    }
+
     private UserAccount getUserAccount(Long userId) {
         // This would typically come from UserRepository
         // For now, assuming UserAccount can be obtained from context
@@ -1544,20 +1735,30 @@ public class ClassServiceImpl implements ClassService {
      * 1=Monday, 7=Sunday
      */
     private String getDayName(Short dayOfWeek) {
-        if (dayOfWeek == null) return "Unknown";
+        if (dayOfWeek == null)
+            return "Unknown";
         switch (dayOfWeek) {
-            case 1: return "Monday";
-            case 2: return "Tuesday";
-            case 3: return "Wednesday";
-            case 4: return "Thursday";
-            case 5: return "Friday";
-            case 6: return "Saturday";
-            case 7: return "Sunday";
-            default: return "Unknown";
+            case 1:
+                return "Monday";
+            case 2:
+                return "Tuesday";
+            case 3:
+                return "Wednesday";
+            case 4:
+                return "Thursday";
+            case 5:
+                return "Friday";
+            case 6:
+                return "Saturday";
+            case 7:
+                return "Sunday";
+            default:
+                return "Unknown";
         }
     }
 
-    // ==================== CREATE CLASS WORKFLOW - PHASE 2.3: TEACHER ASSIGNMENT (PRE-CHECK) ====================
+    // ==================== CREATE CLASS WORKFLOW - PHASE 2.3: TEACHER ASSIGNMENT
+    // (PRE-CHECK) ====================
 
     @Override
     public List<TeacherAvailabilityDTO> getAvailableTeachers(Long classId, Long userId) {
@@ -1574,8 +1775,8 @@ public class ClassServiceImpl implements ClassService {
             }
 
             // Execute PRE-CHECK query via TeacherAssignmentService
-            List<TeacherAvailabilityDTO> teachers = 
-                    teacherAssignmentService.queryAvailableTeachersWithPrecheck(classId);
+            List<TeacherAvailabilityDTO> teachers = teacherAssignmentService
+                    .queryAvailableTeachersWithPrecheck(classId);
 
             // Populate schedule information for UNAVAILABLE teachers
             populateScheduleInformation(teachers, classId);
@@ -1607,8 +1808,7 @@ public class ClassServiceImpl implements ClassService {
             }
 
             // Execute day-level availability query via TeacherAssignmentService
-            List<TeacherDayAvailabilityDTO> teachers = 
-                    teacherAssignmentService.queryTeachersAvailableByDay(classId);
+            List<TeacherDayAvailabilityDTO> teachers = teacherAssignmentService.queryTeachersAvailableByDay(classId);
 
             log.info("Found {} teachers with day-level availability for class ID: {}", teachers.size(), classId);
             return teachers;
@@ -1623,7 +1823,8 @@ public class ClassServiceImpl implements ClassService {
     }
 
     /**
-     * Populate schedule information for UNAVAILABLE teachers to show detailed mismatch message
+     * Populate schedule information for UNAVAILABLE teachers to show detailed
+     * mismatch message
      * <p>
      * For teachers with noAvailability = totalSessions, populate:
      * - teacherSchedule: What teacher registered (e.g., "T3/T5/T7 Chiều")
@@ -1633,17 +1834,17 @@ public class ClassServiceImpl implements ClassService {
     private void populateScheduleInformation(List<TeacherAvailabilityDTO> teachers, Long classId) {
         // Get class schedule once (reuse for all teachers)
         TeacherAvailabilityDTO.ScheduleInfo classSchedule = getClassSchedule(classId);
-        
+
         for (TeacherAvailabilityDTO teacher : teachers) {
             // Populate for ANY teacher with noAvailability conflicts (partial or full)
             // This includes:
             // - UNAVAILABLE (0% availability) with full noAvailability
             // - PARTIALLY_AVAILABLE (1-99%) with some noAvailability (e.g., missing Friday)
             if (teacher.getConflicts().getNoAvailability() > 0) {
-                
+
                 // Get teacher's registered schedule
                 TeacherAvailabilityDTO.ScheduleInfo teacherSchedule = getTeacherSchedule(teacher.getTeacherId());
-                
+
                 if (teacherSchedule != null && classSchedule != null) {
                     teacher.setTeacherSchedule(teacherSchedule);
                     teacher.setClassSchedule(classSchedule);
@@ -1657,7 +1858,7 @@ public class ClassServiceImpl implements ClassService {
      */
     private TeacherAvailabilityDTO.ScheduleInfo getTeacherSchedule(Long teacherId) {
         List<TeacherAvailability> availabilities = teacherAvailabilityRepository.findByTeacherId(teacherId);
-        
+
         if (availabilities.isEmpty()) {
             return null;
         }
@@ -1669,9 +1870,10 @@ public class ClassServiceImpl implements ClassService {
                 .sorted(Comparator.comparingInt(this::getDayOrder))
                 .collect(Collectors.toList());
 
-        // Assume all availabilities have same time slot (teacher registers for one shift)
+        // Assume all availabilities have same time slot (teacher registers for one
+        // shift)
         TimeSlotTemplate timeSlot = availabilities.get(0).getTimeSlotTemplate();
-        
+
         return TeacherAvailabilityDTO.ScheduleInfo.builder()
                 .days(days)
                 .timeSlot(timeSlot.getName())
@@ -1684,7 +1886,7 @@ public class ClassServiceImpl implements ClassService {
      */
     private TeacherAvailabilityDTO.ScheduleInfo getClassSchedule(Long classId) {
         List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
-        
+
         if (sessions.isEmpty()) {
             return null;
         }
@@ -1698,7 +1900,7 @@ public class ClassServiceImpl implements ClassService {
 
         // Assume all sessions have same time slot
         TimeSlotTemplate timeSlot = sessions.get(0).getTimeSlotTemplate();
-        
+
         return TeacherAvailabilityDTO.ScheduleInfo.builder()
                 .days(days)
                 .timeSlot(timeSlot.getName())
@@ -1708,18 +1910,20 @@ public class ClassServiceImpl implements ClassService {
 
     /**
      * Convert day of week number to Vietnamese abbreviation
-     * @param dayOfWeek 1=Monday, 2=Tuesday, ..., 7=Sunday, 0=Sunday (PostgreSQL format)
+     * 
+     * @param dayOfWeek 1=Monday, 2=Tuesday, ..., 7=Sunday, 0=Sunday (PostgreSQL
+     *                  format)
      */
     private String getDayAbbreviation(Integer dayOfWeek) {
         Map<Integer, String> dayMap = Map.of(
-                0, "CN",  // Sunday (PostgreSQL format)
-                1, "T2",  // Monday
-                2, "T3",  // Tuesday
-                3, "T4",  // Wednesday
-                4, "T5",  // Thursday
-                5, "T6",  // Friday
-                6, "T7",  // Saturday
-                7, "CN"   // Sunday (alternative)
+                0, "CN", // Sunday (PostgreSQL format)
+                1, "T2", // Monday
+                2, "T3", // Tuesday
+                3, "T4", // Wednesday
+                4, "T5", // Thursday
+                5, "T6", // Friday
+                6, "T7", // Saturday
+                7, "CN" // Sunday (alternative)
         );
         return dayMap.getOrDefault(dayOfWeek, "T" + dayOfWeek);
     }
@@ -1735,8 +1939,7 @@ public class ClassServiceImpl implements ClassService {
                 "T5", 4,
                 "T6", 5,
                 "T7", 6,
-                "CN", 7
-        );
+                "CN", 7);
         return orderMap.getOrDefault(dayAbbr, 99);
     }
 
@@ -1771,8 +1974,7 @@ public class ClassServiceImpl implements ClassService {
             assignTeacherRequestValidator.validate(classId, request);
 
             // Execute teacher assignment via TeacherAssignmentService
-            AssignTeacherResponse response = 
-                    teacherAssignmentService.assignTeacher(classId, request);
+            AssignTeacherResponse response = teacherAssignmentService.assignTeacher(classId, request);
 
             log.info("Teacher assignment completed for class ID: {}. Assigned: {}, Remaining: {}",
                     classId, response.getAssignedCount(), response.getRemainingSessions());
