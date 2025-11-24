@@ -63,7 +63,7 @@ public class SessionAutoUpdateService {
                     studentSession.setRecordedAt(OffsetDateTime.now());
                     studentSessionsToSave.add(studentSession);
                     updatedAttendanceCount++;
-                }
+        }
             }
         }
         

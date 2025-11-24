@@ -10,8 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.fyp.tmssep490be.dtos.attendance.AttendanceMatrixDTO;
 import org.fyp.tmssep490be.dtos.attendance.TeacherClassListItemDTO;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.dtos.teacher.TeacherProfileDTO;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.AttendanceService;
+import org.fyp.tmssep490be.services.TeacherService;
 import org.fyp.tmssep490be.utils.TeacherContextHelper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,6 +34,7 @@ public class TeacherController {
 
     private final AttendanceService attendanceService;
     private final TeacherContextHelper teacherContextHelper;
+    private final TeacherService teacherService;
 
     @GetMapping("/classes")
     @PreAuthorize("hasRole('TEACHER')")
@@ -63,11 +66,29 @@ public class TeacherController {
     ) {
         Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
         AttendanceMatrixDTO data = attendanceService.getClassAttendanceMatrix(teacherId, classId);
-        return ResponseEntity.ok(
+            return ResponseEntity.ok(
                 ResponseObject.<AttendanceMatrixDTO>builder()
                         .success(true)
                         .message("OK")
                         .data(data)
+                        .build()
+        );
+    }
+
+    @GetMapping("/me/profile")
+    @PreAuthorize("hasRole('TEACHER')")
+    @Operation(summary = "Get teacher profile information")
+    @ApiResponse(responseCode = "200", description = "OK",
+            content = @Content(schema = @Schema(implementation = TeacherProfileDTO.class)))
+    public ResponseEntity<ResponseObject<TeacherProfileDTO>> getMyProfile(
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        TeacherProfileDTO profile = teacherService.getMyProfile(userPrincipal.getId());
+        return ResponseEntity.ok(
+                ResponseObject.<TeacherProfileDTO>builder()
+                        .success(true)
+                        .message("Teacher profile retrieved successfully")
+                        .data(profile)
                         .build()
         );
     }

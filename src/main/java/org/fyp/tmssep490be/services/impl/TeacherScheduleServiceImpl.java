@@ -10,6 +10,7 @@ import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.fyp.tmssep490be.repositories.TeacherRepository;
 import org.fyp.tmssep490be.repositories.TeachingSlotRepository;
+import org.fyp.tmssep490be.repositories.TimeSlotTemplateRepository;
 import org.fyp.tmssep490be.services.TeacherScheduleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class TeacherScheduleServiceImpl implements TeacherScheduleService {
     private final TeacherRepository teacherRepository;
     private final TeachingSlotRepository teachingSlotRepository;
     private final StudentSessionRepository studentSessionRepository;
+    private final TimeSlotTemplateRepository timeSlotTemplateRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -52,13 +54,8 @@ public class TeacherScheduleServiceImpl implements TeacherScheduleService {
 
         log.debug("Found {} teaching slots for week {} to {}", teachingSlots.size(), weekStart, weekEnd);
 
-        // 5. Extract unique timeslots
-        List<TimeSlotTemplate> timeSlots = teachingSlots.stream()
-                .map(ts -> ts.getSession().getTimeSlotTemplate())
-                .filter(Objects::nonNull)
-                .distinct()
-                .sorted(Comparator.comparing(TimeSlotTemplate::getStartTime))
-                .toList();
+        // 5. Get all time slots from branches where teacher teaches
+        List<TimeSlotDTO> timeSlots = getAllTimeSlotsForTeacher(teacherId);
 
         // 6. Group by day of week and map to DTOs
         Map<DayOfWeek, List<TeacherSessionSummaryDTO>> scheduleMap = teachingSlots.stream()
@@ -78,7 +75,7 @@ public class TeacherScheduleServiceImpl implements TeacherScheduleService {
                 .weekEnd(weekEnd)
                 .teacherId(teacher.getId())
                 .teacherName(teacher.getUserAccount().getFullName())
-                .timeSlots(timeSlots.stream().map(this::mapToTimeSlotDTO).toList())
+                .timeSlots(timeSlots)
                 .schedule(scheduleMap)
                 .build();
     }
@@ -107,13 +104,8 @@ public class TeacherScheduleServiceImpl implements TeacherScheduleService {
         log.debug("Found {} teaching slots for teacher {} in class {} for week {} to {}",
                 teachingSlots.size(), teacherId, classId, weekStart, weekEnd);
 
-        // 5. Extract unique timeslots
-        List<TimeSlotTemplate> timeSlots = teachingSlots.stream()
-                .map(ts -> ts.getSession().getTimeSlotTemplate())
-                .filter(Objects::nonNull)
-                .distinct()
-                .sorted(Comparator.comparing(TimeSlotTemplate::getStartTime))
-                .toList();
+        // 5. Get all time slots from branches where teacher teaches
+        List<TimeSlotDTO> timeSlots = getAllTimeSlotsForTeacher(teacherId);
 
         // 6. Group by day of week
         Map<DayOfWeek, List<TeacherSessionSummaryDTO>> scheduleMap = teachingSlots.stream()
@@ -133,7 +125,7 @@ public class TeacherScheduleServiceImpl implements TeacherScheduleService {
                 .weekEnd(weekEnd)
                 .teacherId(teacher.getId())
                 .teacherName(teacher.getUserAccount().getFullName())
-                .timeSlots(timeSlots.stream().map(this::mapToTimeSlotDTO).toList())
+                .timeSlots(timeSlots)
                 .schedule(scheduleMap)
                 .build();
     }
@@ -156,6 +148,85 @@ public class TeacherScheduleServiceImpl implements TeacherScheduleService {
     public LocalDate getCurrentWeekStart() {
         LocalDate today = LocalDate.now();
         return today.minusDays(today.getDayOfWeek().getValue() - 1);
+    }
+
+    /**
+     * Get all time slots for a teacher by unioning time slots from all branches
+     * where the teacher has teaching slots, then merging duplicates by time range
+     */
+    private List<TimeSlotDTO> getAllTimeSlotsForTeacher(Long teacherId) {
+        log.debug("Getting all time slots for teacher: {}", teacherId);
+
+        // 1. Get all distinct classes that teacher teaches
+        List<ClassEntity> classes = teachingSlotRepository.findDistinctClassesByTeacherId(teacherId);
+
+        if (classes.isEmpty()) {
+            log.warn("Teacher {} has no classes", teacherId);
+            return new ArrayList<>();
+        }
+
+        // 2. Extract unique branch IDs from classes
+        Set<Long> branchIds = classes.stream()
+                .map(c -> c.getBranch().getId())
+                .collect(Collectors.toSet());
+
+        log.debug("Teacher {} teaches in {} branches", teacherId, branchIds.size());
+
+        // 3. Union time slots from all branches
+        List<TimeSlotTemplate> allTimeSlots = branchIds.stream()
+                .flatMap(branchId -> timeSlotTemplateRepository
+                        .findByBranchIdOrderByStartTimeAsc(branchId).stream())
+                .collect(Collectors.toList());
+
+        // 4. Group by TimeRange (startTime, endTime) to merge duplicates
+        Map<TimeRange, List<TimeSlotTemplate>> groupedByTimeRange = allTimeSlots.stream()
+                .collect(Collectors.groupingBy(
+                        ts -> new TimeRange(ts.getStartTime(), ts.getEndTime())
+                ));
+
+        // 5. Merge duplicates and build DTOs
+        List<TimeSlotDTO> mergedTimeSlots = groupedByTimeRange.entrySet().stream()
+                .map(entry -> {
+                    TimeRange timeRange = entry.getKey();
+                    List<TimeSlotTemplate> slots = entry.getValue();
+
+                    // If multiple time slots with same time range, merge their names
+                    String mergedName;
+                    Long timeSlotTemplateId;
+                    if (slots.size() == 1) {
+                        TimeSlotTemplate slot = slots.get(0);
+                        mergedName = slot.getName();
+                        timeSlotTemplateId = slot.getId();
+                    } else {
+                        // Merge names from different branches (e.g., "HN Morning 1 / SG Morning 1")
+                        mergedName = slots.stream()
+                                .map(TimeSlotTemplate::getName)
+                                .distinct()
+                                .collect(Collectors.joining(" / "));
+                        timeSlotTemplateId = slots.get(0).getId(); // Use first one as representative
+                    }
+
+                    return TimeSlotDTO.builder()
+                            .timeSlotTemplateId(timeSlotTemplateId)
+                            .name(mergedName)
+                            .startTime(timeRange.getStartTime())
+                            .endTime(timeRange.getEndTime())
+                            .build();
+                })
+                .sorted(Comparator.comparing(TimeSlotDTO::getStartTime))
+                .collect(Collectors.toList());
+
+        log.debug("Merged {} unique time slots for teacher {}", mergedTimeSlots.size(), teacherId);
+        return mergedTimeSlots;
+    }
+
+    /**
+     * Helper class to group time slots by time range (startTime, endTime)
+     */
+    @lombok.Value
+    private static class TimeRange {
+        java.time.LocalTime startTime;
+        java.time.LocalTime endTime;
     }
 
     private TeacherSessionSummaryDTO mapToTeacherSessionSummaryDTO(TeachingSlot teachingSlot) {
