@@ -83,6 +83,21 @@ public class GradebookDTO {
         
         @Schema(description = "Total number of assessments")
         private Integer totalAssessments;
+
+        @Schema(description = "Number of sessions student attended")
+        private Integer attendedSessions;
+
+        @Schema(description = "Total completed sessions in class")
+        private Integer totalSessions;
+
+        @Schema(description = "Attendance rate (percentage 0-100)")
+        private BigDecimal attendanceRate;
+
+        @Schema(description = "Attendance score (same as rate, reserved for weighting)")
+        private BigDecimal attendanceScore;
+
+        @Schema(description = "Whether attendance score is finalized (class completed)")
+        private Boolean attendanceFinalized;
     }
     
     @Data

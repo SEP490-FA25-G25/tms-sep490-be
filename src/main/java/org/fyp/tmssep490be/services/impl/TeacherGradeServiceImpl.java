@@ -4,7 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.teachergrade.*;
 import org.fyp.tmssep490be.entities.*;
+import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
+import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
+import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
@@ -34,6 +37,44 @@ public class TeacherGradeServiceImpl implements TeacherGradeService {
     private final TeacherRepository teacherRepository;
     private final StudentRepository studentRepository;
     private final ClassRepository classRepository;
+    private final StudentSessionRepository studentSessionRepository;
+
+    private record AttendanceSummary(int attendedSessions, int totalSessions, BigDecimal attendanceRate) {
+        BigDecimal score() {
+            return attendanceRate;
+        }
+    }
+
+    private AttendanceSummary buildAttendanceSummary(List<StudentSession> sessions) {
+        if (sessions == null || sessions.isEmpty()) {
+            return new AttendanceSummary(0, 0, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        }
+        long totalCompletedSessions = sessions.stream()
+                .map(StudentSession::getSession)
+                .filter(Objects::nonNull)
+                .filter(sess -> sess.getStatus() == SessionStatus.DONE)
+                .count();
+
+        long attendedSessions = sessions.stream()
+                .filter(ss -> ss.getSession() != null && ss.getSession().getStatus() == SessionStatus.DONE)
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                .count();
+
+        if (totalCompletedSessions == 0) {
+            return new AttendanceSummary(0, 0, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        }
+
+        BigDecimal attendanceRate = BigDecimal.valueOf(attendedSessions)
+                .divide(BigDecimal.valueOf(totalCompletedSessions), 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        return new AttendanceSummary(
+                (int) attendedSessions,
+                (int) totalCompletedSessions,
+                attendanceRate
+        );
+    }
 
     /**
      * Verify that teacher teaches the class
@@ -612,6 +653,15 @@ public class TeacherGradeServiceImpl implements TeacherGradeService {
             }
         }
         
+        boolean attendanceFinalized = classEntity.getStatus() == ClassStatus.COMPLETED;
+        Map<Long, List<StudentSession>> sessionsByStudent = Collections.emptyMap();
+        if (attendanceFinalized) {
+            List<StudentSession> classSessions = studentSessionRepository.findByClassId(classId);
+            sessionsByStudent = classSessions.stream()
+                    .filter(ss -> ss.getStudent() != null)
+                    .collect(Collectors.groupingBy(ss -> ss.getStudent().getId()));
+        }
+
         // Build students list with scores
         List<GradebookDTO.GradebookStudentDTO> studentDTOs = new ArrayList<>();
         for (Enrollment enrollment : enrollments) {
@@ -677,6 +727,12 @@ public class TeacherGradeServiceImpl implements TeacherGradeService {
                     .filter(GradebookDTO.GradebookScoreDTO::getIsGraded)
                     .count();
             
+            AttendanceSummary attendanceSummary = null;
+            if (attendanceFinalized) {
+                List<StudentSession> sessions = sessionsByStudent.getOrDefault(studentId, Collections.emptyList());
+                attendanceSummary = buildAttendanceSummary(sessions);
+            }
+
             studentDTOs.add(GradebookDTO.GradebookStudentDTO.builder()
                     .studentId(studentId)
                     .studentCode(student.getStudentCode())
@@ -685,6 +741,11 @@ public class TeacherGradeServiceImpl implements TeacherGradeService {
                     .averageScore(averageScore)
                     .gradedCount(gradedCount)
                     .totalAssessments(assessments.size())
+                    .attendedSessions(attendanceSummary != null ? attendanceSummary.attendedSessions() : null)
+                    .totalSessions(attendanceSummary != null ? attendanceSummary.totalSessions() : null)
+                    .attendanceRate(attendanceSummary != null ? attendanceSummary.attendanceRate() : null)
+                    .attendanceScore(attendanceSummary != null ? attendanceSummary.score() : null)
+                    .attendanceFinalized(attendanceSummary != null)
                     .build());
         }
         

@@ -13,11 +13,7 @@ import java.util.List;
 @Repository
 public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, TeachingSlot.TeachingSlotId> {
 
-    @Query("SELECT ts FROM TeachingSlot ts " +
-         "JOIN FETCH ts.session s " +
-         "JOIN FETCH ts.teacher t " +
-         "JOIN FETCH t.userAccount ua " +
-         "WHERE s.classEntity.id = :classId AND ts.status = :status")
+    @Query("SELECT ts FROM TeachingSlot ts WHERE ts.session.classEntity.id = :classId AND ts.status = :status")
     List<TeachingSlot> findByClassEntityIdAndStatus(@Param("classId") Long classId, @Param("status") TeachingSlotStatus status);
     
     /**
