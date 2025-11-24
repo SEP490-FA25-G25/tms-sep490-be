@@ -18,7 +18,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class TeacherRequestApproveDTO {
 
-    // For SWAP - Staff can override replacement teacher
+    // For REPLACEMENT - Staff can override replacement teacher
     private Long replacementTeacherId;
 
     // For RESCHEDULE - Staff can override date/slot/resource

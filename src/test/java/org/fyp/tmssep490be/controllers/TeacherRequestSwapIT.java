@@ -22,18 +22,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 @org.junit.jupiter.api.DisplayName("Teacher Request Swap Integration Tests")
 class TeacherRequestSwapIT {
 
-    @Autowired private TeacherRequestService teacherRequestService;
-    @Autowired private TeacherRequestRepository teacherRequestRepository;
-    @Autowired private TeacherRepository teacherRepository;
-    @Autowired private UserAccountRepository userAccountRepository;
-    @Autowired private SessionRepository sessionRepository;
-    @Autowired private ClassRepository classRepository;
-    @Autowired private TimeSlotTemplateRepository timeSlotTemplateRepository;
-    @Autowired private CenterRepository centerRepository;
-    @Autowired private BranchRepository branchRepository;
-    @Autowired private SubjectRepository subjectRepository;
-    @Autowired private CourseRepository courseRepository;
-    @Autowired private TeachingSlotRepository teachingSlotRepository;
+    @Autowired
+    private TeacherRequestService teacherRequestService;
+    @Autowired
+    private TeacherRequestRepository teacherRequestRepository;
+    @Autowired
+    private TeacherRepository teacherRepository;
+    @Autowired
+    private UserAccountRepository userAccountRepository;
+    @Autowired
+    private SessionRepository sessionRepository;
+    @Autowired
+    private ClassRepository classRepository;
+    @Autowired
+    private TimeSlotTemplateRepository timeSlotTemplateRepository;
+    @Autowired
+    private CenterRepository centerRepository;
+    @Autowired
+    private BranchRepository branchRepository;
+    @Autowired
+    private SubjectRepository subjectRepository;
+    @Autowired
+    private CourseRepository courseRepository;
+    @Autowired
+    private TeachingSlotRepository teachingSlotRepository;
 
     private UserAccount staff;
     private Teacher originalTeacher;
@@ -46,7 +58,7 @@ class TeacherRequestSwapIT {
     @BeforeEach
     void setup() {
         uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
-        
+
         // Basic users
         staff = new UserAccount();
         staff.setEmail("staff+" + uniqueSuffix + "@test.com");
@@ -117,8 +129,8 @@ class TeacherRequestSwapIT {
         timeSlot = new TimeSlotTemplate();
         timeSlot.setBranch(branch);
         timeSlot.setName("Morning");
-        timeSlot.setStartTime(java.time.LocalTime.of(8,0));
-        timeSlot.setEndTime(java.time.LocalTime.of(10,0));
+        timeSlot.setStartTime(java.time.LocalTime.of(8, 0));
+        timeSlot.setEndTime(java.time.LocalTime.of(10, 0));
         timeSlot = timeSlotTemplateRepository.save(timeSlot);
 
         // Session
@@ -148,7 +160,7 @@ class TeacherRequestSwapIT {
         TeacherRequest req = TeacherRequest.builder()
                 .teacher(originalTeacher)
                 .session(session)
-                .requestType(TeacherRequestType.SWAP)
+                .requestType(TeacherRequestType.REPLACEMENT)
                 .status(RequestStatus.PENDING)
                 .replacementTeacher(replacementTeacher)
                 .submittedAt(OffsetDateTime.now())
@@ -173,7 +185,7 @@ class TeacherRequestSwapIT {
         TeacherRequest req = TeacherRequest.builder()
                 .teacher(originalTeacher)
                 .session(session)
-                .requestType(TeacherRequestType.SWAP)
+                .requestType(TeacherRequestType.REPLACEMENT)
                 .status(RequestStatus.WAITING_CONFIRM)
                 .replacementTeacher(replacementTeacher)
                 .submittedAt(OffsetDateTime.now())
@@ -181,15 +193,17 @@ class TeacherRequestSwapIT {
         req = teacherRequestRepository.save(req);
 
         // Confirm by replacement teacher
-        teacherRequestService.confirmSwap(req.getId(), replacementTeacher.getUserAccount().getId());
+        teacherRequestService.confirmReplacement(req.getId(), replacementTeacher.getUserAccount().getId());
 
         // Assert: original teacher slot → ON_LEAVE
-        TeachingSlot.TeachingSlotId originalSlotId = new TeachingSlot.TeachingSlotId(session.getId(), originalTeacher.getId());
+        TeachingSlot.TeachingSlotId originalSlotId = new TeachingSlot.TeachingSlotId(session.getId(),
+                originalTeacher.getId());
         TeachingSlot originalSlot = teachingSlotRepository.findById(originalSlotId).orElseThrow();
         assertThat(originalSlot.getStatus()).isEqualTo(TeachingSlotStatus.ON_LEAVE);
 
         // Assert: replacement teacher slot → SUBSTITUTED
-        TeachingSlot.TeachingSlotId replacementSlotId = new TeachingSlot.TeachingSlotId(session.getId(), replacementTeacher.getId());
+        TeachingSlot.TeachingSlotId replacementSlotId = new TeachingSlot.TeachingSlotId(session.getId(),
+                replacementTeacher.getId());
         TeachingSlot replacementSlot = teachingSlotRepository.findById(replacementSlotId).orElseThrow();
         assertThat(replacementSlot.getStatus()).isEqualTo(TeachingSlotStatus.SUBSTITUTED);
 
@@ -205,7 +219,7 @@ class TeacherRequestSwapIT {
         TeacherRequest req = TeacherRequest.builder()
                 .teacher(originalTeacher)
                 .session(session)
-                .requestType(TeacherRequestType.SWAP)
+                .requestType(TeacherRequestType.REPLACEMENT)
                 .status(RequestStatus.WAITING_CONFIRM)
                 .replacementTeacher(replacementTeacher)
                 .submittedAt(OffsetDateTime.now())
@@ -213,7 +227,8 @@ class TeacherRequestSwapIT {
         req = teacherRequestRepository.save(req);
 
         // Decline by replacement teacher
-        teacherRequestService.declineSwap(req.getId(), "Cannot take over", replacementTeacher.getUserAccount().getId());
+        teacherRequestService.declineReplacement(req.getId(), "Cannot take over",
+                replacementTeacher.getUserAccount().getId());
 
         // Assert: request status → PENDING
         TeacherRequest updatedReq = teacherRequestRepository.findById(req.getId()).orElseThrow();
@@ -222,4 +237,3 @@ class TeacherRequestSwapIT {
         assertThat(updatedReq.getNote()).contains("DECLINED_BY_TEACHER_ID_" + replacementTeacher.getId());
     }
 }
-

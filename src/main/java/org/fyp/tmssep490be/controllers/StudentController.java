@@ -131,6 +131,30 @@ public class StudentController {
                 .build());
     }
 
+  /**
+     * Get current student's own profile information
+     * For students to view their personal academic information and statistics
+     */
+    @GetMapping("/me/profile")
+    @Operation(
+            summary = "Get my student profile",
+            description = "Retrieve the current student's profile information including personal details, academic statistics, and current classes"
+    )
+    @PreAuthorize("hasRole('ROLE_STUDENT')")
+    public ResponseEntity<ResponseObject<StudentProfileDTO>> getMyProfile(
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("Student {} requesting their profile information", currentUser.getId());
+
+        StudentProfileDTO studentProfile = studentService.getMyProfile(currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<StudentProfileDTO>builder()
+                .success(true)
+                .message("Student profile retrieved successfully")
+                .data(studentProfile)
+                .build());
+    }
+
     /**
      * Get detailed information about a specific student
      * Includes enrollment history and current active classes
@@ -204,49 +228,5 @@ public class StudentController {
                 .message("Student enrollment history retrieved successfully")
                 .data(enrollmentHistory)
                 .build());
-    }
-
-    /**
-     * Get classes for a specific student
-     * Both students and academic affairs can access this endpoint
-     * Students can only view their own classes
-     */
-    @GetMapping("/{studentId}/classes")
-    @Operation(
-            summary = "Get student classes",
-            description = "Retrieve all active classes that a student is currently enrolled in"
-    )
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ROLE_ACADEMIC_AFFAIR')")
-    public ResponseEntity<ResponseObject<List<StudentClassDTO>>> getStudentClasses(
-            @Parameter(description = "Student ID")
-            @PathVariable Long studentId,
-
-            @AuthenticationPrincipal UserPrincipal currentUser
-    ) {
-        // For testing when security is disabled
-        Long currentUserId = currentUser != null ? currentUser.getId() : 1L;
-        boolean isStudent = currentUser != null &&
-            currentUser.getAuthorities().stream().anyMatch(auth -> auth.getAuthority().equals("ROLE_STUDENT"));
-
-        log.info("User {} requesting classes for student {}", currentUserId, studentId);
-
-        // Students can only view their own classes (only enforced when security is enabled)
-        if (currentUser != null && isStudent) {
-            Student student = studentRepository.findByUserAccountId(currentUserId)
-                    .orElseThrow(() -> new BusinessRuleException("ACCESS_DENIED", "Student not found"));
-
-            if (!student.getId().equals(studentId)) {
-                throw new BusinessRuleException("ACCESS_DENIED", "Students can only view their own classes");
-            }
-        }
-
-        // Get classes for the studentId
-        List<StudentClassDTO> classes = studentRequestService.getMyClassesForStudent(studentId);
-
-        return ResponseEntity.ok(ResponseObject.<List<StudentClassDTO>>builder()
-                .success(true)
-                .message("Student classes retrieved successfully")
-                .data(classes)
-                .build());
-    }
+}
 }

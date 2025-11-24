@@ -12,7 +12,19 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CourseSessionDTO {
+    private Long id;
     private String topic;
+
+    // HEAD fields
     private String studentTask;
     private List<String> mappedCLOs; // List of CLO codes
+
+    // Main fields
+    private Integer sequenceNo;
+    private String description;
+    private String objectives;
+    private List<String> skillSets;
+    private List<CourseMaterialDTO> materials;
+    private Integer totalMaterials;
+    private Boolean isCompleted;
 }

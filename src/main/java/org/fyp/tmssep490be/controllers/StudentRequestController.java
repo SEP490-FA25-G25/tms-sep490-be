@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.studentrequest.*;
 import org.fyp.tmssep490be.entities.Student;
+import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.entities.enums.StudentRequestType;
 import org.fyp.tmssep490be.exceptions.BusinessRuleException;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
@@ -23,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 
 @RestController
@@ -41,23 +43,72 @@ public class StudentRequestController {
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ResponseObject<Page<StudentRequestResponseDTO>>> getMyRequests(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @Parameter(description = "Filter by request type: ABSENCE, MAKEUP, TRANSFER")
+            @Parameter(description = "Filter by request type: ABSENCE, MAKEUP, TRANSFER (single value)")
             @RequestParam(required = false) String requestType,
-            @Parameter(description = "Filter by status: PENDING, APPROVED, REJECTED, CANCELLED")
+            @Parameter(description = "Filter by multiple request types: ABSENCE,MAKEUP,TRANSFER (comma-separated)")
+            @RequestParam(required = false) String requestTypes,
+            @Parameter(description = "Filter by status: PENDING, APPROVED, REJECTED, CANCELLED (single value)")
             @RequestParam(required = false) String status,
+            @Parameter(description = "Filter by multiple statuses: PENDING,APPROVED,REJECTED,CANCELLED (comma-separated)")
+            @RequestParam(required = false) String statuses,
             @Parameter(description = "Page number (0-based)")
             @RequestParam(defaultValue = "0") Integer page,
             @Parameter(description = "Page size")
             @RequestParam(defaultValue = "10") Integer size,
-            @Parameter(description = "Sort criter......................................ia: field,direction (e.g., submittedAt,desc)")
-            @RequestParam(defaultValue = "submittedAt,desc") String sort) {
+            @Parameter(description = "Sort criteria: field,direction (e.g., submittedAt,desc)")
+            @RequestParam(defaultValue = "submittedAt,desc") String sort,
+            @Parameter(description = "Search by request reason, class code, or session title")
+            @RequestParam(required = false) String search) {
 
         // Get student ID from user principal
         Long studentId = currentUser.getId();
 
+        // Process filter parameters - support both single and multiple values
+        List<StudentRequestType> requestTypeFilters = null;
+        List<RequestStatus> statusFilters = null;
+
+        // Parse request types
+        if (requestTypes != null && !requestTypes.trim().isEmpty()) {
+            try {
+                requestTypeFilters = Arrays.stream(requestTypes.split(","))
+                        .map(String::trim)
+                        .map(StudentRequestType::valueOf)
+                        .collect(java.util.stream.Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                // Invalid enum value, ignore and use null
+            }
+        } else if (requestType != null && !requestType.trim().isEmpty()) {
+            try {
+                requestTypeFilters = List.of(StudentRequestType.valueOf(requestType));
+            } catch (IllegalArgumentException e) {
+                // Invalid enum value, ignore and use null
+            }
+        }
+
+        // Parse statuses
+        if (statuses != null && !statuses.trim().isEmpty()) {
+            try {
+                statusFilters = Arrays.stream(statuses.split(","))
+                        .map(String::trim)
+                        .map(RequestStatus::valueOf)
+                        .collect(java.util.stream.Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                // Invalid enum value, ignore and use null
+            }
+        } else if (status != null && !status.trim().isEmpty()) {
+            try {
+                statusFilters = List.of(RequestStatus.valueOf(status));
+            } catch (IllegalArgumentException e) {
+                // Invalid enum value, ignore and use null
+            }
+        }
+
         RequestFilterDTO filter = RequestFilterDTO.builder()
-                .requestType(requestType)
-                .status(status)
+                .requestType(requestType) // Keep for backward compatibility
+                .status(status) // Keep for backward compatibility
+                .requestTypeFilters(requestTypeFilters)
+                .statusFilters(statusFilters)
+                .search(search)
                 .page(page)
                 .size(size)
                 .sort(sort)

@@ -11,7 +11,7 @@ import org.fyp.tmssep490be.entities.enums.TeacherRequestType;
 import java.time.LocalDate;
 
 /**
- * DTO for creating Teacher Request (used for all request types: SWAP, RESCHEDULE, MODALITY_CHANGE)
+ * DTO for creating Teacher Request (used for all request types: REPLACEMENT, RESCHEDULE, MODALITY_CHANGE)
  */
 @Data
 @Builder
@@ -23,9 +23,9 @@ public class TeacherRequestCreateDTO {
     private Long sessionId;
 
     @NotNull(message = "Request type is required")
-    private TeacherRequestType requestType; // SWAP/RESCHEDULE/MODALITY_CHANGE
+    private TeacherRequestType requestType; // REPLACEMENT/RESCHEDULE/MODALITY_CHANGE
 
-    // For SWAP
+    // For REPLACEMENT
     private Long replacementTeacherId;
 
     // For RESCHEDULE

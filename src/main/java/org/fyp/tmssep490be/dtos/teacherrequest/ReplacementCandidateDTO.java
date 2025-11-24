@@ -6,13 +6,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * DTO for swap candidate teachers
+ * DTO for replacement candidate teachers
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SwapCandidateDTO {
+public class ReplacementCandidateDTO {
     private Long teacherId;
     private String fullName;
     private String email;
@@ -30,4 +30,5 @@ public class SwapCandidateDTO {
         private Short level;  // Nullable level (0-? depending on data)
     }
 }
+
 

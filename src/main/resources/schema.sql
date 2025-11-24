@@ -703,7 +703,7 @@ CREATE TABLE teacher_request (
   CONSTRAINT fk_teacher_request_new_time_slot FOREIGN KEY(new_time_slot_id) REFERENCES time_slot_template(id) ON DELETE SET NULL,
   CONSTRAINT fk_teacher_request_new_resource FOREIGN KEY(new_resource_id) REFERENCES resource(id) ON DELETE SET NULL,
   CONSTRAINT fk_teacher_request_new_session FOREIGN KEY(new_session_id) REFERENCES session(id) ON DELETE SET NULL,
-  CONSTRAINT chk_teacher_request_type CHECK (request_type IN ('SWAP', 'RESCHEDULE', 'MODALITY_CHANGE')),
+  CONSTRAINT chk_teacher_request_type CHECK (request_type IN ('REPLACEMENT', 'RESCHEDULE', 'MODALITY_CHANGE')),
   CONSTRAINT chk_teacher_request_status CHECK (status IN ('PENDING', 'WAITING_CONFIRM', 'APPROVED', 'REJECTED'))
 );
 

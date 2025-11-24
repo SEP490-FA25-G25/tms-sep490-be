@@ -4,6 +4,8 @@ import org.fyp.tmssep490be.dtos.studentattendance.StudentAttendanceOverviewRespo
 import org.fyp.tmssep490be.dtos.studentattendance.StudentAttendanceReportResponseDTO;
 import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
+import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
+import org.fyp.tmssep490be.repositories.EnrollmentRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,8 +30,36 @@ class StudentAttendanceServiceImplTest {
     @MockitoBean
     private StudentSessionRepository studentSessionRepository;
 
+    @MockitoBean
+    private EnrollmentRepository enrollmentRepository;
+
     private static final LocalDate CLASS_START = LocalDate.of(2025, 1, 10);
     private static final LocalDate CLASS_END = LocalDate.of(2025, 3, 30);
+
+    private Enrollment buildEnrollment(Long studentId, Long classId, String classCode, String courseCode) {
+        Course course = new Course();
+        course.setId(1L);
+        course.setCode(courseCode);
+        course.setName("Course " + courseCode);
+
+        ClassEntity classEntity = new ClassEntity();
+        classEntity.setId(classId);
+        classEntity.setCode(classCode);
+        classEntity.setName("Class " + classCode);
+        classEntity.setStartDate(CLASS_START);
+        classEntity.setActualEndDate(CLASS_END);
+        classEntity.setStatus(org.fyp.tmssep490be.entities.enums.ClassStatus.ONGOING);
+        classEntity.setCourse(course);
+
+        Enrollment enrollment = new Enrollment();
+        enrollment.setId(1L);
+        enrollment.setStudentId(studentId);
+        enrollment.setClassId(classId);
+        enrollment.setClassEntity(classEntity);
+        enrollment.setStatus(EnrollmentStatus.ENROLLED);
+
+        return enrollment;
+    }
 
     private Session buildSession(Long id, String classCode) {
         return buildSession(id, classCode, LocalDate.now(), org.fyp.tmssep490be.entities.enums.SessionStatus.PLANNED);
@@ -74,6 +104,13 @@ class StudentAttendanceServiceImplTest {
 
     @Test
     void getOverview_groupsByClass_andAggregates() {
+        // Mock enrollment
+        when(enrollmentRepository.findByStudentIdWithClassAndCourse(anyLong()))
+                .thenReturn(List.of(
+                        buildEnrollment(1L, 100L, "CLS-A", "COURSE-1")
+                ));
+
+        // Mock sessions
         when(studentSessionRepository.findAllByStudentId(anyLong()))
                 .thenReturn(List.of(
                         buildSS(1, buildSession(1L, "CLS-A"), AttendanceStatus.PRESENT),
@@ -123,6 +160,13 @@ class StudentAttendanceServiceImplTest {
                 org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED
         );
 
+        // Mock enrollment
+        when(enrollmentRepository.findByStudentIdWithClassAndCourse(anyLong()))
+                .thenReturn(List.of(
+                        buildEnrollment(2L, 100L, "CLS-B", "COURSE-1")
+                ));
+
+        // Mock sessions
         when(studentSessionRepository.findAllByStudentId(anyLong()))
                 .thenReturn(List.of(
                         buildSS(1, activeSession, AttendanceStatus.PRESENT),
@@ -157,6 +201,49 @@ class StudentAttendanceServiceImplTest {
         assertThat(dto.getSummary().getUpcoming()).isZero();
         assertThat(dto.getSessions()).hasSize(1);
         assertThat(dto.getSessions().get(0).getAttendanceStatus()).isEqualTo(AttendanceStatus.ABSENT);
+    }
+
+    @Test
+    void getOverview_includesClassesWithoutSessions() {
+        // Student enrolled 2 lớp: 1 lớp có sessions, 1 lớp SCHEDULED chưa có sessions
+        Enrollment enrollmentWithSessions = buildEnrollment(1L, 100L, "CLS-ONGOING", "COURSE-1");
+        Enrollment enrollmentNoSessions = buildEnrollment(1L, 200L, "CLS-SCHEDULED", "COURSE-2");
+        enrollmentNoSessions.getClassEntity().setStatus(org.fyp.tmssep490be.entities.enums.ClassStatus.SCHEDULED);
+
+        when(enrollmentRepository.findByStudentIdWithClassAndCourse(anyLong()))
+                .thenReturn(List.of(enrollmentWithSessions, enrollmentNoSessions));
+
+        // Chỉ lớp 100L có sessions
+        when(studentSessionRepository.findAllByStudentId(anyLong()))
+                .thenReturn(List.of(
+                        buildSS(1, buildSession(1L, "CLS-ONGOING"), AttendanceStatus.PRESENT),
+                        buildSS(1, buildSession(2L, "CLS-ONGOING"), AttendanceStatus.ABSENT)
+                ));
+
+        StudentAttendanceOverviewResponseDTO dto = service.getOverview(1L);
+
+        // Phải trả về 2 lớp
+        assertThat(dto.getClasses()).hasSize(2);
+
+        // Lớp có sessions
+        var classWithSessions = dto.getClasses().stream()
+                .filter(c -> c.getClassCode().equals("CLS-ONGOING"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(classWithSessions.getTotalSessions()).isEqualTo(2);
+        assertThat(classWithSessions.getAttended()).isEqualTo(1);
+        assertThat(classWithSessions.getAbsent()).isEqualTo(1);
+
+        // Lớp không có sessions
+        var classNoSessions = dto.getClasses().stream()
+                .filter(c -> c.getClassCode().equals("CLS-SCHEDULED"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(classNoSessions.getTotalSessions()).isZero();
+        assertThat(classNoSessions.getAttended()).isZero();
+        assertThat(classNoSessions.getAbsent()).isZero();
+        assertThat(classNoSessions.getUpcoming()).isZero();
+        assertThat(classNoSessions.getStatus()).isEqualTo("SCHEDULED");
     }
 }
 

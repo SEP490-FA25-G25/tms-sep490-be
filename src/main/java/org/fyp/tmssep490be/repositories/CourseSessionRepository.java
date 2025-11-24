@@ -22,4 +22,11 @@ public interface CourseSessionRepository extends JpaRepository<CourseSession, Lo
      */
     @Query("SELECT COUNT(cs) FROM CourseSession cs WHERE cs.phase.course.id = :courseId")
     long countByCourseId(@Param("courseId") Long courseId);
+
+    // Main branch methods
+    @Query("SELECT cs FROM CourseSession cs WHERE cs.phase.id = :phaseId ORDER BY cs.sequenceNo")
+    List<CourseSession> findByPhaseIdOrderBySequenceNo(@Param("phaseId") Long phaseId);
+
+    @Query("SELECT cs FROM CourseSession cs WHERE cs.phase.course.id = :courseId ORDER BY cs.phase.id, cs.sequenceNo")
+    List<CourseSession> findByCourseIdOrderByPhaseIdAndSequenceNo(@Param("courseId") Long courseId);
 }

@@ -11,8 +11,12 @@ import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.schedule.WeeklyScheduleResponseDTO;
 import org.fyp.tmssep490be.dtos.studentrequest.*;
 import org.fyp.tmssep490be.entities.Student;
+import org.fyp.tmssep490be.entities.UserAccount;
+import org.fyp.tmssep490be.exceptions.BusinessRuleException;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
 import org.fyp.tmssep490be.repositories.StudentRepository;
+import org.fyp.tmssep490be.repositories.UserAccountRepository;
+import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentRequestService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -36,6 +40,8 @@ public class AcademicAffairsRequestController {
 
     private final StudentRequestService studentRequestService;
     private final StudentRepository studentRepository;
+    private final UserBranchesRepository userBranchesRepository;
+    private final UserAccountRepository userAccountRepository;
 
     @GetMapping("/pending")
     @Operation(summary = "Get pending requests for review", description = "Retrieve all pending requests that need Academic Affairs review with filtering and pagination")
@@ -73,8 +79,8 @@ public class AcademicAffairsRequestController {
                 .sort(sort)
                 .build();
 
-        Page<AARequestResponseDTO> requests = studentRequestService.getPendingRequests(filter);
-        RequestSummaryDTO summary = studentRequestService.getRequestSummary(filter);
+        Page<AARequestResponseDTO> requests = studentRequestService.getPendingRequests(currentUser.getId(), filter);
+        RequestSummaryDTO summary = studentRequestService.getRequestSummary(currentUser.getId(), filter);
 
         PagedAARequestResponseDTO response = PagedAARequestResponseDTO.builder()
                 .content(requests.getContent())
@@ -137,9 +143,47 @@ public class AcademicAffairsRequestController {
                 .sort(sort)
                 .build();
 
-        Page<AARequestResponseDTO> requests = studentRequestService.getAllRequests(filter);
+        Page<AARequestResponseDTO> requests = studentRequestService.getAllRequests(currentUser.getId(), filter);
 
         return ResponseEntity.ok(ResponseObject.success("Retrieved all requests successfully", requests));
+    }
+
+    @GetMapping("/staff")
+    @Operation(summary = "Get AA staff list for filters", description = "Get list of Academic Affairs staff in current user's branch(es) for filtering by 'decided by'")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<AAStaffDTO>>> getAAStaffForFilters(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        // Get current user's assigned branches
+        List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(currentUser.getId());
+
+        if (userBranchIds.isEmpty()) {
+            throw new BusinessRuleException("ACCESS_DENIED",
+                "User is not assigned to any branch. Contact administrator.");
+        }
+
+        // Find all AA users in the same branches (using role code "ACADEMIC_AFFAIR")
+        List<UserAccount> aaStaff = userAccountRepository.findByRoleCodeAndBranches("ACADEMIC_AFFAIR", userBranchIds);
+
+        // Map to simplified DTO
+        List<AAStaffDTO> staffList = aaStaff.stream()
+                .map(user -> AAStaffDTO.builder()
+                        .id(user.getId())
+                        .fullName(user.getFullName())
+                        .email(user.getEmail())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved AA staff successfully", staffList));
+    }
+
+    // Simple DTO for AA staff
+    @lombok.Data
+    @lombok.Builder
+    public static class AAStaffDTO {
+        private Long id;
+        private String fullName;
+        private String email;
     }
 
     @GetMapping("/{requestId}")

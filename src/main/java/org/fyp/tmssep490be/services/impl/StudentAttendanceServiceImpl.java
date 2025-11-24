@@ -5,10 +5,13 @@ import org.fyp.tmssep490be.dtos.studentattendance.StudentAttendanceOverviewItemD
 import org.fyp.tmssep490be.dtos.studentattendance.StudentAttendanceOverviewResponseDTO;
 import org.fyp.tmssep490be.dtos.studentattendance.StudentAttendanceReportResponseDTO;
 import org.fyp.tmssep490be.dtos.studentattendance.StudentAttendanceReportSessionDTO;
+import org.fyp.tmssep490be.entities.Enrollment;
 import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
+import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
+import org.fyp.tmssep490be.repositories.EnrollmentRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.fyp.tmssep490be.services.StudentAttendanceService;
 import org.springframework.stereotype.Service;
@@ -22,23 +25,46 @@ import java.util.stream.Collectors;
 public class StudentAttendanceServiceImpl implements StudentAttendanceService {
 
     private final StudentSessionRepository studentSessionRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     @Override
     public StudentAttendanceOverviewResponseDTO getOverview(Long studentId) {
-        List<StudentSession> all = studentSessionRepository.findAllByStudentId(studentId);
-        Map<Long, List<StudentSession>> byClass = all.stream()
-                .collect(Collectors.groupingBy(ss -> ss.getSession().getClassEntity().getId(), LinkedHashMap::new, Collectors.toList()));
+        // 1. Lấy TẤT CẢ enrollments của student (bất kể class status, bất kể có session hay không)
+        List<Enrollment> enrollments = enrollmentRepository.findByStudentIdWithClassAndCourse(studentId);
 
-        List<StudentAttendanceOverviewItemDTO> items = byClass.entrySet().stream()
-                .map(entry -> {
-                    Long clsId = entry.getKey();
-                    List<StudentSession> list = entry.getValue();
-                    List<StudentSession> activeSessions = list.stream()
+        // 2. Lấy tất cả student sessions (để tính attendance)
+        List<StudentSession> allSessions = studentSessionRepository.findAllByStudentId(studentId);
+
+        // 3. Group sessions by classId
+        Map<Long, List<StudentSession>> sessionsByClass = allSessions.stream()
+                .collect(Collectors.groupingBy(ss -> ss.getSession().getClassEntity().getId()));
+
+        // 4. Sort and map enrollments to DTOs (ONGOING first, then SCHEDULED, then COMPLETED)
+        List<StudentAttendanceOverviewItemDTO> items = enrollments.stream()
+                .sorted((e1, e2) -> {
+                    ClassStatus s1 = e1.getClassEntity().getStatus();
+                    ClassStatus s2 = e2.getClassEntity().getStatus();
+                    // Priority: ONGOING=1, SCHEDULED=2, COMPLETED=3, others=4
+                    int p1 = s1 == ClassStatus.ONGOING ? 1 : s1 == ClassStatus.SCHEDULED ? 2 : s1 == ClassStatus.COMPLETED ? 3 : 4;
+                    int p2 = s2 == ClassStatus.ONGOING ? 1 : s2 == ClassStatus.SCHEDULED ? 2 : s2 == ClassStatus.COMPLETED ? 3 : 4;
+                    return Integer.compare(p1, p2);
+                })
+                .map(enrollment -> {
+                    var classEntity = enrollment.getClassEntity();
+                    Long classId = classEntity.getId();
+
+                    // Get sessions for this class (may be empty)
+                    List<StudentSession> classSessions = sessionsByClass.getOrDefault(classId, List.of());
+
+                    // Filter out CANCELLED sessions
+                    List<StudentSession> activeSessions = classSessions.stream()
                             .filter(ss -> {
                                 Session session = ss.getSession();
                                 return session != null && session.getStatus() != SessionStatus.CANCELLED;
                             })
                             .collect(Collectors.toList());
+
+                    // Calculate stats
                     int attended = 0;
                     int absent = 0;
                     int upcoming = 0;
@@ -53,11 +79,9 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
                             case PLANNED -> upcoming++;
                         }
                     }
-                    StudentSession reference = !activeSessions.isEmpty() ? activeSessions.get(0) : list.get(0);
-                    Session anySession = reference.getSession();
-                    var classEntity = anySession.getClassEntity();
+
                     return StudentAttendanceOverviewItemDTO.builder()
-                            .classId(clsId)
+                            .classId(classId)
                             .classCode(classEntity.getCode())
                             .className(classEntity.getName())
                             .courseId(classEntity.getCourse().getId())

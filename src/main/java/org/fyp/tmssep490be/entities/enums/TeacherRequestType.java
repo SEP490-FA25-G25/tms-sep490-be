@@ -1,7 +1,7 @@
 package org.fyp.tmssep490be.entities.enums;
 
 public enum TeacherRequestType {
-    SWAP,
+    REPLACEMENT,
     RESCHEDULE,
     MODALITY_CHANGE
 }

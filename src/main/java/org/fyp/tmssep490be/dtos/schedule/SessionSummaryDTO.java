@@ -28,6 +28,9 @@ public class SessionSummaryDTO {
     @Schema(description = "Student session ID", example = "5001")
     private Long studentSessionId;
 
+    @Schema(description = "Class ID", example = "101")
+    private Long classId;
+
     @Schema(description = "Session date", example = "2025-11-04")
     private LocalDate date;
 

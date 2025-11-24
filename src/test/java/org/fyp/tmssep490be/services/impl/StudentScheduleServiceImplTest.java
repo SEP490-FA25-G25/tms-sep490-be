@@ -5,9 +5,12 @@ import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
+import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
+import org.fyp.tmssep490be.repositories.EnrollmentRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
 import org.fyp.tmssep490be.repositories.StudentRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
+import org.fyp.tmssep490be.repositories.TimeSlotTemplateRepository;
 import org.fyp.tmssep490be.services.StudentScheduleService;
 import org.fyp.tmssep490be.utils.TestDataBuilder;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +50,12 @@ class StudentScheduleServiceImplTest {
 
     @MockitoBean
     private SessionRepository sessionRepository;
+
+    @MockitoBean
+    private EnrollmentRepository enrollmentRepository;
+
+    @MockitoBean
+    private TimeSlotTemplateRepository timeSlotTemplateRepository;
 
     private Student testStudent;
     private List<StudentSession> testStudentSessions;
@@ -241,5 +250,281 @@ class StudentScheduleServiceImplTest {
         // Assert
         assertThat(result).isNotNull();
         assertThat(result.getDayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
+    }
+
+    @Test
+    @DisplayName("Should get time slots from single branch enrollment")
+    void shouldGetTimeSlotsFromSingleBranchEnrollment() {
+        // Arrange
+        Branch branch = TestDataBuilder.buildBranch()
+                .code("BRANCH01")
+                .name("Test Branch")
+                .build();
+        branch.setId(1L);
+
+        ClassEntity classEntity = TestDataBuilder.buildClassEntity()
+                .code("CLASS001")
+                .name("Test Class")
+                .branch(branch)
+                .build();
+        classEntity.setId(1L);
+
+        Enrollment enrollment = Enrollment.builder()
+                .id(1L)
+                .studentId(100L)
+                .classId(1L)
+                .classEntity(classEntity)
+                .status(EnrollmentStatus.ENROLLED)
+                .build();
+
+        TimeSlotTemplate timeSlot1 = TimeSlotTemplate.builder()
+                .id(1L)
+                .branch(branch)
+                .name("Morning 1")
+                .startTime(java.time.LocalTime.of(8, 0))
+                .endTime(java.time.LocalTime.of(10, 0))
+                .build();
+
+        TimeSlotTemplate timeSlot2 = TimeSlotTemplate.builder()
+                .id(2L)
+                .branch(branch)
+                .name("Morning 2")
+                .startTime(java.time.LocalTime.of(10, 0))
+                .endTime(java.time.LocalTime.of(12, 0))
+                .build();
+
+        when(studentRepository.findById(100L)).thenReturn(Optional.of(testStudent));
+        when(enrollmentRepository.findByStudentIdAndStatus(100L, EnrollmentStatus.ENROLLED))
+                .thenReturn(List.of(enrollment));
+        when(timeSlotTemplateRepository.findByBranchIdOrderByStartTimeAsc(1L))
+                .thenReturn(List.of(timeSlot1, timeSlot2));
+        when(studentSessionRepository.findWeeklyScheduleByStudentId(100L, testWeekStart, testWeekEnd))
+                .thenReturn(new ArrayList<>());
+
+        // Act
+        WeeklyScheduleResponseDTO result = studentScheduleService.getWeeklySchedule(100L, testWeekStart);
+
+        // Assert
+        assertThat(result.getTimeSlots()).hasSize(2);
+        assertThat(result.getTimeSlots().get(0).getName()).isEqualTo("Morning 1");
+        assertThat(result.getTimeSlots().get(1).getName()).isEqualTo("Morning 2");
+
+        verify(enrollmentRepository).findByStudentIdAndStatus(100L, EnrollmentStatus.ENROLLED);
+        verify(timeSlotTemplateRepository).findByBranchIdOrderByStartTimeAsc(1L);
+    }
+
+    @Test
+    @DisplayName("Should union time slots from multiple branch enrollments")
+    void shouldUnionTimeSlotsFromMultipleBranches() {
+        // Arrange
+        Branch branch1 = TestDataBuilder.buildBranch()
+                .code("BRANCH01")
+                .name("HN Branch")
+                .build();
+        branch1.setId(1L);
+
+        Branch branch2 = TestDataBuilder.buildBranch()
+                .code("BRANCH02")
+                .name("SG Branch")
+                .build();
+        branch2.setId(2L);
+
+        ClassEntity class1 = TestDataBuilder.buildClassEntity()
+                .code("CLASS001")
+                .name("Test Class 1")
+                .branch(branch1)
+                .build();
+        class1.setId(1L);
+
+        ClassEntity class2 = TestDataBuilder.buildClassEntity()
+                .code("CLASS002")
+                .name("Test Class 2")
+                .branch(branch2)
+                .build();
+        class2.setId(2L);
+
+        Enrollment enrollment1 = Enrollment.builder()
+                .id(1L)
+                .studentId(100L)
+                .classId(1L)
+                .classEntity(class1)
+                .status(EnrollmentStatus.ENROLLED)
+                .build();
+
+        Enrollment enrollment2 = Enrollment.builder()
+                .id(2L)
+                .studentId(100L)
+                .classId(2L)
+                .classEntity(class2)
+                .status(EnrollmentStatus.ENROLLED)
+                .build();
+
+        // Branch 1 time slots
+        TimeSlotTemplate hnMorning = TimeSlotTemplate.builder()
+                .id(1L)
+                .branch(branch1)
+                .name("HN Morning 1")
+                .startTime(java.time.LocalTime.of(8, 0))
+                .endTime(java.time.LocalTime.of(10, 0))
+                .build();
+
+        TimeSlotTemplate hnAfternoon = TimeSlotTemplate.builder()
+                .id(2L)
+                .branch(branch1)
+                .name("HN Afternoon 1")
+                .startTime(java.time.LocalTime.of(14, 0))
+                .endTime(java.time.LocalTime.of(16, 0))
+                .build();
+
+        // Branch 2 time slots (including one with same time range as branch 1)
+        TimeSlotTemplate sgMorning = TimeSlotTemplate.builder()
+                .id(3L)
+                .branch(branch2)
+                .name("SG Morning 1")
+                .startTime(java.time.LocalTime.of(8, 0))
+                .endTime(java.time.LocalTime.of(10, 0))
+                .build();
+
+        TimeSlotTemplate sgEvening = TimeSlotTemplate.builder()
+                .id(4L)
+                .branch(branch2)
+                .name("SG Evening 1")
+                .startTime(java.time.LocalTime.of(18, 0))
+                .endTime(java.time.LocalTime.of(20, 0))
+                .build();
+
+        when(studentRepository.findById(100L)).thenReturn(Optional.of(testStudent));
+        when(enrollmentRepository.findByStudentIdAndStatus(100L, EnrollmentStatus.ENROLLED))
+                .thenReturn(List.of(enrollment1, enrollment2));
+        when(timeSlotTemplateRepository.findByBranchIdOrderByStartTimeAsc(1L))
+                .thenReturn(List.of(hnMorning, hnAfternoon));
+        when(timeSlotTemplateRepository.findByBranchIdOrderByStartTimeAsc(2L))
+                .thenReturn(List.of(sgMorning, sgEvening));
+        when(studentSessionRepository.findWeeklyScheduleByStudentId(100L, testWeekStart, testWeekEnd))
+                .thenReturn(new ArrayList<>());
+
+        // Act
+        WeeklyScheduleResponseDTO result = studentScheduleService.getWeeklySchedule(100L, testWeekStart);
+
+        // Assert
+        assertThat(result.getTimeSlots()).hasSize(3); // 4 time slots but 2 with same time range merged into 1
+
+        // Check that time slots are sorted by start time
+        assertThat(result.getTimeSlots().get(0).getStartTime()).isEqualTo(java.time.LocalTime.of(8, 0));
+        assertThat(result.getTimeSlots().get(1).getStartTime()).isEqualTo(java.time.LocalTime.of(14, 0));
+        assertThat(result.getTimeSlots().get(2).getStartTime()).isEqualTo(java.time.LocalTime.of(18, 0));
+
+        // Check that same time range is merged (8:00-10:00 from both branches)
+        assertThat(result.getTimeSlots().get(0).getName()).contains("Morning 1");
+
+        verify(enrollmentRepository).findByStudentIdAndStatus(100L, EnrollmentStatus.ENROLLED);
+        verify(timeSlotTemplateRepository).findByBranchIdOrderByStartTimeAsc(1L);
+        verify(timeSlotTemplateRepository).findByBranchIdOrderByStartTimeAsc(2L);
+    }
+
+    @Test
+    @DisplayName("Should merge duplicate time slots with same time range")
+    void shouldMergeDuplicateTimeSlotsWithSameTimeRange() {
+        // Arrange
+        Branch branch1 = TestDataBuilder.buildBranch()
+                .code("BRANCH01")
+                .name("HN Branch")
+                .build();
+        branch1.setId(1L);
+
+        Branch branch2 = TestDataBuilder.buildBranch()
+                .code("BRANCH02")
+                .name("SG Branch")
+                .build();
+        branch2.setId(2L);
+
+        ClassEntity class1 = TestDataBuilder.buildClassEntity()
+                .code("CLASS001")
+                .name("Test Class 1")
+                .branch(branch1)
+                .build();
+        class1.setId(1L);
+
+        ClassEntity class2 = TestDataBuilder.buildClassEntity()
+                .code("CLASS002")
+                .name("Test Class 2")
+                .branch(branch2)
+                .build();
+        class2.setId(2L);
+
+        Enrollment enrollment1 = Enrollment.builder()
+                .id(1L)
+                .studentId(100L)
+                .classId(1L)
+                .classEntity(class1)
+                .status(EnrollmentStatus.ENROLLED)
+                .build();
+
+        Enrollment enrollment2 = Enrollment.builder()
+                .id(2L)
+                .studentId(100L)
+                .classId(2L)
+                .classEntity(class2)
+                .status(EnrollmentStatus.ENROLLED)
+                .build();
+
+        // Both branches have same time range but different names
+        TimeSlotTemplate hnMorning = TimeSlotTemplate.builder()
+                .id(1L)
+                .branch(branch1)
+                .name("HN Morning 1")
+                .startTime(java.time.LocalTime.of(8, 0))
+                .endTime(java.time.LocalTime.of(10, 0))
+                .build();
+
+        TimeSlotTemplate sgMorning = TimeSlotTemplate.builder()
+                .id(2L)
+                .branch(branch2)
+                .name("SG Morning 1")
+                .startTime(java.time.LocalTime.of(8, 0))
+                .endTime(java.time.LocalTime.of(10, 0))
+                .build();
+
+        when(studentRepository.findById(100L)).thenReturn(Optional.of(testStudent));
+        when(enrollmentRepository.findByStudentIdAndStatus(100L, EnrollmentStatus.ENROLLED))
+                .thenReturn(List.of(enrollment1, enrollment2));
+        when(timeSlotTemplateRepository.findByBranchIdOrderByStartTimeAsc(1L))
+                .thenReturn(List.of(hnMorning));
+        when(timeSlotTemplateRepository.findByBranchIdOrderByStartTimeAsc(2L))
+                .thenReturn(List.of(sgMorning));
+        when(studentSessionRepository.findWeeklyScheduleByStudentId(100L, testWeekStart, testWeekEnd))
+                .thenReturn(new ArrayList<>());
+
+        // Act
+        WeeklyScheduleResponseDTO result = studentScheduleService.getWeeklySchedule(100L, testWeekStart);
+
+        // Assert
+        assertThat(result.getTimeSlots()).hasSize(1); // Merged into 1
+        assertThat(result.getTimeSlots().get(0).getStartTime()).isEqualTo(java.time.LocalTime.of(8, 0));
+        assertThat(result.getTimeSlots().get(0).getEndTime()).isEqualTo(java.time.LocalTime.of(10, 0));
+        // Name should contain both branch names merged
+        assertThat(result.getTimeSlots().get(0).getName()).containsAnyOf("HN Morning 1", "SG Morning 1");
+
+        verify(enrollmentRepository).findByStudentIdAndStatus(100L, EnrollmentStatus.ENROLLED);
+        verify(timeSlotTemplateRepository).findByBranchIdOrderByStartTimeAsc(1L);
+        verify(timeSlotTemplateRepository).findByBranchIdOrderByStartTimeAsc(2L);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when student has no active enrollments")
+    void shouldThrowExceptionWhenNoActiveEnrollments() {
+        // Arrange
+        when(studentRepository.findById(100L)).thenReturn(Optional.of(testStudent));
+        when(enrollmentRepository.findByStudentIdAndStatus(100L, EnrollmentStatus.ENROLLED))
+                .thenReturn(new ArrayList<>());
+
+        // Act & Assert
+        assertThatThrownBy(() -> studentScheduleService.getWeeklySchedule(100L, testWeekStart))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.STUDENT_NOT_ENROLLED_IN_CLASS.getMessage());
+
+        verify(studentRepository).findById(100L);
+        verify(enrollmentRepository).findByStudentIdAndStatus(100L, EnrollmentStatus.ENROLLED);
+        verify(timeSlotTemplateRepository, never()).findByBranchIdOrderByStartTimeAsc(any());
     }
 }

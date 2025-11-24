@@ -39,7 +39,7 @@ public class TeacherRequestListDTO {
     private String teacherName;
     private String teacherEmail;
 
-    // Replacement teacher (for SWAP)
+    // Replacement teacher (for REPLACEMENT)
     private String replacementTeacherName;
 
     // Proposed schedule (for RESCHEDULE)

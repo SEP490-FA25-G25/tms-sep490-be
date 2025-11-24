@@ -26,6 +26,12 @@ public class MakeupInfoDTO {
     @Schema(description = "Date of the original session", example = "2025-10-28")
     private LocalDate originalDate;
 
+    @Schema(description = "Start time of the original session", example = "15:30")
+    private String originalStartTime;
+
+    @Schema(description = "End time of the original session", example = "17:30")
+    private String originalEndTime;
+
     @Schema(description = "Status of the original session", example = "CANCELLED")
     private SessionStatus originalStatus;
 

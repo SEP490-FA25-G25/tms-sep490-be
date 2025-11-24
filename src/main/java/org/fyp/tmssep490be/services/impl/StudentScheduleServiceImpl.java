@@ -6,9 +6,12 @@ import org.fyp.tmssep490be.dtos.schedule.*;
 import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
+import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
+import org.fyp.tmssep490be.repositories.EnrollmentRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
 import org.fyp.tmssep490be.repositories.StudentRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
+import org.fyp.tmssep490be.repositories.TimeSlotTemplateRepository;
 import org.fyp.tmssep490be.services.StudentScheduleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,6 +32,8 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
     private final StudentRepository studentRepository;
     private final StudentSessionRepository studentSessionRepository;
     private final SessionRepository sessionRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final TimeSlotTemplateRepository timeSlotTemplateRepository;
 
     @Override
     public WeeklyScheduleResponseDTO getWeeklySchedule(Long studentId, LocalDate weekStart) {
@@ -51,13 +57,8 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
 
         log.debug("Found {} sessions for week {} to {}", studentSessions.size(), weekStart, weekEnd);
 
-        // 5. Extract unique timeslots
-        List<TimeSlotTemplate> timeSlots = studentSessions.stream()
-                .map(ss -> ss.getSession().getTimeSlotTemplate())
-                .filter(Objects::nonNull)
-                .distinct()
-                .sorted(Comparator.comparing(TimeSlotTemplate::getStartTime))
-                .toList();
+        // 5. Get all time slots from all branches with active enrollments (Union + Merge)
+        List<TimeSlotDTO> timeSlots = getAllTimeSlotsForStudent(studentId);
 
         // 6. Group by day of week
         Map<DayOfWeek, List<SessionSummaryDTO>> scheduleMap = studentSessions.stream()
@@ -77,7 +78,7 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
                 .weekEnd(weekEnd)
                 .studentId(student.getId())
                 .studentName(student.getUserAccount().getFullName())
-                .timeSlots(timeSlots.stream().map(this::mapToTimeSlotDTO).toList())
+                .timeSlots(timeSlots)
                 .schedule(scheduleMap)
                 .build();
     }
@@ -105,13 +106,8 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
         log.debug("Found {} sessions for student {} in class {} for week {} to {}",
                 studentSessions.size(), studentId, classId, weekStart, weekEnd);
 
-        // 5. Extract unique timeslots
-        List<TimeSlotTemplate> timeSlots = studentSessions.stream()
-                .map(ss -> ss.getSession().getTimeSlotTemplate())
-                .filter(Objects::nonNull)
-                .distinct()
-                .sorted(Comparator.comparing(TimeSlotTemplate::getStartTime))
-                .toList();
+        // 5. Get all time slots from all branches with active enrollments (Union + Merge)
+        List<TimeSlotDTO> timeSlots = getAllTimeSlotsForStudent(studentId);
 
         // 6. Group by day of week
         Map<DayOfWeek, List<SessionSummaryDTO>> scheduleMap = studentSessions.stream()
@@ -131,7 +127,7 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
                 .weekEnd(weekEnd)
                 .studentId(student.getId())
                 .studentName(student.getUserAccount().getFullName())
-                .timeSlots(timeSlots.stream().map(this::mapToTimeSlotDTO).toList())
+                .timeSlots(timeSlots)
                 .schedule(scheduleMap)
                 .build();
     }
@@ -154,6 +150,86 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
         return today.minusDays(today.getDayOfWeek().getValue() - 1);
     }
 
+    /**
+     * Get all time slots for a student by unioning time slots from all branches
+     * where the student has active enrollments, then merging duplicates by time range
+     */
+    private List<TimeSlotDTO> getAllTimeSlotsForStudent(Long studentId) {
+        log.debug("Getting all time slots for student: {}", studentId);
+
+        // 1. Get all active enrollments for student
+        List<Enrollment> activeEnrollments = enrollmentRepository
+                .findByStudentIdAndStatus(studentId, EnrollmentStatus.ENROLLED);
+
+        if (activeEnrollments.isEmpty()) {
+            log.warn("Student {} has no active enrollments", studentId);
+            throw new CustomException(ErrorCode.STUDENT_NOT_ENROLLED_IN_CLASS);
+        }
+
+        // 2. Extract unique branch IDs from enrollments
+        Set<Long> branchIds = activeEnrollments.stream()
+                .map(e -> e.getClassEntity().getBranch().getId())
+                .collect(Collectors.toSet());
+
+        log.debug("Student {} has active enrollments in {} branches", studentId, branchIds.size());
+
+        // 3. Union time slots from all branches
+        List<TimeSlotTemplate> allTimeSlots = branchIds.stream()
+                .flatMap(branchId -> timeSlotTemplateRepository
+                        .findByBranchIdOrderByStartTimeAsc(branchId).stream())
+                .collect(Collectors.toList());
+
+        // 4. Group by TimeRange (startTime, endTime) to merge duplicates
+        Map<TimeRange, List<TimeSlotTemplate>> groupedByTimeRange = allTimeSlots.stream()
+                .collect(Collectors.groupingBy(
+                        ts -> new TimeRange(ts.getStartTime(), ts.getEndTime())
+                ));
+
+        // 5. Merge duplicates and build DTOs
+        List<TimeSlotDTO> mergedTimeSlots = groupedByTimeRange.entrySet().stream()
+                .map(entry -> {
+                    TimeRange timeRange = entry.getKey();
+                    List<TimeSlotTemplate> slots = entry.getValue();
+
+                    // If multiple time slots with same time range, merge their names
+                    String mergedName;
+                    Long timeSlotTemplateId;
+                    if (slots.size() == 1) {
+                        TimeSlotTemplate slot = slots.get(0);
+                        mergedName = slot.getName();
+                        timeSlotTemplateId = slot.getId();
+                    } else {
+                        // Merge names from different branches (e.g., "HN Morning 1 / SG Morning 1")
+                        mergedName = slots.stream()
+                                .map(TimeSlotTemplate::getName)
+                                .distinct()
+                                .collect(Collectors.joining(" / "));
+                        timeSlotTemplateId = slots.get(0).getId(); // Use first one as representative
+                    }
+
+                    return TimeSlotDTO.builder()
+                            .timeSlotTemplateId(timeSlotTemplateId)
+                            .name(mergedName)
+                            .startTime(timeRange.getStartTime())
+                            .endTime(timeRange.getEndTime())
+                            .build();
+                })
+                .sorted(Comparator.comparing(TimeSlotDTO::getStartTime))
+                .collect(Collectors.toList());
+
+        log.debug("Merged {} unique time slots for student {}", mergedTimeSlots.size(), studentId);
+        return mergedTimeSlots;
+    }
+
+    /**
+     * Helper class to group time slots by time range (startTime, endTime)
+     */
+    @lombok.Value
+    private static class TimeRange {
+        LocalTime startTime;
+        LocalTime endTime;
+    }
+
     private SessionSummaryDTO mapToSessionSummaryDTO(StudentSession studentSession) {
         Session session = studentSession.getSession();
         ClassEntity classEntity = session.getClassEntity();
@@ -168,6 +244,7 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
         return SessionSummaryDTO.builder()
                 .sessionId(session.getId())
                 .studentSessionId(studentSession.getId().getSessionId())
+                .classId(classEntity.getId())
                 .date(session.getDate())
                 .dayOfWeek(session.getDate().getDayOfWeek())
                 .timeSlotTemplateId(timeSlot != null ? timeSlot.getId() : null)

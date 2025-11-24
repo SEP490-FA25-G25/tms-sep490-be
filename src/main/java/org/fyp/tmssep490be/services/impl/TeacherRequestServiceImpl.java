@@ -3,9 +3,9 @@ package org.fyp.tmssep490be.services.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.teacherrequest.ModalityResourceSuggestionDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.RescheduleResourceSuggestionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.RescheduleSlotSuggestionDTO;
-import org.fyp.tmssep490be.dtos.teacherrequest.SwapCandidateDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestApproveDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestCreateDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestListDTO;
@@ -297,9 +297,9 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         } else if (request.getRequestType() == TeacherRequestType.RESCHEDULE) {
             approveReschedule(request, approveDTO, userAccount);
             request.setStatus(RequestStatus.APPROVED);
-        } else if (request.getRequestType() == TeacherRequestType.SWAP) {
-            approveSwap(request, approveDTO, userAccount);
-            // SWAP status = WAITING_CONFIRM (chờ replacement teacher confirm)
+        } else if (request.getRequestType() == TeacherRequestType.REPLACEMENT) {
+            approveReplacement(request, approveDTO, userAccount);
+            // REPLACEMENT status = WAITING_CONFIRM (chờ replacement teacher confirm)
             request.setStatus(RequestStatus.WAITING_CONFIRM);
         } else {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
@@ -922,11 +922,11 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
     }
 
     /**
-     * Approve SWAP request
+     * Approve REPLACEMENT request
      * - Staff can override replacement teacher
      * - Status = WAITING_CONFIRM (chờ replacement teacher confirm)
      */
-    private void approveSwap(TeacherRequest request, TeacherRequestApproveDTO approveDTO, UserAccount decidedBy) {
+    private void approveReplacement(TeacherRequest request, TeacherRequestApproveDTO approveDTO, UserAccount decidedBy) {
         Session session = sessionRepository.findById(request.getSession().getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.SESSION_NOT_FOUND));
 
@@ -943,7 +943,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
             replacementTeacher = request.getReplacementTeacher();
         } else {
             // Cả hai đều null -> không thể approve
-            // Với SWAP, phải có ít nhất một replacement teacher (từ teacher hoặc staff)
+            // Với REPLACEMENT, phải có ít nhất một replacement teacher (từ teacher hoặc staff)
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
@@ -967,7 +967,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         // Set replacement teacher
         request.setReplacementTeacher(replacementTeacher);
 
-        log.info("Swap approved: Replacement teacher {} will replace teacher {} for session {}", 
+        log.info("Replacement approved: Replacement teacher {} will replace teacher {} for session {}", 
                 replacementTeacher.getId(), request.getTeacher().getId(), session.getId());
     }
 
@@ -1191,7 +1191,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
                         .replacementTeacherName(null)
                         .replacementTeacherEmail(null);
                 break;
-            case SWAP:
+            case REPLACEMENT:
                 // Cần replacementTeacherId, replacementTeacherName, replacementTeacherEmail
                 builder.replacementTeacherId(replacementTeacher != null ? replacementTeacher.getId() : null)
                         .replacementTeacherName(replacementTeacherAccount != null ? replacementTeacherAccount.getFullName() : null)
@@ -1364,8 +1364,8 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SwapCandidateDTO> suggestSwapCandidates(Long sessionId, Long userId) {
-        log.info("Suggesting swap candidates for session {} by user {}", sessionId, userId);
+    public List<ReplacementCandidateDTO> suggestReplacementCandidates(Long sessionId, Long userId) {
+        log.info("Suggesting replacement candidates for session {} by user {}", sessionId, userId);
 
         // 1. Get teacher from user account
         Teacher currentTeacher = teacherRepository.findByUserAccountId(userId)
@@ -1384,15 +1384,15 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
             throw new CustomException(ErrorCode.TIMESLOT_NOT_FOUND);
         }
 
-        // 3. Get declined teachers for this session (teachers who have declined swap requests for this session)
-        List<TeacherRequest> swapRequestsForSession = teacherRequestRepository.findAll().stream()
+        // 3. Get declined teachers for this session (teachers who have declined replacement requests for this session)
+        List<TeacherRequest> replacementRequestsForSession = teacherRequestRepository.findAll().stream()
                 .filter(tr -> tr.getSession() != null && tr.getSession().getId().equals(sessionId))
-                .filter(tr -> tr.getRequestType() == TeacherRequestType.SWAP)
+                .filter(tr -> tr.getRequestType() == TeacherRequestType.REPLACEMENT)
                 .filter(tr -> tr.getNote() != null && tr.getNote().contains("DECLINED_BY_TEACHER_ID_"))
                 .collect(Collectors.toList());
 
         java.util.Set<Long> declinedTeacherIds = new java.util.HashSet<>();
-        for (TeacherRequest tr : swapRequestsForSession) {
+        for (TeacherRequest tr : replacementRequestsForSession) {
             String note = tr.getNote();
             if (note != null && note.contains("DECLINED_BY_TEACHER_ID_")) {
                 // Parse teacher ID from note: "DECLINED_BY_TEACHER_ID_{teacherId}: {reason}"
@@ -1432,7 +1432,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
         // 6. Map to candidates with priority calculation
         final Long sessionTimeSlotId = sessionTimeSlot.getId();
-        List<SwapCandidateDTO> candidates = allTeachers.stream()
+        List<ReplacementCandidateDTO> candidates = allTeachers.stream()
                 .map(teacher -> {
                     UserAccount teacherAccount = teacher.getUserAccount();
                     boolean hasConflict = hasTeacherConflict(teacher.getId(), session.getDate(), 
@@ -1440,7 +1440,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
                     List<TeacherSkill> teacherSkills = teacherSkillsMap.getOrDefault(
                             teacher.getId(), List.of());
-                    List<SwapCandidateDTO.SkillDetail> skillDetails = teacherSkills.stream()
+                    List<ReplacementCandidateDTO.SkillDetail> skillDetails = teacherSkills.stream()
                             .map(skill -> {
                                 TeacherSkill.TeacherSkillId id = skill.getId();
                                 String skillName = id != null && id.getSkill() != null
@@ -1449,13 +1449,13 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
                                 if (skillName == null) {
                                     return null;
                                 }
-                                return SwapCandidateDTO.SkillDetail.builder()
+                                return ReplacementCandidateDTO.SkillDetail.builder()
                                         .skill(skillName)
                                         .level(skill.getLevel())
                                         .build();
                             })
                             .filter(Objects::nonNull)
-                            .sorted(Comparator.comparing(SwapCandidateDTO.SkillDetail::getSkill))
+                            .sorted(Comparator.comparing(ReplacementCandidateDTO.SkillDetail::getSkill))
                             .collect(Collectors.toList());
 
                     // Simple skill priority: teacher has skills = 1, no skills = 0
@@ -1465,7 +1465,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
                     // Availability priority: no conflict = 1, has conflict = 0
                     int availabilityPriority = hasConflict ? 0 : 1;
 
-                    return SwapCandidateDTO.builder()
+                    return ReplacementCandidateDTO.builder()
                             .teacherId(teacher.getId())
                             .fullName(teacherAccount != null ? teacherAccount.getFullName() : null)
                             .email(teacherAccount != null ? teacherAccount.getEmail() : null)
@@ -1494,14 +1494,14 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SwapCandidateDTO> suggestSwapCandidatesForStaff(Long requestId) {
-        log.info("Suggesting swap candidates for request {} by staff", requestId);
+    public List<ReplacementCandidateDTO> suggestReplacementCandidatesForStaff(Long requestId) {
+        log.info("Suggesting replacement candidates for request {} by staff", requestId);
 
         // 1. Get request and validate
         TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND));
 
-        if (request.getRequestType() != TeacherRequestType.SWAP) {
+        if (request.getRequestType() != TeacherRequestType.REPLACEMENT) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
@@ -1538,14 +1538,14 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         }
 
         // 3. Get declined teachers for this session
-        List<TeacherRequest> swapRequestsForSession = teacherRequestRepository.findAll().stream()
+        List<TeacherRequest> replacementRequestsForSession = teacherRequestRepository.findAll().stream()
                 .filter(tr -> tr.getSession() != null && tr.getSession().getId().equals(session.getId()))
-                .filter(tr -> tr.getRequestType() == TeacherRequestType.SWAP)
+                .filter(tr -> tr.getRequestType() == TeacherRequestType.REPLACEMENT)
                 .filter(tr -> tr.getNote() != null && tr.getNote().contains("DECLINED_BY_TEACHER_ID_"))
                 .collect(Collectors.toList());
 
         Set<Long> declinedTeacherIds = new HashSet<>();
-        for (TeacherRequest tr : swapRequestsForSession) {
+        for (TeacherRequest tr : replacementRequestsForSession) {
             String note = tr.getNote();
             if (note != null && note.contains("DECLINED_BY_TEACHER_ID_")) {
                 try {
@@ -1591,7 +1591,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
         // 7. Map to candidates with priority calculation
         final Long sessionTimeSlotId = sessionTimeSlot.getId();
-        List<SwapCandidateDTO> candidates = allTeachers.stream()
+        List<ReplacementCandidateDTO> candidates = allTeachers.stream()
                 .map(teacher -> {
                     UserAccount teacherAccount = teacher.getUserAccount();
                     boolean hasConflict = hasTeacherConflict(teacher.getId(), session.getDate(), 
@@ -1599,7 +1599,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
                     List<TeacherSkill> teacherSkills = teacherSkillsMap.getOrDefault(
                             teacher.getId(), List.of());
-                    List<SwapCandidateDTO.SkillDetail> skillDetails = teacherSkills.stream()
+                    List<ReplacementCandidateDTO.SkillDetail> skillDetails = teacherSkills.stream()
                             .map(skill -> {
                                 TeacherSkill.TeacherSkillId id = skill.getId();
                                 String skillName = id != null && id.getSkill() != null
@@ -1608,19 +1608,19 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
                                 if (skillName == null) {
                                     return null;
                                 }
-                                return SwapCandidateDTO.SkillDetail.builder()
+                                return ReplacementCandidateDTO.SkillDetail.builder()
                                         .skill(skillName)
                                         .level(skill.getLevel())
                                         .build();
                             })
                             .filter(Objects::nonNull)
-                            .sorted(Comparator.comparing(SwapCandidateDTO.SkillDetail::getSkill))
+                            .sorted(Comparator.comparing(ReplacementCandidateDTO.SkillDetail::getSkill))
                             .collect(Collectors.toList());
 
                     int skillPriority = skillDetails.isEmpty() ? 0 : 1;
                     int availabilityPriority = hasConflict ? 0 : 1;
 
-                    return SwapCandidateDTO.builder()
+                    return ReplacementCandidateDTO.builder()
                             .teacherId(teacher.getId())
                             .fullName(teacherAccount != null ? teacherAccount.getFullName() : null)
                             .email(teacherAccount != null ? teacherAccount.getEmail() : null)
@@ -1666,14 +1666,14 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
     @Override
     @Transactional
-    public TeacherRequestResponseDTO confirmSwap(Long requestId, Long userId) {
-        log.info("Confirming swap request {} by replacement teacher {}", requestId, userId);
+    public TeacherRequestResponseDTO confirmReplacement(Long requestId, Long userId) {
+        log.info("Confirming replacement request {} by replacement teacher {}", requestId, userId);
 
         TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND));
 
         // Validate request type
-        if (request.getRequestType() != TeacherRequestType.SWAP) {
+        if (request.getRequestType() != TeacherRequestType.REPLACEMENT) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
 
@@ -1727,20 +1727,20 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         request.setDecidedAt(OffsetDateTime.now());
         request = teacherRequestRepository.save(request);
 
-        log.info("Swap request {} confirmed successfully", requestId);
+        log.info("Replacement request {} confirmed successfully", requestId);
         return mapToResponseDTO(request);
     }
 
     @Override
     @Transactional
-    public TeacherRequestResponseDTO declineSwap(Long requestId, String reason, Long userId) {
-        log.info("Declining swap request {} by replacement teacher {}", requestId, userId);
+    public TeacherRequestResponseDTO declineReplacement(Long requestId, String reason, Long userId) {
+        log.info("Declining replacement request {} by replacement teacher {}", requestId, userId);
 
         TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND));
 
         // Validate request type
-        if (request.getRequestType() != TeacherRequestType.SWAP) {
+        if (request.getRequestType() != TeacherRequestType.REPLACEMENT) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
 
@@ -1768,7 +1768,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         request.setDecidedAt(OffsetDateTime.now());
         request = teacherRequestRepository.save(request);
 
-        log.info("Swap request {} declined, status reset to PENDING", requestId);
+        log.info("Replacement request {} declined, status reset to PENDING", requestId);
         return mapToResponseDTO(request);
     }
 

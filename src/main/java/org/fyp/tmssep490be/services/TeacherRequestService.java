@@ -108,34 +108,34 @@ public interface TeacherRequestService {
     List<TeacherSessionDTO> getMySessions(Long userId, java.time.LocalDate date);
 
     /**
-     * Suggest swap candidate teachers for a session
+     * Suggest replacement candidate teachers for a session
      * @param sessionId Session ID to find replacement for
      * @param userId Current authenticated user ID
      * @return List of candidate teachers sorted by priority
      */
-    List<SwapCandidateDTO> suggestSwapCandidates(Long sessionId, Long userId);
+    List<ReplacementCandidateDTO> suggestReplacementCandidates(Long sessionId, Long userId);
 
     /**
-     * Suggest swap candidate teachers for a request (Staff only)
+     * Suggest replacement candidate teachers for a request (Staff only)
      * @param requestId Request ID to find replacement for
      * @return List of candidate teachers sorted by priority
      */
-    List<SwapCandidateDTO> suggestSwapCandidatesForStaff(Long requestId);
+    List<ReplacementCandidateDTO> suggestReplacementCandidatesForStaff(Long requestId);
 
     /**
-     * Confirm swap request (Replacement Teacher only)
+     * Confirm replacement request (Replacement Teacher only)
      * @param requestId Request ID
      * @param userId Current authenticated replacement teacher user ID
      * @return Confirmed teacher request
      */
-    TeacherRequestResponseDTO confirmSwap(Long requestId, Long userId);
+    TeacherRequestResponseDTO confirmReplacement(Long requestId, Long userId);
 
     /**
-     * Decline swap request (Replacement Teacher only)
+     * Decline replacement request (Replacement Teacher only)
      * @param requestId Request ID
      * @param reason Decline reason
      * @param userId Current authenticated replacement teacher user ID
      * @return Declined teacher request
      */
-    TeacherRequestResponseDTO declineSwap(Long requestId, String reason, Long userId);
+    TeacherRequestResponseDTO declineReplacement(Long requestId, String reason, Long userId);
 }

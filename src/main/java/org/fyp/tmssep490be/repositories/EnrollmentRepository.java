@@ -102,4 +102,35 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
      * Find enrollment by student and class (without status filter)
      */
     Enrollment findByStudentIdAndClassId(Long studentId, Long classId);
+
+    /**
+     * Find enrollment by student and course and status
+     */
+    @Query("SELECT e FROM Enrollment e " +
+           "WHERE e.studentId = :studentId " +
+           "AND e.classEntity.course.id = :courseId " +
+           "AND e.status = :status")
+    Enrollment findByStudentIdAndCourseIdAndStatus(
+            @Param("studentId") Long studentId,
+            @Param("courseId") Long courseId,
+            @Param("status") EnrollmentStatus status
+    );
+
+    /**
+     * Find enrollments by student ID and status
+     */
+    List<Enrollment> findByStudentIdAndStatus(Long studentId, EnrollmentStatus status);
+
+    /**
+     * Find all enrollments by student ID with eager fetch of Class and Course
+     * Excludes CANCELLED enrollments to show only active/historical classes
+     */
+    @Query("""
+        SELECT e FROM Enrollment e
+        JOIN FETCH e.classEntity c
+        JOIN FETCH c.course
+        WHERE e.studentId = :studentId
+        AND e.status != 'CANCELLED'
+        """)
+    List<Enrollment> findByStudentIdWithClassAndCourse(@Param("studentId") Long studentId);
 }

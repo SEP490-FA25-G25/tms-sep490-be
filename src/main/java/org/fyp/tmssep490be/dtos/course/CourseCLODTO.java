@@ -12,7 +12,17 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CourseCLODTO {
+    private Long id;
     private String code;
     private String description;
+
+    // HEAD fields
     private List<String> mappedPLOs; // List of PLO codes
+
+    // Main fields
+    private String competencyLevel;
+    private List<String> assessmentMethods;
+    private List<CoursePLODTO> relatedPLOs;
+    private Boolean isAchieved;
+    private Double achievementRate;
 }

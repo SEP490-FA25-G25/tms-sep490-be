@@ -1,8 +1,8 @@
 package org.fyp.tmssep490be.services;
 
 import org.fyp.tmssep490be.dtos.common.CourseDTO;
-import org.fyp.tmssep490be.dtos.course.CourseDetailDTO;
-import org.fyp.tmssep490be.dtos.course.CreateCourseRequestDTO;
+import org.fyp.tmssep490be.dtos.course.*;
+
 import java.util.List;
 
 /**
@@ -22,4 +22,19 @@ public interface CourseService {
     CourseDetailDTO getCourseDetails(Long id);
 
     void updateCourse(Long id, CreateCourseRequestDTO request);
+
+    // Student/View methods
+    List<StudentCourseDTO> getStudentCourses(Long studentId);
+
+    List<StudentCourseDTO> getStudentCoursesByUserId(Long userId);
+
+    CourseDetailDTO getCourseDetail(Long courseId);
+
+    CourseDetailDTO getCourseSyllabus(Long courseId);
+
+    MaterialHierarchyDTO getCourseMaterials(Long courseId, Long studentId);
+
+    List<CoursePLODTO> getCoursePLOs(Long courseId);
+
+    List<CourseCLODTO> getCourseCLOs(Long courseId);
 }

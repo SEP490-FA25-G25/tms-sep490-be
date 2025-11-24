@@ -44,4 +44,9 @@ public interface StudentService {
             Pageable pageable,
             Long userId
     );
+
+  /**
+     * Get current student's own profile information
+     */
+    StudentProfileDTO getMyProfile(Long userAccountId);
 }

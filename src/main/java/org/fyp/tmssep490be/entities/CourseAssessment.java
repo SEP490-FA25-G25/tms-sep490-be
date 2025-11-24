@@ -23,7 +23,7 @@ public class CourseAssessment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
@@ -40,9 +40,14 @@ public class CourseAssessment {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false)
+    @ElementCollection
     @Enumerated(EnumType.STRING)
-    private Skill[] skills;
+    @CollectionTable(
+        name = "course_assessment_skills",
+        joinColumns = @JoinColumn(name = "course_assessment_id")
+    )
+    @Column(name = "skill")
+    private Set<Skill> skills;
 
     @Column(name = "max_score", nullable = false, precision = 5, scale = 2)
     private BigDecimal maxScore;

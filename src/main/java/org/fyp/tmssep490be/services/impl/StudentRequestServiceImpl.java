@@ -14,17 +14,22 @@ import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.StudentRequestService;
 import org.fyp.tmssep490be.services.StudentScheduleService;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import static org.fyp.tmssep490be.repositories.StudentRequestRepository.*;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -42,6 +47,7 @@ public class StudentRequestServiceImpl implements StudentRequestService {
     private final EnrollmentRepository enrollmentRepository;
     private final StudentSessionRepository studentSessionRepository;
     private final UserAccountRepository userAccountRepository;
+    private final UserBranchesRepository userBranchesRepository;
     private final StudentScheduleService studentScheduleService;
 
     // Configuration values (in real implementation, these would come from properties)
@@ -55,16 +61,100 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         Student student = studentRepository.findByUserAccountId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
 
-        List<RequestStatus> statuses = filter.getStatus() != null ?
-                List.of(RequestStatus.valueOf(filter.getStatus())) :
-                List.of(RequestStatus.values());
+        // Build dynamic specification
+        Specification<StudentRequest> spec = Specification.where(null);
 
-        Sort sort = Sort.by(Sort.Direction.fromString(filter.getSort().split(",")[1]),
-                filter.getSort().split(",")[0]);
+        // Always filter by student ID
+        spec = spec.and(hasStudentId(student.getId()));
+
+        // Add search filter if provided
+        if (filter.getSearch() != null && !filter.getSearch().trim().isEmpty()) {
+            spec = spec.and(hasSearchTerm(filter.getSearch()));
+        }
+
+        // Use new multi-value filters if available, otherwise fall back to single values
+        if (filter.getRequestTypeFilters() != null && !filter.getRequestTypeFilters().isEmpty()) {
+            spec = spec.and(hasRequestTypes(filter.getRequestTypeFilters()));
+        } else if (filter.getRequestType() != null) {
+            try {
+                StudentRequestType requestType = StudentRequestType.valueOf(filter.getRequestType());
+                spec = spec.and(hasRequestType(requestType));
+            } catch (IllegalArgumentException e) {
+                // Invalid enum value, ignore the filter
+            }
+        }
+
+        if (filter.getStatusFilters() != null && !filter.getStatusFilters().isEmpty()) {
+            spec = spec.and(hasStatuses(filter.getStatusFilters()));
+        } else if (filter.getStatus() != null) {
+            try {
+                RequestStatus status = RequestStatus.valueOf(filter.getStatus());
+                spec = spec.and(hasStatus(status));
+            } catch (IllegalArgumentException e) {
+                // Invalid enum value, ignore the filter
+            }
+        }
+
+        // Check if no status filters are applied
+        boolean hasStatusFilter = (filter.getStatusFilters() != null && !filter.getStatusFilters().isEmpty()) ||
+                                 (filter.getStatus() != null);
+
+        // Parse sort criteria - use pending-first sorting when no status filter
+        Sort sort;
+        if (!hasStatusFilter) {
+            // Use pending-first sorting when no status filters
+            try {
+                String[] sortParts = filter.getSort().split(",");
+                String field = sortParts[0];
+                String direction = sortParts.length > 1 ? sortParts[1] : "desc";
+                sort = Sort.by(
+                    Sort.Order.asc("status"), // PENDING (0) comes before others
+                    new Sort.Order(Sort.Direction.fromString(direction), field)
+                );
+            } catch (Exception e) {
+                // Default pending-first sort if parsing fails
+                sort = Sort.by(
+                    Sort.Order.asc("status"),
+                    Sort.Order.desc("submittedAt")
+                );
+            }
+        } else {
+            // Use regular sorting when status filters are applied
+            try {
+                String[] sortParts = filter.getSort().split(",");
+                String field = sortParts[0];
+                String direction = sortParts.length > 1 ? sortParts[1] : "desc";
+                sort = Sort.by(Sort.Direction.fromString(direction), field);
+            } catch (Exception e) {
+                // Default sort if parsing fails
+                sort = Sort.by(Sort.Direction.DESC, "submittedAt");
+            }
+        }
+
         Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
 
-        Page<StudentRequest> requests = studentRequestRepository.findByStudentIdAndStatusIn(
-                student.getId(), statuses, pageable);
+        // Execute dynamic query
+        Page<StudentRequest> requests;
+        if (!hasStatusFilter) {
+            // For pending-first sorting when no status filters
+            // Use a custom specification to add database-level ordering
+            Specification<StudentRequest> pendingFirstSpec = spec.and((root, query, criteriaBuilder) -> {
+                // Add custom ORDER BY clause using CASE WHEN
+                query.orderBy(
+                    criteriaBuilder.asc(
+                        criteriaBuilder.selectCase()
+                            .when(criteriaBuilder.equal(root.get("status"), RequestStatus.PENDING), 0)
+                            .otherwise(1)
+                    ),
+                    criteriaBuilder.desc(root.get("submittedAt"))
+                );
+                return criteriaBuilder.conjunction();
+            });
+            requests = studentRequestRepository.findAll(pendingFirstSpec, pageable);
+        } else {
+            // Use standard repository query when status filters are applied
+            requests = studentRequestRepository.findAll(spec, pageable);
+        }
 
         return requests.map(this::mapToStudentResponseDTO);
     }
@@ -220,27 +310,42 @@ public class StudentRequestServiceImpl implements StudentRequestService {
     }
 
     @Override
-    public Page<AARequestResponseDTO> getPendingRequests(AARequestFilterDTO filter) {
+    public Page<AARequestResponseDTO> getPendingRequests(Long currentUserId, AARequestFilterDTO filter) {
+        // SECURITY: Get current user's assigned branch IDs
+        List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(currentUserId);
+
+        if (userBranchIds.isEmpty()) {
+            throw new BusinessRuleException("ACCESS_DENIED",
+                "User is not assigned to any branch. Contact administrator.");
+        }
+
+        log.info("AA user {} has access to branches: {}", currentUserId, userBranchIds);
+
+        // SECURITY: Validate requested branchId if provided
+        if (filter.getBranchId() != null && !userBranchIds.contains(filter.getBranchId())) {
+            throw new BusinessRuleException("ACCESS_DENIED",
+                "Access denied to branch ID: " + filter.getBranchId());
+        }
+
+        // Determine which branches to query (specific branch or all user's branches)
+        List<Long> targetBranchIds = filter.getBranchId() != null ?
+            List.of(filter.getBranchId()) : userBranchIds;
+
         Sort sort = Sort.by(Sort.Direction.fromString(filter.getSort().split(",")[1]),
                 filter.getSort().split(",")[0]);
+        Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
 
-        // Fetch all pending requests without pagination for filtering
-        List<StudentRequest> allRequests = studentRequestRepository.findByStatus(RequestStatus.PENDING, sort);
+        // DATABASE-LEVEL filtering by branch (secure and efficient)
+        Page<StudentRequest> requests = studentRequestRepository.findPendingRequestsByBranches(
+                RequestStatus.PENDING, targetBranchIds, pageable);
 
-        // Apply filtering
-        List<StudentRequest> filteredRequests = allRequests.stream()
+        // Apply additional filters in-memory (only on paginated results)
+        List<StudentRequest> filteredRequests = requests.getContent().stream()
                 .filter(request -> {
                     // Filter by request type
                     if (filter.getRequestType() != null) {
                         StudentRequestType requestType = StudentRequestType.valueOf(filter.getRequestType());
                         if (!request.getRequestType().equals(requestType)) {
-                            return false;
-                        }
-                    }
-
-                    // Filter by branch
-                    if (filter.getBranchId() != null && request.getCurrentClass() != null) {
-                        if (!request.getCurrentClass().getBranch().getId().equals(filter.getBranchId())) {
                             return false;
                         }
                     }
@@ -284,50 +389,67 @@ public class StudentRequestServiceImpl implements StudentRequestService {
                 })
                 .collect(Collectors.toList());
 
-        // Calculate pagination manually
-        int start = Math.min(filter.getPage() * filter.getSize(), filteredRequests.size());
-        int end = Math.min(start + filter.getSize(), filteredRequests.size());
-        List<StudentRequest> paginatedRequests = filteredRequests.subList(start, end);
-
-        // Create properly paginated result
-        Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
+        // Return filtered results with original pagination metadata
         return new org.springframework.data.domain.PageImpl<>(
-                paginatedRequests.stream().map(this::mapToAAResponseDTO).collect(Collectors.toList()),
+                filteredRequests.stream().map(this::mapToAAResponseDTO).collect(Collectors.toList()),
                 pageable,
-                filteredRequests.size() // Correct total count
+                requests.getTotalElements() // Keep original total for pagination
         );
     }
 
     @Override
-    public Page<AARequestResponseDTO> getAllRequests(AARequestFilterDTO filter) {
-        Sort sort = Sort.by(Sort.Direction.fromString(filter.getSort().split(",")[1]),
-                filter.getSort().split(",")[0]);
+    public Page<AARequestResponseDTO> getAllRequests(Long currentUserId, AARequestFilterDTO filter) {
+        // SECURITY: Get current user's assigned branch IDs
+        List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(currentUserId);
 
-        // Fetch all requests without pagination for proper filtering
-        List<StudentRequest> allRequests;
-        RequestStatus status = filter.getStatus() != null ?
-                RequestStatus.valueOf(filter.getStatus()) : null;
-
-        if (status != null) {
-            allRequests = studentRequestRepository.findByStatus(status, sort);
-        } else {
-            allRequests = studentRequestRepository.findAll(sort);
+        if (userBranchIds.isEmpty()) {
+            throw new BusinessRuleException("ACCESS_DENIED",
+                "User is not assigned to any branch. Contact administrator.");
         }
 
-        // Apply additional filtering in service layer
-        List<StudentRequest> filteredRequests = allRequests.stream()
+        log.info("AA user {} has access to branches: {}", currentUserId, userBranchIds);
+
+        // SECURITY: Validate requested branchId if provided
+        if (filter.getBranchId() != null && !userBranchIds.contains(filter.getBranchId())) {
+            throw new BusinessRuleException("ACCESS_DENIED",
+                "Access denied to branch ID: " + filter.getBranchId());
+        }
+
+        // Determine which branches to query (specific branch or all user's branches)
+        List<Long> targetBranchIds = filter.getBranchId() != null ?
+            List.of(filter.getBranchId()) : userBranchIds;
+
+        Sort sort = Sort.by(Sort.Direction.fromString(filter.getSort().split(",")[1]),
+                filter.getSort().split(",")[0]);
+        Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
+
+        // DATABASE-LEVEL filtering by branch and decidedBy (secure and efficient)
+        Page<StudentRequest> requests;
+        if (filter.getDecidedBy() != null) {
+            // Use repository method with decidedBy filtering
+            requests = studentRequestRepository.findAllRequestsByBranchesAndDecidedBy(
+                    targetBranchIds, filter.getDecidedBy(), pageable);
+        } else {
+            // Use regular repository method when decidedBy is not specified
+            requests = studentRequestRepository.findAllRequestsByBranches(
+                    targetBranchIds, pageable);
+        }
+
+        // Apply additional filters in-memory (only on paginated results)
+        List<StudentRequest> filteredRequests = requests.getContent().stream()
                 .filter(request -> {
-                    // Filter by request type
-                    if (filter.getRequestType() != null) {
-                        StudentRequestType requestType = StudentRequestType.valueOf(filter.getRequestType());
-                        if (!request.getRequestType().equals(requestType)) {
+                    // Filter by status
+                    if (filter.getStatus() != null) {
+                        RequestStatus status = RequestStatus.valueOf(filter.getStatus());
+                        if (!request.getStatus().equals(status)) {
                             return false;
                         }
                     }
 
-                    // Filter by branch
-                    if (filter.getBranchId() != null && request.getCurrentClass() != null) {
-                        if (!request.getCurrentClass().getBranch().getId().equals(filter.getBranchId())) {
+                    // Filter by request type
+                    if (filter.getRequestType() != null) {
+                        StudentRequestType requestType = StudentRequestType.valueOf(filter.getRequestType());
+                        if (!request.getRequestType().equals(requestType)) {
                             return false;
                         }
                     }
@@ -352,12 +474,7 @@ public class StudentRequestServiceImpl implements StudentRequestService {
                         }
                     }
 
-                    // Filter by decided by
-                    if (filter.getDecidedBy() != null && request.getDecidedBy() != null) {
-                        if (!request.getDecidedBy().getId().equals(filter.getDecidedBy())) {
-                            return false;
-                        }
-                    }
+                    // decidedBy filtering now handled at database level - no need for in-memory filtering
 
                     // Filter by session date
                     if (filter.getSessionDateFrom() != null && request.getTargetSession() != null) {
@@ -393,17 +510,11 @@ public class StudentRequestServiceImpl implements StudentRequestService {
                 })
                 .collect(Collectors.toList());
 
-        // Calculate pagination manually
-        int start = Math.min(filter.getPage() * filter.getSize(), filteredRequests.size());
-        int end = Math.min(start + filter.getSize(), filteredRequests.size());
-        List<StudentRequest> paginatedRequests = filteredRequests.subList(start, end);
-
-        // Create properly paginated result with correct total count
-        Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
+        // Return filtered results with original pagination metadata
         return new org.springframework.data.domain.PageImpl<>(
-                paginatedRequests.stream().map(this::mapToAAResponseDTO).collect(Collectors.toList()),
+                filteredRequests.stream().map(this::mapToAAResponseDTO).collect(Collectors.toList()),
                 pageable,
-                filteredRequests.size() // Correct total count
+                requests.getTotalElements() // Keep original total for pagination
         );
     }
 
@@ -507,19 +618,40 @@ public class StudentRequestServiceImpl implements StudentRequestService {
     }
 
     @Override
-    public RequestSummaryDTO getRequestSummary(AARequestFilterDTO filter) {
-        long totalPending = studentRequestRepository.countByStatus(RequestStatus.PENDING);
+    public RequestSummaryDTO getRequestSummary(Long currentUserId, AARequestFilterDTO filter) {
+        // SECURITY: Get current user's assigned branch IDs
+        List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(currentUserId);
+
+        if (userBranchIds.isEmpty()) {
+            throw new BusinessRuleException("ACCESS_DENIED",
+                "User is not assigned to any branch. Contact administrator.");
+        }
+
+        // SECURITY: Validate requested branchId if provided
+        if (filter.getBranchId() != null && !userBranchIds.contains(filter.getBranchId())) {
+            throw new BusinessRuleException("ACCESS_DENIED",
+                "Access denied to branch ID: " + filter.getBranchId());
+        }
+
+        // Determine which branches to query (specific branch or all user's branches)
+        List<Long> targetBranchIds = filter.getBranchId() != null ?
+            List.of(filter.getBranchId()) : userBranchIds;
+
+        // Use branch-filtered counts
+        long totalPending = studentRequestRepository.countByStatusAndBranches(
+                RequestStatus.PENDING, targetBranchIds);
 
         // Count urgent requests (sessions in next 2 days)
         LocalDate twoDaysFromNow = LocalDate.now().plusDays(2);
-        long urgentCount = studentRequestRepository.countByStatus(RequestStatus.PENDING); // Simplified, would need date filtering
+        long urgentCount = studentRequestRepository.countByStatusAndBranches(
+                RequestStatus.PENDING, targetBranchIds); // Simplified, would need date filtering
 
-        long absenceRequests = studentRequestRepository.countByRequestTypeAndStatus(
-                StudentRequestType.ABSENCE, RequestStatus.PENDING);
-        long makeupRequests = studentRequestRepository.countByRequestTypeAndStatus(
-                StudentRequestType.MAKEUP, RequestStatus.PENDING);
-        long transferRequests = studentRequestRepository.countByRequestTypeAndStatus(
-                StudentRequestType.TRANSFER, RequestStatus.PENDING);
+        long absenceRequests = studentRequestRepository.countByRequestTypeAndStatusAndBranches(
+                StudentRequestType.ABSENCE, RequestStatus.PENDING, targetBranchIds);
+        long makeupRequests = studentRequestRepository.countByRequestTypeAndStatusAndBranches(
+                StudentRequestType.MAKEUP, RequestStatus.PENDING, targetBranchIds);
+        long transferRequests = studentRequestRepository.countByRequestTypeAndStatusAndBranches(
+                StudentRequestType.TRANSFER, RequestStatus.PENDING, targetBranchIds);
 
         return RequestSummaryDTO.builder()
                 .totalPending((int) totalPending)

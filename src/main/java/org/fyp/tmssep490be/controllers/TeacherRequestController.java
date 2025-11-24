@@ -20,13 +20,13 @@ import java.util.List;
 
 /**
  * Controller for Teacher Request management
- * Supports: SWAP, RESCHEDULE, MODALITY_CHANGE
+ * Supports: REPLACEMENT, RESCHEDULE, MODALITY_CHANGE
  */
 @RestController
 @RequestMapping("/api/v1/teacher-requests")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Teacher Request", description = "Teacher request management APIs (Swap, Reschedule, Modality Change)")
+@Tag(name = "Teacher Request", description = "Teacher request management APIs (Replacement, Reschedule, Modality Change)")
 @SecurityRequirement(name = "Bearer Authentication")
 public class TeacherRequestController {
 
@@ -41,7 +41,7 @@ public class TeacherRequestController {
     @PreAuthorize("hasRole('TEACHER')")
     @Operation(
             summary = "Create teacher request",
-            description = "Create a new request (SWAP, RESCHEDULE, or MODALITY_CHANGE)"
+            description = "Create a new request (REPLACEMENT, RESCHEDULE, or MODALITY_CHANGE)"
     )
     public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> createRequest(
             @RequestBody @Valid TeacherRequestCreateDTO createDTO,
@@ -207,19 +207,19 @@ public class TeacherRequestController {
     }
 
     /**
-     * Suggest swap candidate teachers (SWAP)
+     * Suggest replacement candidate teachers (REPLACEMENT)
      * For TEACHER: uses sessionId to suggest candidates for a session
      * For ACADEMIC_AFFAIR: uses requestId to suggest candidates for a request (to override replacement teacher)
      */
-    @GetMapping("/{id}/swap/candidates")
+    @GetMapping("/{id}/replacement/candidates")
     @PreAuthorize("hasRole('TEACHER') or hasRole('ACADEMIC_AFFAIR')")
     @Operation(
-            summary = "Suggest swap candidates",
+            summary = "Suggest replacement candidates",
             description = "For TEACHER: List teachers who can replace the current teacher for the session. " +
-                    "For ACADEMIC_AFFAIR: List teachers who can replace the original teacher for the swap request. " +
+                    "For ACADEMIC_AFFAIR: List teachers who can replace the original teacher for the replacement request. " +
                     "Sorted by skill priority, availability priority, and name."
     )
-    public ResponseEntity<ResponseObject<List<SwapCandidateDTO>>> suggestSwapCandidates(
+    public ResponseEntity<ResponseObject<List<ReplacementCandidateDTO>>> suggestReplacementCandidates(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
@@ -227,20 +227,20 @@ public class TeacherRequestController {
         
         if (isAcademicStaff) {
             // Staff: id is requestId
-            log.info("Suggest swap candidates for request {} by staff", id);
-            List<SwapCandidateDTO> candidates = teacherRequestService.suggestSwapCandidatesForStaff(id);
-            return ResponseEntity.ok(ResponseObject.<List<SwapCandidateDTO>>builder()
+            log.info("Suggest replacement candidates for request {} by staff", id);
+            List<ReplacementCandidateDTO> candidates = teacherRequestService.suggestReplacementCandidatesForStaff(id);
+            return ResponseEntity.ok(ResponseObject.<List<ReplacementCandidateDTO>>builder()
                     .success(true)
-                    .message(candidates.isEmpty() ? "No suitable replacement teachers found" : "Swap candidates loaded successfully")
+                    .message(candidates.isEmpty() ? "No suitable replacement teachers found" : "Replacement candidates loaded successfully")
                     .data(candidates)
                     .build());
         } else {
             // Teacher: id is sessionId
-            log.info("Suggest swap candidates for session {} by user {}", id, currentUser.getId());
-            List<SwapCandidateDTO> candidates = teacherRequestService.suggestSwapCandidates(id, currentUser.getId());
-            return ResponseEntity.ok(ResponseObject.<List<SwapCandidateDTO>>builder()
+            log.info("Suggest replacement candidates for session {} by user {}", id, currentUser.getId());
+            List<ReplacementCandidateDTO> candidates = teacherRequestService.suggestReplacementCandidates(id, currentUser.getId());
+            return ResponseEntity.ok(ResponseObject.<List<ReplacementCandidateDTO>>builder()
                     .success(true)
-                    .message(candidates.isEmpty() ? "No suitable replacement teachers found" : "Swap candidates loaded successfully")
+                    .message(candidates.isEmpty() ? "No suitable replacement teachers found" : "Replacement candidates loaded successfully")
                     .data(candidates)
                     .build());
         }
@@ -355,57 +355,57 @@ public class TeacherRequestController {
     }
 
     /**
-     * Confirm swap request (Replacement Teacher only)
+     * Confirm replacement request (Replacement Teacher only)
      * PATCH /api/v1/teacher-requests/{id}/confirm
      */
     @PatchMapping("/{id}/confirm")
     @PreAuthorize("hasRole('TEACHER')")
     @Operation(
-            summary = "Confirm swap request",
+            summary = "Confirm replacement request",
             description = "Replacement teacher confirms to take over the session. " +
                     "Updates teaching slots: original teacher → ON_LEAVE, replacement teacher → SUBSTITUTED. " +
                     "Request status → APPROVED."
     )
-    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> confirmSwap(
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> confirmReplacement(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        log.info("Confirm swap request {} by replacement teacher {}", id, currentUser.getId());
+        log.info("Confirm replacement request {} by replacement teacher {}", id, currentUser.getId());
 
-        TeacherRequestResponseDTO response = teacherRequestService.confirmSwap(id, currentUser.getId());
+        TeacherRequestResponseDTO response = teacherRequestService.confirmReplacement(id, currentUser.getId());
 
         return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
                 .success(true)
-                .message("Swap request confirmed successfully")
+                .message("Replacement request confirmed successfully")
                 .data(response)
                 .build());
     }
 
     /**
-     * Decline swap request (Replacement Teacher only)
+     * Decline replacement request (Replacement Teacher only)
      * PATCH /api/v1/teacher-requests/{id}/decline
      */
     @PatchMapping("/{id}/decline")
     @PreAuthorize("hasRole('TEACHER')")
     @Operation(
-            summary = "Decline swap request",
+            summary = "Decline replacement request",
             description = "Replacement teacher declines to take over the session. " +
                     "Request status → PENDING, replacementTeacherId → null. " +
                     "Staff can approve again with a different replacement teacher."
     )
-    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> declineSwap(
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> declineReplacement(
             @PathVariable Long id,
             @RequestBody @Valid TeacherRequestRejectDTO declineDTO,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        log.info("Decline swap request {} by replacement teacher {}", id, currentUser.getId());
+        log.info("Decline replacement request {} by replacement teacher {}", id, currentUser.getId());
 
-        TeacherRequestResponseDTO response = teacherRequestService.declineSwap(
+        TeacherRequestResponseDTO response = teacherRequestService.declineReplacement(
                 id, declineDTO.getReason(), currentUser.getId());
 
         return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
                 .success(true)
-                .message("Swap request declined")
+                .message("Replacement request declined")
                 .data(response)
                 .build());
     }

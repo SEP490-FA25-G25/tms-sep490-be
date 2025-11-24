@@ -26,13 +26,13 @@ public interface StudentRequestService {
     TransferOptionsResponseDTO getTransferOptionsFlexible(Long currentClassId, Long targetBranchId, String targetModality, Boolean scheduleOnly);
     List<StudentClassDTO> getMyClassesForStudent(Long studentId);
 
-    // Academic Affairs operations
-    Page<AARequestResponseDTO> getPendingRequests(AARequestFilterDTO filter);
-    Page<AARequestResponseDTO> getAllRequests(AARequestFilterDTO filter);
+    // Academic Affairs operations (with branch-level security)
+    Page<AARequestResponseDTO> getPendingRequests(Long currentUserId, AARequestFilterDTO filter);
+    Page<AARequestResponseDTO> getAllRequests(Long currentUserId, AARequestFilterDTO filter);
     StudentRequestDetailDTO getRequestDetailsForAA(Long requestId);
     StudentRequestResponseDTO approveRequest(Long requestId, Long decidedById, ApprovalDTO dto);
     StudentRequestResponseDTO rejectRequest(Long requestId, Long decidedById, RejectionDTO dto);
-    RequestSummaryDTO getRequestSummary(AARequestFilterDTO filter);
+    RequestSummaryDTO getRequestSummary(Long currentUserId, AARequestFilterDTO filter);
 
     // AA on-behalf operations
     MissedSessionsResponseDTO getMissedSessionsForStudent(Long studentId, Integer weeksBack);

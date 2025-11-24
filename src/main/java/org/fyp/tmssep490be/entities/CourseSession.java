@@ -10,7 +10,7 @@ import java.util.Set;
 
 @Entity
 @Table(name = "course_session", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_course_session_phase_sequence", columnNames = {"phase_id", "sequence_no"})
+        @UniqueConstraint(name = "uq_course_session_phase_sequence", columnNames = { "phase_id", "sequence_no" })
 })
 @Getter
 @Setter
@@ -36,9 +36,12 @@ public class CourseSession {
     @Column(name = "student_task", columnDefinition = "TEXT")
     private String studentTask;
 
-    @Column(name = "skill_set")
+    @ElementCollection
     @Enumerated(EnumType.STRING)
-    private Skill[] skillSet;
+    @CollectionTable(name = "course_session_skills", joinColumns = @JoinColumn(name = "course_session_id"))
+    @Column(name = "skill")
+    @Builder.Default
+    private Set<Skill> skillSet = new HashSet<>();
 
     @OneToMany(mappedBy = "courseSession", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

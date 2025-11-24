@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.studentmanagement.*;
 import org.fyp.tmssep490be.entities.*;
+import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
 import org.fyp.tmssep490be.entities.enums.UserStatus;
+import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
@@ -41,6 +43,8 @@ public class StudentServiceImpl implements StudentService {
     private final BranchRepository branchRepository;
     private final LevelRepository levelRepository;
     private final ReplacementSkillAssessmentRepository replacementSkillAssessmentRepository;
+    private final StudentSessionRepository studentSessionRepository;
+    private final ScoreRepository scoreRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -550,6 +554,113 @@ public class StudentServiceImpl implements StudentService {
                 .attendedSessions(0) // TODO: Calculate from student_sessions
                 .attendanceRate(0.0) // TODO: Calculate from student_sessions
                 .averageScore(null) // TODO: Calculate from scores
+                .build();
+    }
+
+    @Override
+    public StudentProfileDTO getMyProfile(Long userAccountId) {
+        log.debug("Getting student profile for user account {}", userAccountId);
+
+        // Find student by user account ID
+        Student student = studentRepository.findByUserAccountId(userAccountId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+
+        // Convert to profile DTO
+        return convertToStudentProfileDTO(student);
+    }
+
+    /**
+     * Convert Student entity to StudentProfileDTO
+     */
+    private StudentProfileDTO convertToStudentProfileDTO(Student student) {
+        UserAccount user = student.getUserAccount();
+
+        // Get branch info
+        String branchName = null;
+        Long branchId = null;
+        if (!user.getUserBranches().isEmpty()) {
+            branchId = user.getUserBranches().iterator().next().getBranch().getId();
+            branchName = user.getUserBranches().iterator().next().getBranch().getName();
+        }
+
+        // Get enrollment statistics
+        long totalEnrollments = student.getEnrollments().size();
+        long activeEnrollments = student.getEnrollments().stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.ENROLLED)
+                .count();
+        long completedEnrollments = student.getEnrollments().stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.COMPLETED)
+                .count();
+
+        // Get first enrollment date
+        LocalDate firstEnrollmentDate = student.getEnrollments().stream()
+                .map(Enrollment::getEnrolledAt)
+                .filter(Objects::nonNull)
+                .map(OffsetDateTime::toLocalDate)
+                .min(LocalDate::compareTo)
+                .orElse(null);
+
+        // Calculate attendance rate - only count completed sessions with recorded attendance
+        List<StudentSession> studentSessions =
+                studentSessionRepository.findAllByStudentId(student.getId());
+
+        // Filter only completed sessions that are not cancelled and have actual attendance recorded
+        List<StudentSession> attendedSessions = studentSessions.stream()
+                .filter(ss -> ss.getSession().getStatus() == SessionStatus.DONE)
+                .filter(ss -> ss.getSession().getStatus() != SessionStatus.CANCELLED)
+                .filter(ss -> ss.getAttendanceStatus() != AttendanceStatus.PLANNED)
+                .collect(Collectors.toList());
+
+        long totalAttendedSessions = attendedSessions.size();
+        long presentSessions = attendedSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                .count();
+
+        java.math.BigDecimal attendanceRate = totalAttendedSessions > 0
+                ? java.math.BigDecimal.valueOf(presentSessions * 100.0 / totalAttendedSessions)
+                        .setScale(1, java.math.RoundingMode.HALF_UP)
+                : java.math.BigDecimal.ZERO;
+
+        long totalAbsences = attendedSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                .count();
+
+        // Calculate average score
+        java.math.BigDecimal averageScore = scoreRepository.calculateAverageScore(student.getId());
+
+        // Get ALL enrollments (not just active ones) - sorted by enrolledAt descending
+        List<StudentActiveClassDTO> enrollments = student.getEnrollments().stream()
+                .sorted((e1, e2) -> {
+                    if (e1.getEnrolledAt() == null && e2.getEnrolledAt() == null) return 0;
+                    if (e1.getEnrolledAt() == null) return 1;
+                    if (e2.getEnrolledAt() == null) return -1;
+                    return e2.getEnrolledAt().compareTo(e1.getEnrolledAt());
+                })
+                .map(this::convertToStudentActiveClassDTO)
+                .collect(Collectors.toList());
+
+        return StudentProfileDTO.builder()
+                .studentId(student.getId())
+                .studentCode(student.getStudentCode())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .address(user.getAddress())
+                .gender(user.getGender().name())
+                .dateOfBirth(user.getDob())
+                .status(user.getStatus().name())
+                .lastLoginAt(user.getLastLoginAt())
+                .branchName(branchName)
+                .branchId(branchId)
+                .totalEnrollments(totalEnrollments)
+                .activeEnrollments(activeEnrollments)
+                .completedEnrollments(completedEnrollments)
+                .firstEnrollmentDate(firstEnrollmentDate)
+                .attendanceRate(attendanceRate)
+                .averageScore(averageScore)
+                .totalSessions(totalAttendedSessions)
+                .totalAbsences(totalAbsences)
+                .enrollments(enrollments)
                 .build();
     }
 }

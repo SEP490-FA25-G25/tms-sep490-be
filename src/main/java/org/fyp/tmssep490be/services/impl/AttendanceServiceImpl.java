@@ -178,7 +178,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     public AttendanceSaveResponseDTO saveAttendance(Long teacherId, Long sessionId, AttendanceSaveRequestDTO request) {
         assertOwnership(teacherId, sessionId);
         if (request.getRecords() == null || request.getRecords().isEmpty()) {
-            throw new IllegalArgumentException("Attendance records must not be empty");
+            throw new CustomException(ErrorCode.ATTENDANCE_RECORDS_EMPTY);
         }
 
         Session session = sessionRepository.findById(sessionId)
@@ -205,13 +205,10 @@ public class AttendanceServiceImpl implements AttendanceService {
             // Allow NO_HOMEWORK if previous session has no homework
             if (record.getHomeworkStatus() != null) {
                 if (!hasPreviousHomework && record.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK) {
-                    throw new IllegalArgumentException(
-                            "Cannot set homework status to " + record.getHomeworkStatus() + 
-                            " because previous session has no homework assignment");
+                    throw new CustomException(ErrorCode.HOMEWORK_STATUS_INVALID_NO_PREVIOUS_HOMEWORK);
                 }
                 if (hasPreviousHomework && record.getHomeworkStatus() == HomeworkStatus.NO_HOMEWORK) {
-                    throw new IllegalArgumentException(
-                            "Cannot set homework status to NO_HOMEWORK because previous session has homework assignment");
+                    throw new CustomException(ErrorCode.HOMEWORK_STATUS_INVALID_HAS_PREVIOUS_HOMEWORK);
                 }
             }
             
@@ -233,6 +230,11 @@ public class AttendanceServiceImpl implements AttendanceService {
     @Transactional
     public MarkAllResponseDTO markAllPresent(Long teacherId, Long sessionId) {
         assertOwnership(teacherId, sessionId);
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+        if (session.getStatus() == SessionStatus.DONE) {
+            throw new CustomException(ErrorCode.SESSION_ALREADY_DONE);
+        }
         List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(sessionId);
         // Do not persist changes here. Only propose the summary as if all are PRESENT.
         AttendanceSummaryDTO summary = AttendanceSummaryDTO.builder()
@@ -250,6 +252,11 @@ public class AttendanceServiceImpl implements AttendanceService {
     @Transactional
     public MarkAllResponseDTO markAllAbsent(Long teacherId, Long sessionId) {
         assertOwnership(teacherId, sessionId);
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+        if (session.getStatus() == SessionStatus.DONE) {
+            throw new CustomException(ErrorCode.SESSION_ALREADY_DONE);
+        }
         List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(sessionId);
         // Do not persist changes here. Only propose the summary as if all are ABSENT.
         AttendanceSummaryDTO summary = AttendanceSummaryDTO.builder()
@@ -308,6 +315,9 @@ public class AttendanceServiceImpl implements AttendanceService {
         assertOwnership(teacherId, sessionId);
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+        if (session.getStatus() == SessionStatus.DONE) {
+            throw new CustomException(ErrorCode.SESSION_ALREADY_DONE);
+        }
         session.setTeacherNote(request.getTeacherNote());
         // Mark session as DONE upon report submission
         session.setStatus(SessionStatus.DONE);
@@ -469,12 +479,18 @@ public class AttendanceServiceImpl implements AttendanceService {
 
         ClassEntity classEntity = sessions.get(0).getClassEntity();
         
-        // Tính tỷ lệ chuyên cần của cả lớp
-        double classAttendanceRate = calculateClassAttendanceRate(classId);
+        // Tính tỷ lệ chuyên cần của cả lớp từ danh sách học viên đã tính sẵn
+        // Đảm bảo tính nhất quán với tỷ lệ của từng học viên (cùng nguồn dữ liệu)
+        double classAttendanceRate = studentDtos.stream()
+                .filter(student -> student.getAttendanceRate() != null)
+                .mapToDouble(StudentAttendanceMatrixDTO::getAttendanceRate)
+                .average()
+                .orElse(0.0);
 
         return AttendanceMatrixDTO.builder()
                 .classId(classId)
                 .classCode(classEntity.getCode())
+                .className(classEntity.getName())
                 .courseName(classEntity.getCourse() != null ? classEntity.getCourse().getName() : null)
                 .attendanceRate(classAttendanceRate)
                 .sessions(sessionDtos)
@@ -635,7 +651,8 @@ public class AttendanceServiceImpl implements AttendanceService {
     }
 
     private TeacherClassListItemDTO mapToTeacherClassListItemDTO(ClassEntity classEntity) {
-        long totalSessions = sessionRepository.countByClassEntityId(classEntity.getId());
+        // Count sessions excluding CANCELLED (consistent with attendance rate calculation)
+        long totalSessions = sessionRepository.countByClassEntityIdExcludingCancelled(classEntity.getId());
         double attendanceRate = calculateClassAttendanceRate(classEntity.getId());
         return TeacherClassListItemDTO.builder()
                 .id(classEntity.getId())
@@ -680,8 +697,18 @@ public class AttendanceServiceImpl implements AttendanceService {
      * Calculate average attendance rate for all enrolled students in a class
      * Formula: (Sum of all students' attendance rates) / (Number of enrolled students)
      * Each student's rate = PRESENT sessions / (PRESENT + ABSENT sessions) [excluding PLANNED]
+     * Only counts sessions that are not CANCELLED, consistent with matrix calculation
      */
     private double calculateClassAttendanceRate(Long classId) {
+        // Get all non-CANCELLED sessions for the class (same as in getClassAttendanceMatrix)
+        List<Session> sessions = sessionRepository.findAllByClassIdOrderByDateAndTime(classId).stream()
+                .filter(session -> session.getStatus() != SessionStatus.CANCELLED)
+                .toList();
+        
+        if (sessions.isEmpty()) {
+            return 0.0;
+        }
+
         List<Enrollment> enrollments = enrollmentRepository.findByClassIdAndStatus(
                 classId, EnrollmentStatus.ENROLLED);
         
@@ -689,25 +716,52 @@ public class AttendanceServiceImpl implements AttendanceService {
             return 0.0;
         }
 
+        List<Long> sessionIds = sessions.stream().map(Session::getId).toList();
+        Set<Long> enrolledStudentIds = enrollments.stream()
+                .map(Enrollment::getStudentId)
+                .collect(Collectors.toSet());
+
+        // Get all StudentSessions for enrolled students and these sessions
+        Map<Long, List<StudentSession>> sessionStudentMap = studentSessionRepository.findBySessionIds(sessionIds)
+                .stream()
+                .filter(ss -> enrolledStudentIds.contains(ss.getStudent().getId()))
+                .collect(Collectors.groupingBy(ss -> ss.getSession().getId()));
+
         double totalRate = 0.0;
         int studentCount = 0;
 
         for (Enrollment enrollment : enrollments) {
             Long studentId = enrollment.getStudentId();
-            List<StudentSession> studentSessions = studentSessionRepository
-                    .findByStudentIdAndClassEntityId(studentId, classId);
-
-            // Count PRESENT and ABSENT (exclude PLANNED)
+            
+            // Count PRESENT and ABSENT only from non-CANCELLED sessions
             int present = 0;
             int absent = 0;
-            for (StudentSession ss : studentSessions) {
-                AttendanceStatus status = ss.getAttendanceStatus();
-                if (status == null) continue;
-                if (status == AttendanceStatus.PRESENT) {
+            
+            for (Session session : sessions) {
+                List<StudentSession> studentSessions = sessionStudentMap.getOrDefault(session.getId(), List.of());
+                StudentSession studentSession = studentSessions.stream()
+                        .filter(ss -> ss.getStudent().getId().equals(studentId))
+                        .findFirst()
+                        .orElse(null);
+                
+                AttendanceStatus displayStatus;
+                if (studentSession != null) {
+                    // Use same logic as matrix to resolve display status
+                    displayStatus = resolveMatrixDisplayStatus(studentSession, session);
+                } else {
+                    // No StudentSession record - check if session has passed
+                    boolean isFutureSession = session.getDate().isAfter(LocalDate.now()) ||
+                            (session.getDate().equals(LocalDate.now()) && session.getStatus() == SessionStatus.PLANNED);
+                    displayStatus = isFutureSession ? AttendanceStatus.PLANNED : AttendanceStatus.ABSENT;
+                }
+                
+                // Count only PRESENT and ABSENT (exclude PLANNED)
+                if (displayStatus == AttendanceStatus.PRESENT) {
                     present++;
-                } else if (status == AttendanceStatus.ABSENT) {
+                } else if (displayStatus == AttendanceStatus.ABSENT) {
                     absent++;
                 }
+                // PLANNED is excluded
             }
 
             // Calculate rate for this student

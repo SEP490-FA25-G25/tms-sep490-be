@@ -1,6 +1,7 @@
 package org.fyp.tmssep490be.repositories;
 
 import org.fyp.tmssep490be.entities.StudentSession;
+import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -144,6 +145,17 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
     );
 
     /**
+     * Fetch all student sessions for a class (used for attendance aggregation)
+     */
+    @Query("""
+            SELECT ss FROM StudentSession ss
+            JOIN FETCH ss.session s
+            JOIN FETCH ss.student st
+            WHERE s.classEntity.id = :classId
+            """)
+    List<StudentSession> findByClassId(@Param("classId") Long classId);
+
+    /**
      * Find sessions for a student on a specific date (for conflict checking)
      */
     @Query("SELECT s FROM Session s " +
@@ -154,4 +166,46 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             @Param("studentId") Long studentId,
             @Param("date") LocalDate date
     );
+
+    /**
+     * Find student session by student ID and course session
+     * Note: StudentSession links to Session, which links to CourseSession
+     */
+    @Query("SELECT ss FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE ss.student.id = :studentId " +
+           "AND s.courseSession.id = :courseSessionId")
+    Optional<StudentSession> findByStudentIdAndCourseSessionId(
+            @Param("studentId") Long studentId,
+            @Param("courseSessionId") Long courseSessionId
+    );
+
+    /**
+     * Find all student sessions for a student in a specific class
+     * Used for enrollment-based progress tracking
+     */
+    @Query("SELECT ss FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE ss.student.id = :studentId " +
+           "AND s.classEntity.id = :classId")
+    List<StudentSession> findByStudentIdAndClassId(
+            @Param("studentId") Long studentId,
+            @Param("classId") Long classId
+    );
+
+    /**
+     * Count students by session ID and attendance status
+     * Used for teacher schedule attendance summary
+     */
+    @Query("SELECT COUNT(ss) FROM StudentSession ss WHERE ss.session.id = :sessionId AND ss.attendanceStatus = :attendanceStatus")
+    long countBySessionIdAndAttendanceStatus(
+            @Param("sessionId") Long sessionId,
+            @Param("attendanceStatus") AttendanceStatus attendanceStatus
+    );
+
+    /**
+     * Check if any student session for a session has isMakeup = true
+     * Used to determine if a session is a makeup session
+     */
+    boolean existsBySessionIdAndIsMakeup(Long sessionId, Boolean isMakeup);
 }

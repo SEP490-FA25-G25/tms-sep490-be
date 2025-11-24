@@ -19,7 +19,7 @@
 -- See schema.sql for table definitions.
 
 -- Enum for Teacher Request Type
-CREATE TYPE teacher_request_type_enum AS ENUM ('SWAP', 'RESCHEDULE', 'MODALITY_CHANGE');
+CREATE TYPE teacher_request_type_enum AS ENUM ('REPLACEMENT', 'RESCHEDULE', 'MODALITY_CHANGE');
 
 -- Enum for Student Request Type
 CREATE TYPE student_request_type_enum AS ENUM ('ABSENCE', 'MAKEUP', 'TRANSFER');
