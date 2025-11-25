@@ -44,4 +44,13 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     List<UserAccount> findByRoleCodeAndBranches(
             @Param("roleCode") String roleCode,
             @Param("branchIds") List<Long> branchIds);
+
+    // ============== SCHEDULER JOB METHODS ==============
+
+    /**
+     * Find all users with specific role (no branch filtering)
+     * Used by scheduler jobs to send notifications to specific user roles
+     */
+    @Query("SELECT u FROM UserAccount u JOIN u.userRoles ur WHERE ur.role.code = :roleCode")
+    List<UserAccount> findUsersByRole(@Param("roleCode") String roleCode);
 }

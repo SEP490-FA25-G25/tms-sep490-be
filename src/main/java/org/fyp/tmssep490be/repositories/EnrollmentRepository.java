@@ -133,4 +133,68 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
         AND e.status != 'CANCELLED'
         """)
     List<Enrollment> findByStudentIdWithClassAndCourse(@Param("studentId") Long studentId);
+
+    // ============== SCHEDULER JOB METHODS ==============
+
+    /**
+     * Find enrollments where class is completed but enrollment status is still ENROLLED
+     * Used by EnrollmentStatusUpdateJob to auto-complete enrollments
+     */
+    @Query("SELECT e FROM Enrollment e JOIN e.classEntity c WHERE c.status = :classStatus AND e.status = :enrollmentStatus")
+    List<Enrollment> findByClassEntityStatusAndEnrollmentStatus(
+        @Param("classStatus") String classStatus,
+        @Param("enrollmentStatus") String enrollmentStatus
+    );
+
+    /**
+     * Generate weekly attendance report by class
+     * Used by WeeklyAttendanceReportJob for class-level attendance statistics
+     */
+    @Query("""
+        SELECT new org.fyp.tmssep490be.dtos.WeeklyAttendanceReportDTO(
+            c.id, c.name, COUNT(ss.id),
+            COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END),
+            COUNT(CASE WHEN ss.attendanceStatus = 'ABSENT' THEN 1 END),
+            ROUND(COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END) * 100.0 / NULLIF(COUNT(ss.id), 0), 2)
+        )
+        FROM ClassEntity c
+        JOIN c.sessions s
+        JOIN s.studentSessions ss
+        WHERE s.date BETWEEN :weekStart AND :weekEnd
+        AND s.status != 'CANCELLED'
+        GROUP BY c.id, c.name
+        """)
+    List<org.fyp.tmssep490be.dtos.WeeklyAttendanceReportDTO> generateWeeklyAttendanceReport(
+        @Param("weekStart") java.time.LocalDate weekStart,
+        @Param("weekEnd") java.time.LocalDate weekEnd
+    );
+
+    /**
+     * Find students with low attendance rate below threshold
+     * Used by WeeklyAttendanceReportJob to identify students needing attention
+     */
+    @Query("""
+        SELECT new org.fyp.tmssep490be.dtos.StudentAttendanceAlertDTO(
+            u.id, u.fullName, u.email, c.name,
+            COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END),
+            COUNT(ss.id),
+            ROUND(COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END) * 100.0 / COUNT(ss.id), 2)
+        )
+        FROM UserAccount u
+        JOIN u.student s
+        JOIN s.enrollments e
+        JOIN e.classEntity c
+        JOIN c.sessions sess
+        JOIN sess.studentSessions ss
+        WHERE sess.date BETWEEN :weekStart AND :weekEnd
+        AND sess.status != 'CANCELLED'
+        AND e.status = 'ENROLLED'
+        GROUP BY u.id, u.fullName, u.email, c.id, c.name
+        HAVING COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END) * 100.0 / COUNT(ss.id) < :threshold
+        """)
+    List<org.fyp.tmssep490be.dtos.StudentAttendanceAlertDTO> findStudentsWithLowAttendance(
+        @Param("weekStart") java.time.LocalDate weekStart,
+        @Param("weekEnd") java.time.LocalDate weekEnd,
+        @Param("threshold") Double threshold
+    );
 }

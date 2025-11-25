@@ -89,3 +89,27 @@ tms:
       course-activation:
         enabled: true
         cron: "0 0 1 * * ?"  # Daily at 1:00 AM
+
+      # ========== PHASE 2 JOBS ==========
+
+      # Job 6: Enrollment Status Update (auto-complete enrollments for completed classes)
+      enrollment-status-update:
+        enabled: true
+        cron: "0 0 1 * * ?"  # Daily at 1:00 AM (after CourseActivationJob)
+
+      # Job 7: Pending Request Reminder (remind Academic Affairs about old pending requests)
+      pending-request-reminder:
+        enabled: true
+        cron: "0 0 9 * * MON-FRI"  # Weekdays at 9:00 AM
+        reminder-threshold-days: 3  # Remind about requests pending 3+ days
+
+      # Job 8: Weekly Attendance Report (generate attendance reports and alerts)
+      weekly-attendance-report:
+        enabled: true
+        cron: "0 0 18 * * SUN"  # Sundays at 6:00 PM
+        low-attendance-threshold: 75.0  # Alert students with attendance below 75%
+
+      # Job 10: Feedback Collection Reminder (remind students to provide feedback)
+      feedback-collection-reminder:
+        enabled: true
+        cron: "0 0 10 * * MON,WED,FRI"  # Mon/Wed/Fri at 10:00 AM
