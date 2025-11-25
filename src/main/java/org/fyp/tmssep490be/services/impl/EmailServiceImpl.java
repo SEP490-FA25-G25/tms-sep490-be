@@ -231,13 +231,145 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public CompletableFuture<Void> sendWeeklyAttendanceReportAsync(String to, String reportData) {
+    public CompletableFuture<Void> sendWeeklyAttendanceReportAsync(String to, Map<String, Object> reportData) {
         String subject = "Báo cáo điểm danh hàng tuần";
-        Map<String, Object> templateData = new HashMap<>();
-        templateData.put("reportData", reportData);
-        templateData.put("frontendUrl", frontendUrl);
+        reportData.put("frontendUrl", frontendUrl);
 
-        return sendEmailWithTemplateAsync(to, subject, "emails/weekly-attendance-report", templateData);
+        return sendEmailWithTemplateAsync(to, subject, "emails/weekly-attendance-report", reportData);
+    }
+
+    // Student Request Email Implementations
+
+    @Override
+    public CompletableFuture<Void> sendStudentRequestApprovalAsync(String to, Map<String, Object> requestData) {
+        String subject = "Yêu cầu của bạn đã được duyệt - TMS";
+        requestData.put("frontendUrl", frontendUrl);
+        requestData.put("dashboardUrl", frontendUrl + "/dashboard");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/student-request-approved", requestData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendStudentRequestRejectionAsync(String to, Map<String, Object> requestData) {
+        String subject = "Yêu cầu của bạn không được duyệt - TMS";
+        requestData.put("frontendUrl", frontendUrl);
+        requestData.put("newRequestUrl", frontendUrl + "/requests/new");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/student-request-rejected", requestData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendStudentRequestCreatedAsync(String to, Map<String, Object> requestData) {
+        String subject = "Xác nhận nhận yêu cầu - TMS";
+        requestData.put("frontendUrl", frontendUrl);
+        requestData.put("dashboardUrl", frontendUrl + "/dashboard");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/student-request-created", requestData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendStudentRequestConfirmedAsync(String to, Map<String, Object> requestData) {
+        String subject = "Yêu cầu đã được xác nhận - TMS";
+        requestData.put("frontendUrl", frontendUrl);
+        requestData.put("dashboardUrl", frontendUrl + "/dashboard");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/student-request-confirmed", requestData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendTeacherTransferNotificationAsync(String to, Map<String, Object> requestData) {
+        String subject = "Thông báo thay đổi lịch giảng dạy - TMS";
+        requestData.put("frontendUrl", frontendUrl);
+        requestData.put("dashboardUrl", frontendUrl + "/teacher/dashboard");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/teacher-transfer-notification", requestData);
+    }
+
+    // Teacher Request Email Implementations
+
+    @Override
+    public CompletableFuture<Void> sendTeacherRequestApprovalAsync(String to, Map<String, Object> requestData) {
+        String subject = "Yêu cầu của giáo viên đã được duyệt - TMS";
+        requestData.put("frontendUrl", frontendUrl);
+        requestData.put("dashboardUrl", frontendUrl + "/teacher/dashboard");
+        requestData.put("calendarUrl", frontendUrl + "/teacher/calendar");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/teacher-request-approved", requestData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendTeacherRequestRejectionAsync(String to, Map<String, Object> requestData) {
+        String subject = "Yêu cầu của giáo viên không được duyệt - TMS";
+        requestData.put("frontendUrl", frontendUrl);
+        requestData.put("newRequestUrl", frontendUrl + "/teacher/requests/new");
+        requestData.put("policiesUrl", frontendUrl + "/policies");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/teacher-request-rejected", requestData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendTeacherRequestCreatedAsync(String to, Map<String, Object> requestData) {
+        String subject = "Xác nhận nhận yêu cầu từ giáo viên - TMS";
+        requestData.put("frontendUrl", frontendUrl);
+        requestData.put("dashboardUrl", frontendUrl + "/dashboard");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/teacher-request-created", requestData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendTeacherRequestConfirmedAsync(String to, Map<String, Object> requestData) {
+        String subject = "Yêu cầu giáo viên đã được xác nhận - TMS";
+        requestData.put("frontendUrl", frontendUrl);
+        requestData.put("dashboardUrl", frontendUrl + "/dashboard");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/teacher-request-confirmed", requestData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendDepartmentScheduleChangeNotificationAsync(String to, Map<String, Object> requestData) {
+        String subject = "Thông báo thay đổi lịch bộ môn - TMS";
+        requestData.put("frontendUrl", frontendUrl);
+        requestData.put("dashboardUrl", frontendUrl + "/department/dashboard");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/department-schedule-change", requestData);
+    }
+
+    // Scheduled Job Email Implementations
+
+    @Override
+    public CompletableFuture<Void> sendMonthlyAnalyticsReportAsync(String to, Map<String, Object> reportData) {
+        String subject = "Báo cáo phân tích hàng tháng - TMS";
+        reportData.put("frontendUrl", frontendUrl);
+        reportData.put("dashboardUrl", frontendUrl + "/analytics");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/monthly-analytics-report", reportData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendSystemHealthAlertAsync(String to, Map<String, Object> healthData) {
+        String subject = "Cảnh báo sức khỏe hệ thống - TMS";
+        healthData.put("frontendUrl", frontendUrl);
+        healthData.put("adminUrl", frontendUrl + "/admin/health");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/system-health-alert", healthData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendDatabaseBackupConfirmationAsync(String to, Map<String, Object> backupData) {
+        String subject = "Xác nhận sao lưu cơ sở dữ liệu - TMS";
+        backupData.put("frontendUrl", frontendUrl);
+        backupData.put("adminUrl", frontendUrl + "/admin/backup");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/database-backup-confirmation", backupData);
+    }
+
+    @Override
+    public CompletableFuture<Void> sendArchiveCompletionNotificationAsync(String to, Map<String, Object> archiveData) {
+        String subject = "Hoàn thành lưu trữ dữ liệu - TMS";
+        archiveData.put("frontendUrl", frontendUrl);
+        archiveData.put("adminUrl", frontendUrl + "/admin/archive");
+
+        return sendEmailWithTemplateAsync(to, subject, "emails/archive-completion-notification", archiveData);
     }
 
     // Fallback methods for rate limiting

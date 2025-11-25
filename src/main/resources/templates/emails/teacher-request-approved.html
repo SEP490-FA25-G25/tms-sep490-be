@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yêu cầu của giáo viên đã được duyệt - TMS</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            color: #4CAF50;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .status {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .request-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .detail-label {
+            font-weight: bold;
+            min-width: 140px;
+            color: #666;
+        }
+        .detail-value {
+            flex: 1;
+        }
+        .approval-note {
+            background-color: #e8f5e8;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        .action-button {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .info-box {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #2196F3;
+        }
+        .warning-box {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">👨‍🏫 TMS</div>
+            <h1>Yêu cầu của bạn đã được duyệt!</h1>
+        </div>
+
+        <div class="status">
+            ✅ ĐÃ DUYỆT
+        </div>
+
+        <p>Chào giáo viên <strong th:text="${teacherName}">Giáo viên</strong>,</p>
+
+        <p>Yêu cầu <strong th:text="${requestType}">điều chỉnh lịch</strong> của bạn đã được xét duyệt và <strong>CHẤP NHẬN</strong>.</p>
+
+        <div class="request-details">
+            <h3>📋 Chi tiết yêu cầu:</h3>
+            <div class="detail-row">
+                <span class="detail-label">Mã yêu cầu:</span>
+                <span class="detail-value" th:text="${requestId}">#REQ-12345</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Loại yêu cầu:</span>
+                <span class="detail-value" th:text="${requestType}">Điều chỉnh lịch</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Buổi học liên quan:</span>
+                <span class="detail-value" th:text="${sessionInfo}">Thứ 7, 25/12/2024 - 14:00 (IELTS 7.0)</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Ngày tạo yêu cầu:</span>
+                <span class="detail-value" th:text="${createdDate}">20/12/2024 09:30</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Ngày duyệt:</span>
+                <span class="detail-value" th:text="${approvedDate}">21/12/2024 14:15</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Người duyệt:</span>
+                <span class="detail-value" th:text="${approvedBy}">Trưởng phòng Academic Affairs</span>
+            </div>
+        </div>
+
+        <div class="approval-note" th:if="${approvalNote}">
+            <h4>📝 Ghi chú duyệt:</h4>
+            <p th:text="${approvalNote}">Yêu cầu hợp lệ, đã sắp xếp được giáo viên thay thế.</p>
+        </div>
+
+        <div th:if="${requestType == 'Đổi lịch'}">
+            <h3>📅 Thông tin đổi lịch:</h3>
+            <div class="info-box">
+                <div class="detail-row">
+                    <span class="detail-label">Lịch cũ:</span>
+                    <span class="detail-value" th:text="${oldSchedule}">Thứ 7, 25/12/2024 - 14:00</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Lịch mới:</span>
+                    <span class="detail-value" th:text="${newSchedule}">Chủ Nhật, 26/12/2024 - 10:00</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Phòng học:</span>
+                    <span class="detail-value" th:text="${roomInfo}">Phòng B105</span>
+                </div>
+            </div>
+        </div>
+
+        <div th:if="${requestType == 'Nhân sự'}">
+            <h3>👥 Thông tin nhân sự:</h3>
+            <div class="info-box">
+                <div class="detail-row">
+                    <span class="detail-label">Giáo viên thay thế:</span>
+                    <span class="detail-value" th:text="${substituteTeacher}">Nguyễn Thị B</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Nội dung buổi học:</span>
+                    <span class="detail-value" th:text="${sessionContent}">Unit 5 - Speaking Practice</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Tài liệu cần chuẩn bị:</span>
+                    <span class="detail-value" th:text="${materials}">Slide, Audio file, Worksheet</span>
+                </div>
+            </div>
+        </div>
+
+        <div th:if="${requestType == 'Cơ sở vật chất'}">
+            <h3>🏢 Thông tin cơ sở vật chất:</h3>
+            <div class="info-box">
+                <div class="detail-row">
+                    <span class="detail-label">Thiết bị yêu cầu:</span>
+                    <span class="detail-value" th:text="${equipment}">Máy chiếu, Loa, Whiteboard</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Phòng học:</span>
+                    <span class="detail-value" th:text="${assignedRoom}">Phòng A201</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Trạng thái:</span>
+                    <span class="detail-value" th:text="${roomStatus}">Đã sẵn sàng</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="warning-box">
+            <h4>⚠️ Lưu ý quan trọng:</h4>
+            <ul>
+                <li>Vui lòng kiểm tra lại lịch giảng dạy của bạn trên hệ thống</li>
+                <li th:if="${requestType == 'Đổi lịch'}">Thông báo đổi lịch cho học viên trước buổi học ít nhất 24 giờ</li>
+                <li th:if="${requestType == 'Nhân sự'}">Chuẩn bị đầy đủ tài liệu cho giáo viên thay thế</li>
+                <li th:if="${requestType == 'Cơ sở vật chất'}">Kiểm tra trang thiết bị trước buổi học 30 phút</li>
+                <li>Báo cáo ngay nếu có bất kỳ vấn đề nào phát sinh</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a th:href="${dashboardUrl}" class="action-button">
+                Xem lịch giảng dạy
+            </a>
+            <a th:href="${calendarUrl}" class="action-button">
+                Xem calendar
+            </a>
+        </div>
+
+        <div class="info-box">
+            <h4>📞 Hỗ trợ:</h4>
+            <ul>
+                <li>Phòng Academic Affairs: ext. 101</li>
+                <li>Phòng IT (cơ sở vật chất): ext. 205</li>
+                <li>Email: teacher-support@tms.edu.vn</li>
+                <li>Hotline: 1900-1234 (nhánh 2)</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>Trân trọng,<br>
+            <strong>Phòng Academic Affairs</strong><br>
+            👨‍🏫 Hệ thống Quản lý Tutor TMS</p>
+
+            <p style="margin-top: 20px; font-size: 12px; color: #999;">
+                Đây là email tự động từ hệ thống TMS. Vui lòng không trả lời email này.<br>
+                Nếu cần hỗ trợ, vui lòng liên hệ: teacher-support@tms.edu.vn
+            </p>
+        </div>
+    </div>
+</body>
+</html>

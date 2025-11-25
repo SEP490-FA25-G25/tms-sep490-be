@@ -83,5 +83,81 @@ public interface EmailService {
     /**
      * Send weekly attendance report
      */
-    CompletableFuture<Void> sendWeeklyAttendanceReportAsync(String to, String reportData);
+    CompletableFuture<Void> sendWeeklyAttendanceReportAsync(String to, Map<String, Object> reportData);
+
+    // Student Request Email Methods
+
+    /**
+     * Send student request approval notification
+     */
+    CompletableFuture<Void> sendStudentRequestApprovalAsync(String to, Map<String, Object> requestData);
+
+    /**
+     * Send student request rejection notification
+     */
+    CompletableFuture<Void> sendStudentRequestRejectionAsync(String to, Map<String, Object> requestData);
+
+    /**
+     * Send student request confirmation email when created
+     */
+    CompletableFuture<Void> sendStudentRequestCreatedAsync(String to, Map<String, Object> requestData);
+
+    /**
+     * Send student request confirmed notification
+     */
+    CompletableFuture<Void> sendStudentRequestConfirmedAsync(String to, Map<String, Object> requestData);
+
+    /**
+     * Send teacher transfer schedule notification
+     */
+    CompletableFuture<Void> sendTeacherTransferNotificationAsync(String to, Map<String, Object> requestData);
+
+    // Teacher Request Email Methods
+
+    /**
+     * Send teacher request approval notification
+     */
+    CompletableFuture<Void> sendTeacherRequestApprovalAsync(String to, Map<String, Object> requestData);
+
+    /**
+     * Send teacher request rejection notification
+     */
+    CompletableFuture<Void> sendTeacherRequestRejectionAsync(String to, Map<String, Object> requestData);
+
+    /**
+     * Send teacher request confirmation email when created
+     */
+    CompletableFuture<Void> sendTeacherRequestCreatedAsync(String to, Map<String, Object> requestData);
+
+    /**
+     * Send teacher request confirmed notification
+     */
+    CompletableFuture<Void> sendTeacherRequestConfirmedAsync(String to, Map<String, Object> requestData);
+
+    /**
+     * Send department schedule change notification
+     */
+    CompletableFuture<Void> sendDepartmentScheduleChangeNotificationAsync(String to, Map<String, Object> requestData);
+
+    // Scheduled Job Email Methods
+
+    /**
+     * Send monthly analytics report
+     */
+    CompletableFuture<Void> sendMonthlyAnalyticsReportAsync(String to, Map<String, Object> reportData);
+
+    /**
+     * Send system health alert
+     */
+    CompletableFuture<Void> sendSystemHealthAlertAsync(String to, Map<String, Object> healthData);
+
+    /**
+     * Send database backup confirmation
+     */
+    CompletableFuture<Void> sendDatabaseBackupConfirmationAsync(String to, Map<String, Object> backupData);
+
+    /**
+     * Send archive completion notification
+     */
+    CompletableFuture<Void> sendArchiveCompletionNotificationAsync(String to, Map<String, Object> archiveData);
 }

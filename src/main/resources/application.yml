@@ -117,9 +117,9 @@ tms:
 # Resend Email Service Configuration
 resend:
   api:
-    key: ${RESEND_API_KEY:re_6ScZZQdt_Euobyv1BeBNisuY1Uz2C8ZbH}
+    key: ${RESEND_API_KEY:re_oRYdB81f_H9EAu7nBYXNk75gz9cJnG3Jj}
   from:
-    email: ${RESEND_FROM_EMAIL:noreply@tms.edu.vn}
+    email: ${RESEND_FROM_EMAIL:onboarding@resend.dev} # onboarding@resend.dev
     name: ${RESEND_FROM_NAME:Hệ thống TMS}
   rate:
     limit: ${RESEND_RATE_LIMIT:5}  # 5 emails per second

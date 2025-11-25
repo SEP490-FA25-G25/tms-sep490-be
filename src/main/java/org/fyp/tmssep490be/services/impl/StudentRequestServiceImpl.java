@@ -11,6 +11,7 @@ import org.fyp.tmssep490be.exceptions.BusinessRuleException;
 import org.fyp.tmssep490be.exceptions.DuplicateRequestException;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
 import org.fyp.tmssep490be.repositories.*;
+import org.fyp.tmssep490be.services.EmailService;
 import org.fyp.tmssep490be.services.StudentRequestService;
 import org.fyp.tmssep490be.services.StudentScheduleService;
 import org.fyp.tmssep490be.services.NotificationService;
@@ -51,6 +52,7 @@ public class StudentRequestServiceImpl implements StudentRequestService {
     private final UserBranchesRepository userBranchesRepository;
     private final NotificationService notificationService;
     private final StudentScheduleService studentScheduleService;
+    private final EmailService emailService;
 
     // Configuration values (in real implementation, these would come from properties)
     private static final int LEAD_TIME_DAYS = 1;
@@ -249,6 +251,9 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
         // Gửi notification cho Academic Affairs
         sendNotificationToAcademicAffairs(request);
+
+        // Send email notification to student
+        sendEmailNotificationForCreatedRequest(request);
 
         return mapToStudentResponseDTO(request);
     }
@@ -594,6 +599,9 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         // Gửi notification cho student
         sendNotificationToStudentForApproval(request);
 
+        // Send email notification to student
+        sendEmailNotificationForApproval(request);
+
         return mapToStudentResponseDTO(request);
     }
 
@@ -620,6 +628,9 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
         // Gửi notification cho student
         sendNotificationToStudentForRejection(request);
+
+        // Send email notification to student
+        sendEmailNotificationForRejection(request);
 
         return mapToStudentResponseDTO(request);
     }
@@ -2670,5 +2681,177 @@ public class StudentRequestServiceImpl implements StudentRequestService {
             default:
                 return requestType.toString();
         }
+    }
+
+    // ==================== EMAIL NOTIFICATION METHODS ====================
+
+    /**
+     * Gửi email notification cho student khi request được duyệt
+     */
+    private void sendEmailNotificationForApproval(StudentRequest request) {
+        try {
+            String studentEmail = request.getStudent().getUserAccount().getEmail();
+            if (studentEmail == null || studentEmail.trim().isEmpty()) {
+                log.warn("Student {} has no email address, skipping email notification", request.getStudent().getId());
+                return;
+            }
+
+            Map<String, Object> emailData = new HashMap<>();
+            emailData.put("studentName", request.getStudent().getUserAccount().getFullName());
+            emailData.put("requestId", "#" + request.getId());
+            emailData.put("requestType", getRequestTypeDisplayName(request.getRequestType()));
+            emailData.put("className", request.getCurrentClass() != null ? request.getCurrentClass().getName() : "N/A");
+            emailData.put("sessionInfo", getSessionInfo(request));
+            emailData.put("approvedDate", request.getDecidedAt() != null ?
+                request.getDecidedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "N/A");
+            emailData.put("approvedBy", request.getDecidedBy() != null ?
+                request.getDecidedBy().getFullName() : "Hệ thống");
+            emailData.put("approvalNote", request.getNote());
+
+            // Add transfer-specific data
+            if (request.getRequestType() == StudentRequestType.TRANSFER && request.getTargetClass() != null) {
+                emailData.put("currentClass", request.getCurrentClass().getName());
+                emailData.put("targetClass", request.getTargetClass().getName());
+                emailData.put("effectiveDate", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            }
+
+            // Add makeup-specific data
+            if (request.getRequestType() == StudentRequestType.MAKEUP) {
+                emailData.put("missedSession", getSessionInfo(request));
+                emailData.put("makeupSession", getMakeupSessionInfo(request));
+                emailData.put("roomInfo", getRoomInfo(request));
+            }
+
+            emailService.sendStudentRequestApprovalAsync(studentEmail, emailData)
+                .whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        log.error("Failed to send approval email to student {} for request {}: {}",
+                            studentEmail, request.getId(), throwable.getMessage());
+                    } else {
+                        log.info("Approval email sent successfully to student {} for request {}",
+                            studentEmail, request.getId());
+                    }
+                });
+
+        } catch (Exception e) {
+            log.error("Error preparing approval email for request {}: {}", request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi email notification cho student khi request bị từ chối
+     */
+    private void sendEmailNotificationForRejection(StudentRequest request) {
+        try {
+            String studentEmail = request.getStudent().getUserAccount().getEmail();
+            if (studentEmail == null || studentEmail.trim().isEmpty()) {
+                log.warn("Student {} has no email address, skipping email notification", request.getStudent().getId());
+                return;
+            }
+
+            Map<String, Object> emailData = new HashMap<>();
+            emailData.put("studentName", request.getStudent().getUserAccount().getFullName());
+            emailData.put("requestId", "#" + request.getId());
+            emailData.put("requestType", getRequestTypeDisplayName(request.getRequestType()));
+            emailData.put("className", request.getCurrentClass() != null ? request.getCurrentClass().getName() : "N/A");
+            emailData.put("sessionInfo", getSessionInfo(request));
+            emailData.put("rejectedDate", request.getDecidedAt() != null ?
+                request.getDecidedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "N/A");
+            emailData.put("rejectedBy", request.getDecidedBy() != null ?
+                request.getDecidedBy().getFullName() : "Hệ thống");
+            emailData.put("rejectionReason", request.getNote());
+            emailData.put("canAppeal", true); // Students can appeal rejections
+
+            emailService.sendStudentRequestRejectionAsync(studentEmail, emailData)
+                .whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        log.error("Failed to send rejection email to student {} for request {}: {}",
+                            studentEmail, request.getId(), throwable.getMessage());
+                    } else {
+                        log.info("Rejection email sent successfully to student {} for request {}",
+                            studentEmail, request.getId());
+                    }
+                });
+
+        } catch (Exception e) {
+            log.error("Error preparing rejection email for request {}: {}", request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi email notification cho student khi request được tạo
+     */
+    private void sendEmailNotificationForCreatedRequest(StudentRequest request) {
+        try {
+            String studentEmail = request.getStudent().getUserAccount().getEmail();
+            if (studentEmail == null || studentEmail.trim().isEmpty()) {
+                log.warn("Student {} has no email address, skipping email notification", request.getStudent().getId());
+                return;
+            }
+
+            Map<String, Object> emailData = new HashMap<>();
+            emailData.put("studentName", request.getStudent().getUserAccount().getFullName());
+            emailData.put("requestId", "#" + request.getId());
+            emailData.put("requestType", getRequestTypeDisplayName(request.getRequestType()));
+            emailData.put("className", request.getCurrentClass() != null ? request.getCurrentClass().getName() : "N/A");
+            emailData.put("sessionInfo", getSessionInfo(request));
+            emailData.put("submittedDate", request.getSubmittedAt() != null ?
+                request.getSubmittedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "N/A");
+            emailData.put("requestReason", request.getRequestReason());
+            emailData.put("note", request.getNote());
+
+            emailService.sendStudentRequestCreatedAsync(studentEmail, emailData)
+                .whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        log.error("Failed to send created email to student {} for request {}: {}",
+                            studentEmail, request.getId(), throwable.getMessage());
+                    } else {
+                        log.info("Created email sent successfully to student {} for request {}",
+                            studentEmail, request.getId());
+                    }
+                });
+
+        } catch (Exception e) {
+            log.error("Error preparing created email for request {}: {}", request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Lấy thông tin session hiển thị
+     */
+    private String getSessionInfo(StudentRequest request) {
+        if (request.getTargetSession() != null) {
+            Session session = request.getTargetSession();
+            return String.format("%s, %s - %s",
+                session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getStartTime() : "N/A",
+                session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getEndTime() : "N/A");
+        }
+        return "N/A";
+    }
+
+    /**
+     * Lấy thông tin makeup session
+     */
+    private String getMakeupSessionInfo(StudentRequest request) {
+        if (request.getMakeupSession() != null) {
+            Session makeupSession = request.getMakeupSession();
+            return String.format("%s, %s - %s",
+                makeupSession.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                makeupSession.getTimeSlotTemplate() != null ? makeupSession.getTimeSlotTemplate().getStartTime() : "N/A",
+                makeupSession.getTimeSlotTemplate() != null ? makeupSession.getTimeSlotTemplate().getEndTime() : "N/A");
+        }
+        return "N/A";
+    }
+
+    /**
+     * Lấy thông tin phòng học
+     */
+    private String getRoomInfo(StudentRequest request) {
+        // Session entity doesn't have Room field, return class name as fallback
+        if (request.getMakeupSession() != null && request.getMakeupSession().getClassEntity() != null) {
+            return request.getMakeupSession().getClassEntity().getName();
+        }
+        return "N/A";
     }
 }
