@@ -519,33 +519,84 @@ INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, cre
 (2, 1, 2, 'Foundation Practice', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
 -- Course Sessions for Foundation (24 sessions = 8 weeks × 3 sessions/week)
-INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skill_set, created_at, updated_at) VALUES
+INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, created_at, updated_at) VALUES
 -- Phase 1: Foundation Basics (Sessions 1-12)
-(1, 1, 1, 'Introduction to IELTS & Basic Listening', 'Listen to simple dialogues', ARRAY['GENERAL','LISTENING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(2, 1, 2, 'Basic Speaking: Greetings and Introductions', 'Practice self-introduction', ARRAY['SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(3, 1, 3, 'Basic Reading: Short Passages', 'Read and answer simple questions', ARRAY['READING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(4, 1, 4, 'Basic Writing: Simple Sentences', 'Write about yourself', ARRAY['WRITING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(5, 1, 5, 'Listening: Numbers and Dates', 'Complete listening exercises', ARRAY['LISTENING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(6, 1, 6, 'Speaking: Daily Activities', 'Describe your daily routine', ARRAY['SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(7, 1, 7, 'Reading: Understanding Main Ideas', 'Identify main ideas', ARRAY['READING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(8, 1, 8, 'Writing: Simple Paragraphs', 'Write a short paragraph', ARRAY['WRITING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(9, 1, 9, 'Listening: Conversations', 'Listen to basic conversations', ARRAY['LISTENING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(10, 1, 10, 'Speaking: Expressing Likes and Dislikes', 'Talk about preferences', ARRAY['SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(11, 1, 11, 'Reading: Details and Facts', 'Find specific information', ARRAY['READING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(12, 1, 12, 'Writing: Connecting Ideas', 'Use simple connectors', ARRAY['WRITING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(1, 1, 1, 'Introduction to IELTS & Basic Listening', 'Listen to simple dialogues', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(2, 1, 2, 'Basic Speaking: Greetings and Introductions', 'Practice self-introduction', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(3, 1, 3, 'Basic Reading: Short Passages', 'Read and answer simple questions', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(4, 1, 4, 'Basic Writing: Simple Sentences', 'Write about yourself', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(5, 1, 5, 'Listening: Numbers and Dates', 'Complete listening exercises', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(6, 1, 6, 'Speaking: Daily Activities', 'Describe your daily routine', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(7, 1, 7, 'Reading: Understanding Main Ideas', 'Identify main ideas', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(8, 1, 8, 'Writing: Simple Paragraphs', 'Write a short paragraph', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(9, 1, 9, 'Listening: Conversations', 'Listen to basic conversations', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(10, 1, 10, 'Speaking: Expressing Likes and Dislikes', 'Talk about preferences', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(11, 1, 11, 'Reading: Details and Facts', 'Find specific information', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(12, 1, 12, 'Writing: Connecting Ideas', 'Use simple connectors', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 -- Phase 2: Foundation Practice (Sessions 13-24)
-(13, 2, 1, 'Listening: Following Instructions', 'Complete tasks from audio', ARRAY['LISTENING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(14, 2, 2, 'Speaking: Asking Questions', 'Practice question forms', ARRAY['SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(15, 2, 3, 'Reading: Short Stories', 'Read and summarize', ARRAY['READING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(16, 2, 4, 'Writing: Describing People and Places', 'Write descriptions', ARRAY['WRITING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(17, 2, 5, 'Listening: News and Announcements', 'Understand main points', ARRAY['LISTENING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(18, 2, 6, 'Speaking: Giving Opinions', 'Express simple opinions', ARRAY['SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(19, 2, 7, 'Reading: Understanding Context', 'Use context clues', ARRAY['READING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(20, 2, 8, 'Writing: Personal Letters', 'Write informal letters', ARRAY['WRITING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(21, 2, 9, 'Practice Test: Listening & Reading', 'Complete practice test', ARRAY['LISTENING','READING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(22, 2, 10, 'Practice Test: Writing & Speaking', 'Complete practice test', ARRAY['WRITING','SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(23, 2, 11, 'Review and Feedback', 'Review all skills', ARRAY['GENERAL'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(24, 2, 12, 'Final Assessment', 'Complete final test', ARRAY['GENERAL','READING','WRITING','SPEAKING','LISTENING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+(13, 2, 1, 'Listening: Following Instructions', 'Complete tasks from audio', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(14, 2, 2, 'Speaking: Asking Questions', 'Practice question forms', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(15, 2, 3, 'Reading: Short Stories', 'Read and summarize', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(16, 2, 4, 'Writing: Describing People and Places', 'Write descriptions', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(17, 2, 5, 'Listening: News and Announcements', 'Understand main points', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(18, 2, 6, 'Speaking: Giving Opinions', 'Express simple opinions', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(19, 2, 7, 'Reading: Understanding Context', 'Use context clues', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(20, 2, 8, 'Writing: Personal Letters', 'Write informal letters', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(21, 2, 9, 'Practice Test: Listening & Reading', 'Complete practice test', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(22, 2, 10, 'Practice Test: Writing & Speaking', 'Complete practice test', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(23, 2, 11, 'Review and Feedback', 'Review all skills', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(24, 2, 12, 'Final Assessment', 'Complete final test', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+
+-- Course Session Skills (JPA @ElementCollection mapping)
+INSERT INTO course_session_skills (course_session_id, skill) VALUES
+-- Session 1: GENERAL, LISTENING
+(1, 'GENERAL'), (1, 'LISTENING'),
+-- Session 2: SPEAKING
+(2, 'SPEAKING'),
+-- Session 3: READING
+(3, 'READING'),
+-- Session 4: WRITING
+(4, 'WRITING'),
+-- Session 5: LISTENING
+(5, 'LISTENING'),
+-- Session 6: SPEAKING
+(6, 'SPEAKING'),
+-- Session 7: READING
+(7, 'READING'),
+-- Session 8: WRITING
+(8, 'WRITING'),
+-- Session 9: LISTENING
+(9, 'LISTENING'),
+-- Session 10: SPEAKING
+(10, 'SPEAKING'),
+-- Session 11: READING
+(11, 'READING'),
+-- Session 12: WRITING
+(12, 'WRITING'),
+-- Session 13: LISTENING
+(13, 'LISTENING'),
+-- Session 14: SPEAKING
+(14, 'SPEAKING'),
+-- Session 15: READING
+(15, 'READING'),
+-- Session 16: WRITING
+(16, 'WRITING'),
+-- Session 17: LISTENING
+(17, 'LISTENING'),
+-- Session 18: SPEAKING
+(18, 'SPEAKING'),
+-- Session 19: READING
+(19, 'READING'),
+-- Session 20: WRITING
+(20, 'WRITING'),
+-- Session 21: LISTENING, READING
+(21, 'LISTENING'), (21, 'READING'),
+-- Session 22: WRITING, SPEAKING
+(22, 'WRITING'), (22, 'SPEAKING'),
+-- Session 23: GENERAL
+(23, 'GENERAL'),
+-- Session 24: GENERAL, READING, WRITING, SPEAKING, LISTENING
+(24, 'GENERAL'), (24, 'READING'), (24, 'WRITING'), (24, 'SPEAKING'), (24, 'LISTENING');
 
 -- CLOs for Foundation Course
 INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
@@ -1661,29 +1712,29 @@ SELECT setval('enrollment_id_seq', (SELECT MAX(id) FROM enrollment), true);
 
 -- ========== SECTION 12: NOTIFICATIONS SAMPLE DATA ==========
 -- Sample notifications for different users and scenarios
-INSERT INTO notification (recipient_id, type, title, message, priority, status, reference_type, reference_id, metadata, created_at, expires_at) VALUES
--- Academic Affairs notifications
-((SELECT id FROM user_account WHERE email = 'academic.affairs@tms.edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu chuyển lớp chờ duyệt', 'Học sinh Nguyen Van A yêu cầu chuyển từ lớp HSK1-101 sang HSK2-201', 'MEDIUM', 'UNREAD', 'StudentRequest', 1, '{"studentName":"Nguyen Van A","fromClass":"HSK1-101","toClass":"HSK2-201"}', CURRENT_TIMESTAMP - INTERVAL '1 day', CURRENT_TIMESTAMP + INTERVAL '7 days'),
-((SELECT id FROM user_account WHERE email = 'academic.affairs@tms.edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu nghỉ học chờ duyệt', 'Học sinh Tran Thi B yêu cầu nghỉ buổi học ngày 2025-11-15', 'LOW', 'UNREAD', 'StudentRequest', 2, '{"studentName":"Tran Thi B","absenceDate":"2025-11-15","reason":"Bị ốm"}', CURRENT_TIMESTAMP - INTERVAL '2 hours', CURRENT_TIMESTAMP + INTERVAL '5 days'),
+INSERT INTO notification (recipient_id, type, title, message, priority, status, reference_type, reference_id, metadata, created_at, expires_at, read_at) VALUES
+-- Academic Affairs notifications (using staff.huong.hn as Academic Affairs staff)
+((SELECT id FROM user_account WHERE email = 'staff.huong.hn@tms-edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu chuyển lớp chờ duyệt', 'Học sinh Nguyen Van A yêu cầu chuyển từ lớp HSK1-101 sang HSK2-201', 'MEDIUM', 'UNREAD', 'StudentRequest', 1, '{"studentName":"Nguyen Van A","fromClass":"HSK1-101","toClass":"HSK2-201"}', CURRENT_TIMESTAMP - INTERVAL '1 day', CURRENT_TIMESTAMP + INTERVAL '7 days', NULL),
+((SELECT id FROM user_account WHERE email = 'staff.huong.hn@tms-edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu nghỉ học chờ duyệt', 'Học sinh Tran Thi B yêu cầu nghỉ buổi học ngày 2025-11-15', 'LOW', 'UNREAD', 'StudentRequest', 2, '{"studentName":"Tran Thi B","absenceDate":"2025-11-15","reason":"Bị ốm"}', CURRENT_TIMESTAMP - INTERVAL '2 hours', CURRENT_TIMESTAMP + INTERVAL '5 days', NULL),
 
--- Teacher notifications
-((SELECT id FROM user_account WHERE email = 'teacher.hsk1@tms.edu.vn'), 'CLASS_REMINDER', 'Nhắc nhở buổi học', 'Lớp HSK1-101 sẽ bắt đầu vào lúc 09:00 ngày mai tại phòng Room-A', 'MEDIUM', 'UNREAD', NULL, NULL, '{"className":"HSK1-101","startTime":"2025-11-26 09:00:00","room":"Room-A"}', CURRENT_TIMESTAMP - INTERVAL '3 hours', CURRENT_TIMESTAMP + INTERVAL '1 day'),
-((SELECT id FROM user_account WHERE email = 'teacher.hsk1@tms.edu.vn'), 'FEEDBACK_REMINDER', 'Nhắc nhở cung cấp phản hồi', 'Vui lòng cung cấp phản hồi cho khóa học Foundation Level sau khi hoàn thành', 'LOW', 'READ', NULL, NULL, '{"courseName":"Foundation Level","feedbackDue":"2025-11-30"}', CURRENT_TIMESTAMP - INTERVAL '1 week', CURRENT_TIMESTAMP + INTERVAL '3 days'),
+-- Teacher notifications (using existing teacher emails)
+((SELECT id FROM user_account WHERE email = 'john.smith@tms-edu.vn'), 'CLASS_REMINDER', 'Nhắc nhở buổi học', 'Lớp HSK1-101 sẽ bắt đầu vào lúc 09:00 ngày mai tại phòng Room-A', 'MEDIUM', 'UNREAD', NULL, NULL, '{"className":"HSK1-101","startTime":"2025-11-26 09:00:00","room":"Room-A"}', CURRENT_TIMESTAMP - INTERVAL '3 hours', CURRENT_TIMESTAMP + INTERVAL '1 day', NULL),
+((SELECT id FROM user_account WHERE email = 'john.smith@tms-edu.vn'), 'FEEDBACK_REMINDER', 'Nhắc nhở cung cấp phản hồi', 'Vui lòng cung cấp phản hồi cho khóa học Foundation Level sau khi hoàn thành', 'LOW', 'READ', NULL, NULL, '{"courseName":"Foundation Level","feedbackDue":"2025-11-30"}', CURRENT_TIMESTAMP - INTERVAL '1 week', CURRENT_TIMESTAMP + INTERVAL '3 days', CURRENT_TIMESTAMP - INTERVAL '1 week'),
 
--- Student notifications
-((SELECT id FROM user_account WHERE email = 'student.hsk1.1@tms.edu.vn'), 'GRADE_NOTIFICATION', 'Thông báo điểm số', 'Điểm bài kiểm tra giữa kỳ của bạn đã có: 8.5/10', 'HIGH', 'UNREAD', 'Score', 1, '{"assessmentName":"Midterm Quiz","score":8.5,"maxScore":10.0}', CURRENT_TIMESTAMP - INTERVAL '6 hours', CURRENT_TIMESTAMP + INTERVAL '30 days'),
-((SELECT id FROM user_account WHERE email = 'student.hsk1.1@tms.edu.vn'), 'ASSIGNMENT_DEADLINE', 'Hạn nộp bài tập', 'Bài tập cuối tuần sẽ hết hạn vào ngày 2025-11-27 23:59', 'MEDIUM', 'UNREAD', NULL, NULL, '{"assignmentName":"Weekly Homework 3","dueDate":"2025-11-27 23:59:59"}', CURRENT_TIMESTAMP - INTERVAL '12 hours', CURRENT_TIMESTAMP + INTERVAL '2 days'),
+-- Student notifications (using generated student emails)
+((SELECT id FROM user_account WHERE email = 'student.0001@gmail.com'), 'GRADE_NOTIFICATION', 'Thông báo điểm số', 'Điểm bài kiểm tra giữa kỳ của bạn đã có: 8.5/10', 'HIGH', 'UNREAD', 'Score', 1, '{"assessmentName":"Midterm Quiz","score":8.5,"maxScore":10.0}', CURRENT_TIMESTAMP - INTERVAL '6 hours', CURRENT_TIMESTAMP + INTERVAL '30 days', NULL),
+((SELECT id FROM user_account WHERE email = 'student.0001@gmail.com'), 'ASSIGNMENT_DEADLINE', 'Hạn nộp bài tập', 'Bài tập cuối tuần sẽ hết hạn vào ngày 2025-11-27 23:59', 'MEDIUM', 'UNREAD', NULL, NULL, '{"assignmentName":"Weekly Homework 3","dueDate":"2025-11-27 23:59:59"}', CURRENT_TIMESTAMP - INTERVAL '12 hours', CURRENT_TIMESTAMP + INTERVAL '2 days', NULL),
 
 -- Center Head notifications
-((SELECT id FROM user_account WHERE email = 'center.head.hn@tms.edu.vn'), 'LICENSE_WARNING', 'Cảnh báo giấy phép Zoom', 'Giấy phép Zoom cho phòng Room-B sẽ hết hạn trong 15 ngày', 'HIGH', 'UNREAD', NULL, NULL, '{"resourceName":"Room-B","licenseType":"Premium","expiryDate":"2025-12-10","daysRemaining":15}', CURRENT_TIMESTAMP - INTERVAL '4 hours', CURRENT_TIMESTAMP + INTERVAL '15 days'),
+((SELECT id FROM user_account WHERE email = 'head.hn01@tms-edu.vn'), 'LICENSE_WARNING', 'Cảnh báo giấy phép Zoom', 'Giấy phép Zoom cho phòng Room-B sẽ hết hạn trong 15 ngày', 'HIGH', 'UNREAD', NULL, NULL, '{"resourceName":"Room-B","licenseType":"Premium","expiryDate":"2025-12-10","daysRemaining":15}', CURRENT_TIMESTAMP - INTERVAL '4 hours', CURRENT_TIMESTAMP + INTERVAL '15 days', NULL),
 
 -- System notifications for multiple users
-((SELECT id FROM user_account WHERE email = 'teacher.hsk1@tms.edu.vn'), 'SYSTEM_ALERT', 'Bảo trì hệ thống', 'Hệ thống sẽ bảo trì từ 02:00-04:00 ngày 2025-11-28', 'URGENT', 'UNREAD', NULL, NULL, '{"maintenanceWindow":"2025-11-28 02:00-04:00","affectedServices":["Class Management","Attendance"]}', CURRENT_TIMESTAMP - INTERVAL '30 minutes', CURRENT_TIMESTAMP + INTERVAL '2 days'),
-((SELECT id FROM user_account WHERE email = 'academic.affairs@tms.edu.vn'), 'SYSTEM_ALERT', 'Bảo trì hệ thống', 'Hệ thống sẽ bảo trì từ 02:00-04:00 ngày 2025-11-28', 'URGENT', 'UNREAD', NULL, NULL, '{"maintenanceWindow":"2025-11-28 02:00-04:00","affectedServices":["Student Requests","Class Scheduling"]}', CURRENT_TIMESTAMP - INTERVAL '30 minutes', CURRENT_TIMESTAMP + INTERVAL '2 days'),
+((SELECT id FROM user_account WHERE email = 'john.smith@tms-edu.vn'), 'SYSTEM_ALERT', 'Bảo trì hệ thống', 'Hệ thống sẽ bảo trì từ 02:00-04:00 ngày 2025-11-28', 'URGENT', 'UNREAD', NULL, NULL, '{"maintenanceWindow":"2025-11-28 02:00-04:00","affectedServices":["Class Management","Attendance"]}', CURRENT_TIMESTAMP - INTERVAL '30 minutes', CURRENT_TIMESTAMP + INTERVAL '2 days', NULL),
+((SELECT id FROM user_account WHERE email = 'staff.huong.hn@tms-edu.vn'), 'SYSTEM_ALERT', 'Bảo trì hệ thống', 'Hệ thống sẽ bảo trì từ 02:00-04:00 ngày 2025-11-28', 'URGENT', 'UNREAD', NULL, NULL, '{"maintenanceWindow":"2025-11-28 02:00-04:00","affectedServices":["Student Requests","Class Scheduling"]}', CURRENT_TIMESTAMP - INTERVAL '30 minutes', CURRENT_TIMESTAMP + INTERVAL '2 days', NULL),
 
 -- Some read notifications for testing
-((SELECT id FROM user_account WHERE email = 'student.hsk1.2@tms.edu.vn'), 'CLASS_REMINDER', 'Buổi học đã di chuyển', 'Lớp HSK1-102 ngày 2025-11-20 đã được chuyển sang phòng Room-C', 'MEDIUM', 'READ', 'Session', 5, '{"originalRoom":"Room-A","newRoom":"Room-C","sessionDate":"2025-11-20"}', CURRENT_TIMESTAMP - INTERVAL '3 days', CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '1 day'),
-((SELECT id FROM user_account WHERE email = 'teacher.hsk2@tms.edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu thay thế đã duyệt', 'Yêu cầu dạy thay lớp HSK2-201 ngày 2025-11-15 đã được duyệt', 'MEDIUM', 'READ', 'TeacherRequest', 1, '{"replacementTeacher":"Teacher HSK1","sessionDate":"2025-11-15","status":"APPROVED"}', CURRENT_TIMESTAMP - INTERVAL '5 days', CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '4 days');
+((SELECT id FROM user_account WHERE email = 'student.0002@gmail.com'), 'CLASS_REMINDER', 'Buổi học đã di chuyển', 'Lớp HSK1-102 ngày 2025-11-20 đã được chuyển sang phòng Room-C', 'MEDIUM', 'READ', 'Session', 5, '{"originalRoom":"Room-A","newRoom":"Room-C","sessionDate":"2025-11-20"}', CURRENT_TIMESTAMP - INTERVAL '3 days', CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '1 day'),
+((SELECT id FROM user_account WHERE email = 'emma.wilson@tms-edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu thay thế đã duyệt', 'Yêu cầu dạy thay lớp HSK2-201 ngày 2025-11-15 đã được duyệt', 'MEDIUM', 'READ', 'TeacherRequest', 1, '{"replacementTeacher":"Teacher HSK1","sessionDate":"2025-11-15","status":"APPROVED"}', CURRENT_TIMESTAMP - INTERVAL '5 days', CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '4 days');
 
 -- =========================================
 -- END OF SEED DATA

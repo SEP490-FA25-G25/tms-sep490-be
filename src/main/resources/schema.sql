@@ -329,11 +329,19 @@ CREATE TABLE course_session (
   sequence_no INTEGER NOT NULL, -- ví dụ: Session 1, Session 2, Session 3, ...
   topic VARCHAR(500),
   student_task TEXT,
-  skill_set VARCHAR(20)[],
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_course_session_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE CASCADE,
   CONSTRAINT uq_course_session_phase_sequence UNIQUE(phase_id,sequence_no)
+);
+
+-- Bảng mapping cho skills của course_session (JPA @ElementCollection)
+CREATE TABLE course_session_skills (
+  course_session_id BIGINT NOT NULL,
+  skill VARCHAR(20) NOT NULL,
+  PRIMARY KEY (course_session_id, skill),
+  CONSTRAINT fk_course_session_skills_session FOREIGN KEY(course_session_id) REFERENCES course_session(id) ON DELETE CASCADE,
+  CONSTRAINT chk_course_session_skill CHECK (skill IN ('GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI'))
 );
 
 CREATE TABLE course_material (
