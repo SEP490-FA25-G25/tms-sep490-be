@@ -54,6 +54,14 @@ springdoc:
   show-actuator: false
   paths-to-match: /api/**
   packages-to-scan: org.fyp.tmssep490be.controllers
+
+# Application Configuration
+app:
+  frontend:
+    url: ${FRONTEND_URL:http://localhost:5173}
+  email:
+    enabled: ${EMAIL_ENABLED:true}
+
 server:
   port: 8080
 
@@ -113,3 +121,24 @@ tms:
       feedback-collection-reminder:
         enabled: true
         cron: "0 0 10 * * MON,WED,FRI"  # Mon/Wed/Fri at 10:00 AM
+
+# Resend Email Service Configuration
+resend:
+  api:
+    key: ${RESEND_API_KEY:re_oRYdB81f_H9EAu7nBYXNk75gz9cJnG3Jj}
+  from:
+    email: ${RESEND_FROM_EMAIL:onboarding@resend.dev} # onboarding@resend.dev
+    name: ${RESEND_FROM_NAME:Hệ thống TMS}
+  rate:
+    limit: ${RESEND_RATE_LIMIT:5}  # 5 emails per second
+    limit-duration: ${RESEND_RATE_LIMIT_DURATION:1}  # 1 second
+  retry:
+    max-attempts: ${RESEND_RETRY_MAX_ATTEMPTS:3}
+    delay: ${RESEND_RETRY_DELAY:1000}  # 1 second
+
+# Email Configuration
+email:
+  async:
+    pool-size: ${EMAIL_ASYNC_POOL_SIZE:10}
+    queue-capacity: ${EMAIL_ASYNC_QUEUE_CAPACITY:100}
+    thread-name-prefix: ${EMAIL_ASYNC_THREAD_PREFIX:EmailAsync-}

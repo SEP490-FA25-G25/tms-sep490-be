@@ -16,6 +16,7 @@ import org.fyp.tmssep490be.entities.enums.*;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
+import org.fyp.tmssep490be.services.EmailService;
 import org.fyp.tmssep490be.services.TeacherRequestService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
+import java.time.format.DateTimeFormatter;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +50,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
     private final StudentSessionRepository studentSessionRepository;
     private final TeacherSkillRepository teacherSkillRepository;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -162,6 +168,9 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
         request = teacherRequestRepository.save(request);
         log.info("Created teacher request with ID: {}", request.getId());
+
+        // Send email notification to teacher
+        sendEmailNotificationForCreatedRequest(request);
 
         // Reload request with all relationships for response
         request = teacherRequestRepository.findByIdWithTeacherAndSession(request.getId())
@@ -312,6 +321,9 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         request = teacherRequestRepository.save(request);
         log.info("Request {} approved successfully", requestId);
 
+        // Send email notification to teacher
+        sendEmailNotificationForApproval(request);
+
         return mapToResponseDTO(request);
     }
 
@@ -339,6 +351,9 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
         request = teacherRequestRepository.save(request);
         log.info("Request {} rejected successfully", requestId);
+
+        // Send email notification to teacher
+        sendEmailNotificationForRejection(request);
 
         return mapToResponseDTO(request);
     }
@@ -1781,5 +1796,274 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         }
         return userAccount.getUserRoles().stream()
                 .anyMatch(ur -> ur.getRole() != null && "ACADEMIC_AFFAIR".equals(ur.getRole().getCode()));
+    }
+
+    // ==================== EMAIL NOTIFICATION METHODS ====================
+
+    /**
+     * Gửi email notification cho teacher khi request được duyệt
+     */
+    private void sendEmailNotificationForApproval(TeacherRequest request) {
+        try {
+            String teacherEmail = request.getTeacher().getUserAccount().getEmail();
+            if (teacherEmail == null || teacherEmail.trim().isEmpty()) {
+                log.warn("Teacher {} has no email address, skipping email notification", request.getTeacher().getId());
+                return;
+            }
+
+            Map<String, Object> emailData = new HashMap<>();
+            emailData.put("teacherName", request.getTeacher().getUserAccount().getFullName());
+            emailData.put("requestId", "#REQ-" + request.getId());
+            emailData.put("requestType", getRequestTypeDisplayName(request.getRequestType()));
+            emailData.put("sessionInfo", getSessionInfo(request));
+            emailData.put("approvedDate", request.getDecidedAt() != null ?
+                request.getDecidedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "N/A");
+            emailData.put("approvedBy", request.getDecidedBy() != null ?
+                request.getDecidedBy().getFullName() : "Hệ thống");
+            emailData.put("approvalNote", request.getNote());
+
+            // Add specific data based on request type
+            if (request.getRequestType() == TeacherRequestType.RESCHEDULE) {
+                emailData.put("oldSchedule", getOldScheduleInfo(request));
+                emailData.put("newSchedule", getNewScheduleInfo(request));
+                emailData.put("roomInfo", getRoomInfo(request));
+            }
+
+            if (request.getRequestType() == TeacherRequestType.REPLACEMENT) {
+                emailData.put("substituteTeacher", request.getReplacementTeacher() != null ?
+                    request.getReplacementTeacher().getUserAccount().getFullName() : "Chưa có");
+                emailData.put("sessionContent", request.getSession() != null ?
+                    request.getSession().getClassEntity().getName() : "N/A");
+                emailData.put("materials", getMaterialsInfo(request));
+            }
+
+            if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
+                emailData.put("equipment", getEquipmentInfo(request));
+                emailData.put("assignedRoom", request.getSession() != null && request.getSession().getClassEntity() != null ?
+                    request.getSession().getClassEntity().getName() : "N/A");
+                emailData.put("roomStatus", "Đã sẵn sàng");
+            }
+
+            emailService.sendTeacherRequestApprovalAsync(teacherEmail, emailData)
+                .whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        log.error("Failed to send approval email to teacher {} for request {}: {}",
+                            teacherEmail, request.getId(), throwable.getMessage());
+                    } else {
+                        log.info("Approval email sent successfully to teacher {} for request {}",
+                            teacherEmail, request.getId());
+                    }
+                });
+
+        } catch (Exception e) {
+            log.error("Error preparing approval email for request {}: {}", request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi email notification cho teacher khi request bị từ chối
+     */
+    private void sendEmailNotificationForRejection(TeacherRequest request) {
+        try {
+            String teacherEmail = request.getTeacher().getUserAccount().getEmail();
+            if (teacherEmail == null || teacherEmail.trim().isEmpty()) {
+                log.warn("Teacher {} has no email address, skipping email notification", request.getTeacher().getId());
+                return;
+            }
+
+            Map<String, Object> emailData = new HashMap<>();
+            emailData.put("teacherName", request.getTeacher().getUserAccount().getFullName());
+            emailData.put("requestId", "#REQ-" + request.getId());
+            emailData.put("requestType", getRequestTypeDisplayName(request.getRequestType()));
+            emailData.put("sessionInfo", getSessionInfo(request));
+            emailData.put("rejectedDate", request.getDecidedAt() != null ?
+                request.getDecidedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "N/A");
+            emailData.put("rejectedBy", request.getDecidedBy() != null ?
+                request.getDecidedBy().getFullName() : "Hệ thống");
+            emailData.put("rejectionReason", request.getNote());
+            emailData.put("canAppeal", true); // Teachers can appeal rejections
+
+            // Add suggestions based on request type
+            List<String> suggestions = new ArrayList<>();
+            if (request.getRequestType() == TeacherRequestType.RESCHEDULE) {
+                suggestions.add("Liên hệ giáo viên khác để tr đổi lịch");
+                suggestions.add("Kiểm tra lại lịch trống của giáo viên thay thế");
+            } else if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
+                suggestions.add("Liên hệ phòng IT để kiểm tra thiết bị");
+                suggestions.add("Chuẩn bị phương án dự phòng nếu thiết bị không sẵn sàng");
+            }
+            emailData.put("suggestions", suggestions);
+
+            emailService.sendTeacherRequestRejectionAsync(teacherEmail, emailData)
+                .whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        log.error("Failed to send rejection email to teacher {} for request {}: {}",
+                            teacherEmail, request.getId(), throwable.getMessage());
+                    } else {
+                        log.info("Rejection email sent successfully to teacher {} for request {}",
+                            teacherEmail, request.getId());
+                    }
+                });
+
+        } catch (Exception e) {
+            log.error("Error preparing rejection email for request {}: {}", request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi email notification cho teacher khi request được tạo
+     */
+    private void sendEmailNotificationForCreatedRequest(TeacherRequest request) {
+        try {
+            String teacherEmail = request.getTeacher().getUserAccount().getEmail();
+            if (teacherEmail == null || teacherEmail.trim().isEmpty()) {
+                log.warn("Teacher {} has no email address, skipping email notification", request.getTeacher().getId());
+                return;
+            }
+
+            Map<String, Object> emailData = new HashMap<>();
+            emailData.put("teacherName", request.getTeacher().getUserAccount().getFullName());
+            emailData.put("requestId", "#REQ-" + request.getId());
+            emailData.put("requestType", getRequestTypeDisplayName(request.getRequestType()));
+            emailData.put("sessionInfo", getSessionInfo(request));
+            emailData.put("createdDate", request.getSubmittedAt() != null ?
+                request.getSubmittedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "N/A");
+            emailData.put("requestReason", request.getNote());
+            emailData.put("note", request.getNote());
+
+            // Add specific data based on request type
+            if (request.getRequestType() == TeacherRequestType.RESCHEDULE) {
+                emailData.put("preferredDate", request.getNewDate() != null ?
+                    request.getNewDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A");
+                emailData.put("preferredTimeSlot", request.getNewTimeSlot() != null ?
+                    request.getNewTimeSlot().getName() : "N/A");
+            }
+
+            if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
+                emailData.put("currentModality", getCurrentModality(request));
+                emailData.put("requestedModality", getRequestedModality(request));
+            }
+
+            emailService.sendTeacherRequestCreatedAsync(teacherEmail, emailData)
+                .whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        log.error("Failed to send created email to teacher {} for request {}: {}",
+                            teacherEmail, request.getId(), throwable.getMessage());
+                    } else {
+                        log.info("Created email sent successfully to teacher {} for request {}",
+                            teacherEmail, request.getId());
+                    }
+                });
+
+        } catch (Exception e) {
+            log.error("Error preparing created email for request {}: {}", request.getId(), e.getMessage(), e);
+        }
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    /**
+     * Lấy display name cho request type
+     */
+    private String getRequestTypeDisplayName(TeacherRequestType requestType) {
+        switch (requestType) {
+            case RESCHEDULE:
+                return "Đổi lịch";
+            case REPLACEMENT:
+                return "Nhân sự";
+            case MODALITY_CHANGE:
+                return "Cơ sở vật chất";
+            default:
+                return requestType.toString();
+        }
+    }
+
+    /**
+     * Lấy thông tin session hiển thị
+     */
+    private String getSessionInfo(TeacherRequest request) {
+        if (request.getSession() != null) {
+            Session session = request.getSession();
+            return String.format("%s (%s), %s - %s",
+                session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                session.getClassEntity() != null ? session.getClassEntity().getName() : "N/A",
+                session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getStartTime() : "N/A",
+                session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getEndTime() : "N/A");
+        }
+        return "N/A";
+    }
+
+    /**
+     * Lấy thông tin lịch cũ
+     */
+    private String getOldScheduleInfo(TeacherRequest request) {
+        if (request.getSession() != null) {
+            Session session = request.getSession();
+            return String.format("%s, %s - %s",
+                session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getStartTime() : "N/A",
+                session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getEndTime() : "N/A");
+        }
+        return "N/A";
+    }
+
+    /**
+     * Lấy thông tin lịch mới
+     */
+    private String getNewScheduleInfo(TeacherRequest request) {
+        return String.format("%s, %s",
+            request.getNewDate() != null ?
+                request.getNewDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A",
+            request.getNewTimeSlot() != null ? request.getNewTimeSlot().getName() : "N/A");
+    }
+
+    /**
+     * Lấy thông tin phòng học
+     */
+    private String getRoomInfo(TeacherRequest request) {
+        // Session entity doesn't have Room field, return class name as fallback
+        if (request.getSession() != null && request.getSession().getClassEntity() != null) {
+            return request.getSession().getClassEntity().getName();
+        }
+        return "N/A";
+    }
+
+    /**
+     * Lấy thông tin tài liệu
+     */
+    private String getMaterialsInfo(TeacherRequest request) {
+        if (request.getSession() != null) {
+            // For simplicity, return generic materials info
+            return "Slide, Audio file, Worksheet";
+        }
+        return "N/A";
+    }
+
+    /**
+     * Lấy thông tin thiết bị
+     */
+    private String getEquipmentInfo(TeacherRequest request) {
+        if (request.getNewResource() != null) {
+            return request.getNewResource().getName();
+        }
+        return "N/A";
+    }
+
+    /**
+     * Lấy thông tin modality hiện tại
+     */
+    private String getCurrentModality(TeacherRequest request) {
+        // TeacherRequest doesn't have currentResource field, return generic value
+        return "Hiện tại";
+    }
+
+    /**
+     * Lấy thông tin modality yêu cầu
+     */
+    private String getRequestedModality(TeacherRequest request) {
+        if (request.getNewResource() != null) {
+            return request.getNewResource().getName();
+        }
+        return "N/A";
     }
 }

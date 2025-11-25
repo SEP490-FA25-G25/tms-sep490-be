@@ -134,6 +134,32 @@
             <artifactId>spring-mock-mvc</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Resend Java SDK for Email Service -->
+        <dependency>
+            <groupId>com.resend</groupId>
+            <artifactId>resend-java</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+        <!-- Spring Boot Async Support for Email Processing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- Rate Limiting -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>2.1.0</version>
+        </dependency>
+
+        <!-- Thymeleaf for Email Templates -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

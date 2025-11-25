@@ -210,4 +210,52 @@ public class JwtTokenProvider {
     public long getAccessTokenExpirationInSeconds() {
         return accessTokenValidityInMs / 1000;
     }
+
+    // ============== PASSWORD RESET TOKEN METHODS ==============
+
+    /**
+     * Generate password reset token with 15-minute validity
+     */
+    public String generatePasswordResetToken(Long userId) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + accessTokenValidityInMs); // 15 minutes
+
+        return Jwts.builder()
+                .setSubject("password-reset")
+                .claim("userId", userId)
+                .claim("type", "password-reset")
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(secretKey, SignatureAlgorithm.HS512)
+                .compact();
+    }
+
+    /**
+     * Validate password reset token and extract user ID
+     * @return User ID if token is valid, null otherwise
+     */
+    public Long validatePasswordResetToken(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+            String tokenType = claims.get("type", String.class);
+            if (!"password-reset".equals(tokenType)) {
+                log.warn("Invalid token type for password reset: {}", tokenType);
+                return null;
+            }
+
+            return claims.get("userId", Long.class);
+
+        } catch (ExpiredJwtException ex) {
+            log.warn("Password reset token expired");
+            return null;
+        } catch (Exception ex) {
+            log.error("Invalid password reset token", ex);
+            return null;
+        }
+    }
 }

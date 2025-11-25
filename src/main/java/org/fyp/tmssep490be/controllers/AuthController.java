@@ -4,10 +4,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
-import org.fyp.tmssep490be.dtos.auth.AuthResponse;
-import org.fyp.tmssep490be.dtos.auth.LoginRequest;
-import org.fyp.tmssep490be.dtos.auth.RefreshTokenRequest;
+import org.fyp.tmssep490be.dtos.auth.*;
 import org.fyp.tmssep490be.services.AuthService;
+import org.fyp.tmssep490be.services.ForgotPasswordService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final ForgotPasswordService forgotPasswordService;
 
     /**
      * Login endpoint
@@ -73,6 +73,59 @@ public class AuthController {
                 ResponseObject.<Void>builder()
                         .success(true)
                         .message("Logout successful - please discard your tokens")
+                        .build()
+        );
+    }
+
+    /**
+     * Forgot password endpoint
+     * POST /api/v1/auth/forgot-password
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ResponseObject<ForgotPasswordResponse>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("Forgot password request received for email: {}", request.getEmail());
+
+        ForgotPasswordResponse response = forgotPasswordService.requestPasswordReset(request.getEmail());
+
+        return ResponseEntity.ok(
+                ResponseObject.<ForgotPasswordResponse>builder()
+                        .success(true)
+                        .message(response.getMessage())
+                        .data(response)
+                        .build()
+        );
+    }
+
+    /**
+     * Reset password endpoint
+     * POST /api/v1/auth/reset-password
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<ResponseObject<ResetPasswordResponse>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+        log.info("Reset password request received");
+
+        // Validate password confirmation
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            return ResponseEntity.badRequest()
+                    .body(ResponseObject.<ResetPasswordResponse>builder()
+                            .success(false)
+                            .message("Mật khẩu xác nhận không khớp")
+                            .build()
+                    );
+        }
+
+        ResetPasswordResponse response = forgotPasswordService.resetPassword(
+                request.getToken(),
+                request.getNewPassword()
+        );
+
+        return ResponseEntity.ok(
+                ResponseObject.<ResetPasswordResponse>builder()
+                        .success(response.isSuccess())
+                        .message(response.getMessage())
+                        .data(response)
                         .build()
         );
     }

@@ -118,6 +118,8 @@ INSERT INTO user_account (id, email, phone, full_name, gender, dob, address, pas
 (9, 'staff.tuan.hcm@tms-edu.vn', '0912000009', 'Tran Minh Tuan',  'MALE', '1993-08-20', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
 (10, 'qa.linh@tms-edu.vn', '0912000010', 'Vu Thi Linh',  'FEMALE', '1988-09-25', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
 (11, 'qa.thanh@tms-edu.vn', '0912000011', 'Dang Ngoc Thanh',  'MALE', '1989-04-10', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+-- Test user for forgot password functionality (using Resend verified email)
+(12, 'cccccc9712@gmail.com', '0912345678', 'Truong Manh Thang', 'MALE', '1997-12-31', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
 
 -- Teachers (16 teachers: 8 per branch)
 (20, 'john.smith@tms-edu.vn', '0912001001', 'John Smith',  'MALE', '1985-04-12', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'),
@@ -223,9 +225,19 @@ INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 1, 6 FROM
 INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 2, 8 FROM user_account WHERE id > 130;
 
 -- Teachers & Students
-INSERT INTO teacher (id, user_account_id, employee_code, hire_date, contract_type, created_at, updated_at) 
+INSERT INTO teacher (id, user_account_id, employee_code, hire_date, contract_type, created_at, updated_at)
 SELECT (id - 19), id, 'TCH-' || LPAD((id-19)::text, 3, '0'), '2024-02-01', CASE WHEN id % 3 = 0 THEN 'part-time' ELSE 'full-time' END, '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07'
 FROM user_account WHERE id BETWEEN 20 AND 35;
+
+-- Test student for forgot password functionality
+INSERT INTO student (id, user_id, student_code, created_at, updated_at) VALUES
+(61, 12, 'TEST-0012', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
+
+-- Add user role for test student (STUDENT role = 7)
+INSERT INTO user_role (user_id, role_id) VALUES (12, 7);
+
+-- Add user branch for test student (HN branch = 1)
+INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES (12, 1, 1);
 
 INSERT INTO student (id, user_id, student_code, created_at, updated_at)
 SELECT (id - 100), id, 'STD-' || LPAD((id - 100)::text, 4, '0'),

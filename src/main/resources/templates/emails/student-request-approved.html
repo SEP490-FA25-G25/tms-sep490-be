@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yêu cầu của bạn đã được duyệt - TMS</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            color: #4CAF50;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .status {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .request-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .detail-label {
+            font-weight: bold;
+            min-width: 120px;
+            color: #666;
+        }
+        .detail-value {
+            flex: 1;
+        }
+        .approval-note {
+            background-color: #e8f5e8;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        .action-button {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">📚 TMS</div>
+            <h1>Yêu cầu của bạn đã được duyệt!</h1>
+        </div>
+
+        <div class="status">
+            ✅ ĐÃ DUYỆT
+        </div>
+
+        <p>Chào bạn <strong th:text="${studentName}">Học viên</strong>,</p>
+
+        <p>Yêu cầu <strong th:text="${requestType}">xin nghỉ</strong> của bạn đã được xét duyệt và <strong>CHẤP NHẬN</strong>.</p>
+
+        <div class="request-details">
+            <h3>📋 Chi tiết yêu cầu:</h3>
+            <div class="detail-row">
+                <span class="detail-label">Mã yêu cầu:</span>
+                <span class="detail-value" th:text="#{requestId}">#12345</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Loại yêu cầu:</span>
+                <span class="detail-value" th:text="${requestType}">Xin nghỉ</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Lớp học:</span>
+                <span class="detail-value" th:text="${className}">IELTS 7.0</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Buổi học:</span>
+                <span class="detail-value" th:text="${sessionInfo}">Thứ 7, 25/12/2024 - 14:00</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Ngày duyệt:</span>
+                <span class="detail-value" th:text="${approvedDate}">25/12/2024 10:30</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Người duyệt:</span>
+                <span class="detail-value" th:text="${approvedBy}">Nguyễn Văn A</span>
+            </div>
+        </div>
+
+        <div class="approval-note" th:if="${approvalNote}">
+            <h4>📝 Ghi chú duyệt:</h4>
+            <p th:text="${approvalNote}">Yêu cầu hợp lệ, đã được chấp thuận.</p>
+        </div>
+
+        <div th:if="${requestType == 'Chuyển lớp'}">
+            <h3>🔄 Thông tin chuyển lớp:</h3>
+            <div class="request-details">
+                <div class="detail-row">
+                    <span class="detail-label">Lớp hiện tại:</span>
+                    <span class="detail-value" th:text="${currentClass}">IELTS 6.5</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Lớp mới:</span>
+                    <span class="detail-value" th:text="${targetClass}">IELTS 7.0</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Ngày hiệu lực:</span>
+                    <span class="detail-value" th:text="${effectiveDate}">01/01/2025</span>
+                </div>
+            </div>
+        </div>
+
+        <div th:if="${requestType == 'Buổi học bù'}">
+            <h3>📅 Thông tin buổi học bù:</h3>
+            <div class="request-details">
+                <div class="detail-row">
+                    <span class="detail-label">Buổi nghỉ:</span>
+                    <span class="detail-value" th:text="${missedSession}">Thứ 7, 18/12/2024</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Buổi học bù:</span>
+                    <span class="detail-value" th:text="${makeupSession}">Chủ Nhật, 27/12/2024 - 14:00</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Phòng học:</span>
+                    <span class="detail-value" th:text="${roomInfo}">Phòng A201</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a th:href="${dashboardUrl}" class="action-button">
+                Xem chi tiết trên TMS Dashboard
+            </a>
+        </div>
+
+        <p><strong>Lưu ý:</strong></p>
+        <ul>
+            <li th:if="${requestType == 'Xin nghỉ'}">Buổi học này sẽ được ghi nhận là "Nghỉ có phép"</li>
+            <li th:if="${requestType == 'Chuyển lớp'}">Vui lòng đến lớp mới theo lịch đã xác nhận</li>
+            <li th:if="${requestType == 'Buổi học bù'}">Vui lòng tham dự buổi học bù đúng giờ</li>
+            <li>Nếu có bất kỳ câu hỏi nào, vui lòng liên hệ phòng academic affairs</li>
+        </ul>
+
+        <div class="footer">
+            <p>Trân trọng,<br>
+            <strong>Phòng Academic Affairs</strong><br>
+            📚 Hệ thống Quản lý Tutor TMS</p>
+
+            <p style="margin-top: 20px; font-size: 12px; color: #999;">
+                Đây là email tự động từ hệ thống TMS. Vui lòng không trả lời email này.<br>
+                Nếu cần hỗ trợ, vui lòng liên hệ: academic@tms.edu.vn
+            </p>
+        </div>
+    </div>
+</body>
+</html>

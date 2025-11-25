@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chào mừng đến với TMS</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            color: #4CAF50;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .welcome-text {
+            font-size: 24px;
+            color: #2196F3;
+            margin-bottom: 20px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        .footer {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .highlight {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">TMS - Hệ thống Quản lý Đào tạo</div>
+        </div>
+
+        <div class="welcome-text">
+            Chào mừng <span th:text="${userName}"></span> đến với TMS!
+        </div>
+
+        <div class="content">
+            <p>Cảm ơn bạn đã đăng ký tham gia Hệ thống Quản lý Đào tạo TMS. Chúng tôi rất vui mừng được đồng hành cùng bạn trên hành trình học tập và phát triển.</p>
+
+            <div class="highlight">
+                <strong>Quan trọng:</strong> Vui lòng xác nhận địa chỉ email của bạn bằng cách nhấp vào nút bên dưới.
+            </div>
+
+            <p>Sau khi xác nhận, bạn sẽ có thể:</p>
+            <ul>
+                <li>Đăng nhập vào hệ thống</li>
+                <li>Xem lịch học và thông tin lớp học</li>
+                <li>Theo dõi tiến độ học tập</li>
+                <li>Nhận thông báo quan trọng</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center;">
+            <a th:href="${verificationLink}" class="btn">Xác nhận Email</a>
+        </div>
+
+        <p style="text-align: center; margin-top: 20px; font-size: 12px; color: #666;">
+            Nếu nút không hoạt động, vui lòng sao chép và dán đường link sau vào trình duyệt:<br>
+            <span th:text="${verificationLink}" style="word-break: break-all;"></span>
+        </p>
+
+        <div class="footer">
+            <p>Trân trọng,<br>
+            Đội ngũ TMS</p>
+
+            <p style="font-size: 12px; margin-top: 15px;">
+                Email này được gửi tự động, vui lòng không trả lời.<br>
+                Nếu bạn không đăng ký tài khoản này, vui lòng bỏ qua email này.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

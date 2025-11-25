@@ -8,6 +8,7 @@ import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.UserAccountService;
+import org.fyp.tmssep490be.services.EmailService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,6 +33,7 @@ public class UserAccountServiceImpl implements UserAccountService {
     private final UserRoleRepository userRoleRepository;
     private final UserBranchesRepository userBranchesRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -98,6 +100,17 @@ public class UserAccountServiceImpl implements UserAccountService {
         }
 
         log.info("User created successfully: {}", user.getEmail());
+
+        // Send welcome email
+        try {
+            String verificationLink = "http://localhost:3000/verify?email=" + user.getEmail() + "&token=" + user.getId();
+            emailService.sendWelcomeEmailAsync(user.getEmail(), user.getFullName(), verificationLink);
+            log.info("Welcome email sent to: {}", user.getEmail());
+        } catch (Exception e) {
+            log.warn("Failed to send welcome email to {}: {}", user.getEmail(), e.getMessage());
+            // Don't fail the user creation if email fails
+        }
+
         return mapToResponse(user);
     }
 
