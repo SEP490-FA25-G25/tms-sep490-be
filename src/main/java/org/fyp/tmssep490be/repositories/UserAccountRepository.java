@@ -73,4 +73,33 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     @Transactional
     @Query("UPDATE UserAccount u SET u.passwordHash = :passwordHash WHERE u.id = :userId")
     int updatePasswordById(@Param("userId") Long userId, @Param("passwordHash") String passwordHash);
+
+    /**
+     * Find all users with roles and branches eagerly fetched
+     * Used for admin user management listing
+     * Override default findAll to include roles and branches
+     */
+    @Override
+    @EntityGraph(attributePaths = {"userRoles", "userRoles.role", "userBranches", "userBranches.branch"})
+    org.springframework.data.domain.Page<UserAccount> findAll(org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Find all users with filtering support
+     * Supports search by email, fullName, phone and filtering by role and status
+     */
+    @EntityGraph(attributePaths = {"userRoles", "userRoles.role", "userBranches", "userBranches.branch"})
+    @Query("SELECT DISTINCT u FROM UserAccount u " +
+           "LEFT JOIN u.userRoles ur " +
+           "LEFT JOIN u.userBranches ub " +
+           "WHERE (:search IS NULL OR :search = '' OR " +
+           "       LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "       LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "       (u.phone IS NOT NULL AND LOWER(u.phone) LIKE LOWER(CONCAT('%', :search, '%')))) " +
+           "AND (:role IS NULL OR :role = '' OR ur.role.code = :role) " +
+           "AND (:statusEnum IS NULL OR u.status = :statusEnum)")
+    org.springframework.data.domain.Page<UserAccount> findAllWithFilters(
+            @Param("search") String search,
+            @Param("role") String role,
+            @Param("statusEnum") UserStatus statusEnum,
+            org.springframework.data.domain.Pageable pageable);
 }

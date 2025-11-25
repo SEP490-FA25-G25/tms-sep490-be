@@ -134,10 +134,32 @@ public class UserAccountServiceImpl implements UserAccountService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<UserResponse> getAllUsers(Pageable pageable) {
-        log.debug("Fetching all users with pagination");
-        return userAccountRepository.findAll(pageable)
-                .map(this::mapToResponse);
+    public Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status) {
+        log.debug("Fetching all users with pagination and filters - search: {}, role: {}, status: {}", search, role, status);
+        
+        // Normalize search term - trim and handle null/empty
+        String searchTerm = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        String roleCode = (role != null && !role.trim().isEmpty()) ? role.trim() : null;
+        UserStatus statusEnum = null;
+        
+        // Validate and convert status string to enum
+        if (status != null && !status.trim().isEmpty()) {
+            try {
+                statusEnum = UserStatus.valueOf(status.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid status value provided: {}, ignoring status filter", status);
+            }
+        }
+        
+        // Use filtered query if any filter is provided, otherwise use simple findAll
+        Page<UserAccount> usersPage;
+        if (searchTerm != null || roleCode != null || statusEnum != null) {
+            usersPage = userAccountRepository.findAllWithFilters(searchTerm, roleCode, statusEnum, pageable);
+        } else {
+            usersPage = userAccountRepository.findAll(pageable);
+        }
+        
+        return usersPage.map(this::mapToResponse);
     }
 
     @Override
@@ -184,7 +206,7 @@ public class UserAccountServiceImpl implements UserAccountService {
      */
     private UserResponse mapToResponse(UserAccount user) {
         Set<String> roles = user.getUserRoles().stream()
-                .map(ur -> ur.getRole().getName())
+                .map(ur -> ur.getRole().getCode())
                 .collect(Collectors.toSet());
 
         Set<String> branches = user.getUserBranches().stream()
