@@ -1268,9 +1268,12 @@ public class StudentRequestServiceImpl implements StudentRequestService {
                     "Makeup session must have same content (courseSessionId)");
         }
 
-        // 5. Check capacity
+        // 5. Check capacity with pessimistic lock to prevent race condition
+        ClassEntity makeupClass = classRepository.findByIdWithLock(makeupSession.getClassEntity().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Makeup class not found"));
+
         long enrolledCount = studentSessionRepository.countBySessionId(makeupSession.getId());
-        if (enrolledCount >= makeupSession.getClassEntity().getMaxCapacity()) {
+        if (enrolledCount >= makeupClass.getMaxCapacity()) {
             throw new BusinessRuleException("SESSION_FULL", "Makeup session is full");
         }
 
@@ -1961,8 +1964,12 @@ public class StudentRequestServiceImpl implements StudentRequestService {
             throw new BusinessRuleException("NOT_ENROLLED", "Student is not enrolled in current class");
         }
 
-        // 2. Validate target class
-        ClassEntity targetClass = classRepository.findByIdWithCourse(dto.getTargetClassId())
+        // 2. Validate target class with pessimistic lock to prevent race condition
+        ClassEntity targetClass = classRepository.findByIdWithLock(dto.getTargetClassId())
+                .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
+
+        // Fetch course relationship separately
+        targetClass = classRepository.findByIdWithCourse(dto.getTargetClassId())
                 .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
 
         // 3. Business rule validations
