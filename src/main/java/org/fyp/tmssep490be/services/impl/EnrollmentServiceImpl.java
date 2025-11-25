@@ -12,6 +12,7 @@ import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.EnrollmentService;
 import org.fyp.tmssep490be.services.ExcelParserService;
 import org.fyp.tmssep490be.services.NotificationService;
+import org.fyp.tmssep490be.services.EmailService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final ReplacementSkillAssessmentRepository replacementSkillAssessmentRepository;
     private final LevelRepository levelRepository;
     private final NotificationService notificationService;
+    private final EmailService emailService;
 
     @Override
     public ClassEnrollmentImportPreview previewClassEnrollmentImport(
@@ -511,11 +513,25 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         // 5. Send notifications cho students và Academic Affairs
         sendEnrollmentNotifications(enrollments, classEntity);
 
-        // 6. Send welcome emails (async) - COMMENTED OUT for future implementation
-        // for (Long studentId : studentIds) {
-        //     emailService.sendEnrollmentConfirmation(studentId, classId);
-        // }
-        log.info("Email sending skipped (not implemented yet)");
+        // 6. Send enrollment confirmation emails (async)
+        for (Long studentId : studentIds) {
+            try {
+                Student student = studentRepository.findById(studentId).orElse(null);
+                if (student != null && student.getUserAccount() != null) {
+                    String centerName = classEntity.getBranch() != null ? classEntity.getBranch().getName() : "TMS";
+                    emailService.sendClassEnrollmentNotificationAsync(
+                        student.getUserAccount().getEmail(),
+                        student.getUserAccount().getFullName(),
+                        classEntity.getCode(),
+                        centerName
+                    );
+                }
+            } catch (Exception e) {
+                log.warn("Failed to send enrollment email to student {}: {}", studentId, e.getMessage());
+                // Don't fail the enrollment process if email fails
+            }
+        }
+        log.info("Enrollment confirmation emails sent to {} students", studentIds.size());
 
         // 7. Return result
         List<String> warnings = new ArrayList<>();

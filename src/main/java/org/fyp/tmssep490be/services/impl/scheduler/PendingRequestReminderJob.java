@@ -10,6 +10,7 @@ import org.fyp.tmssep490be.repositories.StudentRequestRepository;
 import org.fyp.tmssep490be.repositories.TeacherRequestRepository;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.services.NotificationService;
+import org.fyp.tmssep490be.services.EmailService;
 import org.fyp.tmssep490be.entities.enums.NotificationType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -40,6 +41,7 @@ public class PendingRequestReminderJob extends BaseScheduledJob {
     private final TeacherRequestRepository teacherRequestRepository;
     private final UserAccountRepository userAccountRepository;
     private final NotificationService notificationService;
+    private final EmailService emailService;
 
     @Value("${tms.scheduler.jobs.pending-request-reminder.reminder-threshold-days:3}")
     private int reminderThresholdDays;
@@ -117,6 +119,9 @@ public class PendingRequestReminderJob extends BaseScheduledJob {
                 }
             }
 
+            // Send email reminders to Academic Affairs staff
+            sendPendingRequestEmails(academicAffairsUsers, oldStudentRequests.size(), oldTeacherRequests.size(), cutoffDate);
+
             logJobEnd("PendingRequestReminderJob",
                 String.format("Sent %d notifications to %d AA users for %d student + %d teacher requests",
                     notificationsSent, academicAffairsUsers.size(), oldStudentRequests.size(), oldTeacherRequests.size()));
@@ -124,6 +129,41 @@ public class PendingRequestReminderJob extends BaseScheduledJob {
         } catch (Exception e) {
             logJobError("PendingRequestReminderJob", e);
             throw e; // Re-throw to prevent silent failures
+        }
+    }
+
+    /**
+     * Send email reminders for pending requests
+     */
+    private void sendPendingRequestEmails(List<UserAccount> academicAffairsUsers, int studentRequestCount,
+                                       int teacherRequestCount, OffsetDateTime oldestRequestDate) {
+        try {
+            int totalPendingRequests = studentRequestCount + teacherRequestCount;
+            if (totalPendingRequests == 0) {
+                return;
+            }
+
+            int emailsSent = 0;
+            String oldestDateStr = oldestRequestDate.toLocalDate().toString();
+
+            for (UserAccount aaUser : academicAffairsUsers) {
+                try {
+                    emailService.sendPendingRequestReminderAsync(
+                        aaUser.getEmail(),
+                        totalPendingRequests,
+                        oldestDateStr
+                    );
+                    emailsSent++;
+                    logJobInfo("Sent pending request reminder email to AA user: " + aaUser.getEmail());
+                } catch (Exception e) {
+                    logJobError("Failed to send pending request email to AA user " + aaUser.getEmail(), e);
+                }
+            }
+
+            logJobInfo(String.format("Pending request email reminders sent: %d", emailsSent));
+
+        } catch (Exception e) {
+            logJobError("Failed to send pending request emails", e);
         }
     }
 }

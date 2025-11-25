@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nhắc nhở lịch học</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            color: #4CAF50;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .reminder-title {
+            font-size: 24px;
+            color: #17a2b8;
+            margin-bottom: 20px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #17a2b8;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .btn:hover {
+            background-color: #138496;
+        }
+        .footer {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .schedule-box {
+            background-color: #d1ecf1;
+            padding: 20px;
+            border-left: 4px solid #17a2b8;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .info-item {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+        }
+        .info-label {
+            font-weight: bold;
+            width: 120px;
+            color: #0c5460;
+        }
+        .calendar-icon {
+            color: #17a2b8;
+            margin-right: 10px;
+            font-size: 20px;
+        }
+        .tips {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">TMS - Hệ thống Quản lý Đào tạo</div>
+        </div>
+
+        <div class="reminder-title">
+            📅 Nhắc nhở lịch học
+        </div>
+
+        <div class="content">
+            <p>Xin chào <span th:text="${studentName}"></span>,</p>
+
+            <p>Đây là email nhắc nhở về buổi học sắp tới của bạn. Vui lòng kiểm tra thông tin chi tiết dưới đây:</p>
+
+            <div class="schedule-box">
+                <h3 style="margin-top: 0; color: #0c5460;">Thông tin buổi học:</h3>
+                <div class="info-item">
+                    <span class="calendar-icon">📚</span>
+                    <span class="info-label">Lớp học:</span>
+                    <span th:text="${className}" style="font-weight: bold;"></span>
+                </div>
+                <div class="info-item">
+                    <span class="calendar-icon">📅</span>
+                    <span class="info-label">Ngày học:</span>
+                    <span th:text="${sessionDate}"></span>
+                </div>
+                <div class="info-item">
+                    <span class="calendar-icon">🕐</span>
+                    <span class="info-label">Thời gian:</span>
+                    <span th:text="${sessionTime}"></span>
+                </div>
+            </div>
+
+            <div class="tips">
+                <h4 style="margin-top: 0; color: #856404;">💡 Lưu ý quan trọng:</h4>
+                <ul>
+                    <li>Vui lòng có mặt trước 10 phút để chuẩn bị</li>
+                    <li>Mang theo tài liệu học tập cần thiết</li>
+                    <li>Đảm bảo thiết bị (nếu cần) đã sẵn sàng</li>
+                    <li>Thông báo cho giáo viên nếu bạn đến muộn hoặc không thể tham gia</li>
+                </ul>
+            </div>
+
+            <p>Để xem thông tin chi tiết về lịch học và tài liệu học tập, vui lòng đăng nhập vào hệ thống:</p>
+        </div>
+
+        <div style="text-align: center;">
+            <a th:href="${frontendUrl}" class="btn">Xem Lịch Học</a>
+        </div>
+
+        <div class="footer">
+            <p>Chúc bạn có buổi học hiệu quả!<br>
+            Trân trọng,<br>
+            Đội ngũ TMS</p>
+
+            <p style="font-size: 12px; margin-top: 15px;">
+                Email này được gửi tự động, vui lòng không trả lời.<br>
+                Nếu bạn không thể tham gia buổi học, vui lòng thông báo cho giáo viên hoặc trung tâm.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

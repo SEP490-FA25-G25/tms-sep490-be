@@ -3,8 +3,11 @@ package org.fyp.tmssep490be.services.impl.scheduler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.entities.Resource;
+import org.fyp.tmssep490be.entities.Center;
 import org.fyp.tmssep490be.entities.enums.ResourceType;
 import org.fyp.tmssep490be.repositories.ResourceRepository;
+import org.fyp.tmssep490be.repositories.CenterRepository;
+import org.fyp.tmssep490be.services.EmailService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -40,6 +43,8 @@ import java.util.List;
 public class LicenseExpiryWarningJob extends BaseScheduledJob {
 
     private final ResourceRepository resourceRepository;
+    private final CenterRepository centerRepository;
+    private final EmailService emailService;
 
     @Value("${tms.scheduler.jobs.license-expiry-warning.warning-days:30}")
     private int warningDays;
@@ -127,6 +132,9 @@ public class LicenseExpiryWarningJob extends BaseScheduledJob {
                 log.error("╔═══════════════════════════════════════════════════════════════╗");
                 log.error("║ ACTION REQUIRED: {} resources need immediate attention", (criticalCount + urgentCount));
                 log.error("╚═══════════════════════════════════════════════════════════════╝");
+
+                // Send email notifications for critical and urgent resources
+                sendLicenseExpiryEmails(virtualResources, today, urgentDate);
             }
 
             logJobEnd("LicenseExpiryWarning", summary);
@@ -134,6 +142,47 @@ public class LicenseExpiryWarningJob extends BaseScheduledJob {
         } catch (Exception e) {
             logJobError("LicenseExpiryWarning", e);
             throw e;
+        }
+    }
+
+    /**
+     * Send email notifications for license expiry warnings
+     */
+    private void sendLicenseExpiryEmails(List<Resource> resources, LocalDate today, LocalDate urgentDate) {
+        try {
+            logJobInfo("Sending license expiry email notifications...");
+
+            int emailsSent = 0;
+            for (Resource resource : resources) {
+                LocalDate expiryDate = resource.getExpiryDate();
+                long daysUntilExpiry = java.time.temporal.ChronoUnit.DAYS.between(today, expiryDate);
+
+                // Send email for critical and urgent resources
+                if (daysUntilExpiry <= urgentDays) {
+                    try {
+                        String centerName = "TMS";
+                        if (resource.getBranch() != null) {
+                            centerName = resource.getBranch().getName();
+                        }
+
+                        emailService.sendLicenseExpiryWarningAsync(
+                            "admin@tms.edu.vn", // Should be configured or fetched from admins
+                            resource.getName(),
+                            expiryDate.toString(),
+                            centerName
+                        );
+                        emailsSent++;
+                        logJobInfo("Sent license expiry warning email for resource: " + resource.getName());
+                    } catch (Exception e) {
+                        logJobError("Failed to send license expiry email for resource " + resource.getName(), e);
+                    }
+                }
+            }
+
+            logJobInfo(String.format("License expiry email notifications sent: %d", emailsSent));
+
+        } catch (Exception e) {
+            logJobError("Failed to send license expiry emails", e);
         }
     }
 }
