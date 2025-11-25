@@ -135,13 +135,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Resend Java SDK for Email Service -->
-        <dependency>
-            <groupId>com.resend</groupId>
-            <artifactId>resend-java</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-
+  
         <!-- Spring Boot Async Support for Email Processing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

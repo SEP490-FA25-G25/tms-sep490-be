@@ -1,77 +1,74 @@
 package org.fyp.tmssep490be.services.impl;
 
-import com.resend.Resend;
-import com.resend.core.exception.ResendException;
-import com.resend.services.emails.model.CreateEmailOptions;
-import com.resend.services.emails.model.CreateEmailResponse;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
+import org.fyp.tmssep490be.config.EmailConfig;
 import org.fyp.tmssep490be.services.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import jakarta.mail.internet.MimeMessage;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Implementation of EmailService using Resend API
+ * Implementation of EmailService using Gmail SMTP
  * Supports Vietnamese content with proper UTF-8 encoding
- * Includes rate limiting (5 emails/second) and retry mechanisms
+ * Includes rate limiting (20 emails/second) and retry mechanisms
  */
 @Service
 @Slf4j
 public class EmailServiceImpl implements EmailService {
 
     @Autowired
-    @Qualifier("resendClient")
-    private Resend resend;
+    @Qualifier("javaMailSender")
+    private JavaMailSender mailSender;
 
     @Autowired
     @Qualifier("emailTemplateEngine")
     private TemplateEngine templateEngine;
 
-    @Value("${resend.from.email:noreply@tms.edu.vn}")
-    private String fromEmail;
+    @Autowired
+    private EmailConfig emailConfig;
 
-    @Value("${resend.from.name:Hệ thống TMS}")
-    private String fromName;
-
-    @Value("${app.frontend.url:http://localhost:3000}")
+    @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
 
     @Override
     @Async
     @RateLimiter(name = "emailRateLimiter", fallbackMethod = "sendEmailFallback")
     public CompletableFuture<Void> sendEmailAsync(String to, String subject, String htmlContent) {
-        if (resend == null) {
+        if (mailSender == null) {
             log.warn("Email service is not configured. Skipping email to: {}", to);
             return CompletableFuture.completedFuture(null);
         }
 
         try {
-            CreateEmailOptions request = CreateEmailOptions.builder()
-                    .from(String.format("%s <%s>", fromName, fromEmail))
-                    .to(to)
-                    .subject(subject)
-                    .html(htmlContent)
-                    .build();
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, StandardCharsets.UTF_8.name());
 
-            CreateEmailResponse response = resend.emails().send(request);
-            log.info("Email sent successfully to: {}, Response: {}", to, response.getId());
+            helper.setFrom(String.format("%s <%s>", emailConfig.getFromName(), emailConfig.getFromEmail()));
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(mimeMessage);
+            log.info("Email sent successfully to: {}", to);
             return CompletableFuture.completedFuture(null);
 
-        } catch (ResendException e) {
-            log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
-            return CompletableFuture.failedFuture(e);
         } catch (Exception e) {
-            log.error("Unexpected error sending email to {}: {}", to, e.getMessage(), e);
+            log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
             return CompletableFuture.failedFuture(e);
         }
     }

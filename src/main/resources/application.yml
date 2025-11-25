@@ -122,22 +122,36 @@ tms:
         enabled: true
         cron: "0 0 10 * * MON,WED,FRI"  # Mon/Wed/Fri at 10:00 AM
 
-# Resend Email Service Configuration
-resend:
-  api:
-    key: ${RESEND_API_KEY:re_oRYdB81f_H9EAu7nBYXNk75gz9cJnG3Jj}
-  from:
-    email: ${RESEND_FROM_EMAIL:onboarding@resend.dev} # onboarding@resend.dev
-    name: ${RESEND_FROM_NAME:Hệ thống TMS}
-  rate:
-    limit: ${RESEND_RATE_LIMIT:5}  # 5 emails per second
-    limit-duration: ${RESEND_RATE_LIMIT_DURATION:1}  # 1 second
-  retry:
-    max-attempts: ${RESEND_RETRY_MAX_ATTEMPTS:3}
-    delay: ${RESEND_RETRY_DELAY:1000}  # 1 second
+# Gmail SMTP Configuration for Email Service
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USERNAME:t03612977@gmail.com}
+    password: ${GMAIL_APP_PASSWORD:hejz yray vzsj anli}
+    protocol: smtp
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+        debug: false
 
-# Email Configuration
-email:
+# Email Service Configuration
+    email:
+      from:
+        email: ${GMAIL_USERNAME:t03612977@gmail.com}
+        name: ${TMS_FROM_NAME:Hệ thống TMS}
+      rate:
+        limit: ${GMAIL_RATE_LIMIT:20}  # 20 emails per second for Gmail
+        limit-duration: ${GMAIL_RATE_LIMIT_DURATION:1}  # 1 second
+      retry:
+        max-attempts: ${GMAIL_RETRY_MAX_ATTEMPTS:3}
+        delay: ${GMAIL_RETRY_DELAY:1000}  # 1 second
   async:
     pool-size: ${EMAIL_ASYNC_POOL_SIZE:10}
     queue-capacity: ${EMAIL_ASYNC_QUEUE_CAPACITY:100}

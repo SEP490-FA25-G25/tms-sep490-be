@@ -14,23 +14,23 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Duration;
 
 /**
- * Resilience4J Configuration for Email Service
+ * Resilience4J Configuration for Email Service with Gmail SMTP
  * Provides rate limiting and retry mechanisms
  */
 @Configuration
 @Slf4j
 public class ResilienceConfig {
 
-    @Value("${resend.rate.limit:5}")
+    @Value("${tms.email.rate.limit:20}")
     private int emailRateLimit;
 
-    @Value("${resend.rate.limit.duration:1}")
+    @Value("${tms.email.rate.limit.duration:1}")
     private int emailRateLimitDuration;
 
-    @Value("${resend.retry.max-attempts:3}")
+    @Value("${tms.email.retry.max-attempts:3}")
     private int emailRetryMaxAttempts;
 
-    @Value("${resend.retry.delay:1000}")
+    @Value("${tms.email.retry.delay:1000}")
     private long emailRetryDelay;
 
     @Bean

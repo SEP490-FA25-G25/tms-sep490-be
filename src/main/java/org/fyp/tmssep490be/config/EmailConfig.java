@@ -1,10 +1,11 @@
 package org.fyp.tmssep490be.config;
 
-import com.resend.Resend;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.thymeleaf.TemplateEngine;
@@ -12,20 +13,35 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import java.util.Properties;
 import java.util.concurrent.Executor;
 
 /**
- * Configuration for Email Service with Resend
- * Includes rate limiting (5 emails/second), async processing, and UTF-8 support
+ * Configuration for Email Service with Gmail SMTP
+ * Includes rate limiting (20 emails/second), async processing, and UTF-8 support
  */
 @Configuration
 @Slf4j
 public class EmailConfig implements AsyncConfigurer {
 
-    @Value("${resend.api.key:}")
-    private String resendApiKey;
+    @Value("${spring.mail.host:smtp.gmail.com}")
+    private String mailHost;
 
-    
+    @Value("${spring.mail.port:587}")
+    private int mailPort;
+
+    @Value("${spring.mail.username:t03612977@gmail.com}")
+    private String mailUsername;
+
+    @Value("${spring.mail.password:hejz yray vzsj anli}")
+    private String mailPassword;
+
+    @Value("${tms.email.from.email:t03612977@gmail.com}")
+    private String fromEmail;
+
+    @Value("${tms.email.from.name:Hệ thống TMS}")
+    private String fromName;
+
     @Value("${email.async.pool-size:10}")
     private int asyncPoolSize;
 
@@ -38,21 +54,36 @@ public class EmailConfig implements AsyncConfigurer {
     @Value("${app.email.enabled:true}")
     private boolean emailEnabled;
 
-    
+
     @Bean
-    public Resend resendClient() {
+    public JavaMailSender javaMailSender() {
         if (!emailEnabled) {
             log.info("Email service is disabled via configuration.");
             return null;
         }
-        if (resendApiKey == null || resendApiKey.trim().isEmpty()) {
-            log.warn("Resend API key not configured. Email service will be disabled.");
-            return null;
-        }
-        return new Resend(resendApiKey);
+
+        log.info("Configuring Gmail SMTP with username: {}", mailUsername);
+
+        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+        mailSender.setHost(mailHost);
+        mailSender.setPort(mailPort);
+        mailSender.setUsername(mailUsername);
+        mailSender.setPassword(mailPassword);
+
+        Properties props = mailSender.getJavaMailProperties();
+        props.put("mail.transport.protocol", "smtp");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.debug", "false");
+        props.put("mail.smtp.connectiontimeout", "10000");
+        props.put("mail.smtp.timeout", "10000");
+        props.put("mail.smtp.writetimeout", "10000");
+
+        log.info("Gmail SMTP configured for username: {}", mailUsername);
+        return mailSender;
     }
 
-    
+
     @Bean(name = "emailTaskExecutor")
     public Executor emailTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -90,5 +121,13 @@ public class EmailConfig implements AsyncConfigurer {
         templateResolver.setCacheable(true);
         templateResolver.setCheckExistence(true);
         return templateResolver;
+    }
+
+    public String getFromEmail() {
+        return fromEmail.isEmpty() ? mailUsername : fromEmail;
+    }
+
+    public String getFromName() {
+        return fromName;
     }
 }
