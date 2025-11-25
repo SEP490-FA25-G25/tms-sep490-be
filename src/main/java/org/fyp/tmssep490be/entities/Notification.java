@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 import org.fyp.tmssep490be.entities.enums.NotificationPriority;
 import org.fyp.tmssep490be.entities.enums.NotificationStatus;
 import org.fyp.tmssep490be.entities.enums.NotificationType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -68,7 +70,8 @@ public class Notification {
     @Column(name = "reference_id")
     private Long referenceId;
 
-    @Column(columnDefinition = "JSONB")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "metadata")
     private String metadata;
 
     @CreatedDate
