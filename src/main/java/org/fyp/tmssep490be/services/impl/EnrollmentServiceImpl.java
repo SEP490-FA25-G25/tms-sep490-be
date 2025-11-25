@@ -11,6 +11,7 @@ import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.EnrollmentService;
 import org.fyp.tmssep490be.services.ExcelParserService;
+import org.fyp.tmssep490be.services.NotificationService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final PasswordEncoder passwordEncoder;
     private final ReplacementSkillAssessmentRepository replacementSkillAssessmentRepository;
     private final LevelRepository levelRepository;
+    private final NotificationService notificationService;
 
     @Override
     public ClassEnrollmentImportPreview previewClassEnrollmentImport(
@@ -506,13 +508,16 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         log.info("Generated {} student_session records ({} sessions per student)",
                 studentSessions.size(), futureSessions.size());
 
-        // 5. Send welcome emails (async) - COMMENTED OUT for future implementation
+        // 5. Send notifications cho students và Academic Affairs
+        sendEnrollmentNotifications(enrollments, classEntity);
+
+        // 6. Send welcome emails (async) - COMMENTED OUT for future implementation
         // for (Long studentId : studentIds) {
         //     emailService.sendEnrollmentConfirmation(studentId, classId);
         // }
         log.info("Email sending skipped (not implemented yet)");
 
-        // 6. Return result
+        // 7. Return result
         List<String> warnings = new ArrayList<>();
         if (LocalDate.now().isAfter(classEntity.getStartDate())) {
             warnings.add("Mid-course enrollment: Students will only be enrolled in future sessions");
@@ -809,5 +814,141 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 result.getEnrolledCount(), request.getClassId(), result.getTotalStudentSessionsCreated());
 
         return result;
+    }
+
+    // ==================== NOTIFICATION METHODS ====================
+
+    /**
+     * Gửi notification khi student được enroll vào class
+     */
+    private void sendEnrollmentNotifications(List<Enrollment> enrollments, ClassEntity classEntity) {
+        try {
+            if (enrollments.isEmpty()) {
+                log.debug("Không có enrollments nào để gửi notification");
+                return;
+            }
+
+            // Gửi notification cho từng student
+            for (Enrollment enrollment : enrollments) {
+                sendEnrollmentNotificationToStudent(enrollment, classEntity);
+            }
+
+            // Gửi notification cho Academic Affairs của branch tương ứng
+            sendEnrollmentNotificationToAcademicAffairs(enrollments, classEntity);
+
+            log.info("Đã gửi notifications cho {} enrollments trong class {}",
+                    enrollments.size(), classEntity.getId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi enrollment notifications cho class {}: {}",
+                    classEntity.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi enrollment confirmation notification cho student
+     */
+    private void sendEnrollmentNotificationToStudent(Enrollment enrollment, ClassEntity classEntity) {
+        try {
+            Long studentUserId = enrollment.getStudent().getUserAccount().getId();
+
+            String title = String.format("Xác nhận đăng ký lớp: %s", classEntity.getCode());
+            String message = String.format(
+                    "Bạn đã được đăng ký thành công vào lớp học %s (%s). " +
+                    "Khóa học sẽ bắt đầu vào ngày %s. " +
+                    "Lịch học: %s",
+                    classEntity.getCode(),
+                    classEntity.getCourse().getName(),
+                    classEntity.getStartDate() != null ? classEntity.getStartDate().toString() : "sớm",
+                    buildScheduleDisplay(classEntity)
+            );
+
+            notificationService.createNotificationWithReference(
+                    studentUserId,
+                    NotificationType.CLASS_REMINDER,
+                    title,
+                    message,
+                    "Enrollment",
+                    enrollment.getId()
+            );
+
+            log.debug("Đã gửi enrollment confirmation notification cho student {}", enrollment.getStudentId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho student {} về enrollment {}: {}",
+                    enrollment.getStudentId(), enrollment.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi notification cho Academic Affairs khi có enrollment mới
+     */
+    private void sendEnrollmentNotificationToAcademicAffairs(List<Enrollment> enrollments, ClassEntity classEntity) {
+        try {
+            // Lấy branch của class để gửi cho Academic Affairs tương ứng
+            Long branchId = classEntity.getBranch().getId();
+
+            List<UserAccount> academicAffairsUsers = userAccountRepository.findByRoleCodeAndBranches(
+                    "ACADEMIC_AFFAIRS", List.of(branchId));
+
+            if (!academicAffairsUsers.isEmpty()) {
+                String title = String.format("Đăng ký mới: %d học viên", enrollments.size());
+                // Lấy số lượng enrolled students hiện tại
+                Integer currentEnrolled = enrollmentRepository.countByClassIdAndStatus(
+                        classEntity.getId(), EnrollmentStatus.ENROLLED);
+
+                String message = String.format(
+                        "Có %d học viên mới đã được đăng ký vào lớp %s (%s). " +
+                        "Tổng sĩ số hiện tại: %d/%d",
+                        enrollments.size(),
+                        classEntity.getCode(),
+                        classEntity.getCourse().getName(),
+                        currentEnrolled != null ? currentEnrolled : 0,
+                        classEntity.getMaxCapacity()
+                );
+
+                List<Long> recipientIds = academicAffairsUsers.stream()
+                        .map(UserAccount::getId)
+                        .collect(Collectors.toList());
+
+                notificationService.sendBulkNotificationsWithReference(
+                        recipientIds,
+                        NotificationType.SYSTEM_ALERT,
+                        title,
+                        message,
+                        "Class",
+                        classEntity.getId()
+                );
+
+                log.info("Đã gửi enrollment notification cho {} Academic Affairs users về class {}",
+                        academicAffairsUsers.size(), classEntity.getId());
+            } else {
+                log.warn("Không tìm thấy Academic Affairs user nào cho branch {}", branchId);
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho Academic Affairs về enrollments trong class {}: {}",
+                    classEntity.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Xây dựng chuỗi hiển thị lịch học từ class entity
+     */
+    private String buildScheduleDisplay(ClassEntity classEntity) {
+        if (classEntity.getScheduleDays() == null || classEntity.getScheduleDays().length == 0) {
+            return "Chưa có lịch cụ thể";
+        }
+
+        // Convert schedule days to day names
+        String[] dayNames = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
+        StringBuilder schedule = new StringBuilder();
+
+        for (int i = 0; i < classEntity.getScheduleDays().length; i++) {
+            if (i > 0) schedule.append(", ");
+            int dayIndex = classEntity.getScheduleDays()[i];
+            if (dayIndex >= 0 && dayIndex < dayNames.length) {
+                schedule.append(dayNames[dayIndex]);
+            }
+        }
+
+        return schedule.toString();
     }
 }

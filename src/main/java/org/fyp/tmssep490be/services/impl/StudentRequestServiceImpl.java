@@ -13,6 +13,7 @@ import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
 import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.StudentRequestService;
 import org.fyp.tmssep490be.services.StudentScheduleService;
+import org.fyp.tmssep490be.services.NotificationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +49,7 @@ public class StudentRequestServiceImpl implements StudentRequestService {
     private final StudentSessionRepository studentSessionRepository;
     private final UserAccountRepository userAccountRepository;
     private final UserBranchesRepository userBranchesRepository;
+    private final NotificationService notificationService;
     private final StudentScheduleService studentScheduleService;
 
     // Configuration values (in real implementation, these would come from properties)
@@ -245,7 +247,8 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         request = studentRequestRepository.save(request);
         log.info("Absence request created successfully with id: {}", request.getId());
 
-        // TODO: Send notification to Academic Affairs
+        // Gửi notification cho Academic Affairs
+        sendNotificationToAcademicAffairs(request);
 
         return mapToStudentResponseDTO(request);
     }
@@ -587,7 +590,9 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         }
 
         log.info("Request {} approved by user {}", requestId, decidedById);
-        // TODO: Send notification to student
+
+        // Gửi notification cho student
+        sendNotificationToStudentForApproval(request);
 
         return mapToStudentResponseDTO(request);
     }
@@ -612,7 +617,9 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         request = studentRequestRepository.save(request);
 
         log.info("Request {} rejected by user {}", requestId, decidedById);
-        // TODO: Send notification to student
+
+        // Gửi notification cho student
+        sendNotificationToStudentForRejection(request);
 
         return mapToStudentResponseDTO(request);
     }
@@ -2506,5 +2513,162 @@ public class StudentRequestServiceImpl implements StudentRequestService {
     @Override
     public LocalDate getCurrentWeekStart() {
         return studentScheduleService.getCurrentWeekStart();
+    }
+
+    // ==================== NOTIFICATION METHODS ====================
+
+    /**
+     * Gửi notification cho Academic Affairs khi có request mới
+     */
+    private void sendNotificationToAcademicAffairs(StudentRequest request) {
+        try {
+            // Lấy branch của student để gửi cho Academic Affairs tương ứng
+            // Student không có center trực tiếp, cần lấy qua enrollment hoặc user account
+            Long branchId = null;
+
+            // Cách 1: Lấy branch từ user account của student (nếu có)
+            try {
+                // Thử lấy branch từ enrollment gần nhất
+                List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatus(
+                        request.getStudent().getId(), EnrollmentStatus.ENROLLED);
+                if (!enrollments.isEmpty()) {
+                    branchId = enrollments.get(0).getClassEntity().getBranch().getId();
+                }
+            } catch (Exception e) {
+                log.debug("Không thể lấy branch từ enrollment cho student {}", request.getStudent().getId());
+            }
+
+            // Nếu không có enrollment, lấy branch từ user account (nếu có)
+            if (branchId == null && request.getStudent().getUserAccount() != null) {
+                // Giả sử user có branch assignment, cần implement logic này
+                // Tạm thời set null và log warning
+                log.warn("Không thể xác định branch cho student {}, sẽ gửi notification cho tất cả Academic Affairs",
+                        request.getStudent().getId());
+            }
+
+            List<UserAccount> academicAffairsUsers;
+            if (branchId != null) {
+                academicAffairsUsers = userAccountRepository.findByRoleCodeAndBranches(
+                        "ACADEMIC_AFFAIRS", List.of(branchId));
+            } else {
+                // Nếu không xác định được branch, lấy tất cả Academic Affairs users
+                log.warn("Không xác định được branch cho student {}, gửi notification cho tất cả Academic Affairs users",
+                        request.getStudent().getId());
+                academicAffairsUsers = userAccountRepository.findByRoleCodeAndBranches(
+                        "ACADEMIC_AFFAIRS", List.of()); // Truyền danh sách rỗng để lấy tất cả
+            }
+
+            if (!academicAffairsUsers.isEmpty()) {
+                String requestType = getRequestTypeDisplayName(request.getRequestType());
+                String title = String.format("Yêu cầu mới: %s", requestType);
+                String studentName = request.getStudent().getUserAccount() != null ?
+                        request.getStudent().getUserAccount().getFullName() :
+                        request.getStudent().getStudentCode();
+
+                String message = String.format(
+                        "Học viên %s đã tạo yêu cầu %s. Chi tiết: %s",
+                        studentName,
+                        requestType.toLowerCase(),
+                        request.getRequestReason() != null ? request.getRequestReason() : "Không có lý do cụ thể"
+                );
+
+                List<Long> recipientIds = academicAffairsUsers.stream()
+                        .map(UserAccount::getId)
+                        .collect(Collectors.toList());
+
+                notificationService.sendBulkNotificationsWithReference(
+                        recipientIds,
+                        NotificationType.REQUEST_APPROVAL,
+                        title,
+                        message,
+                        "StudentRequest",
+                        request.getId()
+                );
+
+                log.info("Đã gửi notification cho {} Academic Affairs users về request {}",
+                        academicAffairsUsers.size(), request.getId());
+            } else {
+                log.warn("Không tìm thấy Academic Affairs user nào cho branch {}", branchId);
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho Academic Affairs về request {}: {}",
+                    request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi notification cho student khi request được duyệt
+     */
+    private void sendNotificationToStudentForApproval(StudentRequest request) {
+        try {
+            String requestType = getRequestTypeDisplayName(request.getRequestType());
+            String title = String.format("Yêu cầu được duyệt: %s", requestType);
+            String message = String.format(
+                    "Yêu cầu %s của bạn đã được duyệt. %s",
+                    requestType.toLowerCase(),
+                    request.getNote() != null ? "Ghi chú: " + request.getNote() : ""
+            );
+
+            notificationService.createNotificationWithReference(
+                    request.getStudent().getUserAccount().getId(),
+                    NotificationType.REQUEST_APPROVAL,
+                    title,
+                    message,
+                    "StudentRequest",
+                    request.getId()
+            );
+
+            log.info("Đã gửi notification cho student {} về request được duyệt {}",
+                    request.getStudent().getId(), request.getId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho student về request được duyệt {}: {}",
+                    request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi notification cho student khi request bị từ chối
+     */
+    private void sendNotificationToStudentForRejection(StudentRequest request) {
+        try {
+            String requestType = getRequestTypeDisplayName(request.getRequestType());
+            String title = String.format("Yêu cầu bị từ chối: %s", requestType);
+            String message = String.format(
+                    "Yêu cầu %s của bạn đã bị từ chối. Lý do: %s",
+                    requestType.toLowerCase(),
+                    request.getNote() != null ? request.getNote() : "Không có lý do cụ thể"
+            );
+
+            notificationService.createNotificationWithReference(
+                    request.getStudent().getUserAccount().getId(),
+                    NotificationType.REQUEST_APPROVAL,
+                    title,
+                    message,
+                    "StudentRequest",
+                    request.getId()
+            );
+
+            log.info("Đã gửi notification cho student {} về request bị từ chối {}",
+                    request.getStudent().getId(), request.getId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho student về request bị từ chối {}: {}",
+                    request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Lấy display name cho request type
+     */
+    private String getRequestTypeDisplayName(StudentRequestType requestType) {
+        switch (requestType) {
+            case ABSENCE:
+                return "Nghỉ học";
+            case MAKEUP:
+                return "Học bù";
+            case TRANSFER:
+                return "Chuyển lớp";
+            default:
+                return requestType.toString();
+        }
     }
 }

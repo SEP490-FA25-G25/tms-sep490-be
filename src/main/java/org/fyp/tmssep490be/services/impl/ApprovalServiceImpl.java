@@ -6,19 +6,27 @@ import org.fyp.tmssep490be.dtos.classmanagement.RejectClassResponse;
 import org.fyp.tmssep490be.dtos.classmanagement.SubmitClassResponse;
 import org.fyp.tmssep490be.dtos.classmanagement.ValidateClassResponse;
 import org.fyp.tmssep490be.entities.ClassEntity;
+import org.fyp.tmssep490be.entities.Enrollment;
 import org.fyp.tmssep490be.entities.UserAccount;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
+import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
+import org.fyp.tmssep490be.entities.enums.NotificationType;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.ClassRepository;
+import org.fyp.tmssep490be.repositories.EnrollmentRepository;
+import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.services.ApprovalService;
+import org.fyp.tmssep490be.services.NotificationService;
 import org.fyp.tmssep490be.services.ValidationService;
 import org.fyp.tmssep490be.utils.ValidateClassResponseUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +34,10 @@ import java.time.OffsetDateTime;
 public class ApprovalServiceImpl implements ApprovalService {
 
     private final ClassRepository classRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final UserAccountRepository userAccountRepository;
     private final ValidationService validationService;
+    private final NotificationService notificationService;
     private final ValidateClassResponseUtil validateClassResponseUtil;
 
     @Override
@@ -68,6 +79,9 @@ public class ApprovalServiceImpl implements ApprovalService {
             classEntity.setApprovalStatus(ApprovalStatus.PENDING);
 
             ClassEntity savedClass = classRepository.save(classEntity);
+
+            // Gửi notification cho Academic Affairs khi class được submit
+            sendNotificationForClassSubmission(savedClass);
 
             log.info("Class ID: {} successfully submitted for approval", classId);
 
@@ -131,6 +145,9 @@ public class ApprovalServiceImpl implements ApprovalService {
             classEntity.setRejectionReason(null); // Clear any previous rejection reason
 
             ClassEntity savedClass = classRepository.save(classEntity);
+
+            // Gửi notification cho enrolled students khi class được approve
+            sendNotificationForClassApproval(savedClass);
 
             log.info("Class ID: {} successfully approved by user: {}", classId, approverUserId);
 
@@ -211,5 +228,122 @@ public class ApprovalServiceImpl implements ApprovalService {
             log.error("Unexpected error rejecting class ID: {}", classId, e);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    // ==================== NOTIFICATION METHODS ====================
+
+    /**
+     * Gửi notification cho Academic Affairs khi class được submit để duyệt
+     */
+    private void sendNotificationForClassSubmission(ClassEntity classEntity) {
+        try {
+            // Lấy branch của class để gửi cho Academic Affairs tương ứng
+            Long branchId = classEntity.getBranch().getId();
+
+            List<UserAccount> academicAffairsUsers = userAccountRepository.findByRoleCodeAndBranches(
+                    "ACADEMIC_AFFAIRS", List.of(branchId));
+
+            if (!academicAffairsUsers.isEmpty()) {
+                String title = String.format("Lớp học chờ duyệt: %s", classEntity.getCode());
+                // Lấy số lượng enrolled students hiện tại
+                Integer currentEnrolled = enrollmentRepository.countByClassIdAndStatus(
+                        classEntity.getId(), EnrollmentStatus.ENROLLED);
+
+                String message = String.format(
+                        "Lớp học %s (%s) đã được tạo và chờ được duyệt. Khai giảng: %s, Sĩ số: %d/%d",
+                        classEntity.getCode(),
+                        classEntity.getCourse().getName(),
+                        classEntity.getStartDate() != null ? classEntity.getStartDate().toString() : "Chưa xác định",
+                        currentEnrolled != null ? currentEnrolled : 0,
+                        classEntity.getMaxCapacity()
+                );
+
+                List<Long> recipientIds = academicAffairsUsers.stream()
+                        .map(UserAccount::getId)
+                        .collect(Collectors.toList());
+
+                notificationService.sendBulkNotificationsWithReference(
+                        recipientIds,
+                        NotificationType.REQUEST_APPROVAL,
+                        title,
+                        message,
+                        "Class",
+                        classEntity.getId()
+                );
+
+                log.info("Đã gửi notification cho {} Academic Affairs users về class submission {}",
+                        academicAffairsUsers.size(), classEntity.getId());
+            } else {
+                log.warn("Không tìm thấy Academic Affairs user nào cho branch {}", branchId);
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho Academic Affairs về class submission {}: {}",
+                    classEntity.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi notification cho enrolled students khi class được duyệt
+     */
+    private void sendNotificationForClassApproval(ClassEntity classEntity) {
+        try {
+            // Lấy danh sách enrolled students của class
+            List<Enrollment> enrolledStudents = enrollmentRepository
+                    .findByClassIdAndStatus(classEntity.getId(), EnrollmentStatus.ENROLLED);
+
+            if (!enrolledStudents.isEmpty()) {
+                List<Long> studentUserIds = enrolledStudents.stream()
+                        .map(enrollment -> enrollment.getStudent().getUserAccount().getId())
+                        .collect(Collectors.toList());
+
+                String title = String.format("Lớp học đã được duyệt: %s", classEntity.getCode());
+                String message = String.format(
+                        "Lớp học %s của bạn đã được duyệt và sẽ bắt đầu vào ngày %s. Lịch học: %s",
+                        classEntity.getCode(),
+                        classEntity.getStartDate() != null ? classEntity.getStartDate().toString() : "sớm",
+                        buildScheduleDisplay(classEntity)
+                );
+
+                notificationService.sendBulkNotificationsWithReference(
+                        studentUserIds,
+                        NotificationType.CLASS_REMINDER,
+                        title,
+                        message,
+                        "Class",
+                        classEntity.getId()
+                );
+
+                log.info("Đã gửi notification cho {} students về class approval {}",
+                        enrolledStudents.size(), classEntity.getId());
+            } else {
+                log.info("Không có enrolled students nào cho class {} để gửi notification", classEntity.getId());
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho students về class approval {}: {}",
+                    classEntity.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Xây dựng chuỗi hiển thị lịch học từ class entity
+     */
+    private String buildScheduleDisplay(ClassEntity classEntity) {
+        if (classEntity.getScheduleDays() == null || classEntity.getScheduleDays().length == 0) {
+            return "Chưa có lịch cụ thể";
+        }
+
+        // Convert schedule days to day names
+        String[] dayNames = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
+        StringBuilder schedule = new StringBuilder();
+
+        for (int i = 0; i < classEntity.getScheduleDays().length; i++) {
+            if (i > 0) schedule.append(", ");
+            int dayIndex = classEntity.getScheduleDays()[i];
+            if (dayIndex >= 0 && dayIndex < dayNames.length) {
+                schedule.append(dayNames[dayIndex]);
+            }
+        }
+
+        return schedule.toString();
     }
 }

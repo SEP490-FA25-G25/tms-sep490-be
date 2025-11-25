@@ -28,6 +28,7 @@ import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.ApprovalService;
 import org.fyp.tmssep490be.services.ClassCodeGeneratorService;
 import org.fyp.tmssep490be.services.ClassService;
+import org.fyp.tmssep490be.services.NotificationService;
 import org.fyp.tmssep490be.services.ResourceAssignmentService;
 import org.fyp.tmssep490be.services.SessionGenerationService;
 import org.fyp.tmssep490be.services.TeacherAssignmentService;
@@ -65,6 +66,7 @@ public class ClassServiceImpl implements ClassService {
     private final EnrollmentRepository enrollmentRepository;
     private final SessionRepository sessionRepository;
     private final UserBranchesRepository userBranchesRepository;
+    private final UserAccountRepository userAccountRepository;
     private final TeachingSlotRepository teachingSlotRepository;
     private final StudentRepository studentRepository;
     private final ReplacementSkillAssessmentRepository skillAssessmentRepository;
@@ -85,6 +87,7 @@ public class ClassServiceImpl implements ClassService {
     private final TeacherAssignmentService teacherAssignmentService;
     private final ValidationService validationService;
     private final ApprovalService approvalService;
+    private final NotificationService notificationService;
 
     // Validators for Create Class workflow
     private final CreateClassRequestValidator createClassRequestValidator;
