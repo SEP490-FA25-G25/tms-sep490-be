@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -181,4 +182,26 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
       "AND (:#{#criteria.modality} IS NULL OR c.modality = :#{#criteria.modality})")
   List<ClassEntity> findByFlexibleCriteria(
       @Param("criteria") org.fyp.tmssep490be.dtos.classes.ClassSearchCriteria criteria);
+
+  // ==================== SCHEDULER JOB METHODS ====================
+
+  /**
+   * Find classes with startDate <= given date and specific status
+   * Used by ClassStatusUpdateJob to transition SCHEDULED -> ONGOING
+   */
+  @Query("SELECT c FROM ClassEntity c WHERE c.startDate <= :date AND c.status = :status")
+  List<ClassEntity> findByStartDateBeforeOrEqualAndStatus(
+      @Param("date") LocalDate date,
+      @Param("status") ClassStatus status
+  );
+
+  /**
+   * Find classes with plannedEndDate <= given date and specific status
+   * Used by ClassStatusUpdateJob to transition ONGOING -> COMPLETED
+   */
+  @Query("SELECT c FROM ClassEntity c WHERE c.plannedEndDate <= :date AND c.status = :status")
+  List<ClassEntity> findByPlannedEndDateBeforeOrEqualAndStatus(
+      @Param("date") LocalDate date,
+      @Param("status") ClassStatus status
+  );
 }

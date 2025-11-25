@@ -48,6 +48,7 @@ DROP TABLE IF EXISTS user_account CASCADE;
 DROP TABLE IF EXISTS replacement_skill_assessment CASCADE;
 DROP TABLE IF EXISTS feedback_question CASCADE;
 DROP TABLE IF EXISTS student_feedback_response CASCADE;
+DROP TABLE IF EXISTS notification CASCADE;
 
 -- Drop existing enum types (to ensure clean recreation)
 DROP TYPE IF EXISTS session_status_enum CASCADE;
@@ -642,7 +643,30 @@ CREATE TABLE qa_report (
   CONSTRAINT fk_qa_report_reported_by FOREIGN KEY(reported_by) REFERENCES user_account(id) ON DELETE SET NULL
 );
 
--- TIER 6: Requests
+-- TIER 6: Notifications
+CREATE TABLE notification (
+  id BIGSERIAL PRIMARY KEY,
+  recipient_id BIGINT NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  message TEXT NOT NULL,
+  priority VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+  status VARCHAR(20) NOT NULL DEFAULT 'UNREAD',
+  read_at TIMESTAMPTZ,
+  action_url VARCHAR(500),
+  reference_type VARCHAR(50),
+  reference_id BIGINT,
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  expires_at TIMESTAMPTZ,
+  CONSTRAINT fk_notification_recipient FOREIGN KEY(recipient_id) REFERENCES user_account(id) ON DELETE CASCADE,
+  CONSTRAINT chk_notification_type CHECK (type IN ('REQUEST_APPROVAL', 'CLASS_REMINDER', 'LICENSE_WARNING', 'FEEDBACK_REMINDER', 'SYSTEM_ALERT', 'GRADE_NOTIFICATION', 'ASSIGNMENT_DEADLINE')),
+  CONSTRAINT chk_notification_priority CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')),
+  CONSTRAINT chk_notification_status CHECK (status IN ('UNREAD', 'READ', 'ARCHIVED'))
+);
+
+-- TIER 7: Requests
 CREATE TABLE student_request (
   id BIGSERIAL PRIMARY KEY,
   student_id BIGINT NOT NULL,
@@ -793,6 +817,18 @@ CREATE INDEX idx_teacher_request_new_resource ON teacher_request(new_resource_id
 CREATE INDEX idx_teacher_request_new_session ON teacher_request(new_session_id);
 CREATE INDEX idx_teacher_request_decided_by ON teacher_request(decided_by);
 
+-- Notifications
+CREATE INDEX idx_notification_recipient ON notification(recipient_id);
+CREATE INDEX idx_notification_status ON notification(status);
+CREATE INDEX idx_notification_type ON notification(type);
+CREATE INDEX idx_notification_priority ON notification(priority);
+CREATE INDEX idx_notification_created_at ON notification(created_at);
+CREATE INDEX idx_notification_expires_at ON notification(expires_at);
+CREATE INDEX idx_notification_recipient_status ON notification(recipient_id, status);
+CREATE INDEX idx_notification_type_created ON notification(type, created_at);
+CREATE INDEX idx_notification_priority_status ON notification(priority, status);
+CREATE INDEX idx_notification_reference ON notification(reference_type, reference_id);
+
 -- ==================== STATUS & FILTER INDEXES ====================
 -- Indexes cho các query filter thường dùng (status, date ranges)
 
@@ -810,6 +846,7 @@ CREATE INDEX idx_student_session_attendance ON student_session(attendance_status
 CREATE INDEX idx_teaching_slot_status ON teaching_slot(status);
 CREATE INDEX idx_student_request_status ON student_request(status) WHERE status IN ('PENDING', 'WAITING_CONFIRM');
 CREATE INDEX idx_teacher_request_status ON teacher_request(status) WHERE status IN ('PENDING', 'WAITING_CONFIRM');
+CREATE INDEX idx_notification_status_unread ON notification(status) WHERE status = 'UNREAD';
 
 -- Date range queries (frequent in reports and scheduling)
 CREATE INDEX idx_session_date ON session(date);

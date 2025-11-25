@@ -351,4 +351,19 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
      */
     @Query("SELECT COUNT(s) FROM Session s WHERE s.classEntity.id = :classId AND s.status != 'CANCELLED'")
     long countByClassEntityIdExcludingCancelled(@Param("classId") Long classId);
+
+    // ==================== SCHEDULER JOB METHODS ====================
+
+    /**
+     * Find future sessions for a class after a specific date
+     * Used by TransferRequestExecutionJob to create StudentSession records in target class
+     */
+    @Query("SELECT s FROM Session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.date > :date " +
+           "ORDER BY s.date ASC")
+    List<Session> findByClassIdAndDateAfter(
+        @Param("classId") Long classId,
+        @Param("date") LocalDate date
+    );
 }

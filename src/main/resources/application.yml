@@ -56,3 +56,36 @@ springdoc:
   packages-to-scan: org.fyp.tmssep490be.controllers
 server:
   port: 8080
+
+# TMS Scheduler Configuration
+tms:
+  scheduler:
+    enabled: true
+    jobs:
+      # Job 1: Class Status Update (SCHEDULED -> ONGOING, ONGOING -> COMPLETED)
+      class-status-update:
+        enabled: true
+        cron: "0 30 0 * * ?"  # Daily at 12:30 AM
+
+      # Job 2: Transfer Request Execution (execute approved TRANSFER requests)
+      transfer-request-execution:
+        enabled: true
+        cron: "0 0 2 * * ?"  # Daily at 2:00 AM
+
+      # Job 3: Request Expiry (auto-expire old PENDING requests)
+      request-expiry:
+        enabled: true
+        cron: "0 0 3 * * ?"  # Daily at 3:00 AM
+        expiry-days: 7  # Expire after 7 days
+
+      # Job 4: License Expiry Warning (monitor VIRTUAL resource licenses)
+      license-expiry-warning:
+        enabled: true
+        cron: "0 0 8 * * ?"  # Daily at 8:00 AM
+        warning-days: 30  # First warning at 30 days
+        urgent-days: 7    # Urgent warning at 7 days
+
+      # Job 5: Course Activation (DRAFT + APPROVED -> ACTIVE on effectiveDate)
+      course-activation:
+        enabled: true
+        cron: "0 0 1 * * ?"  # Daily at 1:00 AM

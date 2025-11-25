@@ -270,4 +270,39 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
             );
         };
     }
+
+    // ============== SCHEDULER JOB METHODS ==============
+
+    /**
+     * Find PENDING student requests submitted before cutoff date
+     * Used by RequestExpiryJob to auto-expire old requests
+     */
+    @Query("SELECT sr FROM StudentRequest sr " +
+           "WHERE sr.status = :status " +
+           "AND sr.submittedAt < :cutoffDate " +
+           "ORDER BY sr.submittedAt ASC")
+    List<StudentRequest> findByStatusAndSubmittedAtBefore(
+        @Param("status") RequestStatus status,
+        @Param("cutoffDate") java.time.OffsetDateTime cutoffDate
+    );
+
+    /**
+     * Find approved TRANSFER requests with effectiveDate = today
+     * Used by TransferRequestExecutionJob to execute transfers
+     */
+    @Query("SELECT sr FROM StudentRequest sr " +
+           "JOIN FETCH sr.student " +
+           "JOIN FETCH sr.currentClass " +
+           "JOIN FETCH sr.targetClass " +
+           "JOIN FETCH sr.effectiveSession " +
+           "LEFT JOIN FETCH sr.decidedBy " +
+           "WHERE sr.requestType = :requestType " +
+           "AND sr.status = :status " +
+           "AND sr.effectiveDate = :effectiveDate " +
+           "ORDER BY sr.id ASC")
+    List<StudentRequest> findApprovedTransferRequestsByEffectiveDate(
+        @Param("requestType") StudentRequestType requestType,
+        @Param("status") RequestStatus status,
+        @Param("effectiveDate") LocalDate effectiveDate
+    );
 }

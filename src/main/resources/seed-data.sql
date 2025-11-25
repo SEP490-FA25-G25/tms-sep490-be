@@ -21,6 +21,7 @@ TRUNCATE TABLE score CASCADE;
 TRUNCATE TABLE assessment CASCADE;
 TRUNCATE TABLE course_assessment_clo_mapping CASCADE;
 TRUNCATE TABLE course_assessment CASCADE;
+TRUNCATE TABLE notification CASCADE;
 TRUNCATE TABLE teacher_request CASCADE;
 TRUNCATE TABLE student_request CASCADE;
 TRUNCATE TABLE student_session CASCADE;
@@ -1658,6 +1659,32 @@ SELECT setval('enrollment_id_seq', (SELECT MAX(id) FROM enrollment), true);
 -- UNION ALL SELECT 'Attendance Records (Present)', COUNT(*) FROM student_session WHERE attendance_status = 'PRESENT'
 -- UNION ALL SELECT 'Attendance Records (Absent)', COUNT(*) FROM student_session WHERE attendance_status = 'ABSENT';
 
+-- ========== SECTION 12: NOTIFICATIONS SAMPLE DATA ==========
+-- Sample notifications for different users and scenarios
+INSERT INTO notification (recipient_id, type, title, message, priority, status, reference_type, reference_id, metadata, created_at, expires_at) VALUES
+-- Academic Affairs notifications
+((SELECT id FROM user_account WHERE email = 'academic.affairs@tms.edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu chuyển lớp chờ duyệt', 'Học sinh Nguyen Van A yêu cầu chuyển từ lớp HSK1-101 sang HSK2-201', 'MEDIUM', 'UNREAD', 'StudentRequest', 1, '{"studentName":"Nguyen Van A","fromClass":"HSK1-101","toClass":"HSK2-201"}', CURRENT_TIMESTAMP - INTERVAL '1 day', CURRENT_TIMESTAMP + INTERVAL '7 days'),
+((SELECT id FROM user_account WHERE email = 'academic.affairs@tms.edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu nghỉ học chờ duyệt', 'Học sinh Tran Thi B yêu cầu nghỉ buổi học ngày 2025-11-15', 'LOW', 'UNREAD', 'StudentRequest', 2, '{"studentName":"Tran Thi B","absenceDate":"2025-11-15","reason":"Bị ốm"}', CURRENT_TIMESTAMP - INTERVAL '2 hours', CURRENT_TIMESTAMP + INTERVAL '5 days'),
+
+-- Teacher notifications
+((SELECT id FROM user_account WHERE email = 'teacher.hsk1@tms.edu.vn'), 'CLASS_REMINDER', 'Nhắc nhở buổi học', 'Lớp HSK1-101 sẽ bắt đầu vào lúc 09:00 ngày mai tại phòng Room-A', 'MEDIUM', 'UNREAD', NULL, NULL, '{"className":"HSK1-101","startTime":"2025-11-26 09:00:00","room":"Room-A"}', CURRENT_TIMESTAMP - INTERVAL '3 hours', CURRENT_TIMESTAMP + INTERVAL '1 day'),
+((SELECT id FROM user_account WHERE email = 'teacher.hsk1@tms.edu.vn'), 'FEEDBACK_REMINDER', 'Nhắc nhở cung cấp phản hồi', 'Vui lòng cung cấp phản hồi cho khóa học Foundation Level sau khi hoàn thành', 'LOW', 'READ', NULL, NULL, '{"courseName":"Foundation Level","feedbackDue":"2025-11-30"}', CURRENT_TIMESTAMP - INTERVAL '1 week', CURRENT_TIMESTAMP + INTERVAL '3 days'),
+
+-- Student notifications
+((SELECT id FROM user_account WHERE email = 'student.hsk1.1@tms.edu.vn'), 'GRADE_NOTIFICATION', 'Thông báo điểm số', 'Điểm bài kiểm tra giữa kỳ của bạn đã có: 8.5/10', 'HIGH', 'UNREAD', 'Score', 1, '{"assessmentName":"Midterm Quiz","score":8.5,"maxScore":10.0}', CURRENT_TIMESTAMP - INTERVAL '6 hours', CURRENT_TIMESTAMP + INTERVAL '30 days'),
+((SELECT id FROM user_account WHERE email = 'student.hsk1.1@tms.edu.vn'), 'ASSIGNMENT_DEADLINE', 'Hạn nộp bài tập', 'Bài tập cuối tuần sẽ hết hạn vào ngày 2025-11-27 23:59', 'MEDIUM', 'UNREAD', NULL, NULL, '{"assignmentName":"Weekly Homework 3","dueDate":"2025-11-27 23:59:59"}', CURRENT_TIMESTAMP - INTERVAL '12 hours', CURRENT_TIMESTAMP + INTERVAL '2 days'),
+
+-- Center Head notifications
+((SELECT id FROM user_account WHERE email = 'center.head.hn@tms.edu.vn'), 'LICENSE_WARNING', 'Cảnh báo giấy phép Zoom', 'Giấy phép Zoom cho phòng Room-B sẽ hết hạn trong 15 ngày', 'HIGH', 'UNREAD', NULL, NULL, '{"resourceName":"Room-B","licenseType":"Premium","expiryDate":"2025-12-10","daysRemaining":15}', CURRENT_TIMESTAMP - INTERVAL '4 hours', CURRENT_TIMESTAMP + INTERVAL '15 days'),
+
+-- System notifications for multiple users
+((SELECT id FROM user_account WHERE email = 'teacher.hsk1@tms.edu.vn'), 'SYSTEM_ALERT', 'Bảo trì hệ thống', 'Hệ thống sẽ bảo trì từ 02:00-04:00 ngày 2025-11-28', 'URGENT', 'UNREAD', NULL, NULL, '{"maintenanceWindow":"2025-11-28 02:00-04:00","affectedServices":["Class Management","Attendance"]}', CURRENT_TIMESTAMP - INTERVAL '30 minutes', CURRENT_TIMESTAMP + INTERVAL '2 days'),
+((SELECT id FROM user_account WHERE email = 'academic.affairs@tms.edu.vn'), 'SYSTEM_ALERT', 'Bảo trì hệ thống', 'Hệ thống sẽ bảo trì từ 02:00-04:00 ngày 2025-11-28', 'URGENT', 'UNREAD', NULL, NULL, '{"maintenanceWindow":"2025-11-28 02:00-04:00","affectedServices":["Student Requests","Class Scheduling"]}', CURRENT_TIMESTAMP - INTERVAL '30 minutes', CURRENT_TIMESTAMP + INTERVAL '2 days'),
+
+-- Some read notifications for testing
+((SELECT id FROM user_account WHERE email = 'student.hsk1.2@tms.edu.vn'), 'CLASS_REMINDER', 'Buổi học đã di chuyển', 'Lớp HSK1-102 ngày 2025-11-20 đã được chuyển sang phòng Room-C', 'MEDIUM', 'READ', 'Session', 5, '{"originalRoom":"Room-A","newRoom":"Room-C","sessionDate":"2025-11-20"}', CURRENT_TIMESTAMP - INTERVAL '3 days', CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '1 day'),
+((SELECT id FROM user_account WHERE email = 'teacher.hsk2@tms.edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu thay thế đã duyệt', 'Yêu cầu dạy thay lớp HSK2-201 ngày 2025-11-15 đã được duyệt', 'MEDIUM', 'READ', 'TeacherRequest', 1, '{"replacementTeacher":"Teacher HSK1","sessionDate":"2025-11-15","status":"APPROVED"}', CURRENT_TIMESTAMP - INTERVAL '5 days', CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '4 days');
+
 -- =========================================
 -- END OF SEED DATA
 -- =========================================
@@ -1672,5 +1699,6 @@ SELECT setval('enrollment_id_seq', (SELECT MAX(id) FROM enrollment), true);
 -- - 10 Request scenarios (approved, pending, rejected, waiting_confirm)
 -- - Assessments with scores
 -- - Student feedback and QA reports
+-- - 10 Sample notifications covering all types and priorities
 -- - Edge cases: capacity limits, mid-course enrollment, transfers, perfect attendance
 -- =========================================

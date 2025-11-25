@@ -101,4 +101,18 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
             @Param("resourceType") ResourceType resourceType,
             @Param("minCapacity") Integer minCapacity
     );
+
+    // ==================== SCHEDULER JOB METHODS ====================
+
+    /**
+     * Find VIRTUAL resources with expiry dates
+     * Used by LicenseExpiryWarningJob to monitor license expiry
+     */
+    @Query("SELECT r FROM Resource r " +
+           "WHERE r.resourceType = :resourceType " +
+           "AND r.expiryDate IS NOT NULL " +
+           "ORDER BY r.expiryDate ASC")
+    List<Resource> findByResourceTypeAndExpiryDateIsNotNull(
+            @Param("resourceType") ResourceType resourceType
+    );
 }

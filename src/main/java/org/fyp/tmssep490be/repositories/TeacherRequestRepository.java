@@ -116,4 +116,19 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
      * Used to check if sessions have pending requests
      */
     List<TeacherRequest> findBySessionIdInAndStatusIn(List<Long> sessionIds, List<RequestStatus> statuses);
+
+    // ============== SCHEDULER JOB METHODS ==============
+
+    /**
+     * Find PENDING teacher requests submitted before cutoff date
+     * Used by RequestExpiryJob to auto-expire old requests
+     */
+    @Query("SELECT tr FROM TeacherRequest tr " +
+           "WHERE tr.status = :status " +
+           "AND tr.submittedAt < :cutoffDate " +
+           "ORDER BY tr.submittedAt ASC")
+    List<TeacherRequest> findByStatusAndSubmittedAtBefore(
+        @Param("status") RequestStatus status,
+        @Param("cutoffDate") java.time.OffsetDateTime cutoffDate
+    );
 }
