@@ -54,6 +54,14 @@ springdoc:
   show-actuator: false
   paths-to-match: /api/**
   packages-to-scan: org.fyp.tmssep490be.controllers
+
+# Application Configuration
+app:
+  frontend:
+    url: ${FRONTEND_URL:http://localhost:5173}
+  email:
+    enabled: ${EMAIL_ENABLED:true}
+
 server:
   port: 8080
 
@@ -134,10 +142,3 @@ email:
     pool-size: ${EMAIL_ASYNC_POOL_SIZE:10}
     queue-capacity: ${EMAIL_ASYNC_QUEUE_CAPACITY:100}
     thread-name-prefix: ${EMAIL_ASYNC_THREAD_PREFIX:EmailAsync-}
-
-# Application Configuration
-app:
-  frontend:
-    url: ${FRONTEND_URL:http://localhost:5173}
-  email:
-    enabled: ${EMAIL_ENABLED:true}

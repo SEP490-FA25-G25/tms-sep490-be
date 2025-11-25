@@ -1,11 +1,14 @@
 package org.fyp.tmssep490be.repositories;
 
 import org.fyp.tmssep490be.entities.UserAccount;
+import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -53,4 +56,21 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
      */
     @Query("SELECT u FROM UserAccount u JOIN u.userRoles ur WHERE ur.role.code = :roleCode")
     List<UserAccount> findUsersByRole(@Param("roleCode") String roleCode);
+
+    // ============== PASSWORD RESET METHODS ==============
+
+    /**
+     * Find active user by email for password reset
+     * Only returns users with ACTIVE status
+     */
+    Optional<UserAccount> findActiveUserByEmail(String email);
+
+    /**
+     * Update password hash by user ID
+     * Used for password reset functionality
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE UserAccount u SET u.passwordHash = :passwordHash WHERE u.id = :userId")
+    int updatePasswordById(@Param("userId") Long userId, @Param("passwordHash") String passwordHash);
 }
