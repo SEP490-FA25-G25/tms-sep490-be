@@ -84,14 +84,18 @@ public class UserAccountController {
     }
 
     /**
-     * Get all users with pagination
-     * GET /api/v1/users?page=0&size=20&sort=id,desc
+     * Get all users with pagination and filters
+     * GET /api/v1/users?page=0&size=20&sort=id,desc&search=keyword&role=TEACHER&status=ACTIVE
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CENTER_HEAD')")
-    public ResponseEntity<ResponseObject<Page<UserResponse>>> getAllUsers(Pageable pageable) {
+    public ResponseEntity<ResponseObject<Page<UserResponse>>> getAllUsers(
+            Pageable pageable,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String status) {
 
-        Page<UserResponse> users = userAccountService.getAllUsers(pageable);
+        Page<UserResponse> users = userAccountService.getAllUsers(pageable, search, role, status);
 
         return ResponseEntity.ok(
                 ResponseObject.<Page<UserResponse>>builder()

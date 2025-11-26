@@ -27,9 +27,13 @@ public interface UserAccountService {
     UserResponse getUserByEmail(String email);
 
     /**
-     * Get all users with pagination
+     * Get all users with pagination and filters
+     * @param pageable pagination parameters
+     * @param search search term for email, fullName, phone
+     * @param role filter by role code (e.g., "TEACHER", "STUDENT")
+     * @param status filter by status (e.g., "ACTIVE", "INACTIVE", "SUSPENDED")
      */
-    Page<UserResponse> getAllUsers(Pageable pageable);
+    Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status);
 
     /**
      * Update user status
