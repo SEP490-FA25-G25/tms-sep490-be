@@ -58,9 +58,7 @@ public class QAReportController {
                      request.getReportType(), request.getStatus(),
                      request.getClassId(), request.getSessionId());
 
-            // Pre-validate enum values for better error messages
-            validateEnumValues(request.getReportType(), request.getStatus());
-
+            
             QAReportDetailDTO report = qaReportService.createQAReport(request, currentUser.getId());
 
             log.info("Successfully created QA report with ID: {}", report.getId());
@@ -111,10 +109,10 @@ public class QAReportController {
         @RequestParam(required = false) Long phaseId,
 
         @Parameter(description = "Filter by report type")
-        @RequestParam(required = false) String reportType,
+        @RequestParam(required = false) QAReportType reportType,
 
         @Parameter(description = "Filter by status (draft/submitted)")
-        @RequestParam(required = false) String status,
+        @RequestParam(required = false) QAReportStatus status,
 
         @Parameter(description = "Filter by reporter user ID")
         @RequestParam(required = false) Long reportedBy,
@@ -204,8 +202,7 @@ public class QAReportController {
             log.info("Updating QA report {} - Type: {}, Status: {}", reportId,
                      request.getReportType(), request.getStatus());
 
-            validateEnumValues(request.getReportType(), request.getStatus());
-
+            
             QAReportDetailDTO report = qaReportService.updateQAReport(reportId, request, currentUser.getId());
 
             log.info("Successfully updated QA report {}", reportId);
@@ -287,15 +284,5 @@ public class QAReportController {
             .message("QA report deleted successfully")
             .data(null)
             .build());
-    }
-
-    // Helper method for enum validation
-    private void validateEnumValues(String reportType, String status) {
-        if (!QAReportType.isValidValue(reportType)) {
-            throw new IllegalArgumentException("Invalid report type: " + reportType);
-        }
-        if (!QAReportStatus.isValidValue(status)) {
-            throw new IllegalArgumentException("Invalid status: " + status);
-        }
     }
 }

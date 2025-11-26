@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.fyp.tmssep490be.entities.enums.QAReportType;
+import org.fyp.tmssep490be.entities.enums.QAReportStatus;
 
 @Data
 @NoArgsConstructor
@@ -17,9 +19,8 @@ public class CreateQAReportRequest {
     private Long sessionId;
     private Long phaseId;
 
-    @NotBlank(message = "Report type is required")
-    @Size(max = 100)
-    private String reportType;
+    @NotNull(message = "Report type is required")
+    private QAReportType reportType;
 
     @NotBlank(message = "Findings are required")
     @Size(min = 50, message = "Findings must be at least 50 characters")
@@ -27,6 +28,6 @@ public class CreateQAReportRequest {
 
     private String actionItems;
 
-    @NotBlank(message = "Status is required")
-    private String status;
+    @NotNull(message = "Status is required")
+    private QAReportStatus status;
 }

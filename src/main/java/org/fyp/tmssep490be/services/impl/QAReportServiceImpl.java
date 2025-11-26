@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,11 +29,164 @@ public class QAReportServiceImpl implements QAReportService {
     private final SessionRepository sessionRepository;
     private final CoursePhaseRepository coursePhaseRepository;
     private final UserAccountRepository userAccountRepository;
+    private final StudentSessionRepository studentSessionRepository;
+
+    // ========== Enhanced Validation Methods ==========
+
+    /**
+     * Kiểm tra xem lớp có đủ dữ liệu để tạo QA report không
+     * - Session report: Cần có session đã hoàn thành với dữ liệu điểm danh và bài tập
+     * - Phase report: Cần có ít nhất 1 session đã hoàn thành
+     * - Class report: Cần có ít nhất 1 session đã hoàn thành
+     */
+    private void validateClassForQAReport(Long classId, QAReportType reportType, Long sessionId, Long phaseId) {
+        if (reportType == QAReportType.CLASSROOM_OBSERVATION && sessionId != null) {
+            // Validate session exists and is completed
+            Session session = sessionRepository.findById(sessionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Session không tồn tại"));
+
+            if (!session.getClassEntity().getId().equals(classId)) {
+                throw new InvalidRequestException("Session không thuộc class này");
+            }
+
+            if (session.getStatus() != org.fyp.tmssep490be.entities.enums.SessionStatus.DONE) {
+                throw new InvalidRequestException("Session chưa hoàn thành, không thể tạo QA report");
+            }
+
+            // Check if session has student data
+            long studentSessionCount = studentSessionRepository.countBySessionId(sessionId);
+            if (studentSessionCount == 0) {
+                throw new InvalidRequestException("Session không có dữ liệu học sinh, không thể tạo QA report");
+            }
+
+            log.info("Validated session {} for QA report - Students: {}", sessionId, studentSessionCount);
+        } else if (reportType == QAReportType.PHASE_REVIEW && phaseId != null) {
+            // Validate phase exists
+            CoursePhase phase = coursePhaseRepository.findById(phaseId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Phase không tồn tại"));
+
+            ClassEntity classEntity = classRepository.findById(classId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Class không tồn tại"));
+
+            if (!phase.getCourse().getId().equals(classEntity.getCourse().getId())) {
+                throw new InvalidRequestException("Phase không thuộc course của class này");
+            }
+
+            // Check if phase has completed sessions
+            long completedSessionsInPhase = sessionRepository.findByClassId(classId).stream()
+                    .filter(s -> s.getCourseSession() != null &&
+                               s.getCourseSession().getPhase().getId().equals(phaseId) &&
+                               s.getStatus() == org.fyp.tmssep490be.entities.enums.SessionStatus.DONE)
+                    .count();
+
+            if (completedSessionsInPhase == 0) {
+                throw new InvalidRequestException("Phase không có session nào hoàn thành, không thể tạo QA report");
+            }
+
+            log.info("Validated phase {} for QA report - Completed sessions: {}", phaseId, completedSessionsInPhase);
+        } else {
+            // Validate class has completed sessions
+            long completedSessions = sessionRepository.findByClassId(classId).stream()
+                    .filter(s -> s.getStatus() == org.fyp.tmssep490be.entities.enums.SessionStatus.DONE)
+                    .count();
+
+            if (completedSessions == 0) {
+                throw new InvalidRequestException("Class không có session nào hoàn thành, không thể tạo QA report");
+            }
+
+            log.info("Validated class {} for QA report - Completed sessions: {}", classId, completedSessions);
+        }
+    }
+
+    /**
+     * Kiểm tra xem user có quyền tạo QA report cho lớp này không
+     * - QA role: có thể tạo report cho bất kỳ lớp nào
+     * - Teacher role: chỉ có thể tạo report cho lớp mình dạy
+     * - Các role khác: không có quyền tạo report
+     */
+    private void validateUserPermission(Long userId, Long classId) {
+        UserAccount user = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+
+        boolean hasPermission = user.getUserRoles().stream()
+                .anyMatch(ur -> ur.getRole().getCode().equals("QA"));
+
+        if (!hasPermission) {
+            throw new InvalidRequestException("Bạn không có quyền tạo QA report");
+        }
+
+        log.info("Validated user {} permission for class {} - Has QA role: {}",
+                 userId, classId, hasPermission);
+    }
+
+    /**
+     * Lấy metrics hiện tại của class để kèm theo QA report
+     */
+    private QAClassMetrics getClassMetrics(Long classId) {
+        try {
+            // Get attendance data
+            var attendanceData = studentSessionRepository.getAttendanceSummaryByClassId(classId);
+            long presentCount = 0;
+            long totalCount = 0;
+
+            for (Object[] row : attendanceData) {
+                var status = row[0];
+                Long count = (Long) row[1];
+
+                totalCount += count;
+                if (status == org.fyp.tmssep490be.entities.enums.AttendanceStatus.PRESENT) {
+                    presentCount += count;
+                }
+            }
+
+            // Get homework data
+            var homeworkData = studentSessionRepository.getHomeworkSummaryByClassId(classId);
+            long completedHomework = 0;
+            long totalHomework = 0;
+
+            for (Object[] row : homeworkData) {
+                var status = row[0];
+                Long count = (Long) row[1];
+
+                totalHomework += count;
+                if (status == org.fyp.tmssep490be.entities.enums.HomeworkStatus.COMPLETED) {
+                    completedHomework += count;
+                }
+            }
+
+            double attendanceRate = totalCount > 0 ? (presentCount * 100.0 / totalCount) : 0.0;
+            double homeworkRate = totalHomework > 0 ? (completedHomework * 100.0 / totalHomework) : 0.0;
+
+            // Get session counts
+            long totalSessions = sessionRepository.countByClassEntityId(classId);
+            long completedSessions = sessionRepository.countByClassEntityIdExcludingCancelled(classId);
+
+            return QAClassMetrics.builder()
+                    .attendanceRate(attendanceRate)
+                    .homeworkCompletionRate(homeworkRate)
+                    .totalSessions((int) totalSessions)
+                    .completedSessions((int) completedSessions)
+                    .totalStudents((int) totalCount)
+                    .presentStudents((int) presentCount)
+                    .completedHomeworkStudents((int) completedHomework)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Error calculating metrics for class {}: {}", classId, e.getMessage());
+            return QAClassMetrics.builder().build();
+        }
+    }
 
     @Override
     @Transactional
     public QAReportDetailDTO createQAReport(CreateQAReportRequest request, Long userId) {
-        log.info("Creating QA report for classId={} by userId={}", request.getClassId(), userId);
+        log.info("Creating QA report for classId={} type={} by userId={}",
+                 request.getClassId(), request.getReportType(), userId);
+
+        // Enhanced validation
+        validateClassForQAReport(request.getClassId(), request.getReportType(),
+                              request.getSessionId(), request.getPhaseId());
+        validateUserPermission(userId, request.getClassId());
 
         ClassEntity classEntity = classRepository.findById(request.getClassId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class không tồn tại"));
@@ -55,23 +209,34 @@ public class QAReportServiceImpl implements QAReportService {
         UserAccount reportedBy = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
 
-        // Validate enum values explicitly
-        QAReportType reportType = QAReportType.fromString(request.getReportType());
-        QAReportStatus status = QAReportStatus.fromString(request.getStatus());
+        // Direct enum assignment from request DTOs
+        QAReportType reportType = request.getReportType();
+        QAReportStatus status = request.getStatus();
+
+        // Get current class metrics
+        QAClassMetrics metrics = getClassMetrics(request.getClassId());
 
         QAReport report = QAReport.builder()
                 .classEntity(classEntity)
                 .session(session)
                 .phase(phase)
                 .reportedBy(reportedBy)
-                .reportType(reportType.getValue())  // Use getValue()
-                .status(status.getValue())          // Use getValue()
+                .reportType(reportType)
+                .status(status)
                 .findings(request.getFindings())
                 .actionItems(request.getActionItems())
                 .build();
 
         QAReport saved = qaReportRepository.save(report);
-        return mapToDetailDTO(saved);
+
+        log.info("QA report created successfully - ID: {}, Class: {}, Type: {}, Status: {}, " +
+                 "Class Metrics - Attendance: {}%, Homework: {}%, Sessions: {}/{}",
+                 saved.getId(), classEntity.getName(), reportType, status,
+                 String.format("%.1f", metrics.getAttendanceRate()),
+                 String.format("%.1f", metrics.getHomeworkCompletionRate()),
+                 metrics.getCompletedSessions(), metrics.getTotalSessions());
+
+        return mapToDetailDTO(saved, metrics);
     }
 
     @Override
@@ -86,14 +251,14 @@ public class QAReportServiceImpl implements QAReportService {
             throw new InvalidRequestException("Bạn không có quyền sửa report này");
         }
 
-        // Validate enum values
-        QAReportType reportType = QAReportType.fromString(request.getReportType());
-        QAReportStatus status = QAReportStatus.fromString(request.getStatus());
+        // Direct enum assignment from request DTOs
+        QAReportType reportType = request.getReportType();
+        QAReportStatus status = request.getStatus();
 
-        report.setReportType(reportType.getValue());
+        report.setReportType(reportType);  // Direct enum assignment
         report.setFindings(request.getFindings());
         report.setActionItems(request.getActionItems());
-        report.setStatus(status.getValue());
+        report.setStatus(status);          // Direct enum assignment
 
         QAReport updated = qaReportRepository.save(report);
         return mapToDetailDTO(updated);
@@ -111,8 +276,8 @@ public class QAReportServiceImpl implements QAReportService {
             throw new InvalidRequestException("Bạn không có quyền thay đổi status report này");
         }
 
-        QAReportStatus status = QAReportStatus.fromString(request.getStatus());
-        report.setStatus(status.getValue());
+        QAReportStatus status = request.getStatus();
+        report.setStatus(status);  // Direct enum assignment
         QAReport updated = qaReportRepository.save(report);
         return mapToDetailDTO(updated);
     }
@@ -120,7 +285,7 @@ public class QAReportServiceImpl implements QAReportService {
     @Override
     @Transactional(readOnly = true)
     public Page<QAReportListItemDTO> getQAReports(Long classId, Long sessionId, Long phaseId,
-                                                    String reportType, String status, Long reportedBy,
+                                                    QAReportType reportType, QAReportStatus status, Long reportedBy,
                                                     Pageable pageable) {
         log.info("Getting QA reports with filters");
 
@@ -158,12 +323,18 @@ public class QAReportServiceImpl implements QAReportService {
     }
 
     private QAReportDetailDTO mapToDetailDTO(QAReport report) {
+        return mapToDetailDTO(report, null);
+    }
+
+    private QAReportDetailDTO mapToDetailDTO(QAReport report, QAClassMetrics metrics) {
+        if (metrics == null) {
+            metrics = getClassMetrics(report.getClassEntity().getId());
+        }
+
         return QAReportDetailDTO.builder()
                 .id(report.getId())
-                .reportType(report.getReportTypeEnum() != null ?
-                           report.getReportTypeEnum().getDisplayName() : null)
-                .status(report.getStatusEnum() != null ?
-                        report.getStatusEnum().getDisplayName() : null)
+                .reportType(report.getReportType())
+                .status(report.getStatus())
                 .classId(report.getClassEntity().getId())
                 .classCode(report.getClassEntity().getName())
                 .className(report.getClassEntity().getCourse() != null ? report.getClassEntity().getCourse().getName() : null)
@@ -177,6 +348,7 @@ public class QAReportServiceImpl implements QAReportService {
                 .reportedByName(report.getReportedBy().getFullName())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
+                .classMetrics(metrics)
                 .build();
     }
 
@@ -194,8 +366,7 @@ public class QAReportServiceImpl implements QAReportService {
 
         return QAReportListItemDTO.builder()
                 .id(report.getId())
-                .reportType(report.getReportTypeEnum() != null ?
-                           report.getReportTypeEnum().getDisplayName() : null)
+                .reportType(report.getReportType())
                 .reportLevel(reportLevel)
                 .classId(report.getClassEntity().getId())
                 .classCode(report.getClassEntity().getName())
@@ -203,8 +374,7 @@ public class QAReportServiceImpl implements QAReportService {
                 .sessionDate(report.getSession() != null ? report.getSession().getDate().toString() : null)
                 .phaseId(report.getPhase() != null ? report.getPhase().getId() : null)
                 .phaseName(report.getPhase() != null ? report.getPhase().getName() : null)
-                .status(report.getStatusEnum() != null ?
-                        report.getStatusEnum().getDisplayName() : null)
+                .status(report.getStatus())
                 .reportedByName(report.getReportedBy().getFullName())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())

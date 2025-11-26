@@ -9,7 +9,10 @@ import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
 import org.fyp.tmssep490be.entities.ClassEntity;
 import org.fyp.tmssep490be.entities.QAReport;
 import org.fyp.tmssep490be.entities.Session;
+import org.fyp.tmssep490be.entities.StudentSession;
+import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
+import org.fyp.tmssep490be.entities.enums.HomeworkStatus;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
 import org.fyp.tmssep490be.repositories.ClassRepository;
@@ -26,7 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,6 +43,187 @@ public class QAServiceImpl implements QAService {
     private final QAReportRepository qaReportRepository;
     private final SessionRepository sessionRepository;
     private final StudentSessionRepository studentSessionRepository;
+
+    // ========== Helper Methods for Business Logic ==========
+
+    /**
+     * Tính toán tỷ lệ điểm danh cho một lớp
+     * Formula: (Số buổi có mặt / Tổng số buổi đã điểm danh) * 100
+     */
+    private double calculateAttendanceRate(Long classId) {
+        try {
+            List<Object[]> attendanceData = studentSessionRepository.getAttendanceSummaryByClassId(classId);
+
+            long presentCount = 0;
+            long totalCount = 0;
+
+            for (Object[] row : attendanceData) {
+                AttendanceStatus status = (AttendanceStatus) row[0];
+                Long count = (Long) row[1];
+
+                if (status == AttendanceStatus.PRESENT) {
+                    presentCount += count;
+                }
+                totalCount += count;
+            }
+
+            if (totalCount == 0) {
+                log.warn("No attendance data found for classId={}", classId);
+                return 0.0;
+            }
+
+            double rate = (presentCount * 100.0) / totalCount;
+            log.debug("Calculated attendance rate for classId={}: {}% (present={}, total={})",
+                     classId, String.format("%.1f", rate), presentCount, totalCount);
+
+            return rate;
+        } catch (Exception e) {
+            log.error("Error calculating attendance rate for classId={}: {}", classId, e.getMessage());
+            return 0.0;
+        }
+    }
+
+    /**
+     * Tính toán tỷ lệ hoàn thành bài tập cho một lớp
+     * Formula: (Số buổi hoàn thành bài tập / Tổng số buổi có bài tập) * 100
+     */
+    private double calculateHomeworkCompletionRate(Long classId) {
+        try {
+            List<Object[]> homeworkData = studentSessionRepository.getHomeworkSummaryByClassId(classId);
+
+            long completedCount = 0;
+            long totalCount = 0;
+
+            for (Object[] row : homeworkData) {
+                HomeworkStatus status = (HomeworkStatus) row[0];
+                Long count = (Long) row[1];
+
+                if (status == HomeworkStatus.COMPLETED) {
+                    completedCount += count;
+                }
+                totalCount += count;
+            }
+
+            if (totalCount == 0) {
+                log.warn("No homework data found for classId={}", classId);
+                return 0.0;
+            }
+
+            double rate = (completedCount * 100.0) / totalCount;
+            log.debug("Calculated homework completion rate for classId={}: {}% (completed={}, total={})",
+                     classId, String.format("%.1f", rate), completedCount, totalCount);
+
+            return rate;
+        } catch (Exception e) {
+            log.error("Error calculating homework completion rate for classId={}: {}", classId, e.getMessage());
+            return 0.0;
+        }
+    }
+
+    /**
+     * Tính toán tỷ lệ điểm danh trung bình cho nhiều lớp
+     */
+    private Map<Long, Double> calculateAttendanceRatesForClasses(List<Long> classIds) {
+        Map<Long, Double> rates = new HashMap<>();
+
+        if (classIds.isEmpty()) {
+            return rates;
+        }
+
+        try {
+            List<Object[]> attendanceData = studentSessionRepository.getAttendanceSummaryByClassIds(classIds);
+            Map<Long, Long> presentCounts = new HashMap<>();
+            Map<Long, Long> totalCounts = new HashMap<>();
+
+            for (Object[] row : attendanceData) {
+                Long classId = (Long) row[0];
+                AttendanceStatus status = (AttendanceStatus) row[1];
+                Long count = (Long) row[2];
+
+                totalCounts.put(classId, totalCounts.getOrDefault(classId, 0L) + count);
+                if (status == AttendanceStatus.PRESENT) {
+                    presentCounts.put(classId, presentCounts.getOrDefault(classId, 0L) + count);
+                }
+            }
+
+            for (Long classId : classIds) {
+                long presentCount = presentCounts.getOrDefault(classId, 0L);
+                long totalCount = totalCounts.getOrDefault(classId, 0L);
+
+                if (totalCount > 0) {
+                    double rate = (presentCount * 100.0) / totalCount;
+                    rates.put(classId, rate);
+                } else {
+                    rates.put(classId, 0.0);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error calculating attendance rates for classes {}: {}", classIds, e.getMessage());
+            classIds.forEach(classId -> rates.put(classId, 0.0));
+        }
+
+        return rates;
+    }
+
+    /**
+     * Tính toán tỷ lệ hoàn thành bài tập trung bình cho nhiều lớp
+     */
+    private Map<Long, Double> calculateHomeworkRatesForClasses(List<Long> classIds) {
+        Map<Long, Double> rates = new HashMap<>();
+
+        if (classIds.isEmpty()) {
+            return rates;
+        }
+
+        try {
+            List<Object[]> homeworkData = studentSessionRepository.getHomeworkSummaryByClassIds(classIds);
+            Map<Long, Long> completedCounts = new HashMap<>();
+            Map<Long, Long> totalCounts = new HashMap<>();
+
+            for (Object[] row : homeworkData) {
+                Long classId = (Long) row[0];
+                HomeworkStatus status = (HomeworkStatus) row[1];
+                Long count = (Long) row[2];
+
+                totalCounts.put(classId, totalCounts.getOrDefault(classId, 0L) + count);
+                if (status == HomeworkStatus.COMPLETED) {
+                    completedCounts.put(classId, completedCounts.getOrDefault(classId, 0L) + count);
+                }
+            }
+
+            for (Long classId : classIds) {
+                long completedCount = completedCounts.getOrDefault(classId, 0L);
+                long totalCount = totalCounts.getOrDefault(classId, 0L);
+
+                if (totalCount > 0) {
+                    double rate = (completedCount * 100.0) / totalCount;
+                    rates.put(classId, rate);
+                } else {
+                    rates.put(classId, 0.0);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error calculating homework rates for classes {}: {}", classIds, e.getMessage());
+            classIds.forEach(classId -> rates.put(classId, 0.0));
+        }
+
+        return rates;
+    }
+
+    /**
+     * Xác định lớp có rủi ro (dưới ngưỡng an toàn)
+     * Risk thresholds: Attendance < 80% OR Homework < 70%
+     */
+    private String getRiskWarning(double attendanceRate, double homeworkRate) {
+        if (attendanceRate < 80.0 && homeworkRate < 70.0) {
+            return "Cảnh báo cao: Điểm danh < 80% và Bài tập < 70%";
+        } else if (attendanceRate < 80.0) {
+            return "Cảnh báo: Tỷ lệ điểm danh thấp < 80%";
+        } else if (homeworkRate < 70.0) {
+            return "Cảnh báo: Tỷ lệ hoàn thành bài tập thấp < 70%";
+        }
+        return null;
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -57,9 +243,26 @@ public class QAServiceImpl implements QAService {
         List<QAReport> recentReports = qaReportRepository.findRecentReports(startOfMonth, PageRequest.of(0, 1000));
         int qaReportsCreatedThisMonth = recentReports.size();
 
-        // Calculate average attendance and homework completion rates (simplified)
-        double avgAttendanceRate = 85.0; // Placeholder
-        double avgHomeworkRate = 75.0; // Placeholder
+        // Calculate real average attendance and homework completion rates
+        List<Long> ongoingClassIds = ongoingClasses.stream()
+                .map(ClassEntity::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, Double> attendanceRates = calculateAttendanceRatesForClasses(ongoingClassIds);
+        Map<Long, Double> homeworkRates = calculateHomeworkRatesForClasses(ongoingClassIds);
+
+        double avgAttendanceRate = attendanceRates.values().stream()
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .orElse(0.0);
+
+        double avgHomeworkRate = homeworkRates.values().stream()
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .orElse(0.0);
+
+        log.info("Calculated KPIs - Avg Attendance: {}%, Avg Homework: {}% for {} ongoing classes",
+                String.format("%.1f", avgAttendanceRate), String.format("%.1f", avgHomeworkRate), ongoingClassesCount);
 
         QADashboardDTO.KPIMetrics kpiMetrics = QADashboardDTO.KPIMetrics.builder()
                 .ongoingClassesCount(ongoingClassesCount)
@@ -68,23 +271,39 @@ public class QAServiceImpl implements QAService {
                 .averageHomeworkCompletionRate(avgHomeworkRate)
                 .build();
 
-        // Classes requiring attention (attendance < 80% OR no QA report)
+        // Classes requiring attention (attendance < 80% OR homework < 70% OR no QA report)
         List<QADashboardDTO.ClassRequiringAttention> classesRequiringAttention = ongoingClasses.stream()
-                .limit(10)
                 .map(c -> {
+                    double attendanceRate = attendanceRates.getOrDefault(c.getId(), 0.0);
+                    double homeworkRate = homeworkRates.getOrDefault(c.getId(), 0.0);
                     long qaReportCount = qaReportRepository.countByClassEntityId(c.getId());
-                    String warningReason = qaReportCount == 0 ? "Chua co QA report" : "Can theo doi";
+
+                    String warningReason = getRiskWarning(attendanceRate, homeworkRate);
+                    if (warningReason == null && qaReportCount == 0) {
+                        warningReason = "Chưa có QA report";
+                    } else if (warningReason == null) {
+                        warningReason = "Cần theo dõi";
+                    }
 
                     return QADashboardDTO.ClassRequiringAttention.builder()
                             .classId(c.getId())
                             .classCode(c.getName())
                             .courseName(c.getCourse() != null ? c.getCourse().getName() : "N/A")
                             .branchName(c.getBranch() != null ? c.getBranch().getName() : "N/A")
-                            .attendanceRate(80.0) // Placeholder
+                            .attendanceRate(attendanceRate)
+                            .homeworkCompletionRate(homeworkRate)
                             .qaReportCount((int) qaReportCount)
                             .warningReason(warningReason)
                             .build();
                 })
+                .filter(c -> c.getWarningReason() != null && !c.getWarningReason().equals("Cần theo dõi"))
+                .sorted((a, b) -> {
+                    // Sort by risk severity: both metrics low -> attendance low -> homework low
+                    double aRisk = (100 - a.getAttendanceRate()) * 0.6 + (100 - a.getHomeworkCompletionRate()) * 0.4;
+                    double bRisk = (100 - b.getAttendanceRate()) * 0.6 + (100 - b.getHomeworkCompletionRate()) * 0.4;
+                    return Double.compare(bRisk, aRisk);
+                })
+                .limit(15)
                 .collect(Collectors.toList());
 
         // Recent QA reports
@@ -92,14 +311,12 @@ public class QAServiceImpl implements QAService {
                 .limit(10)
                 .map(r -> QADashboardDTO.QAReportSummary.builder()
                         .reportId(r.getId())
-                        .reportType(r.getReportTypeEnum() != null ?
-                                   r.getReportTypeEnum().getDisplayName() : r.getReportType())
+                        .reportType(r.getReportType())
                         .classId(r.getClassEntity().getId())
                         .classCode(r.getClassEntity().getName())
                         .sessionId(r.getSession() != null ? r.getSession().getId() : null)
                         .sessionDate(r.getSession() != null ? r.getSession().getDate().toString() : null)
-                        .status(r.getStatusEnum() != null ?
-                                r.getStatusEnum().getDisplayName() : r.getStatus())
+                        .status(r.getStatus())
                         .createdAt(r.getCreatedAt())
                         .build())
                 .collect(Collectors.toList());
@@ -115,15 +332,30 @@ public class QAServiceImpl implements QAService {
     @Transactional(readOnly = true)
     public Page<QAClassListItemDTO> getQAClasses(List<Long> branchIds, String status, String search,
                                                    Pageable pageable, Long userId) {
-        log.info("Getting QA classes list");
+        log.info("Getting QA classes list with branchIds={}, status={}, search={}", branchIds, status, search);
 
-        // Simplified version - just get all classes and filter
+        // Get classes with pagination and filters
         Page<ClassEntity> classes = classRepository.findAll(pageable);
+
+        // Calculate metrics for all classes in this page
+        List<Long> classIds = classes.getContent().stream()
+                .map(ClassEntity::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, Double> attendanceRates = calculateAttendanceRatesForClasses(classIds);
+        Map<Long, Double> homeworkRates = calculateHomeworkRatesForClasses(classIds);
 
         return classes.map(c -> {
             long totalSessions = sessionRepository.countByClassEntityId(c.getId());
             long completedSessions = sessionRepository.countByClassEntityIdExcludingCancelled(c.getId());
             long qaReportCount = qaReportRepository.countByClassEntityId(c.getId());
+
+            double attendanceRate = attendanceRates.getOrDefault(c.getId(), 0.0);
+            double homeworkRate = homeworkRates.getOrDefault(c.getId(), 0.0);
+
+            log.debug("Class {} - Sessions: {}/{}, Attendance: {}%, Homework: {}%, QA Reports: {}",
+                     c.getName(), completedSessions, totalSessions,
+                     String.format("%.1f", attendanceRate), String.format("%.1f", homeworkRate), qaReportCount);
 
             return QAClassListItemDTO.builder()
                     .classId(c.getId())
@@ -136,8 +368,8 @@ public class QAServiceImpl implements QAService {
                     .startDate(c.getStartDate())
                     .totalSessions((int) totalSessions)
                     .completedSessions((int) completedSessions)
-                    .attendanceRate(85.0) // Placeholder
-                    .homeworkCompletionRate(75.0) // Placeholder
+                    .attendanceRate(attendanceRate)
+                    .homeworkCompletionRate(homeworkRate)
                     .qaReportCount((int) qaReportCount)
                     .build();
         });
@@ -180,13 +412,60 @@ public class QAServiceImpl implements QAService {
                 .nextSessionDate(nextSessionDate)
                 .build();
 
-        // Performance metrics (placeholders)
+        // Calculate real performance metrics for this class
+        double classAttendanceRate = calculateAttendanceRate(classId);
+        double classHomeworkRate = calculateHomeworkCompletionRate(classId);
+
+        // Calculate total absences and students at risk
+        List<StudentSession> classStudentSessions = studentSessionRepository.findByClassIdWithSessionAndStudent(classId);
+
+        // Count absences (excluding cancelled sessions)
+        long totalAbsences = classStudentSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                .count();
+
+        // Count unique students at risk (attendance < 80% OR homework < 70%)
+        Map<Long, List<StudentSession>> studentSessionsMap = classStudentSessions.stream()
+                .collect(Collectors.groupingBy(ss -> ss.getStudent().getId()));
+
+        long studentsAtRisk = studentSessionsMap.entrySet().stream()
+                .filter(entry -> {
+                    Long studentId = entry.getKey();
+                    List<StudentSession> sessions = entry.getValue();
+
+                    long presentCount = sessions.stream()
+                            .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                            .count();
+
+                    long completedHomeworkCount = sessions.stream()
+                            .filter(ss -> ss.getHomeworkStatus() == HomeworkStatus.COMPLETED)
+                            .count();
+
+                    long totalCount = sessions.size();
+                    long homeworkTotalCount = sessions.stream()
+                            .filter(ss -> ss.getHomeworkStatus() != null && ss.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK)
+                            .count();
+
+                    double studentAttendanceRate = totalCount > 0 ? (presentCount * 100.0 / totalCount) : 0.0;
+                    double studentHomeworkRate = homeworkTotalCount > 0 ? (completedHomeworkCount * 100.0 / homeworkTotalCount) : 100.0;
+
+                    return studentAttendanceRate < 80.0 || studentHomeworkRate < 70.0;
+                })
+                .count();
+
         QAClassDetailDTO.QAPerformanceMetrics performanceMetrics = QAClassDetailDTO.QAPerformanceMetrics.builder()
-                .attendanceRate(85.0)
-                .homeworkCompletionRate(75.0)
-                .totalAbsences(15)
-                .studentsAtRisk(3)
+                .attendanceRate(classAttendanceRate)
+                .homeworkCompletionRate(classHomeworkRate)
+                .totalAbsences((int) totalAbsences)
+                .studentsAtRisk((int) studentsAtRisk)
                 .build();
+
+        log.info("Class {} Performance - Attendance: {}%, Homework: {}%, Absences: {}, Students at Risk: {}",
+                 classEntity.getName(),
+                 String.format("%.1f", classAttendanceRate),
+                 String.format("%.1f", classHomeworkRate),
+                 totalAbsences,
+                 studentsAtRisk);
 
         // Get QA reports for this class
         List<QAReport> qaReports = qaReportRepository.findAll().stream()
@@ -204,11 +483,9 @@ public class QAServiceImpl implements QAService {
 
                     return QAClassDetailDTO.QAReportSummary.builder()
                             .reportId(r.getId())
-                            .reportType(r.getReportTypeEnum() != null ?
-                                       r.getReportTypeEnum().getDisplayName() : r.getReportType())
+                            .reportType(r.getReportType())
                             .reportLevel(reportLevel)
-                            .status(r.getStatusEnum() != null ?
-                                    r.getStatusEnum().getDisplayName() : r.getStatus())
+                            .status(r.getStatus())
                             .createdAt(r.getCreatedAt())
                             .reportedByName(r.getReportedBy() != null ? r.getReportedBy().getFullName() : "Unknown")
                             .build();
@@ -254,17 +531,34 @@ public class QAServiceImpl implements QAService {
             .sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate()))
             .collect(Collectors.toList());
 
-        // Map to QASessionItemDTO with metrics
+        // Map to QASessionItemDTO with real metrics
         List<QASessionListResponse.QASessionItemDTO> sessionItems = sessions.stream()
                 .map(s -> {
-                    // Calculate attendance metrics (placeholders)
-                    int totalStudents = classEntity.getEnrollments() != null ? classEntity.getEnrollments().size() : 0;
-                    int presentCount = (int) (totalStudents * 0.85); // Placeholder
-                    int absentCount = totalStudents - presentCount;
+                    // Get real student session data for this session
+                    List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(s.getId());
+
+                    // Calculate real attendance metrics
+                    long presentCount = studentSessions.stream()
+                            .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                            .count();
+
+                    long absentCount = studentSessions.stream()
+                            .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                            .count();
+
+                    long totalStudents = studentSessions.size();
                     double attendanceRate = totalStudents > 0 ? (presentCount * 100.0 / totalStudents) : 0.0;
 
-                    int homeworkCompletedCount = (int) (totalStudents * 0.75); // Placeholder
-                    double homeworkCompletionRate = totalStudents > 0 ? (homeworkCompletedCount * 100.0 / totalStudents) : 0.0;
+                    // Calculate real homework completion metrics (exclude NO_HOMEWORK)
+                    long homeworkCompletedCount = studentSessions.stream()
+                            .filter(ss -> ss.getHomeworkStatus() == HomeworkStatus.COMPLETED)
+                            .count();
+
+                    long homeworkTotalCount = studentSessions.stream()
+                            .filter(ss -> ss.getHomeworkStatus() != null && ss.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK)
+                            .count();
+
+                    double homeworkCompletionRate = homeworkTotalCount > 0 ? (homeworkCompletedCount * 100.0 / homeworkTotalCount) : 0.0;
 
                     // Check QA reports for this session
                     long qaReportCount = qaReportRepository.findAll().stream()
@@ -286,6 +580,10 @@ public class QAServiceImpl implements QAService {
                             .orElse("TBA")
                         : "TBA";
 
+                    log.debug("Session {} - Students: {}, Present: {}, Absent: {}, Attendance: {}%, Homework: {}%",
+                             s.getId(), totalStudents, presentCount, absentCount,
+                             String.format("%.1f", attendanceRate), String.format("%.1f", homeworkCompletionRate));
+
                     return QASessionListResponse.QASessionItemDTO.builder()
                             .sessionId(s.getId())
                             .sequenceNumber(sequenceNumber)
@@ -295,11 +593,11 @@ public class QAServiceImpl implements QAService {
                             .topic(topic)
                             .status(s.getStatus() != null ? s.getStatus().name() : null)
                             .teacherName(teacherName)
-                            .totalStudents(totalStudents)
-                            .presentCount(presentCount)
-                            .absentCount(absentCount)
+                            .totalStudents((int) totalStudents)
+                            .presentCount((int) presentCount)
+                            .absentCount((int) absentCount)
                             .attendanceRate(attendanceRate)
-                            .homeworkCompletedCount(homeworkCompletedCount)
+                            .homeworkCompletedCount((int) homeworkCompletedCount)
                             .homeworkCompletionRate(homeworkCompletionRate)
                             .hasQAReport(qaReportCount > 0)
                             .qaReportCount((int) qaReportCount)

@@ -1,6 +1,8 @@
 package org.fyp.tmssep490be.services;
 
 import org.fyp.tmssep490be.dtos.qa.*;
+import org.fyp.tmssep490be.entities.enums.QAReportType;
+import org.fyp.tmssep490be.entities.enums.QAReportStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -12,7 +14,7 @@ public interface QAReportService {
     QAReportDetailDTO changeReportStatus(Long reportId, ChangeQAReportStatusRequest request, Long userId);
 
     Page<QAReportListItemDTO> getQAReports(Long classId, Long sessionId, Long phaseId,
-                                            String reportType, String status, Long reportedBy,
+                                            QAReportType reportType, QAReportStatus status, Long reportedBy,
                                             Pageable pageable);
 
     QAReportDetailDTO getQAReportDetail(Long reportId);

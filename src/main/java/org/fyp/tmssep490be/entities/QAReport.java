@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.fyp.tmssep490be.entities.enums.QAReportType;
 import org.fyp.tmssep490be.entities.enums.QAReportStatus;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -13,6 +16,7 @@ import java.time.OffsetDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
 public class QAReport {
 
     @Id
@@ -35,11 +39,13 @@ public class QAReport {
     @JoinColumn(name = "reported_by")
     private UserAccount reportedBy;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "report_type", length = 100, nullable = false)
-    private String reportType; // Store as lowercase_with_underscores value
+    private QAReportType reportType;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50, nullable = false)
-    private String status; // Store as lowercase_with_underscores value
+    private QAReportStatus status;
 
     @Column(name = "findings", columnDefinition = "TEXT")
     private String findings;
@@ -47,69 +53,21 @@ public class QAReport {
     @Column(name = "action_items", columnDefinition = "TEXT")
     private String actionItems;
 
+    @CreatedDate
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @LastModifiedDate
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 
-    // Lifecycle callbacks
-    @PrePersist
-    protected void onCreate() {
-        OffsetDateTime now = OffsetDateTime.now();
-        createdAt = now;
-        updatedAt = now;
-
-        // Validate and normalize enum values
-        if (reportType != null) {
-            QAReportType.fromString(reportType); // This will throw if invalid
-            this.reportType = QAReportType.fromString(reportType).getValue();
-        }
-        if (status != null) {
-            QAReportStatus.fromString(status); // This will throw if invalid
-            this.status = QAReportStatus.fromString(status).getValue();
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = OffsetDateTime.now();
-
-        // Validate and normalize enum values on update
-        if (reportType != null) {
-            QAReportType.fromString(reportType);
-            this.reportType = QAReportType.fromString(reportType).getValue();
-        }
-        if (status != null) {
-            QAReportStatus.fromString(status);
-            this.status = QAReportStatus.fromString(status).getValue();
-        }
-    }
-
-    // Helper methods for enum conversion
-    public QAReportType getReportTypeEnum() {
-        return reportType != null ? QAReportType.fromString(reportType) : null;
-    }
-
-    public void setReportTypeEnum(QAReportType reportType) {
-        this.reportType = reportType != null ? reportType.getValue() : null;
-    }
-
-    public QAReportStatus getStatusEnum() {
-        return status != null ? QAReportStatus.fromString(status) : null;
-    }
-
-    public void setStatusEnum(QAReportStatus status) {
-        this.status = status != null ? status.getValue() : null;
-    }
-
-    // Convenience methods
+    // Convenience methods for business logic
     public boolean isDraft() {
-        return "draft".equals(status);
+        return QAReportStatus.DRAFT.equals(status);
     }
 
     public boolean isSubmitted() {
-        return "submitted".equals(status);
+        return QAReportStatus.SUBMITTED.equals(status);
     }
 
     public boolean isClassLevelReport() {

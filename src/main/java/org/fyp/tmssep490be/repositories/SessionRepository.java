@@ -384,4 +384,10 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
            "LEFT JOIN FETCH t.userAccount " +
            "WHERE s.id = :sessionId")
     Optional<Session> findByIdWithDetails(@Param("sessionId") Long sessionId);
+
+    /**
+     * Find all sessions for a class (used in QA metrics calculation)
+     */
+    @Query("SELECT s FROM Session s WHERE s.classEntity.id = :classId")
+    List<Session> findByClassId(@Param("classId") Long classId);
 }

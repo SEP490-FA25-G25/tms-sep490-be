@@ -15,42 +15,43 @@ class EnumParsingIntegrationTest {
     @Test
     void testPhaseReviewEnumParsing() {
         // Test the specific problematic case that was causing the original error
-        QAReportType result = QAReportType.fromString("phase_review");
+        QAReportType result = QAReportType.fromString("PHASE_REVIEW");
         assertEquals(QAReportType.PHASE_REVIEW, result);
-        assertEquals("phase_review", result.getValue());
-        assertEquals("Phase Review", result.getDisplayName());
+        assertEquals("Đánh giá giai đoạn", result.getDisplayName());
+        assertEquals("Đánh giá giai đoạn", result.toString());
     }
 
     @Test
     void testEnumDatabaseConsistency() {
-        // Verify that our enums match the database values
-        assertEquals("phase_review", QAReportType.PHASE_REVIEW.getValue());
-        assertEquals("classroom_observation", QAReportType.CLASSROOM_OBSERVATION.getValue());
+        // Verify that our enums display names are in Vietnamese
+        assertEquals("Đánh giá giai đoạn", QAReportType.PHASE_REVIEW.getDisplayName());
+        assertEquals("Quan sát lớp học", QAReportType.CLASSROOM_OBSERVATION.getDisplayName());
 
-        assertEquals("draft", QAReportStatus.DRAFT.getValue());
-        assertEquals("submitted", QAReportStatus.SUBMITTED.getValue());
+        assertEquals("Bản nháp", QAReportStatus.DRAFT.getDisplayName());
+        assertEquals("Đã nộp", QAReportStatus.SUBMITTED.getDisplayName());
     }
 
     @Test
     void testInvalidEnumHandling() {
         // Verify that invalid values throw appropriate exceptions
-        assertThrows(IllegalArgumentException.class, () -> {
+        Exception typeException = assertThrows(IllegalArgumentException.class, () -> {
             QAReportType.fromString("invalid_type");
         });
+        assertTrue(typeException.getMessage().contains("QAReportType không hợp lệ"));
 
-        assertThrows(IllegalArgumentException.class, () -> {
+        Exception statusException = assertThrows(IllegalArgumentException.class, () -> {
             QAReportStatus.fromString("invalid_status");
         });
+        assertTrue(statusException.getMessage().contains("QAReportStatus không hợp lệ"));
     }
 
     @Test
-    void testEnumValidationHelpers() {
-        assertTrue(QAReportType.isValidValue("phase_review"));
-        assertTrue(QAReportType.isValidValue("Phase Review"));
-        assertFalse(QAReportType.isValidValue("invalid"));
+    void testEnumParsing() {
+        // Test case-insensitive parsing
+        assertEquals(QAReportType.PHASE_REVIEW, QAReportType.fromString("PHASE_REVIEW"));
+        assertEquals(QAReportType.PHASE_REVIEW, QAReportType.fromString("phase_review"));
 
-        assertTrue(QAReportStatus.isValidValue("draft"));
-        assertTrue(QAReportStatus.isValidValue("submitted"));
-        assertFalse(QAReportStatus.isValidValue("invalid"));
+        assertEquals(QAReportStatus.DRAFT, QAReportStatus.fromString("DRAFT"));
+        assertEquals(QAReportStatus.DRAFT, QAReportStatus.fromString("draft"));
     }
 }

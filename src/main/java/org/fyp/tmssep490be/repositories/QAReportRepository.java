@@ -1,6 +1,8 @@
 package org.fyp.tmssep490be.repositories;
 
 import org.fyp.tmssep490be.entities.QAReport;
+import org.fyp.tmssep490be.entities.enums.QAReportType;
+import org.fyp.tmssep490be.entities.enums.QAReportStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,8 +32,8 @@ public interface QAReportRepository extends JpaRepository<QAReport, Long> {
         @Param("classId") Long classId,
         @Param("sessionId") Long sessionId,
         @Param("phaseId") Long phaseId,
-        @Param("reportType") String reportType,
-        @Param("status") String status,
+        @Param("reportType") QAReportType reportType,
+        @Param("status") QAReportStatus status,
         @Param("reportedBy") Long reportedBy,
         Pageable pageable
     );

@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.fyp.tmssep490be.entities.enums.QAReportType;
+import org.fyp.tmssep490be.entities.enums.QAReportStatus;
 
 import java.time.OffsetDateTime;
 
@@ -13,8 +15,8 @@ import java.time.OffsetDateTime;
 @AllArgsConstructor
 public class QAReportDetailDTO {
     private Long id;
-    private String reportType;
-    private String status;
+    private QAReportType reportType;
+    private QAReportStatus status;
     private Long classId;
     private String classCode;
     private String className;
@@ -28,4 +30,5 @@ public class QAReportDetailDTO {
     private String reportedByName;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
+    private QAClassMetrics classMetrics;
 }
