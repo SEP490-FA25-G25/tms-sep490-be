@@ -10,6 +10,7 @@ import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.teacherrequest.*;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.security.UserPrincipal;
+import org.fyp.tmssep490be.services.PolicyService;
 import org.fyp.tmssep490be.services.TeacherRequestService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +32,7 @@ import java.util.List;
 public class TeacherRequestController {
 
     private final TeacherRequestService teacherRequestService;
+    private final PolicyService policyService;
     private static final String ROLE_ACADEMIC_AFFAIR = "ROLE_ACADEMIC_AFFAIR";
 
     /**
@@ -293,6 +295,34 @@ public class TeacherRequestController {
                 .success(true)
                 .message("Sessions loaded successfully")
                 .data(sessions)
+                .build());
+    }
+
+    /**
+     * Get teacher request configuration for current teacher (from policies)
+     * GET /api/v1/teacher-requests/config
+     */
+    @GetMapping("/config")
+    @PreAuthorize("hasRole('TEACHER')")
+    @Operation(
+            summary = "Get teacher request configuration",
+            description = "Return flags controlled by system policies for teacher requests"
+    )
+    public ResponseEntity<ResponseObject<TeacherRequestConfigDTO>> getTeacherRequestConfig() {
+        boolean requireResourceAtRescheduleCreate = policyService.getGlobalBoolean(
+                "teacher.reschedule.require_resource_at_create", true);
+        boolean requireResourceAtModalityChangeCreate = policyService.getGlobalBoolean(
+                "teacher.modality_change.require_resource", true);
+
+        TeacherRequestConfigDTO config = TeacherRequestConfigDTO.builder()
+                .requireResourceAtRescheduleCreate(requireResourceAtRescheduleCreate)
+                .requireResourceAtModalityChangeCreate(requireResourceAtModalityChangeCreate)
+                .build();
+
+        return ResponseEntity.ok(ResponseObject.<TeacherRequestConfigDTO>builder()
+                .success(true)
+                .message("Teacher request configuration loaded successfully")
+                .data(config)
                 .build());
     }
 

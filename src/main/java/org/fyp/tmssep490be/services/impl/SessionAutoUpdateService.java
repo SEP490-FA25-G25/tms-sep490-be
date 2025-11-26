@@ -1,5 +1,6 @@
 package org.fyp.tmssep490be.services.impl;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.entities.Session;
@@ -28,6 +29,20 @@ public class SessionAutoUpdateService {
 
     private final SessionRepository sessionRepository;
     private final StudentSessionRepository studentSessionRepository;
+
+    /**
+     * Run update on server startup to catch any missed sessions
+     * This ensures sessions are updated even if the server was down during the scheduled time
+     */
+    @PostConstruct
+    public void updateOnStartup() {
+        log.info("Server startup: Checking for past sessions that need to be updated to DONE status");
+        try {
+            updatePastSessionsToDone();
+        } catch (Exception e) {
+            log.error("Error updating sessions on startup: {}", e.getMessage(), e);
+        }
+    }
 
     /**
      * Automatically mark sessions as DONE if their date has passed

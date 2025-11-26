@@ -17,6 +17,7 @@ import org.fyp.tmssep490be.dtos.attendance.StudentsAttendanceResponseDTO;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.AttendanceService;
+import org.fyp.tmssep490be.services.impl.SessionAutoUpdateService;
 import org.fyp.tmssep490be.utils.TeacherContextHelper;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -42,6 +43,7 @@ public class AttendanceController {
 
     private final AttendanceService attendanceService;
     private final TeacherContextHelper teacherContextHelper;
+    private final SessionAutoUpdateService sessionAutoUpdateService;
 
     @GetMapping("/sessions/today")
     @PreAuthorize("hasRole('TEACHER')")
@@ -183,6 +185,21 @@ public class AttendanceController {
                         .success(true)
                         .message("OK")
                         .data(data)
+                        .build()
+        );
+    }
+
+    @PostMapping("/admin/update-past-sessions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CENTER_HEAD')")
+    @Operation(summary = "Manually trigger update of past sessions to DONE status")
+    @ApiResponse(responseCode = "200", description = "OK")
+    public ResponseEntity<ResponseObject<String>> updatePastSessions() {
+        sessionAutoUpdateService.updatePastSessionsToDoneNow();
+        return ResponseEntity.ok(
+                ResponseObject.<String>builder()
+                        .success(true)
+                        .message("Past sessions update triggered successfully")
+                        .data("Update completed")
                         .build()
         );
     }

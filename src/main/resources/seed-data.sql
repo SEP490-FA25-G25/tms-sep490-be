@@ -17,6 +17,8 @@
 TRUNCATE TABLE student_feedback_response CASCADE;
 TRUNCATE TABLE student_feedback CASCADE;
 TRUNCATE TABLE qa_report CASCADE;
+TRUNCATE TABLE policy_history CASCADE;
+TRUNCATE TABLE system_policy CASCADE;
 TRUNCATE TABLE score CASCADE;
 TRUNCATE TABLE assessment CASCADE;
 TRUNCATE TABLE course_assessment_clo_mapping CASCADE;
@@ -1749,6 +1751,262 @@ INSERT INTO notification (recipient_id, type, title, message, priority, status, 
 ((SELECT id FROM user_account WHERE email = 'emma.wilson@tms-edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu thay thế đã duyệt', 'Yêu cầu dạy thay lớp HSK2-201 ngày 2025-11-15 đã được duyệt', 'MEDIUM', 'READ', 'TeacherRequest', 1, '{"replacementTeacher":"Teacher HSK1","sessionDate":"2025-11-15","status":"APPROVED"}', CURRENT_TIMESTAMP - INTERVAL '5 days', CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '4 days');
 
 -- =========================================
+-- POLICY MANAGEMENT: System Policies
+-- =========================================
+
+-- 1. Absence Request Lead Time (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'request.absence.lead_time_days',
+    'REQUEST',
+    'Số ngày tối thiểu trước khi xin nghỉ',
+    'Học viên phải xin nghỉ trước tối thiểu X ngày so với ngày session. Nếu xin nghỉ muộn hơn, hệ thống sẽ từ chối hoặc cảnh báo.',
+    'INTEGER',
+    '1',
+    '1',
+    '1',
+    '7',
+    'days',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2. Teacher Session Suggestion Max Days (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.session.suggestion.max_days',
+    'TEACHER',
+    'Số ngày tối đa gợi ý session cho giáo viên',
+    'Số ngày tối đa mà hệ thống sẽ gợi ý sessions cho giáo viên khi họ xem lịch dạy. Giá trị này xác định phạm vi thời gian từ ngày hiện tại.',
+    'INTEGER',
+    '14',
+    '14',
+    '1',
+    '30',
+    'days',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2b. Teacher Modality Change - Require Resource at Create (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.modality_change.require_resource',
+    'TEACHER',
+    'Bắt buộc chọn phòng/link khi đổi hình thức dạy',
+    'Nếu true, giáo viên bắt buộc phải chọn resource (phòng hoặc lớp online) khi tạo yêu cầu đổi modality. Nếu false, giáo vụ có thể chọn resource khi duyệt.',
+    'BOOLEAN',
+    'true',
+    'true',
+    NULL,
+    NULL,
+    NULL,
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2c. Teacher Reschedule - Require Resource at Create (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.reschedule.require_resource_at_create',
+    'TEACHER',
+    'Bắt buộc chọn phòng/link khi xin dời buổi dạy',
+    'Nếu true, giáo viên phải chọn đầy đủ ngày, khung giờ và resource khi tạo yêu cầu dời buổi. Nếu false, giáo viên chỉ cần chọn ngày + khung giờ, resource do giáo vụ chọn khi duyệt.',
+    'BOOLEAN',
+    'true',
+    'true',
+    NULL,
+    NULL,
+    NULL,
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 3. Max Transfers Per Course (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'request.transfer.max_per_course',
+    'REQUEST',
+    'Số lần chuyển lớp tối đa mỗi khóa học',
+    'Học viên chỉ được chuyển lớp tối đa X lần trong một khóa học. Sau đó phải hoàn thành khóa học hiện tại hoặc hủy đăng ký.',
+    'INTEGER',
+    '1',
+    '1',
+    '0',
+    '5',
+    'times',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 4. Attendance Lock Time (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'attendance.lock.hours_after_session',
+    'ATTENDANCE',
+    'Thời gian khóa điểm danh sau khi session kết thúc',
+    'Sau X giờ kể từ khi session kết thúc, hệ thống sẽ khóa việc chỉnh sửa điểm danh. Giáo viên không thể sửa điểm danh sau thời gian này.',
+    'INTEGER',
+    '24',
+    '24',
+    '1',
+    '168',
+    'hours',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 5. Auto Mark Absent (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'attendance.auto_absent.enabled',
+    'ATTENDANCE',
+    'Tự động đánh vắng mặt khi chưa điểm danh',
+    'Nếu bật (true), hệ thống sẽ tự động đánh học viên là vắng mặt (ABSENT) nếu giáo viên chưa điểm danh sau khi session kết thúc.',
+    'BOOLEAN',
+    'true',
+    'true',
+    NULL,
+    NULL,
+    NULL,
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 6. Absence Threshold Percent (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'request.absence.threshold_percent',
+    'REQUEST',
+    'Ngưỡng vắng mặt cảnh báo (%)',
+    'Nếu học viên vắng mặt vượt quá X% tổng số sessions, hệ thống sẽ cảnh báo và có thể từ chối yêu cầu nghỉ tiếp.',
+    'DOUBLE',
+    '20.0',
+    '20.0',
+    '0.0',
+    '100.0',
+    'percent',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 7. Request Reason Min Length (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'request.absence.reason_min_length',
+    'REQUEST',
+    'Độ dài tối thiểu lý do xin nghỉ',
+    'Học viên phải nhập lý do xin nghỉ tối thiểu X ký tự.',
+    'INTEGER',
+    '10',
+    '10',
+    '5',
+    '500',
+    'characters',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 8. Class Min Enrollment (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'class.min_enrollment',
+    'CLASS',
+    'Số học viên tối thiểu để mở lớp',
+    'Lớp học phải có tối thiểu X học viên đăng ký mới được mở. Nếu dưới ngưỡng này, hệ thống sẽ cảnh báo hoặc tự động hủy lớp.',
+    'INTEGER',
+    '5',
+    '5',
+    '1',
+    '50',
+    'students',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- Insert initial CREATE history records for all policies
+INSERT INTO policy_history (policy_id, old_value, new_value, changed_by, reason, version, change_type)
+SELECT 
+    id,
+    NULL,
+    current_value,
+    created_by,
+    'Initial policy creation',
+    version,
+    'CREATE'
+FROM system_policy;
+
+-- =========================================
 -- END OF SEED DATA
 -- =========================================
 -- Summary:
@@ -1763,5 +2021,6 @@ INSERT INTO notification (recipient_id, type, title, message, priority, status, 
 -- - Assessments with scores
 -- - Student feedback and QA reports
 -- - 10 Sample notifications covering all types and priorities
+-- - 10 System Policies (REQUEST, ATTENDANCE, CLASS, TEACHER categories)
 -- - Edge cases: capacity limits, mid-course enrollment, transfers, perfect attendance
 -- =========================================

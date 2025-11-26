@@ -17,6 +17,7 @@ import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.EmailService;
+import org.fyp.tmssep490be.services.PolicyService;
 import org.fyp.tmssep490be.services.TeacherRequestService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +52,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
     private final StudentSessionRepository studentSessionRepository;
     private final TeacherSkillRepository teacherSkillRepository;
     private final EmailService emailService;
+    private final PolicyService policyService;
 
     @Override
     @Transactional
@@ -74,12 +76,19 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         // 3. Validate teacher owns session
         validateTeacherOwnsSession(session.getId(), teacher.getId());
 
-        // 4. Validate time window (session must be within 7 days from today)
+        // 4. Validate time window (session must be within X days from today - configured by policy)
         validateTimeWindow(session.getDate());
 
         // 5. Validate request type specific requirements
         if (createDTO.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
-            // newResourceId là optional - teacher có thể không chọn, staff sẽ chọn khi approve
+            // Policy: teacher.modality_change.require_resource (GLOBAL, default = true)
+            boolean requireResource = policyService.getGlobalBoolean(
+                    "teacher.modality_change.require_resource", true);
+
+            if (requireResource && createDTO.getNewResourceId() == null) {
+                throw new CustomException(ErrorCode.INVALID_INPUT);
+            }
+
             if (createDTO.getNewResourceId() != null) {
                 // Get new resource
                 Resource newResource = resourceRepository.findById(createDTO.getNewResourceId())
@@ -103,7 +112,11 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
             }
         } else if (createDTO.getRequestType() == TeacherRequestType.RESCHEDULE) {
             // Validate required fields for RESCHEDULE
-            if (createDTO.getNewDate() == null || createDTO.getNewTimeSlotId() == null || createDTO.getNewResourceId() == null) {
+            boolean requireResource = policyService.getGlobalBoolean(
+                    "teacher.reschedule.require_resource_at_create", true);
+
+            if (createDTO.getNewDate() == null || createDTO.getNewTimeSlotId() == null ||
+                    (requireResource && createDTO.getNewResourceId() == null)) {
                 throw new CustomException(ErrorCode.INVALID_INPUT);
             }
 
@@ -112,7 +125,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
                 throw new CustomException(ErrorCode.INVALID_INPUT);
             }
 
-            // Validate newDate is within time window (7 days from today)
+            // Validate newDate is within time window (X days from today - configured by policy)
             validateTimeWindow(createDTO.getNewDate());
         }
 
@@ -1019,11 +1032,16 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
     }
 
     /**
-     * Validate session is within 7 days window
+     * Validate session is within window X ngày (đọc từ policy).
+     * Policy: teacher.session.suggestion.max_days (GLOBAL), default = 14 ngày.
      */
     private void validateTimeWindow(LocalDate sessionDate) {
         LocalDate today = LocalDate.now();
-        LocalDate maxDate = today.plusDays(14);
+        int maxDays = policyService.getGlobalInt("teacher.session.suggestion.max_days", 14);
+        if (maxDays < 0) {
+            maxDays = 0;
+        }
+        LocalDate maxDate = today.plusDays(maxDays);
 
         if (sessionDate.isBefore(today) || sessionDate.isAfter(maxDate)) {
             throw new CustomException(ErrorCode.SESSION_NOT_IN_TIME_WINDOW);
@@ -1322,9 +1340,13 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
             fromDate = date;
             toDate = date;
         } else {
-            // Default: next 7 days
+            // Default: next X days (đọc từ policy)
+            int maxDays = policyService.getGlobalInt("teacher.session.suggestion.max_days", 14);
+            if (maxDays < 0) {
+                maxDays = 0;
+            }
             fromDate = today;
-            toDate = today.plusDays(14);
+            toDate = today.plusDays(maxDays);
         }
 
         // 3. Query teaching slots
