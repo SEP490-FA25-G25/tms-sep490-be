@@ -50,6 +50,8 @@ DROP TABLE IF EXISTS replacement_skill_assessment CASCADE;
 DROP TABLE IF EXISTS feedback_question CASCADE;
 DROP TABLE IF EXISTS student_feedback_response CASCADE;
 DROP TABLE IF EXISTS notification CASCADE;
+DROP TABLE IF EXISTS policy_history CASCADE;
+DROP TABLE IF EXISTS system_policy CASCADE;
 
 -- Drop existing enum types (to ensure clean recreation)
 DROP TYPE IF EXISTS session_status_enum CASCADE;
@@ -463,6 +465,59 @@ CREATE TABLE "class" (
   CONSTRAINT chk_class_modality CHECK (modality IN ('OFFLINE', 'ONLINE', 'HYBRID')),
   CONSTRAINT chk_class_status CHECK (status IN ('DRAFT', 'SUBMITTED', 'SCHEDULED', 'ONGOING', 'COMPLETED', 'CANCELLED')),
   CONSTRAINT chk_class_approval_status CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED'))
+);
+
+CREATE TABLE system_policy (
+  id BIGSERIAL PRIMARY KEY,
+  policy_key VARCHAR(100) NOT NULL,
+  policy_category VARCHAR(50) NOT NULL,
+  policy_name VARCHAR(200) NOT NULL,
+  description TEXT,
+  value_type VARCHAR(20) NOT NULL,
+  default_value TEXT NOT NULL,
+  current_value TEXT NOT NULL,
+  min_value TEXT,
+  max_value TEXT,
+  unit VARCHAR(20),
+  scope VARCHAR(20) NOT NULL DEFAULT 'GLOBAL',
+  branch_id BIGINT,
+  course_id BIGINT,
+  class_id BIGINT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_by BIGINT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updated_by BIGINT,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  CONSTRAINT fk_policy_branch FOREIGN KEY(branch_id) REFERENCES branch(id) ON DELETE CASCADE,
+  CONSTRAINT fk_policy_course FOREIGN KEY(course_id) REFERENCES course(id) ON DELETE CASCADE,
+  CONSTRAINT fk_policy_class FOREIGN KEY(class_id) REFERENCES "class"(id) ON DELETE CASCADE,
+  CONSTRAINT fk_policy_created_by FOREIGN KEY(created_by) REFERENCES user_account(id) ON DELETE SET NULL,
+  CONSTRAINT fk_policy_updated_by FOREIGN KEY(updated_by) REFERENCES user_account(id) ON DELETE SET NULL,
+  CONSTRAINT chk_policy_value_type CHECK (value_type IN ('INTEGER', 'DOUBLE', 'BOOLEAN', 'STRING', 'JSON')),
+  CONSTRAINT chk_policy_scope CHECK (scope IN ('GLOBAL', 'BRANCH', 'COURSE', 'CLASS')),
+  CONSTRAINT chk_policy_scope_hierarchy CHECK (
+    (scope = 'GLOBAL' AND branch_id IS NULL AND course_id IS NULL AND class_id IS NULL) OR
+    (scope = 'BRANCH' AND branch_id IS NOT NULL AND course_id IS NULL AND class_id IS NULL) OR
+    (scope = 'COURSE' AND course_id IS NOT NULL AND class_id IS NULL) OR
+    (scope = 'CLASS' AND class_id IS NOT NULL)
+  ),
+  CONSTRAINT uq_policy_key_scope UNIQUE (policy_key, scope, branch_id, course_id, class_id)
+);
+
+CREATE TABLE policy_history (
+  id BIGSERIAL PRIMARY KEY,
+  policy_id BIGINT NOT NULL,
+  old_value TEXT,
+  new_value TEXT NOT NULL,
+  changed_by BIGINT,
+  changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  reason TEXT,
+  version INTEGER NOT NULL,
+  change_type VARCHAR(20) DEFAULT 'UPDATE',
+  CONSTRAINT fk_history_policy FOREIGN KEY(policy_id) REFERENCES system_policy(id) ON DELETE CASCADE,
+  CONSTRAINT fk_history_changed_by FOREIGN KEY(changed_by) REFERENCES user_account(id) ON DELETE SET NULL,
+  CONSTRAINT chk_history_change_type CHECK (change_type IN ('CREATE', 'UPDATE', 'DELETE', 'ENABLE', 'DISABLE'))
 );
 
 CREATE TABLE session (
@@ -935,6 +990,24 @@ CREATE INDEX idx_class_name_gin ON "class" USING gin(to_tsvector('english', name
 
 -- User account name search
 CREATE INDEX idx_user_account_fullname_gin ON user_account USING gin(to_tsvector('english', full_name));
+
+-- ==================== POLICY MANAGEMENT INDEXES ====================
+
+-- Policy lookup indexes
+CREATE INDEX idx_policy_key ON system_policy(policy_key);
+CREATE INDEX idx_policy_category ON system_policy(policy_category);
+CREATE INDEX idx_policy_scope ON system_policy(scope, branch_id, course_id, class_id);
+CREATE INDEX idx_policy_branch ON system_policy(branch_id) WHERE branch_id IS NOT NULL;
+CREATE INDEX idx_policy_course ON system_policy(course_id) WHERE course_id IS NOT NULL;
+CREATE INDEX idx_policy_class ON system_policy(class_id) WHERE class_id IS NOT NULL;
+CREATE INDEX idx_policy_active ON system_policy(is_active) WHERE is_active = true;
+CREATE INDEX idx_policy_scope_key ON system_policy(scope, policy_key);
+
+-- Policy history indexes
+CREATE INDEX idx_history_policy ON policy_history(policy_id, changed_at DESC);
+CREATE INDEX idx_history_user ON policy_history(changed_by, changed_at DESC) WHERE changed_by IS NOT NULL;
+CREATE INDEX idx_history_date ON policy_history(changed_at DESC);
+CREATE INDEX idx_history_policy_date ON policy_history(policy_id, changed_at DESC);
 
 -- ==================== PARTIAL UNIQUE INDEX ====================
 -- Thay thế unique constraint để cho phép multiple enrollment records với status khác nhau
