@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface SessionRepository extends JpaRepository<Session, Long> {
@@ -366,4 +367,21 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
         @Param("classId") Long classId,
         @Param("date") LocalDate date
     );
+
+    // ==================== QA METHODS ====================
+
+    /**
+     * Find session with detailed information for QA
+     * Fetches all related entities to avoid N+1 queries
+     */
+    @Query("SELECT s FROM Session s " +
+           "JOIN FETCH s.classEntity c " +
+           "JOIN FETCH c.course course " +
+           "LEFT JOIN FETCH s.courseSession cs " +
+           "LEFT JOIN FETCH s.timeSlotTemplate tst " +
+           "LEFT JOIN FETCH s.teachingSlots ts " +
+           "LEFT JOIN FETCH ts.teacher t " +
+           "LEFT JOIN FETCH t.userAccount " +
+           "WHERE s.id = :sessionId")
+    Optional<Session> findByIdWithDetails(@Param("sessionId") Long sessionId);
 }

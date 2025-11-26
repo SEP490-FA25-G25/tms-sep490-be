@@ -649,7 +649,9 @@ CREATE TABLE qa_report (
   CONSTRAINT fk_qa_report_class FOREIGN KEY(class_id) REFERENCES "class"(id) ON DELETE CASCADE,
   CONSTRAINT fk_qa_report_session FOREIGN KEY(session_id) REFERENCES session(id) ON DELETE CASCADE,
   CONSTRAINT fk_qa_report_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE SET NULL,
-  CONSTRAINT fk_qa_report_reported_by FOREIGN KEY(reported_by) REFERENCES user_account(id) ON DELETE SET NULL
+  CONSTRAINT fk_qa_report_reported_by FOREIGN KEY(reported_by) REFERENCES user_account(id) ON DELETE SET NULL,
+  CONSTRAINT chk_qa_report_type CHECK (report_type IN ('classroom_observation', 'phase_review', 'clo_achievement_analysis', 'student_feedback_analysis', 'attendance_engagement_review', 'teaching_quality_assessment')),
+  CONSTRAINT chk_qa_report_status CHECK (status IN ('draft', 'submitted'))
 );
 
 -- TIER 6: Notifications

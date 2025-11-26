@@ -1636,12 +1636,32 @@ INSERT INTO student_feedback_response (id, feedback_id, question_id, rating, cre
 
 -- QA Reports
 INSERT INTO qa_report (id, class_id, session_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
-(1, 2, 105, 10, 'classroom_observation', 'closed', 'Teacher demonstrated excellent engagement techniques. Students actively participated.', 'Share teaching approach with other teachers in next training session.', '2025-10-19 15:00:00+07', '2025-10-20 10:00:00+07'),
-(2, 2, 110, 10, 'classroom_observation', 'open', 'Noticed some students struggling with listening exercises. Recommend additional practice materials.', 'Teacher to provide supplementary listening resources. Follow-up in 2 weeks.', '2025-10-30 14:00:00+07', '2025-10-30 14:00:00+07');
+(1, 2, 105, 10, 'classroom_observation', 'submitted', 'Teacher demonstrated excellent engagement techniques. Students actively participated.', 'Share teaching approach with other teachers in next training session.', '2025-10-19 15:00:00+07', '2025-10-20 10:00:00+07'),
+(2, 2, 110, 10, 'classroom_observation', 'draft', 'Noticed some students struggling with listening exercises. Recommend additional practice materials.', 'Teacher to provide supplementary listening resources. Follow-up in 2 weeks.', '2025-10-30 14:00:00+07', '2025-10-30 14:00:00+07');
 
 -- QA Report for Phase
 INSERT INTO qa_report (id, class_id, phase_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
-(3, 2, 1, 10, 'phase_review', 'open', 'Phase 1 completed. Overall good progress.', 'Proceed to Phase 2.', NOW(), NOW());
+(3, 2, 1, 10, 'phase_review', 'draft', 'Phase 1 completed. Overall good progress.', 'Proceed to Phase 2.', NOW(), NOW());
+
+-- Additional QA Reports for Testing All Report Types
+INSERT INTO qa_report (id, class_id, session_id, phase_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
+-- CLO Achievement Analysis
+(4, 1, NULL, 1, 10, 'clo_achievement_analysis', 'submitted', 'CLO achievement assessment shows 78% of students meeting learning objectives for basic communication skills. Writing skills need improvement with only 65% achieving target levels.', 'Develop additional writing practice worksheets. Schedule extra tutorial sessions for writing skills.', '2025-10-25 10:00:00+07', '2025-10-25 10:00:00+07'),
+
+-- Student Feedback Analysis
+(5, 3, 115, NULL, 10, 'student_feedback_analysis', 'submitted', 'Student feedback indicates high satisfaction with teaching methods (4.2/5 average rating). Common suggestions include more practice exercises and clearer explanation of grammar rules.', 'Incorporate more interactive exercises. Create visual aids for complex grammar concepts. Schedule one-on-one sessions for struggling students.', '2025-10-24 14:30:00+07', '2025-10-24 14:30:00+07'),
+
+-- Attendance & Engagement Review
+(6, 2, 120, NULL, 10, 'attendance_engagement_review', 'draft', 'Session 120 had 92% attendance rate. Most students completed homework assignments. Several students showed exceptional participation in group discussions.', 'Recognize high-performing students in next class. Follow up with students who missed homework submission.', '2025-10-23 16:45:00+07', '2025-10-23 16:45:00+07'),
+
+-- Teaching Quality Assessment
+(7, 1, 95, NULL, 10, 'teaching_quality_assessment', 'submitted', 'Teacher demonstrates strong subject knowledge and effective communication skills. Lesson pacing is appropriate for student level. Use of multimedia resources enhances learning experience.', 'Continue current teaching approach. Consider incorporating more real-world examples in lessons.', '2025-10-22 09:15:00+07', '2025-10-22 09:15:00+07'),
+
+-- Mixed Classroom Observations
+(8, 3, 108, NULL, 10, 'classroom_observation', 'draft', 'Teacher uses various engagement techniques effectively. However, classroom management could be improved during transition activities.', 'Provide training on transition management techniques. Consider implementing classroom routines for smoother transitions.', '2025-10-21 11:20:00+07', '2025-10-21 11:20:00+07'),
+
+-- Phase Review for Different Class
+(9, 1, 2, 10, 'phase_review', 'submitted', 'Phase 2 completed with excellent student performance. Average scores improved by 15% compared to Phase 1. Student engagement remained high throughout.', 'Maintain current teaching strategies. Prepare students for advanced concepts in Phase 3. Document successful methods for teacher training.', '2025-10-20 13:00:00+07', '2025-10-20 13:00:00+07');
 
 -- ========== EDGE CASES & BOUNDARY CONDITIONS ==========
 
@@ -1764,4 +1784,42 @@ INSERT INTO notification (recipient_id, type, title, message, priority, status, 
 -- - Student feedback and QA reports
 -- - 10 Sample notifications covering all types and priorities
 -- - Edge cases: capacity limits, mid-course enrollment, transfers, perfect attendance
+-- =========================================
+
+-- ========== QA REPORT DOCUMENTATION ==========
+--
+-- QA Report Status Values (must match QAReportStatus enum):
+-- - 'draft': Bản nháp (work in progress, not submitted)
+-- - 'submitted': Đã nộp (finalized, submitted for review)
+--
+-- QA Report Type Values (must match QAReportType enum):
+-- - 'classroom_observation': Classroom Observation
+-- - 'phase_review': Phase Review
+-- - 'clo_achievement_analysis': CLO Achievement Analysis
+-- - 'student_feedback_analysis': Student Feedback Analysis
+-- - 'attendance_engagement_review': Attendance & Engagement Review
+-- - 'teaching_quality_assessment': Teaching Quality Assessment
+--
+-- Database Constraints:
+-- - qa_report.status CHECK (status IN ('draft', 'submitted'))
+-- - qa_report.report_type CHECK (report_type IN ('classroom_observation', 'phase_review', 'clo_achievement_analysis', 'student_feedback_analysis', 'attendance_engagement_review', 'teaching_quality_assessment'))
+--
+-- ========== DATABASE RESET INSTRUCTIONS ==========
+--
+-- To reset database with updated schema and seed data:
+--
+-- # Method 1: PowerShell (Recommended)
+-- docker exec -it tms-postgres psql -U postgres -d tms -c "DROP DATABASE IF EXISTS tms;"
+-- docker exec -it tms-postgres psql -U postgres -c "CREATE DATABASE tms;"
+-- Get-Content "src/main/resources/schema.sql", "src/main/resources/seed-data.sql" | docker exec -i tms-postgres psql -U postgres -d tms
+--
+-- # Method 2: Git Bash / WSL
+-- docker exec -it tms-postgres psql -U postgres -d tms -c "DROP DATABASE IF EXISTS tms;"
+-- docker exec -it tms-postgres psql -U postgres -c "CREATE DATABASE tms;"
+-- cat src/main/resources/schema.sql src/main/resources/seed-data.sql | docker exec -i tms-postgres psql -U postgres -d tms
+--
+-- # Method 3: Direct SQL (if database already exists)
+-- docker exec -it tms-postgres psql -U postgres -d tms -c "\i schema.sql"
+-- docker exec -it tms-postgres psql -U postgres -d tms -c "\i seed-data.sql"
+--
 -- =========================================
