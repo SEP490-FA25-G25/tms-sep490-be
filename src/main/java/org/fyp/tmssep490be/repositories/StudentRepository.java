@@ -143,4 +143,13 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
            "INNER JOIN u.userBranches ub " +
            "WHERE ub.branch.id = :branchId")
     long countByBranchId(@Param("branchId") Long branchId);
+
+    /**
+     * Count students in multiple branches
+     */
+    @Query("SELECT COUNT(DISTINCT s) FROM Student s " +
+           "INNER JOIN s.userAccount u " +
+           "INNER JOIN u.userBranches ub " +
+           "WHERE ub.branch.id IN :branchIds")
+    long countByBranchIdIn(@Param("branchIds") List<Long> branchIds);
 }

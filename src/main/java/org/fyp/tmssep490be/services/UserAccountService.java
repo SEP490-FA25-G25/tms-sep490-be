@@ -41,6 +41,12 @@ public interface UserAccountService {
     UserResponse updateUserStatus(Long id, String status);
 
     /**
+     * Update user information (admin only)
+     * Note: Email and password cannot be changed via this endpoint
+     */
+    UserResponse updateUser(Long id, org.fyp.tmssep490be.dtos.user.UpdateUserRequest request);
+
+    /**
      * Delete user (soft delete or revoke access)
      */
     void deleteUser(Long id);

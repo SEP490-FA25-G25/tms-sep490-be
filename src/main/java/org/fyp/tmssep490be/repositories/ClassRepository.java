@@ -231,4 +231,22 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
    * Count classes by branch ID and status list
    */
   long countByBranchIdAndStatusIn(Long branchId, List<ClassStatus> statuses);
+
+  /**
+   * Count classes in multiple branches
+   */
+  @Query("SELECT COUNT(c) FROM ClassEntity c WHERE c.branch.id IN :branchIds")
+  long countByBranchIdIn(@Param("branchIds") List<Long> branchIds);
+
+  /**
+   * Count classes in multiple branches with status filter
+   */
+  @Query("SELECT COUNT(c) FROM ClassEntity c WHERE c.branch.id IN :branchIds AND c.status IN :statuses")
+  long countByBranchIdInAndStatusIn(@Param("branchIds") List<Long> branchIds, @Param("statuses") List<ClassStatus> statuses);
+
+  /**
+   * Count classes by approval status in multiple branches
+   */
+  @Query("SELECT COUNT(c) FROM ClassEntity c WHERE c.branch.id IN :branchIds AND c.approvalStatus = :approvalStatus")
+  long countByApprovalStatusAndBranchIdIn(@Param("approvalStatus") ApprovalStatus approvalStatus, @Param("branchIds") List<Long> branchIds);
 }

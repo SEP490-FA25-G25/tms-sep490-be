@@ -135,4 +135,22 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
             @Param("role") String role,
             @Param("statusEnum") UserStatus statusEnum,
             org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Count active users in specific branches
+     */
+    @Query("SELECT COUNT(DISTINCT u) FROM UserAccount u " +
+           "INNER JOIN u.userBranches ub " +
+           "WHERE ub.branch.id IN :branchIds " +
+           "AND u.status = org.fyp.tmssep490be.entities.enums.UserStatus.ACTIVE")
+    long countActiveUsersInBranches(@Param("branchIds") List<Long> branchIds);
+
+    /**
+     * Count inactive users in specific branches
+     */
+    @Query("SELECT COUNT(DISTINCT u) FROM UserAccount u " +
+           "INNER JOIN u.userBranches ub " +
+           "WHERE ub.branch.id IN :branchIds " +
+           "AND u.status = org.fyp.tmssep490be.entities.enums.UserStatus.INACTIVE")
+    long countInactiveUsersInBranches(@Param("branchIds") List<Long> branchIds);
 }

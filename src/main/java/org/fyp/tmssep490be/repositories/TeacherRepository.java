@@ -437,5 +437,25 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
            "INNER JOIN u.userBranches ub " +
            "WHERE ub.branch.id = :branchId")
     long countByBranchId(@Param("branchId") Long branchId);
+
+    /**
+     * Count teachers assigned to classes in specific branches
+     */
+    @Query("SELECT COUNT(DISTINCT t) FROM Teacher t " +
+           "INNER JOIN t.teachingSlots ts " +
+           "INNER JOIN ts.session s " +
+           "INNER JOIN s.classEntity c " +
+           "WHERE c.branch.id IN :branchIds")
+    long countByAssignedClassesInBranches(@Param("branchIds") List<Long> branchIds);
+
+    /**
+     * Count teachers assigned to classes in a specific branch
+     */
+    @Query("SELECT COUNT(DISTINCT t) FROM Teacher t " +
+           "INNER JOIN t.teachingSlots ts " +
+           "INNER JOIN ts.session s " +
+           "INNER JOIN s.classEntity c " +
+           "WHERE c.branch.id = :branchId")
+    long countByAssignedClassesInBranch(@Param("branchId") Long branchId);
 }
 
