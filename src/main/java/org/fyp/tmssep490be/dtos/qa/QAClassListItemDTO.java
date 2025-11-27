@@ -13,8 +13,8 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class QAClassListItemDTO {
     private Long classId;
-    private String classCode;
-    private String className;
+    private String classCode;   // Maps to ClassEntity.code
+    private String className;   // Maps to ClassEntity.name
     private String courseName;
     private String branchName;
     private String modality;

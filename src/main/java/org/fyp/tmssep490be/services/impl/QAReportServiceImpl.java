@@ -187,6 +187,7 @@ public class QAReportServiceImpl implements QAReportService {
         validateClassForQAReport(request.getClassId(), request.getReportType(),
                               request.getSessionId(), request.getPhaseId());
         validateUserPermission(userId, request.getClassId());
+        validateReportTypeAndLevel(request.getReportType(), request.getSessionId(), request.getPhaseId());
 
         ClassEntity classEntity = classRepository.findById(request.getClassId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class không tồn tại"));
@@ -224,7 +225,7 @@ public class QAReportServiceImpl implements QAReportService {
                 .reportType(reportType)
                 .status(status)
                 .findings(request.getFindings())
-                .actionItems(request.getActionItems())
+                .actionItemsText(request.getActionItems())
                 .build();
 
         QAReport saved = qaReportRepository.save(report);
@@ -251,13 +252,18 @@ public class QAReportServiceImpl implements QAReportService {
             throw new InvalidRequestException("Bạn không có quyền sửa report này");
         }
 
+        // Only allow updates for DRAFT status reports
+        if (report.getStatus() != QAReportStatus.DRAFT) {
+            throw new InvalidRequestException("Chỉ có thể sửa report ở trạng thái BẢN NHÁP (DRAFT)");
+        }
+
         // Direct enum assignment from request DTOs
         QAReportType reportType = request.getReportType();
         QAReportStatus status = request.getStatus();
 
         report.setReportType(reportType);  // Direct enum assignment
         report.setFindings(request.getFindings());
-        report.setActionItems(request.getActionItems());
+        report.setActionItemsText(request.getActionItems());
         report.setStatus(status);          // Direct enum assignment
 
         QAReport updated = qaReportRepository.save(report);
@@ -343,7 +349,7 @@ public class QAReportServiceImpl implements QAReportService {
                 .phaseId(report.getPhase() != null ? report.getPhase().getId() : null)
                 .phaseName(report.getPhase() != null ? report.getPhase().getName() : null)
                 .findings(report.getFindings())
-                .actionItems(report.getActionItems())
+                .actionItems(report.getActionItemsText())
                 .reportedById(report.getReportedBy().getId())
                 .reportedByName(report.getReportedBy().getFullName())
                 .createdAt(report.getCreatedAt())
@@ -380,5 +386,39 @@ public class QAReportServiceImpl implements QAReportService {
                 .updatedAt(report.getUpdatedAt())
                 .findingsPreview(findingsPreview)
                 .build();
+    }
+
+    /**
+     * Validate report type and level combinations
+     */
+    private void validateReportTypeAndLevel(QAReportType reportType, Long sessionId, Long phaseId) {
+        switch (reportType) {
+            case CLASSROOM_OBSERVATION:
+                if (sessionId == null) {
+                    throw new InvalidRequestException("CLASSROOM_OBSERVATION requires session ID");
+                }
+                break;
+            case PHASE_REVIEW:
+                if (phaseId == null) {
+                    throw new InvalidRequestException("PHASE_REVIEW requires phase ID");
+                }
+                break;
+            case CLO_ACHIEVEMENT_ANALYSIS:
+                if (sessionId == null && phaseId == null) {
+                    throw new InvalidRequestException("CLO_ACHIEVEMENT_ANALYSIS requires session ID or phase ID");
+                }
+                break;
+            case STUDENT_FEEDBACK_ANALYSIS:
+            case ATTENDANCE_ENGAGEMENT_REVIEW:
+                if (sessionId == null && phaseId == null) {
+                    throw new InvalidRequestException(reportType + " requires session ID or phase ID");
+                }
+                break;
+            case TEACHING_QUALITY_ASSESSMENT:
+                // Class-level report, no specific session or phase required
+                break;
+            default:
+                break;
+        }
     }
 }

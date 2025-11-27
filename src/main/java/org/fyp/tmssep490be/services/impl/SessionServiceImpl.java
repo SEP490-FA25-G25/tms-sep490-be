@@ -43,7 +43,7 @@ public class SessionServiceImpl implements SessionService {
         double attendanceRate = totalStudents > 0 ? (double) presentCount / totalStudents * 100 : 0.0;
 
         long homeworkCompletedCount = studentSessions.stream()
-                .filter(ss -> "DONE".equals(ss.getHomeworkStatus().name()))
+                .filter(ss -> "COMPLETED".equals(ss.getHomeworkStatus().name()))
                 .count();
         double homeworkCompletionRate = totalStudents > 0 ? (double) homeworkCompletedCount / totalStudents * 100 : 0.0;
 
@@ -95,7 +95,7 @@ public class SessionServiceImpl implements SessionService {
         return SessionDetailDTO.builder()
                 .sessionId(session.getId())
                 .classId(session.getClassEntity().getId())
-                .classCode(session.getClassEntity().getName())
+                .classCode(session.getClassEntity().getCode())
                 .courseName(session.getClassEntity().getCourse().getName())
                 .date(session.getDate())
                 .timeSlot(session.getTimeSlotTemplate() != null ?

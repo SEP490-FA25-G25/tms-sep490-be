@@ -8,6 +8,8 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "qa_report")
@@ -50,8 +52,13 @@ public class QAReport {
     @Column(name = "findings", columnDefinition = "TEXT")
     private String findings;
 
+    @OneToMany(mappedBy = "qaReport", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<ActionItem> actionItems = new HashSet<>();
+
+    // Keep backward compatibility with existing action_items text field
     @Column(name = "action_items", columnDefinition = "TEXT")
-    private String actionItems;
+    private String actionItemsText;
 
     @CreatedDate
     @Column(name = "created_at")

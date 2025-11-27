@@ -19,6 +19,7 @@ import org.fyp.tmssep490be.repositories.ClassRepository;
 import org.fyp.tmssep490be.repositories.QAReportRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
+import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.fyp.tmssep490be.services.QAService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -43,6 +44,7 @@ public class QAServiceImpl implements QAService {
     private final QAReportRepository qaReportRepository;
     private final SessionRepository sessionRepository;
     private final StudentSessionRepository studentSessionRepository;
+    private final UserBranchesRepository userBranchesRepository;
 
     // ========== Helper Methods for Business Logic ==========
 
@@ -118,6 +120,13 @@ public class QAServiceImpl implements QAService {
             log.error("Error calculating homework completion rate for classId={}: {}", classId, e.getMessage());
             return 0.0;
         }
+    }
+
+    /**
+     * Get user accessible branch IDs for permission filtering
+     */
+    private List<Long> getUserAccessibleBranches(Long userId) {
+        return userBranchesRepository.findBranchIdsByUserId(userId);
     }
 
     /**
@@ -230,11 +239,15 @@ public class QAServiceImpl implements QAService {
     public QADashboardDTO getQADashboard(List<Long> branchIds, LocalDate dateFrom, LocalDate dateTo, Long userId) {
         log.info("Getting QA dashboard for branchIds={}, dateFrom={}, dateTo={}", branchIds, dateFrom, dateTo);
 
-        // Get ongoing classes
-        List<ClassEntity> ongoingClasses = classRepository.findAll().stream()
-                .filter(c -> c.getStatus() == ClassStatus.ONGOING)
-                .filter(c -> branchIds == null || branchIds.isEmpty() || branchIds.contains(c.getBranch().getId()))
-                .collect(Collectors.toList());
+        // Get user accessible branch IDs if not provided
+        if (branchIds == null || branchIds.isEmpty()) {
+            branchIds = getUserAccessibleBranches(userId);
+        }
+
+        // Get ongoing classes with branch filtering using existing method
+        List<ClassEntity> ongoingClasses = classRepository.findClassesForAcademicAffairs(
+                branchIds, null, ClassStatus.ONGOING, null, null, null,
+                PageRequest.of(0, 1000)).getContent();
 
         int ongoingClassesCount = ongoingClasses.size();
 
@@ -287,7 +300,7 @@ public class QAServiceImpl implements QAService {
 
                     return QADashboardDTO.ClassRequiringAttention.builder()
                             .classId(c.getId())
-                            .classCode(c.getName())
+                            .classCode(c.getCode())
                             .courseName(c.getCourse() != null ? c.getCourse().getName() : "N/A")
                             .branchName(c.getBranch() != null ? c.getBranch().getName() : "N/A")
                             .attendanceRate(attendanceRate)
@@ -359,7 +372,7 @@ public class QAServiceImpl implements QAService {
 
             return QAClassListItemDTO.builder()
                     .classId(c.getId())
-                    .classCode(c.getName())
+                    .classCode(c.getCode())
                     .className(c.getCourse() != null ? c.getCourse().getName() : "N/A")
                     .courseName(c.getCourse() != null ? c.getCourse().getName() : "N/A")
                     .branchName(c.getBranch() != null ? c.getBranch().getName() : "N/A")
@@ -387,16 +400,16 @@ public class QAServiceImpl implements QAService {
         // Session summary
         long totalSessions = sessionRepository.countByClassEntityId(classId);
         long completedSessions = sessionRepository.countByClassEntityIdExcludingCancelled(classId); // Use existing method
-        long cancelledSessions = sessionRepository.findAll().stream()
-            .filter(s -> s.getClassEntity().getId().equals(classId) && s.getStatus() == SessionStatus.CANCELLED)
+        List<Session> classSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
+        long cancelledSessions = classSessions.stream()
+            .filter(s -> s.getStatus() == SessionStatus.CANCELLED)
             .count();
-        long upcomingSessions = sessionRepository.findAll().stream()
-            .filter(s -> s.getClassEntity().getId().equals(classId) && s.getStatus() == SessionStatus.PLANNED)
+        long upcomingSessions = classSessions.stream()
+            .filter(s -> s.getStatus() == SessionStatus.PLANNED)
             .count();
 
-        // Get next session date
-        LocalDate nextSessionDate = sessionRepository.findAll().stream()
-            .filter(s -> s.getClassEntity().getId().equals(classId))
+        // Get next session date using classSessions list
+        LocalDate nextSessionDate = classSessions.stream()
             .filter(s -> s.getStatus() == SessionStatus.PLANNED)
             .map(Session::getDate)
             .filter(d -> d.isAfter(LocalDate.now()) || d.isEqual(LocalDate.now()))
@@ -468,8 +481,7 @@ public class QAServiceImpl implements QAService {
                  studentsAtRisk);
 
         // Get QA reports for this class
-        List<QAReport> qaReports = qaReportRepository.findAll().stream()
-            .filter(r -> r.getClassEntity().getId().equals(classId))
+        List<QAReport> qaReports = qaReportRepository.findByClassEntityId(classId).stream()
             .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
             .collect(Collectors.toList());
         List<QAClassDetailDTO.QAReportSummary> qaReportSummaries = qaReports.stream()
@@ -525,11 +537,8 @@ public class QAServiceImpl implements QAService {
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found with id: " + classId));
 
-        // Get all sessions for this class
-        List<Session> sessions = sessionRepository.findAll().stream()
-            .filter(s -> s.getClassEntity().getId().equals(classId))
-            .sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate()))
-            .collect(Collectors.toList());
+        // Get all sessions for this class using existing method
+        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
 
         // Map to QASessionItemDTO with real metrics
         List<QASessionListResponse.QASessionItemDTO> sessionItems = sessions.stream()
@@ -560,10 +569,9 @@ public class QAServiceImpl implements QAService {
 
                     double homeworkCompletionRate = homeworkTotalCount > 0 ? (homeworkCompletedCount * 100.0 / homeworkTotalCount) : 0.0;
 
-                    // Check QA reports for this session
-                    long qaReportCount = qaReportRepository.findAll().stream()
-                        .filter(r -> r.getSession() != null && r.getSession().getId().equals(s.getId()))
-                        .count();
+                    // Check QA reports for this session using existing method
+                    long qaReportCount = qaReportRepository.findWithFilters(
+                        null, s.getId(), null, null, null, null, Pageable.unpaged()).getTotalElements();
 
                     // Get session info from related entities
                     Integer sequenceNumber = s.getCourseSession() != null ? s.getCourseSession().getSequenceNo() : null;

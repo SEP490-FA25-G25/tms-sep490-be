@@ -89,7 +89,7 @@ public class StudentFeedbackServiceImpl implements StudentFeedbackService {
                 .studentId(feedback.getStudent().getId())
                 .studentName(feedback.getStudent().getUserAccount().getFullName())
                 .classId(feedback.getClassEntity().getId())
-                .classCode(feedback.getClassEntity().getName())
+                .classCode(feedback.getClassEntity().getCode())
                 .phaseId(feedback.getPhase() != null ? feedback.getPhase().getId() : null)
                 .phaseName(feedback.getPhase() != null ? feedback.getPhase().getName() : null)
                 .isFeedback(feedback.getIsFeedback())
