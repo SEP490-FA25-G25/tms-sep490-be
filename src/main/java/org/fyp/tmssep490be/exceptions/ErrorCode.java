@@ -193,6 +193,13 @@ public enum ErrorCode {
     INVALID_RESOURCE_FOR_MODALITY(5006, "Invalid resource for modality change"),
     TEACHER_REQUEST_NOT_WAITING_CONFIRM(5007, "Request is not in waiting_confirm status"),
     REPLACEMENT_TEACHER_CONFLICT(5008, "Replacement teacher has a schedule conflict"),
+    TEACHER_RESCHEDULE_MIN_DAYS_NOT_MET(5009, "Reschedule request must be submitted earlier"),
+    TEACHER_REPLACEMENT_MIN_DAYS_NOT_MET(5010, "Replacement request must be submitted earlier"),
+    TEACHER_RESCHEDULE_MONTHLY_LIMIT_REACHED(5011, "Monthly reschedule limit reached"),
+    TEACHER_MODALITY_CHANGE_COURSE_LIMIT_REACHED(5012, "Modality change limit for this course reached"),
+    TEACHER_REPLACEMENT_MONTHLY_LIMIT_REACHED(5013, "Monthly replacement limit reached"),
+    TEACHER_REQUEST_REASON_REQUIRED(5014, "Reason is required for teacher request"),
+    TEACHER_REQUEST_REASON_TOO_SHORT(5015, "Reason length is too short"),
 
     // Student Request errors (4100-4199)
     STUDENT_REQUEST_NOT_FOUND(4100, "Student request not found"),
