@@ -103,9 +103,10 @@ public interface TeacherRequestService {
      * Get teacher's future sessions (7 days from today or specific date)
      * @param userId Current authenticated user ID
      * @param date Optional date filter (if null, returns next 7 days)
+     * @param classId Optional class filter (if null, returns all classes)
      * @return List of teacher sessions
      */
-    List<TeacherSessionDTO> getMySessions(Long userId, java.time.LocalDate date);
+    List<TeacherSessionDTO> getMySessions(Long userId, java.time.LocalDate date, Long classId);
 
     /**
      * Suggest replacement candidate teachers for a session

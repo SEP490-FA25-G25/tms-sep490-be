@@ -9,10 +9,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
+    
+    /**
+     * Count enrollments created between two dates
+     */
+    long countByEnrolledAtBetween(OffsetDateTime start, OffsetDateTime end);
+    
     /**
      * Count enrolled students của một class với status cụ thể
      */

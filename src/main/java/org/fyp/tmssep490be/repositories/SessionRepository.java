@@ -14,6 +14,11 @@ import java.util.List;
 
 @Repository
 public interface SessionRepository extends JpaRepository<Session, Long> {
+    
+    /**
+     * Count sessions by date
+     */
+    long countByDate(LocalDate date);
     /**
      * Tìm tất cả sessions của class, ordered by date ascending
      * Dùng cho STEP 2: Review sessions (Xem lại buổi học)

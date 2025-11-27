@@ -426,5 +426,16 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
         ORDER BY tda.teacher_id, tda.day_of_week
         """, nativeQuery = true)
     List<Object[]> findAvailableTeachersByDay(@Param("classId") Long classId);
+
+    // ==================== ANALYTICS METHODS ====================
+
+    /**
+     * Count teachers by branch ID
+     */
+    @Query("SELECT COUNT(DISTINCT t) FROM Teacher t " +
+           "INNER JOIN t.userAccount u " +
+           "INNER JOIN u.userBranches ub " +
+           "WHERE ub.branch.id = :branchId")
+    long countByBranchId(@Param("branchId") Long branchId);
 }
 

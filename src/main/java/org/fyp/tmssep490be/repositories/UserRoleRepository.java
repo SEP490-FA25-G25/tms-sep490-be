@@ -6,4 +6,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserRoleRepository extends JpaRepository<UserRole, Long> {
+    /**
+     * Count users by role ID
+     */
+    long countByRoleId(Long roleId);
 }

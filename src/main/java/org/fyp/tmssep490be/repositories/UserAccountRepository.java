@@ -10,11 +10,44 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface UserAccountRepository extends JpaRepository<UserAccount, Long> {
+    
+    /**
+     * Count users by status
+     */
+    long countByStatus(UserStatus status);
+    
+    /**
+     * Count users created between two dates
+     */
+    long countByCreatedAtBetween(OffsetDateTime start, OffsetDateTime end);
+    
+    /**
+     * Count students that have STUDENT role
+     * Chỉ đếm những user có cả role STUDENT và profile student
+     */
+    @Query("SELECT COUNT(DISTINCT u.id) FROM UserAccount u " +
+           "INNER JOIN u.userRoles ur " +
+           "INNER JOIN ur.role r " +
+           "INNER JOIN u.student s " +
+           "WHERE r.code = 'STUDENT'")
+    long countStudentsWithRole();
+    
+    /**
+     * Count teachers that have TEACHER role
+     * Chỉ đếm những user có cả role TEACHER và profile teacher
+     */
+    @Query("SELECT COUNT(DISTINCT u.id) FROM UserAccount u " +
+           "INNER JOIN u.userRoles ur " +
+           "INNER JOIN ur.role r " +
+           "INNER JOIN u.teacher t " +
+           "WHERE r.code = 'TEACHER'")
+    long countTeachersWithRole();
 
     /**
      * Find user account by email (email is used for login)
