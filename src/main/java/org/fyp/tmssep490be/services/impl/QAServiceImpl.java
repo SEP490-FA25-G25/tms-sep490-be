@@ -357,8 +357,24 @@ public class QAServiceImpl implements QAService {
                                                    Pageable pageable, Long userId) {
         log.info("Getting QA classes list with branchIds={}, status={}, search={}", branchIds, status, search);
 
-        // Get classes with pagination and filters
-        Page<ClassEntity> classes = classRepository.findAll(pageable);
+        // Get user accessible branch IDs if not provided
+        if (branchIds == null || branchIds.isEmpty()) {
+            branchIds = getUserAccessibleBranches(userId);
+        }
+
+        // Parse status string to ClassStatus enum
+        ClassStatus classStatus = null;
+        if (status != null && !status.isEmpty() && !status.equalsIgnoreCase("all")) {
+            try {
+                classStatus = ClassStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid class status value: {}. Ignoring status filter.", status);
+            }
+        }
+
+        // Get classes with pagination and filters using existing repository method
+        Page<ClassEntity> classes = classRepository.findClassesForAcademicAffairs(
+                branchIds, null, classStatus, null, null, search, pageable);
 
         // Calculate metrics for all classes in this page
         List<Long> classIds = classes.getContent().stream()
