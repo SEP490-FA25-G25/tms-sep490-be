@@ -2,8 +2,8 @@ package org.fyp.tmssep490be.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.fyp.tmssep490be.dtos.center.CenterRequest;
-import org.fyp.tmssep490be.dtos.center.CenterResponse;
+import org.fyp.tmssep490be.dtos.center.CenterRequestDTO;
+import org.fyp.tmssep490be.dtos.center.CenterResponseDTO;
 import org.fyp.tmssep490be.entities.Center;
 import org.fyp.tmssep490be.repositories.CenterRepository;
 import org.fyp.tmssep490be.services.CenterService;
@@ -21,7 +21,7 @@ public class CenterServiceImpl implements CenterService {
 
     @Override
     @Transactional
-    public CenterResponse createCenter(CenterRequest request) {
+    public CenterResponseDTO createCenter(CenterRequestDTO request) {
         log.info("Creating center with code: {}", request.getCode());
 
         Center center = Center.builder()
@@ -41,7 +41,7 @@ public class CenterServiceImpl implements CenterService {
 
     @Override
     @Transactional(readOnly = true)
-    public CenterResponse getCenterById(Long id) {
+    public CenterResponseDTO getCenterById(Long id) {
         log.debug("Fetching center with id: {}", id);
         Center center = centerRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Center not found with id: " + id));
@@ -50,7 +50,7 @@ public class CenterServiceImpl implements CenterService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CenterResponse> getAllCenters(Pageable pageable) {
+    public Page<CenterResponseDTO> getAllCenters(Pageable pageable) {
         log.debug("Fetching all centers with pagination: {}", pageable);
         return centerRepository.findAll(pageable)
                 .map(this::mapToResponse);
@@ -58,7 +58,7 @@ public class CenterServiceImpl implements CenterService {
 
     @Override
     @Transactional
-    public CenterResponse updateCenter(Long id, CenterRequest request) {
+    public CenterResponseDTO updateCenter(Long id, CenterRequestDTO request) {
         log.info("Updating center with id: {}", id);
 
         Center center = centerRepository.findById(id)
@@ -90,8 +90,8 @@ public class CenterServiceImpl implements CenterService {
         log.info("Center deleted successfully with id: {}", id);
     }
 
-    private CenterResponse mapToResponse(Center center) {
-        return CenterResponse.builder()
+    private CenterResponseDTO mapToResponse(Center center) {
+        return CenterResponseDTO.builder()
                 .id(center.getId())
                 .code(center.getCode())
                 .name(center.getName())

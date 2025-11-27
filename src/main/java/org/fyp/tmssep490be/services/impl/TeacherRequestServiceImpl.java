@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -35,6 +36,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -53,6 +55,9 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
     private final TeacherSkillRepository teacherSkillRepository;
     private final EmailService emailService;
     private final PolicyService policyService;
+
+    private static final List<RequestStatus> ACTIVE_REQUEST_STATUSES =
+            List.of(RequestStatus.PENDING, RequestStatus.WAITING_CONFIRM, RequestStatus.APPROVED);
 
     @Override
     @Transactional
@@ -81,6 +86,8 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
         // 5. Validate request type specific requirements
         if (createDTO.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
+            enforceModalityChangeCourseLimit(teacher, session);
+
             // Policy: teacher.modality_change.require_resource (GLOBAL, default = true)
             boolean requireResource = policyService.getGlobalBoolean(
                     "teacher.modality_change.require_resource", true);
@@ -111,6 +118,18 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
                 validateResourceCapacity(newResource, session.getId());
             }
         } else if (createDTO.getRequestType() == TeacherRequestType.RESCHEDULE) {
+            enforceMonthlyLimit(
+                    teacher,
+                    TeacherRequestType.RESCHEDULE,
+                    "teacher.reschedule.max_per_month",
+                    2,
+                    ErrorCode.TEACHER_RESCHEDULE_MONTHLY_LIMIT_REACHED
+            );
+            validateMinDaysBeforeSession(
+                    session.getDate(),
+                    "teacher.reschedule.min_days_before_session",
+                    1,
+                    ErrorCode.TEACHER_RESCHEDULE_MIN_DAYS_NOT_MET);
             // Validate required fields for RESCHEDULE
             boolean requireResource = policyService.getGlobalBoolean(
                     "teacher.reschedule.require_resource_at_create", true);
@@ -127,9 +146,25 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
             // Validate newDate is within time window (X days from today - configured by policy)
             validateTimeWindow(createDTO.getNewDate());
+        } else if (createDTO.getRequestType() == TeacherRequestType.REPLACEMENT) {
+            enforceMonthlyLimit(
+                    teacher,
+                    TeacherRequestType.REPLACEMENT,
+                    "teacher.replacement.max_per_month",
+                    3,
+                    ErrorCode.TEACHER_REPLACEMENT_MONTHLY_LIMIT_REACHED
+            );
+            validateMinDaysBeforeSession(
+                    session.getDate(),
+                    "teacher.replacement.min_days_before_session",
+                    1,
+                    ErrorCode.TEACHER_REPLACEMENT_MIN_DAYS_NOT_MET);
         }
 
-        // 6. Check for duplicate request
+        // 6. Validate reason requirement and length
+        validateRequestReason(createDTO.getReason());
+
+        // 7. Check for duplicate request
         if (teacherRequestRepository.existsBySessionIdAndRequestTypeAndStatus(
                 createDTO.getSessionId(), 
                 createDTO.getRequestType(), 
@@ -1045,6 +1080,91 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
         if (sessionDate.isBefore(today) || sessionDate.isAfter(maxDate)) {
             throw new CustomException(ErrorCode.SESSION_NOT_IN_TIME_WINDOW);
+        }
+    }
+
+    private void validateMinDaysBeforeSession(LocalDate sessionDate, String policyKey, int defaultValue, ErrorCode errorCode) {
+        int minDays = policyService.getGlobalInt(policyKey, defaultValue);
+        if (minDays <= 0) {
+            return;
+        }
+        long daysUntilSession = ChronoUnit.DAYS.between(LocalDate.now(), sessionDate);
+        if (daysUntilSession < minDays) {
+            throw new CustomException(errorCode);
+        }
+    }
+
+    private void enforceMonthlyLimit(
+            Teacher teacher,
+            TeacherRequestType requestType,
+            String policyKey,
+            int defaultValue,
+            ErrorCode errorCode
+    ) {
+        int maxAllowed = policyService.getGlobalInt(policyKey, defaultValue);
+        if (maxAllowed <= 0) {
+            return;
+        }
+
+        OffsetDateTime monthStart = LocalDate.now()
+                .withDayOfMonth(1)
+                .atStartOfDay(ZoneId.systemDefault())
+                .toOffsetDateTime();
+
+        long currentCount = teacherRequestRepository
+                .countByTeacherIdAndRequestTypeAndStatusInAndSubmittedAtGreaterThanEqual(
+                        teacher.getId(),
+                        requestType,
+                        ACTIVE_REQUEST_STATUSES,
+                        monthStart
+                );
+
+        if (currentCount >= maxAllowed) {
+            throw new CustomException(errorCode);
+        }
+    }
+
+    private void enforceModalityChangeCourseLimit(Teacher teacher, Session session) {
+        ClassEntity classEntity = session.getClassEntity();
+        if (classEntity == null || classEntity.getCourse() == null) {
+            return;
+        }
+
+        int maxPerCourse = policyService.getGlobalInt("teacher.modality_change.max_per_course", 1);
+        if (maxPerCourse <= 0) {
+            return;
+        }
+
+        long currentCount = teacherRequestRepository.countByTeacherAndTypeForCourse(
+                teacher.getId(),
+                TeacherRequestType.MODALITY_CHANGE,
+                ACTIVE_REQUEST_STATUSES,
+                classEntity.getCourse().getId()
+        );
+
+        if (currentCount >= maxPerCourse) {
+            throw new CustomException(ErrorCode.TEACHER_MODALITY_CHANGE_COURSE_LIMIT_REACHED);
+        }
+    }
+
+    /**
+     * Validate request reason requirement and minimum length
+     * Policies: teacher.request.require_reason, teacher.request.reason_min_length
+     */
+    private void validateRequestReason(String reason) {
+        // Policy: teacher.request.require_reason (GLOBAL, default = true)
+        boolean requireReason = policyService.getGlobalBoolean("teacher.request.require_reason", true);
+        
+        if (requireReason) {
+            if (reason == null || reason.trim().isEmpty()) {
+                throw new CustomException(ErrorCode.TEACHER_REQUEST_REASON_REQUIRED);
+            }
+            
+            // Policy: teacher.request.reason_min_length (GLOBAL, default = 15)
+            int minLength = policyService.getGlobalInt("teacher.request.reason_min_length", 15);
+            if (minLength > 0 && reason.trim().length() < minLength) {
+                throw new CustomException(ErrorCode.TEACHER_REQUEST_REASON_TOO_SHORT);
+            }
         }
     }
 

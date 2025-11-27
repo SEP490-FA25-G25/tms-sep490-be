@@ -1850,6 +1850,174 @@ INSERT INTO system_policy (
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
 );
 
+-- 2d. Teacher Reschedule - Minimum Days Before Session (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.reschedule.min_days_before_session',
+    'TEACHER',
+    'Số ngày tối thiểu trước khi xin dời buổi',
+    'Giáo viên phải gửi yêu cầu dời buổi trước ít nhất X ngày so với ngày diễn ra session gốc.',
+    'INTEGER',
+    '1',
+    '1',
+    '0',
+    '30',
+    'days',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2e. Teacher Replacement - Minimum Days Before Session (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.replacement.min_days_before_session',
+    'TEACHER',
+    'Số ngày tối thiểu trước khi xin thay giáo viên',
+    'Giáo viên phải gửi yêu cầu thay người dạy trước ít nhất X ngày để giáo vụ có thời gian sắp xếp.',
+    'INTEGER',
+    '1',
+    '1',
+    '0',
+    '14',
+    'days',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2f. Teacher Reschedule - Max Requests Per Month (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.reschedule.max_per_month',
+    'TEACHER',
+    'Số lần tối đa xin dời buổi mỗi tháng',
+    'Giới hạn số lượng yêu cầu dời buổi mà giáo viên có thể gửi trong một tháng (tính cả yêu cầu đang chờ duyệt và đã duyệt).',
+    'INTEGER',
+    '2',
+    '2',
+    '0',
+    '10',
+    'times',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2g. Teacher Modality Change - Max Requests Per Course (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.modality_change.max_per_course',
+    'TEACHER',
+    'Số lần tối đa đổi hình thức dạy trên một khóa học',
+    'Giới hạn số lượng yêu cầu đổi hình thức dạy mà giáo viên có thể gửi trong cùng một khóa học.',
+    'INTEGER',
+    '1',
+    '1',
+    '0',
+    '5',
+    'times',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2h. Teacher Replacement - Max Requests Per Month (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.replacement.max_per_month',
+    'TEACHER',
+    'Số lần tối đa xin thay giáo viên mỗi tháng',
+    'Giới hạn số lượng yêu cầu nhờ giáo viên khác dạy thay mà giáo viên có thể gửi trong một tháng.',
+    'INTEGER',
+    '3',
+    '3',
+    '0',
+    '10',
+    'times',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2i. Teacher Request - Require Reason (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.request.require_reason',
+    'TEACHER',
+    'Bắt buộc nhập lý do cho tất cả yêu cầu',
+    'Nếu bật (true), giáo viên bắt buộc phải nhập lý do khi tạo bất kỳ yêu cầu nào (dời buổi, đổi hình thức, nhờ dạy thay). Nếu tắt (false), có thể để trống lý do.',
+    'BOOLEAN',
+    'true',
+    'true',
+    NULL,
+    NULL,
+    NULL,
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2j. Teacher Request - Minimum Reason Length (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.request.reason_min_length',
+    'TEACHER',
+    'Độ dài tối thiểu lý do yêu cầu',
+    'Giáo viên phải nhập lý do có độ dài tối thiểu X ký tự khi tạo yêu cầu để đảm bảo thông tin đủ chi tiết cho giáo vụ xem xét.',
+    'INTEGER',
+    '15',
+    '15',
+    '10',
+    '500',
+    'characters',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
 -- 3. Max Transfers Per Course (GLOBAL)
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
@@ -2021,6 +2189,6 @@ FROM system_policy;
 -- - Assessments with scores
 -- - Student feedback and QA reports
 -- - 10 Sample notifications covering all types and priorities
--- - 10 System Policies (REQUEST, ATTENDANCE, CLASS, TEACHER categories)
+-- - 17 System Policies (REQUEST, ATTENDANCE, CLASS, TEACHER categories)
 -- - Edge cases: capacity limits, mid-course enrollment, transfers, perfect attendance
 -- =========================================

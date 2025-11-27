@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -116,6 +117,34 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
      * Used to check if sessions have pending requests
      */
     List<TeacherRequest> findBySessionIdInAndStatusIn(List<Long> sessionIds, List<RequestStatus> statuses);
+
+    /**
+     * Count requests by teacher and type submitted after a given date (inclusive)
+     */
+    long countByTeacherIdAndRequestTypeAndStatusInAndSubmittedAtGreaterThanEqual(
+            Long teacherId,
+            TeacherRequestType requestType,
+            List<RequestStatus> statuses,
+            OffsetDateTime submittedAt
+    );
+
+    /**
+     * Count requests by teacher, type, and course
+     */
+    @Query("SELECT COUNT(tr) FROM TeacherRequest tr " +
+           "JOIN tr.session s " +
+           "JOIN s.classEntity c " +
+           "JOIN c.course course " +
+           "WHERE tr.teacher.id = :teacherId " +
+           "AND tr.requestType = :requestType " +
+           "AND tr.status IN :statuses " +
+           "AND course.id = :courseId")
+    long countByTeacherAndTypeForCourse(
+            @Param("teacherId") Long teacherId,
+            @Param("requestType") TeacherRequestType requestType,
+            @Param("statuses") List<RequestStatus> statuses,
+            @Param("courseId") Long courseId
+    );
 
     // ============== SCHEDULER JOB METHODS ==============
 
