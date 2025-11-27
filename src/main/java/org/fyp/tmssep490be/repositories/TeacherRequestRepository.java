@@ -129,6 +129,16 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
     );
 
     /**
+     * Count all requests by teacher within a date range
+     */
+    long countByTeacherIdAndStatusInAndSubmittedAtBetween(
+            Long teacherId,
+            List<RequestStatus> statuses,
+            OffsetDateTime start,
+            OffsetDateTime end
+    );
+
+    /**
      * Count requests by teacher, type, and course
      */
     @Query("SELECT COUNT(tr) FROM TeacherRequest tr " +

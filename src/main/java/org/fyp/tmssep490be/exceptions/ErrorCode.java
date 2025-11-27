@@ -200,6 +200,8 @@ public enum ErrorCode {
     TEACHER_REPLACEMENT_MONTHLY_LIMIT_REACHED(5013, "Monthly replacement limit reached"),
     TEACHER_REQUEST_REASON_REQUIRED(5014, "Reason is required for teacher request"),
     TEACHER_REQUEST_REASON_TOO_SHORT(5015, "Reason length is too short"),
+    TEACHER_REQUEST_DAILY_LIMIT_REACHED(5016, "Daily request limit reached"),
+    TEACHER_RESCHEDULE_COURSE_LIMIT_REACHED(5017, "Reschedule limit for this course reached"),
 
     // Student Request errors (4100-4199)
     STUDENT_REQUEST_NOT_FOUND(4100, "Student request not found"),

@@ -285,11 +285,12 @@ public class TeacherRequestController {
     )
     public ResponseEntity<ResponseObject<List<TeacherSessionDTO>>> getMySessions(
             @RequestParam(value = "date", required = false) java.time.LocalDate date,
+            @RequestParam(value = "classId", required = false) Long classId,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        log.info("Get my sessions for user {} with date filter {}", currentUser.getId(), date);
+        log.info("Get my sessions for user {} with date filter {} and class filter {}", currentUser.getId(), date, classId);
 
-        List<TeacherSessionDTO> sessions = teacherRequestService.getMySessions(currentUser.getId(), date);
+        List<TeacherSessionDTO> sessions = teacherRequestService.getMySessions(currentUser.getId(), date, classId);
 
         return ResponseEntity.ok(ResponseObject.<List<TeacherSessionDTO>>builder()
                 .success(true)

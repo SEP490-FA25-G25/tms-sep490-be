@@ -32,6 +32,8 @@ public class UserAccountServiceImpl implements UserAccountService {
     private final BranchRepository branchRepository;
     private final UserRoleRepository userRoleRepository;
     private final UserBranchesRepository userBranchesRepository;
+    private final TeacherRepository teacherRepository;
+    private final StudentRepository studentRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
 
@@ -80,6 +82,7 @@ public class UserAccountServiceImpl implements UserAccountService {
         user.setUserRoles(userRoles);
 
         // Assign branches if provided
+        Set<Long> assignedBranchIds = new HashSet<>();
         if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
             Set<UserBranches> userBranches = new HashSet<>();
             for (Long branchId : request.getBranchIds()) {
@@ -95,8 +98,44 @@ public class UserAccountServiceImpl implements UserAccountService {
                 userBranch.setBranch(branch);
 
                 userBranches.add(userBranchesRepository.save(userBranch));
+                assignedBranchIds.add(branchId);
             }
             user.setUserBranches(userBranches);
+        }
+
+        // Auto-create Teacher or Student profile if role matches
+        for (Role role : user.getUserRoles().stream().map(UserRole::getRole).collect(Collectors.toSet())) {
+            String roleCode = role.getCode();
+            
+            if ("TEACHER".equals(roleCode)) {
+                // Auto-create Teacher profile
+                if (!teacherRepository.findByUserAccountId(user.getId()).isPresent()) {
+                    Teacher teacher = new Teacher();
+                    teacher.setUserAccount(user);
+                    teacher.setEmployeeCode(generateEmployeeCode(assignedBranchIds));
+                    teacher.setHireDate(java.time.LocalDate.now());
+                    java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+                    teacher.setCreatedAt(now);
+                    teacher.setUpdatedAt(now);
+                    teacherRepository.save(teacher);
+                    log.info("Auto-created Teacher profile for user: {}", user.getEmail());
+                }
+            } else if ("STUDENT".equals(roleCode)) {
+                // Auto-create Student profile
+                if (!studentRepository.findByUserAccountId(user.getId()).isPresent()) {
+                    if (assignedBranchIds.isEmpty()) {
+                        log.warn("Cannot auto-create Student profile: no branch assigned for user: {}", user.getEmail());
+                    } else {
+                        Student student = new Student();
+                        student.setUserAccount(user);
+                        // Use first branch for student code generation
+                        Long branchId = assignedBranchIds.iterator().next();
+                        student.setStudentCode(generateStudentCode(branchId, user.getFullName(), user.getEmail()));
+                        studentRepository.save(student);
+                        log.info("Auto-created Student profile for user: {}", user.getEmail());
+                    }
+                }
+            }
         }
 
         log.info("User created successfully: {}", user.getEmail());
@@ -199,6 +238,52 @@ public class UserAccountServiceImpl implements UserAccountService {
     @Override
     public boolean existsByEmail(String email) {
         return userAccountRepository.existsByEmail(email);
+    }
+
+    /**
+     * Generate employee code for teacher
+     */
+    private String generateEmployeeCode(Set<Long> branchIds) {
+        Long branchId = branchIds.stream().min(Long::compareTo).orElse(0L);
+        String code;
+        boolean exists;
+        do {
+            int random = (int) (Math.random() * 1000);
+            code = String.format("TC%d%03d", branchId, random);
+            final String finalCode = code;
+            exists = teacherRepository.findAll().stream().anyMatch(t -> finalCode.equals(t.getEmployeeCode()));
+        } while (exists);
+        return code;
+    }
+
+    /**
+     * Generate student code
+     */
+    private String generateStudentCode(Long branchId, String fullName, String email) {
+        String baseName;
+        if (fullName != null && !fullName.trim().isEmpty()) {
+            baseName = fullName.replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+            if (baseName.length() > 10) {
+                baseName = baseName.substring(0, 10);
+            }
+        } else if (email != null && email.contains("@")) {
+            baseName = email.substring(0, email.indexOf("@"))
+                    .replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+            if (baseName.length() > 10) {
+                baseName = baseName.substring(0, 10);
+            }
+        } else {
+            baseName = String.valueOf(System.currentTimeMillis()).substring(6);
+        }
+        String code;
+        boolean exists;
+        do {
+            int randomSuffix = (int) (Math.random() * 1000);
+            code = String.format("ST%d%s%03d", branchId, baseName, randomSuffix);
+            final String finalCode = code;
+            exists = studentRepository.findByStudentCode(finalCode).isPresent();
+        } while (exists);
+        return code;
     }
 
     /**

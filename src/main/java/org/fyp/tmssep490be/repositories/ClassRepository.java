@@ -204,4 +204,31 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
       @Param("date") LocalDate date,
       @Param("status") ClassStatus status
   );
+
+  // ==================== ANALYTICS METHODS ====================
+
+  /**
+   * Count classes by status
+   */
+  long countByStatus(ClassStatus status);
+
+  /**
+   * Count classes by status list
+   */
+  long countByStatusIn(List<ClassStatus> statuses);
+
+  /**
+   * Count classes by approval status
+   */
+  long countByApprovalStatus(ApprovalStatus approvalStatus);
+
+  /**
+   * Count classes by branch ID
+   */
+  long countByBranchId(Long branchId);
+
+  /**
+   * Count classes by branch ID and status list
+   */
+  long countByBranchIdAndStatusIn(Long branchId, List<ClassStatus> statuses);
 }
