@@ -24,8 +24,8 @@ public class QAClassDetailDTO {
 
     // ============== Basic Information ==============
     private Long classId;
-    private String classCode;   // Maps to ClassEntity.code
-    private String className;   // Maps to ClassEntity.name
+    private String classCode;   // Maps to ClassEntity.code (Mã lớp học)
+    private String className;   // Maps to ClassEntity.name (Tên lớp học)
     private String courseName;
     private Long courseId;
     private String branchName;

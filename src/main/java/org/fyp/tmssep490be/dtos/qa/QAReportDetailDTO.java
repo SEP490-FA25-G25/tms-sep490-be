@@ -18,8 +18,8 @@ public class QAReportDetailDTO {
     private QAReportType reportType;
     private QAReportStatus status;
     private Long classId;
-    private String classCode;
-    private String className;
+    private String classCode;    // Maps to ClassEntity.code (Mã lớp học)
+    private String className;    // Maps to ClassEntity.name (Tên lớp học)
     private Long sessionId;
     private String sessionDate;
     private Long phaseId;

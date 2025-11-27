@@ -11,6 +11,7 @@ import org.fyp.tmssep490be.dtos.qa.QAClassDetailDTO;
 import org.fyp.tmssep490be.dtos.qa.QAClassListItemDTO;
 import org.fyp.tmssep490be.dtos.qa.QADashboardDTO;
 import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
+import org.fyp.tmssep490be.dtos.qa.SessionDetailDTO;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.QAService;
@@ -179,6 +180,37 @@ public class QAController {
             .success(true)
             .message("QA session list retrieved successfully")
             .data(sessions)
+            .build());
+    }
+
+    /**
+     * Get QA Session Detail
+     */
+    @GetMapping("/sessions/{sessionId}")
+    @PreAuthorize("hasRole('QA')")
+    @Operation(
+        summary = "Get QA Session Detail",
+        description = "Retrieve detailed session information with student data, CLO achievement metrics, and feedback summary including: " +
+                      "session basic info (date, time, topic, teacher), student attendance details with homework completion, " +
+                      "attendance and homework statistics, CLO information covered in this session, and student feedback summary."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "QA session detail retrieved successfully"),
+        @ApiResponse(responseCode = "404", description = "Session not found")
+    })
+    public ResponseEntity<ResponseObject<SessionDetailDTO>> getQASessionDetail(
+        @Parameter(description = "Session ID", example = "123")
+        @PathVariable Long sessionId,
+        @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} requesting QA session detail for sessionId={}", currentUser.getId(), sessionId);
+
+        SessionDetailDTO sessionDetail = qaService.getQASessionDetail(sessionId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<SessionDetailDTO>builder()
+            .success(true)
+            .message("QA session detail retrieved successfully")
+            .data(sessionDetail)
             .build());
     }
 }

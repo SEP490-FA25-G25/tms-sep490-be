@@ -4,6 +4,7 @@ import org.fyp.tmssep490be.dtos.qa.QAClassDetailDTO;
 import org.fyp.tmssep490be.dtos.qa.QAClassListItemDTO;
 import org.fyp.tmssep490be.dtos.qa.QADashboardDTO;
 import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
+import org.fyp.tmssep490be.dtos.qa.SessionDetailDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -25,4 +26,10 @@ public interface QAService {
      * Get QA-specific session list for a class with attendance metrics
      */
     QASessionListResponse getQASessionList(Long classId, Long userId);
+
+    /**
+     * Get detailed session information with student data, CLO achievement, and feedback summary
+     * Used for QA session detail view and report generation
+     */
+    SessionDetailDTO getQASessionDetail(Long sessionId, Long userId);
 }

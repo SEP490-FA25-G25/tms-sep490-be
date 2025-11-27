@@ -27,6 +27,7 @@ public class SessionDetailDTO {
     private AttendanceStats attendanceStats;
     private List<StudentAttendanceDTO> students;
     private List<CLOInfo> closCovered;
+    private StudentFeedbackSummary studentFeedbackSummary;
 
     @Data
     @Builder
@@ -63,5 +64,17 @@ public class SessionDetailDTO {
         private Long cloId;
         private String cloCode;
         private String description;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class StudentFeedbackSummary {
+        private Integer totalStudents;
+        private Integer feedbackSubmissions;
+        private Double feedbackRate;
+        private Double averageRating;
+        private String commonFeedback;
     }
 }

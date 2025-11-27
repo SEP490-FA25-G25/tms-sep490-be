@@ -6,8 +6,13 @@ import org.fyp.tmssep490be.dtos.qa.QAClassDetailDTO;
 import org.fyp.tmssep490be.dtos.qa.QAClassListItemDTO;
 import org.fyp.tmssep490be.dtos.qa.QADashboardDTO;
 import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
+import org.fyp.tmssep490be.dtos.qa.SessionDetailDTO;
 import org.fyp.tmssep490be.entities.ClassEntity;
+import org.fyp.tmssep490be.entities.CLO;
+import org.fyp.tmssep490be.entities.CoursePhase;
+import org.fyp.tmssep490be.entities.CourseSession;
 import org.fyp.tmssep490be.entities.QAReport;
+import org.fyp.tmssep490be.entities.Score;
 import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
@@ -17,7 +22,9 @@ import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
 import org.fyp.tmssep490be.repositories.ClassRepository;
 import org.fyp.tmssep490be.repositories.QAReportRepository;
+import org.fyp.tmssep490be.repositories.ScoreRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
+import org.fyp.tmssep490be.repositories.StudentFeedbackRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.fyp.tmssep490be.services.QAService;
@@ -27,13 +34,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -42,7 +50,9 @@ public class QAServiceImpl implements QAService {
 
     private final ClassRepository classRepository;
     private final QAReportRepository qaReportRepository;
+    private final ScoreRepository scoreRepository;
     private final SessionRepository sessionRepository;
+    private final StudentFeedbackRepository studentFeedbackRepository;
     private final StudentSessionRepository studentSessionRepository;
     private final UserBranchesRepository userBranchesRepository;
 
@@ -300,7 +310,7 @@ public class QAServiceImpl implements QAService {
 
                     return QADashboardDTO.ClassRequiringAttention.builder()
                             .classId(c.getId())
-                            .classCode(c.getCode())
+                            .classCode(c.getCode() != null ? c.getCode() : "N/A")
                             .courseName(c.getCourse() != null ? c.getCourse().getName() : "N/A")
                             .branchName(c.getBranch() != null ? c.getBranch().getName() : "N/A")
                             .attendanceRate(attendanceRate)
@@ -326,7 +336,7 @@ public class QAServiceImpl implements QAService {
                         .reportId(r.getId())
                         .reportType(r.getReportType())
                         .classId(r.getClassEntity().getId())
-                        .classCode(r.getClassEntity().getName())
+                        .classCode(r.getClassEntity().getCode() != null ? r.getClassEntity().getCode() : "N/A")
                         .sessionId(r.getSession() != null ? r.getSession().getId() : null)
                         .sessionDate(r.getSession() != null ? r.getSession().getDate().toString() : null)
                         .status(r.getStatus())
@@ -372,8 +382,8 @@ public class QAServiceImpl implements QAService {
 
             return QAClassListItemDTO.builder()
                     .classId(c.getId())
-                    .classCode(c.getCode())
-                    .className(c.getCourse() != null ? c.getCourse().getName() : "N/A")
+                    .classCode(c.getCode() != null ? c.getCode() : "N/A")
+                    .className(c.getName() != null ? c.getName() : "N/A")
                     .courseName(c.getCourse() != null ? c.getCourse().getName() : "N/A")
                     .branchName(c.getBranch() != null ? c.getBranch().getName() : "N/A")
                     .modality(c.getModality() != null ? c.getModality().name() : null)
@@ -509,8 +519,8 @@ public class QAServiceImpl implements QAService {
 
         return QAClassDetailDTO.builder()
                 .classId(classEntity.getId())
-                .classCode(classEntity.getName())
-                .className(classEntity.getCourse() != null ? classEntity.getCourse().getName() : "N/A")
+                .classCode(classEntity.getCode() != null ? classEntity.getCode() : "N/A")
+                .className(classEntity.getName() != null ? classEntity.getName() : "N/A")
                 .courseName(classEntity.getCourse() != null ? classEntity.getCourse().getName() : "N/A")
                 .courseId(classEntity.getCourse() != null ? classEntity.getCourse().getId() : null)
                 .branchName(classEntity.getBranch() != null ? classEntity.getBranch().getName() : "N/A")
@@ -615,9 +625,159 @@ public class QAServiceImpl implements QAService {
 
         return QASessionListResponse.builder()
                 .classId(classEntity.getId())
-                .classCode(classEntity.getName())
+                .classCode(classEntity.getCode() != null ? classEntity.getCode() : "N/A")
                 .totalSessions(sessions.size())
                 .sessions(sessionItems)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SessionDetailDTO getQASessionDetail(Long sessionId, Long userId) {
+        log.info("Getting QA session detail for sessionId={} by userId={}", sessionId, userId);
+
+        // Get session with full details
+        Session session = sessionRepository.findByIdWithDetails(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session không tồn tại với id: " + sessionId));
+
+        ClassEntity classEntity = session.getClassEntity();
+
+        // Get student sessions for attendance and homework data
+        List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(sessionId);
+
+        // Build student attendance list
+        List<SessionDetailDTO.StudentAttendanceDTO> studentAttendanceList = studentSessions.stream()
+                .map(ss -> SessionDetailDTO.StudentAttendanceDTO.builder()
+                        .studentId(ss.getStudent().getId())
+                        .studentCode(ss.getStudent().getStudentCode())
+                        .studentName(ss.getStudent().getUserAccount().getFullName())
+                        .attendanceStatus(ss.getAttendanceStatus() != null ? ss.getAttendanceStatus().name() : null)
+                        .homeworkStatus(ss.getHomeworkStatus() != null ? ss.getHomeworkStatus().name() : null)
+                        .isMakeup(ss.getIsMakeup())
+                        .note(ss.getNote())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+
+        // Calculate attendance and homework statistics
+        long totalStudents = studentSessions.size();
+        long presentCount = studentSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                .count();
+        long absentCount = studentSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                .count();
+        long homeworkCompletedCount = studentSessions.stream()
+                .filter(ss -> ss.getHomeworkStatus() == HomeworkStatus.COMPLETED)
+                .count();
+        long homeworkTotalCount = studentSessions.stream()
+                .filter(ss -> ss.getHomeworkStatus() != null && ss.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK)
+                .count();
+
+        double attendanceRate = totalStudents > 0 ? (presentCount * 100.0 / totalStudents) : 0.0;
+        double homeworkCompletionRate = homeworkTotalCount > 0 ? (homeworkCompletedCount * 100.0 / homeworkTotalCount) : 0.0;
+
+        SessionDetailDTO.AttendanceStats attendanceStats = SessionDetailDTO.AttendanceStats.builder()
+                .totalStudents((int) totalStudents)
+                .presentCount((int) presentCount)
+                .absentCount((int) absentCount)
+                .attendanceRate(attendanceRate)
+                .homeworkCompletedCount((int) homeworkCompletedCount)
+                .homeworkCompletionRate(homeworkCompletionRate)
+                .build();
+
+        // Get CLO information if available
+        List<SessionDetailDTO.CLOInfo> closCovered = new ArrayList<>();
+        if (session.getCourseSession() != null && session.getCourseSession().getPhase() != null) {
+            // Get CLOs from course phase
+            CoursePhase phase = session.getCourseSession().getPhase();
+            if (phase.getCourse() != null) {
+                closCovered = phase.getCourse().getClos().stream()
+                        .map(clo -> SessionDetailDTO.CLOInfo.builder()
+                                .cloId(clo.getId())
+                                .cloCode(clo.getCode())
+                                .description(clo.getDescription())
+                                .build())
+                        .collect(java.util.stream.Collectors.toList());
+            }
+        }
+
+        // Get student feedback summary
+        long feedbackSubmissions = studentFeedbackRepository.countBySessionId(sessionId);
+        double feedbackRate = totalStudents > 0 ? (feedbackSubmissions * 100.0 / totalStudents) : 0.0;
+
+        // Get detailed feedback data for average rating and common feedback
+        List<org.fyp.tmssep490be.entities.StudentFeedback> sessionFeedbacks =
+                studentFeedbackRepository.findBySessionIdWithDetails(sessionId);
+
+        Double averageRating = sessionFeedbacks.stream()
+                .filter(sf -> sf.getResponse() != null && !sf.getResponse().trim().isEmpty())
+                .mapToDouble(sf -> {
+                    // Simple rating extraction from feedback text (if numeric)
+                    try {
+                        String response = sf.getResponse().toLowerCase();
+                        if (response.contains("1") || response.contains("kém")) return 1.0;
+                        if (response.contains("2") || response.contains("tb")) return 2.0;
+                        if (response.contains("3") || response.contains("khá")) return 3.0;
+                        if (response.contains("4") || response.contains("tốt")) return 4.0;
+                        if (response.contains("5") || response.contains("rất tốt")) return 5.0;
+                        return 3.0; // Default rating
+                    } catch (Exception e) {
+                        return 3.0;
+                    }
+                })
+                .average()
+                .orElse(0.0);
+
+        String commonFeedback = sessionFeedbacks.stream()
+                .filter(sf -> sf.getResponse() != null && sf.getResponse().length() > 10)
+                .map(org.fyp.tmssep490be.entities.StudentFeedback::getResponse)
+                .collect(java.util.stream.Collectors.joining("; "));
+
+        String teacherName = session.getTeachingSlots() != null && !session.getTeachingSlots().isEmpty()
+                ? session.getTeachingSlots().stream()
+                        .findFirst()
+                        .map(ts -> ts.getTeacher() != null && ts.getTeacher().getUserAccount() != null
+                                ? ts.getTeacher().getUserAccount().getFullName()
+                                : "TBA")
+                        .orElse("TBA")
+                : "TBA";
+
+        // Get session info from related entities
+        Integer sequenceNumber = session.getCourseSession() != null ? session.getCourseSession().getSequenceNo() : null;
+        String timeSlot = session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "TBA";
+        String topic = session.getCourseSession() != null ? session.getCourseSession().getTopic() : "N/A";
+
+        log.info("Session {} detail - Class: {}, Students: {}, Present: {}, Attendance: {}%, Homework: {}%, Feedback: {}",
+                sessionId, classEntity.getCode() != null ? classEntity.getCode() : "N/A",
+                totalStudents, presentCount,
+                String.format("%.1f", attendanceRate),
+                String.format("%.1f", homeworkCompletionRate),
+                feedbackSubmissions);
+
+        SessionDetailDTO.StudentFeedbackSummary feedbackSummary = SessionDetailDTO.StudentFeedbackSummary.builder()
+                .totalStudents((int) totalStudents)
+                .feedbackSubmissions((int) feedbackSubmissions)
+                .feedbackRate(feedbackRate)
+                .averageRating(averageRating)
+                .commonFeedback(commonFeedback)
+                .build();
+
+        return SessionDetailDTO.builder()
+                .sessionId(session.getId())
+                .classId(classEntity.getId())
+                .classCode(classEntity.getCode() != null ? classEntity.getCode() : "N/A")
+                .courseName(classEntity.getCourse() != null ? classEntity.getCourse().getName() : "N/A")
+                .date(session.getDate())
+                .timeSlot(timeSlot)
+                .topic(topic)
+                .studentTask(session.getCourseSession() != null ? session.getCourseSession().getStudentTask() : null)
+                .status(session.getStatus() != null ? session.getStatus().name() : null)
+                .teacherName(teacherName)
+                .teacherNote(session.getTeacherNote())
+                .attendanceStats(attendanceStats)
+                .students(studentAttendanceList)
+                .closCovered(closCovered)
+                .studentFeedbackSummary(feedbackSummary)
                 .build();
     }
 }

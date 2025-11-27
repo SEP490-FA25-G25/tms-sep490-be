@@ -14,6 +14,28 @@ import java.util.Optional;
 @Repository
 public interface StudentFeedbackRepository extends JpaRepository<StudentFeedback, Long> {
 
+    /**
+     * Find all feedbacks for a specific session
+     * Used for QA session detail functionality
+     */
+    @Query("SELECT sf FROM StudentFeedback sf " +
+           "JOIN FETCH sf.student s " +
+           "JOIN FETCH s.userAccount ua " +
+           "JOIN sf.classEntity c " +
+           "JOIN c.sessions sess " +
+           "WHERE sess.id = :sessionId " +
+           "ORDER BY s.userAccount.fullName")
+    List<StudentFeedback> findBySessionIdWithDetails(@Param("sessionId") Long sessionId);
+
+    /**
+     * Count feedback submissions for a session
+     */
+    @Query("SELECT COUNT(sf) FROM StudentFeedback sf " +
+           "JOIN sf.classEntity c " +
+           "JOIN c.sessions sess " +
+           "WHERE sess.id = :sessionId")
+    long countBySessionId(@Param("sessionId") Long sessionId);
+
     // ============== SCHEDULER JOB METHODS ==============
 
     /**
