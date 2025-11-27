@@ -128,6 +128,28 @@ public class UserAccountController {
     }
 
     /**
+     * Update user information (admin only)
+     * PUT /api/v1/users/{id}
+     * Note: Email and password cannot be changed via this endpoint
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ResponseObject<UserResponse>> updateUser(
+            @PathVariable Long id,
+            @Valid @RequestBody org.fyp.tmssep490be.dtos.user.UpdateUserRequest request) {
+
+        UserResponse userResponse = userAccountService.updateUser(id, request);
+
+        return ResponseEntity.ok(
+                ResponseObject.<UserResponse>builder()
+                        .success(true)
+                        .message("User updated successfully")
+                        .data(userResponse)
+                        .build()
+        );
+    }
+
+    /**
      * Delete user (soft delete)
      * DELETE /api/v1/users/{id}
      */

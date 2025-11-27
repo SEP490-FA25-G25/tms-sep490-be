@@ -371,4 +371,12 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
         @Param("classId") Long classId,
         @Param("date") LocalDate date
     );
+
+    /**
+     * Count sessions by date in specific branches
+     */
+    @Query("SELECT COUNT(s) FROM Session s " +
+           "INNER JOIN s.classEntity c " +
+           "WHERE s.date = :date AND c.branch.id IN :branchIds")
+    long countByDateAndBranchIdIn(@Param("date") LocalDate date, @Param("branchIds") List<Long> branchIds);
 }

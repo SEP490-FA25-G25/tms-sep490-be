@@ -35,4 +35,12 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         @Param("status") CourseStatus status,
         @Param("approvalStatus") ApprovalStatus approvalStatus
     );
+
+    /**
+     * Count distinct courses that have classes in specific branches
+     */
+    @Query("SELECT COUNT(DISTINCT c) FROM Course c " +
+           "INNER JOIN c.classes cl " +
+           "WHERE cl.branch.id IN :branchIds")
+    long countDistinctByClassesInBranches(@Param("branchIds") List<Long> branchIds);
 }

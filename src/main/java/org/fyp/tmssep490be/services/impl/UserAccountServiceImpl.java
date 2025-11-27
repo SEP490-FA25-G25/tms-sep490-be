@@ -3,6 +3,7 @@ package org.fyp.tmssep490be.services.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.user.CreateUserRequest;
+import org.fyp.tmssep490be.dtos.user.UpdateUserRequest;
 import org.fyp.tmssep490be.dtos.user.UserResponse;
 import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.UserStatus;
@@ -218,6 +219,78 @@ public class UserAccountServiceImpl implements UserAccountService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid status value: " + status);
         }
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updateUser(Long id, UpdateUserRequest request) {
+        log.info("Updating user ID: {}", id);
+
+        UserAccount user = userAccountRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + id));
+
+        // Update basic fields if provided
+        if (request.getFullName() != null) {
+            user.setFullName(request.getFullName());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getFacebookUrl() != null) {
+            user.setFacebookUrl(request.getFacebookUrl());
+        }
+        if (request.getDob() != null) {
+            user.setDob(request.getDob());
+        }
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress());
+        }
+        if (request.getStatus() != null) {
+            user.setStatus(request.getStatus());
+        }
+
+        // Update roles if provided
+        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+            // Remove existing roles
+            user.getUserRoles().clear();
+            // Add new roles
+            for (Long roleId : request.getRoleIds()) {
+                org.fyp.tmssep490be.entities.Role role = roleRepository.findById(roleId)
+                        .orElseThrow(() -> new IllegalArgumentException("Role not found with ID: " + roleId));
+                org.fyp.tmssep490be.entities.UserRole userRole = new org.fyp.tmssep490be.entities.UserRole();
+                userRole.setUserAccount(user);
+                userRole.setRole(role);
+                user.getUserRoles().add(userRole);
+            }
+        }
+
+        // Update branches if provided
+        if (request.getBranchIds() != null) {
+            // Remove existing branches
+            user.getUserBranches().clear();
+            // Add new branches
+            for (Long branchId : request.getBranchIds()) {
+                org.fyp.tmssep490be.entities.Branch branch = branchRepository.findById(branchId)
+                        .orElseThrow(() -> new IllegalArgumentException("Branch not found with ID: " + branchId));
+                org.fyp.tmssep490be.entities.UserBranches userBranch = new org.fyp.tmssep490be.entities.UserBranches();
+                org.fyp.tmssep490be.entities.UserBranches.UserBranchesId userBranchId = 
+                        new org.fyp.tmssep490be.entities.UserBranches.UserBranchesId();
+                userBranchId.setUserId(user.getId());
+                userBranchId.setBranchId(branchId);
+                userBranch.setId(userBranchId);
+                userBranch.setUserAccount(user);
+                userBranch.setBranch(branch);
+                userBranch.setAssignedAt(java.time.OffsetDateTime.now());
+                user.getUserBranches().add(userBranch);
+            }
+        }
+
+        user = userAccountRepository.save(user);
+        log.info("User updated successfully: {}", user.getEmail());
+        return mapToResponse(user);
     }
 
     @Override
