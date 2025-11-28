@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -70,11 +71,32 @@ public class StudentFeedbackServiceImpl implements StudentFeedbackService {
         long notSubmittedCount = Math.max(0, totalStudents - submittedCount);
         double submissionRate = totalStudents > 0 ? (double) submittedCount / totalStudents * 100 : 0.0;
 
+        // Collect rating metrics for feedbacks that have actual responses
+        List<Double> ratings = feedbacks.getContent().stream()
+                .map(this::calculateAverageRatingForFeedback)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        double averageRating = ratings.isEmpty()
+                ? 0.0
+                : ratings.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+
+        int positiveFeedbackCount = (int) ratings.stream()
+                .filter(r -> r >= 4.0)
+                .count();
+
+        int negativeFeedbackCount = (int) ratings.stream()
+                .filter(r -> r <= 2.5)
+                .count();
+
         StudentFeedbackListResponse.FeedbackStatistics statistics = StudentFeedbackListResponse.FeedbackStatistics.builder()
                 .totalStudents((int) totalStudents)
                 .submittedCount((int) submittedCount)
                 .notSubmittedCount((int) notSubmittedCount)
                 .submissionRate(submissionRate)
+                .averageRating(averageRating)
+                .positiveFeedbackCount(positiveFeedbackCount)
+                .negativeFeedbackCount(negativeFeedbackCount)
                 .build();
 
         Page<StudentFeedbackListResponse.StudentFeedbackItemDTO> feedbackItems = feedbacks.map(sf -> {
@@ -82,17 +104,7 @@ public class StudentFeedbackServiceImpl implements StudentFeedbackService {
                     ? sf.getResponse().substring(0, 100) + "..."
                     : sf.getResponse();
 
-            Double rating = null;
-            if (sf.getStudentFeedbackResponses() != null && !sf.getStudentFeedbackResponses().isEmpty()) {
-                rating = sf.getStudentFeedbackResponses().stream()
-                        .filter(r -> r.getRating() != null)
-                        .mapToInt(r -> r.getRating())
-                        .average()
-                        .orElse(Double.NaN);
-                if (rating.isNaN()) {
-                    rating = null;
-                }
-            }
+            Double rating = calculateAverageRatingForFeedback(sf);
 
             String sentiment = null;
             if (rating != null) {
@@ -176,5 +188,26 @@ public class StudentFeedbackServiceImpl implements StudentFeedbackService {
                 .sentiment(sentiment)
                 .detailedResponses(detailedResponses)
                 .build();
+    }
+
+    /**
+     * Calculate average rating for a feedback based on its response items.
+     * Returns null when there are no rating values to avoid propagating NaN.
+     */
+    private Double calculateAverageRatingForFeedback(StudentFeedback feedback) {
+        if (feedback.getStudentFeedbackResponses() == null || feedback.getStudentFeedbackResponses().isEmpty()) {
+            return null;
+        }
+
+        double rating = feedback.getStudentFeedbackResponses().stream()
+                .filter(r -> r.getRating() != null)
+                .mapToInt(r -> r.getRating())
+                .average()
+                .orElse(Double.NaN);
+
+        if (Double.isNaN(rating)) {
+            return null;
+        }
+        return rating;
     }
 }

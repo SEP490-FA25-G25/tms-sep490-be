@@ -25,6 +25,9 @@ public class StudentFeedbackListResponse {
         private Integer submittedCount;
         private Integer notSubmittedCount;
         private Double submissionRate;
+        private Double averageRating;
+        private Integer positiveFeedbackCount;
+        private Integer negativeFeedbackCount;
     }
 
     @Data
