@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.fyp.tmssep490be.dtos.qa.QAExportRequest;
 import org.fyp.tmssep490be.dtos.qa.QAClassDetailDTO;
 import org.fyp.tmssep490be.dtos.qa.QAClassListItemDTO;
 import org.fyp.tmssep490be.dtos.qa.QADashboardDTO;
@@ -14,6 +15,7 @@ import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
 import org.fyp.tmssep490be.dtos.qa.SessionDetailDTO;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.security.UserPrincipal;
+import org.fyp.tmssep490be.services.ExcelExportService;
 import org.fyp.tmssep490be.services.QAService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,10 +23,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -36,6 +43,7 @@ import java.util.List;
 public class QAController {
 
     private final QAService qaService;
+    private final ExcelExportService excelExportService;
 
     /**
      * QA Dashboard - KPIs and metrics overview
@@ -212,5 +220,56 @@ public class QAController {
             .message("QA session detail retrieved successfully")
             .data(sessionDetail)
             .build());
+    }
+
+    /**
+     * Export QA Dashboard Data to Excel
+     */
+    @PostMapping("/export")
+    @PreAuthorize("hasRole('QA')")
+    @Operation(
+        summary = "Export QA Dashboard Data",
+        description = "Generate Excel export of QA dashboard data including: " +
+                      "KPIs overview, classes requiring attention, and recent QA reports. " +
+                      "Supports date range filtering and section selection."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Excel file generated successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid export request parameters"),
+        @ApiResponse(responseCode = "500", description = "Error generating export file")
+    })
+    public ResponseEntity<Resource> exportQAData(
+        @Valid @RequestBody QAExportRequest exportRequest,
+        @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} requesting QA export with dateFrom={}, dateTo={}, format={}, sections={}",
+                 currentUser.getId(), exportRequest.getDateFrom(), exportRequest.getDateTo(),
+                 exportRequest.getFormat(), exportRequest.getIncludeSections());
+
+        try {
+            // Generate export file
+            Resource exportFile = excelExportService.generateQAExport(exportRequest, currentUser.getId());
+
+            // Get filename from resource
+            String filename = "qa-dashboard-export.xlsx";
+            if (exportFile.getFilename() != null) {
+                filename = exportFile.getFilename();
+            } else {
+                filename = excelExportService.generateExportFilename(exportRequest);
+            }
+
+            log.info("Successfully generated QA export for user {}: filename={}", currentUser.getId(), filename);
+
+            return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(exportFile);
+
+        } catch (Exception e) {
+            log.error("Error generating QA export for user {}: {}", currentUser.getId(), e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"error.txt\"")
+                .body(null);
+        }
     }
 }
