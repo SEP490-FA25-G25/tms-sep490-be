@@ -254,37 +254,49 @@ public class UserAccountServiceImpl implements UserAccountService {
 
         // Update roles if provided
         if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
-            // Remove existing roles
+            // Clear existing roles - orphanRemoval will handle deletion
             user.getUserRoles().clear();
+            
             // Add new roles
             for (Long roleId : request.getRoleIds()) {
                 org.fyp.tmssep490be.entities.Role role = roleRepository.findById(roleId)
                         .orElseThrow(() -> new IllegalArgumentException("Role not found with ID: " + roleId));
+                
                 org.fyp.tmssep490be.entities.UserRole userRole = new org.fyp.tmssep490be.entities.UserRole();
                 userRole.setUserAccount(user);
                 userRole.setRole(role);
+                // ID will be automatically set by @MapsId when saving
+                org.fyp.tmssep490be.entities.UserRole.UserRoleId userRoleId = 
+                        new org.fyp.tmssep490be.entities.UserRole.UserRoleId();
+                userRoleId.setUserId(user.getId());
+                userRoleId.setRoleId(role.getId());
+                userRole.setId(userRoleId);
+                
                 user.getUserRoles().add(userRole);
             }
         }
 
         // Update branches if provided
         if (request.getBranchIds() != null) {
-            // Remove existing branches
+            // Clear existing branches - orphanRemoval will handle deletion
             user.getUserBranches().clear();
-            // Add new branches
-            for (Long branchId : request.getBranchIds()) {
-                org.fyp.tmssep490be.entities.Branch branch = branchRepository.findById(branchId)
-                        .orElseThrow(() -> new IllegalArgumentException("Branch not found with ID: " + branchId));
-                org.fyp.tmssep490be.entities.UserBranches userBranch = new org.fyp.tmssep490be.entities.UserBranches();
-                org.fyp.tmssep490be.entities.UserBranches.UserBranchesId userBranchId = 
-                        new org.fyp.tmssep490be.entities.UserBranches.UserBranchesId();
-                userBranchId.setUserId(user.getId());
-                userBranchId.setBranchId(branchId);
-                userBranch.setId(userBranchId);
-                userBranch.setUserAccount(user);
-                userBranch.setBranch(branch);
-                userBranch.setAssignedAt(java.time.OffsetDateTime.now());
-                user.getUserBranches().add(userBranch);
+            
+            // Add new branches (only if not empty)
+            if (!request.getBranchIds().isEmpty()) {
+                for (Long branchId : request.getBranchIds()) {
+                    org.fyp.tmssep490be.entities.Branch branch = branchRepository.findById(branchId)
+                            .orElseThrow(() -> new IllegalArgumentException("Branch not found with ID: " + branchId));
+                    org.fyp.tmssep490be.entities.UserBranches userBranch = new org.fyp.tmssep490be.entities.UserBranches();
+                    org.fyp.tmssep490be.entities.UserBranches.UserBranchesId userBranchId = 
+                            new org.fyp.tmssep490be.entities.UserBranches.UserBranchesId();
+                    userBranchId.setUserId(user.getId());
+                    userBranchId.setBranchId(branchId);
+                    userBranch.setId(userBranchId);
+                    userBranch.setUserAccount(user);
+                    userBranch.setBranch(branch);
+                    userBranch.setAssignedAt(java.time.OffsetDateTime.now());
+                    user.getUserBranches().add(userBranch);
+                }
             }
         }
 
