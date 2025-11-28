@@ -123,7 +123,7 @@ CREATE TABLE user_account (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_user_gender CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
-  CONSTRAINT chk_user_status CHECK (status IN ('ACTIVE', 'INACTIVE'))
+  CONSTRAINT chk_user_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED'))
 );
 
 -- TIER 2
@@ -311,7 +311,7 @@ CREATE TABLE course (
   CONSTRAINT fk_course_level FOREIGN KEY(level_id) REFERENCES level(id) ON DELETE SET NULL,
   CONSTRAINT fk_course_decided_by_manager FOREIGN KEY(decided_by_manager) REFERENCES user_account(id) ON DELETE SET NULL,
   CONSTRAINT fk_course_created_by FOREIGN KEY(created_by) REFERENCES user_account(id) ON DELETE SET NULL,
-  CONSTRAINT chk_course_status CHECK (status IN ('DRAFT', 'SUBMITTED', 'ACTIVE', 'INACTIVE')),
+  CONSTRAINT chk_course_status CHECK (status IN ('DRAFT', 'SUBMITTED', 'ACTIVE', 'INACTIVE', 'APPROVED', 'REJECTED')),
   CONSTRAINT chk_course_approval_status CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED'))
 );
 
@@ -335,20 +335,12 @@ CREATE TABLE course_session (
   sequence_no INTEGER NOT NULL, -- ví dụ: Session 1, Session 2, Session 3, ...
   topic VARCHAR(500),
   student_task TEXT,
+  skill_set VARCHAR(20)[],
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_course_session_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE CASCADE,
   CONSTRAINT uq_course_session_phase_sequence UNIQUE(phase_id,sequence_no),
   CONSTRAINT chk_course_session_skill_set CHECK (skill_set <@ ARRAY['GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI']::varchar[])
-);
-
--- Bảng mapping cho skills của course_session (JPA @ElementCollection)
-CREATE TABLE course_session_skills (
-  course_session_id BIGINT NOT NULL,
-  skill VARCHAR(20) NOT NULL,
-  PRIMARY KEY (course_session_id, skill),
-  CONSTRAINT fk_course_session_skills_session FOREIGN KEY(course_session_id) REFERENCES course_session(id) ON DELETE CASCADE,
-  CONSTRAINT chk_course_session_skill CHECK (skill IN ('GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI'))
 );
 
 CREATE TABLE course_material (
@@ -550,7 +542,7 @@ CREATE TABLE teacher_skill (
   level SMALLINT,
   PRIMARY KEY(teacher_id, skill, specialization),
   CONSTRAINT fk_teacher_skill_teacher FOREIGN KEY(teacher_id) REFERENCES teacher(id) ON DELETE CASCADE,
-  CONSTRAINT chk_teacher_skill CHECK (skill IN ('GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING'))
+  CONSTRAINT chk_teacher_skill CHECK (skill IN ('GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI'))
 );
 
 CREATE TABLE teacher_availability (
@@ -796,7 +788,7 @@ CREATE TABLE teacher_request (
   CONSTRAINT fk_teacher_request_new_resource FOREIGN KEY(new_resource_id) REFERENCES resource(id) ON DELETE SET NULL,
   CONSTRAINT fk_teacher_request_new_session FOREIGN KEY(new_session_id) REFERENCES session(id) ON DELETE SET NULL,
   CONSTRAINT chk_teacher_request_type CHECK (request_type IN ('REPLACEMENT', 'RESCHEDULE', 'MODALITY_CHANGE')),
-  CONSTRAINT chk_teacher_request_status CHECK (status IN ('PENDING', 'WAITING_CONFIRM', 'APPROVED', 'REJECTED'))
+  CONSTRAINT chk_teacher_request_status CHECK (status IN ('PENDING', 'WAITING_CONFIRM', 'APPROVED', 'REJECTED', 'CANCELLED'))
 );
 
 -- ========== SECTION 4: INDEXES ==========

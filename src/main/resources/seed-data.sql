@@ -477,7 +477,9 @@ INSERT INTO teacher_availability (teacher_id, time_slot_template_id, day_of_week
 INSERT INTO level (id, subject_id, code, name, expected_duration_hours, sort_order, created_at, updated_at) VALUES
 (1, 1, 'FOUNDATION', 'IELTS Foundation (3.0-4.0)', 60, 1, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
 (2, 1, 'INTERMEDIATE', 'IELTS Intermediate (5.0-6.0)', 75, 2, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(3, 1, 'ADVANCED', 'IELTS Advanced (6.5-8.0)', 90, 3, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
+(3, 1, 'ADVANCED', 'IELTS Advanced (6.5-8.0)', 90, 3, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
+(5, 1, 'TOEIC-500', 'TOEIC 500+', 60, 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
+(10, 1, 'JLPT-N5', 'JLPT N5', 60, 10, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
 
 -- Replacement Skill Assessments for initial students
 -- Simulates placement test results before their first enrollment.
@@ -531,84 +533,35 @@ INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, cre
 (2, 1, 2, 'Foundation Practice', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
 -- Course Sessions for Foundation (24 sessions = 8 weeks × 3 sessions/week)
-INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, created_at, updated_at) VALUES
+INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skill_set, created_at, updated_at) VALUES
 -- Phase 1: Foundation Basics (Sessions 1-12)
-(1, 1, 1, 'Introduction to IELTS & Basic Listening', 'Listen to simple dialogues', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(2, 1, 2, 'Basic Speaking: Greetings and Introductions', 'Practice self-introduction', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(3, 1, 3, 'Basic Reading: Short Passages', 'Read and answer simple questions', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(4, 1, 4, 'Basic Writing: Simple Sentences', 'Write about yourself', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(5, 1, 5, 'Listening: Numbers and Dates', 'Complete listening exercises', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(6, 1, 6, 'Speaking: Daily Activities', 'Describe your daily routine', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(7, 1, 7, 'Reading: Understanding Main Ideas', 'Identify main ideas', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(8, 1, 8, 'Writing: Simple Paragraphs', 'Write a short paragraph', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(9, 1, 9, 'Listening: Conversations', 'Listen to basic conversations', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(10, 1, 10, 'Speaking: Expressing Likes and Dislikes', 'Talk about preferences', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(11, 1, 11, 'Reading: Details and Facts', 'Find specific information', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(12, 1, 12, 'Writing: Connecting Ideas', 'Use simple connectors', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(1, 1, 1, 'Introduction to IELTS & Basic Listening', 'Listen to simple dialogues', '{GENERAL, LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(2, 1, 2, 'Basic Speaking: Greetings and Introductions', 'Practice self-introduction', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(3, 1, 3, 'Basic Reading: Short Passages', 'Read and answer simple questions', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(4, 1, 4, 'Basic Writing: Simple Sentences', 'Write about yourself', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(5, 1, 5, 'Listening: Numbers and Dates', 'Complete listening exercises', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(6, 1, 6, 'Speaking: Daily Activities', 'Describe your daily routine', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(7, 1, 7, 'Reading: Understanding Main Ideas', 'Identify main ideas', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(8, 1, 8, 'Writing: Simple Paragraphs', 'Write a short paragraph', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(9, 1, 9, 'Listening: Conversations', 'Listen to basic conversations', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(10, 1, 10, 'Speaking: Expressing Likes and Dislikes', 'Talk about preferences', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(11, 1, 11, 'Reading: Details and Facts', 'Find specific information', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(12, 1, 12, 'Writing: Connecting Ideas', 'Use simple connectors', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 -- Phase 2: Foundation Practice (Sessions 13-24)
-(13, 2, 1, 'Listening: Following Instructions', 'Complete tasks from audio', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(14, 2, 2, 'Speaking: Asking Questions', 'Practice question forms', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(15, 2, 3, 'Reading: Short Stories', 'Read and summarize', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(16, 2, 4, 'Writing: Describing People and Places', 'Write descriptions', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(17, 2, 5, 'Listening: News and Announcements', 'Understand main points', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(18, 2, 6, 'Speaking: Giving Opinions', 'Express simple opinions', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(19, 2, 7, 'Reading: Understanding Context', 'Use context clues', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(20, 2, 8, 'Writing: Personal Letters', 'Write informal letters', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(21, 2, 9, 'Practice Test: Listening & Reading', 'Complete practice test', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(22, 2, 10, 'Practice Test: Writing & Speaking', 'Complete practice test', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(23, 2, 11, 'Review and Feedback', 'Review all skills', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(24, 2, 12, 'Final Assessment', 'Complete final test', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+(13, 2, 1, 'Listening: Following Instructions', 'Complete tasks from audio', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(14, 2, 2, 'Speaking: Asking Questions', 'Practice question forms', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(15, 2, 3, 'Reading: Short Stories', 'Read and summarize', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(16, 2, 4, 'Writing: Describing People and Places', 'Write descriptions', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(17, 2, 5, 'Listening: News and Announcements', 'Understand main points', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(18, 2, 6, 'Speaking: Giving Opinions', 'Express simple opinions', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(19, 2, 7, 'Reading: Understanding Context', 'Use context clues', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(20, 2, 8, 'Writing: Personal Letters', 'Write informal letters', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(21, 2, 9, 'Practice Test: Listening & Reading', 'Complete practice test', '{LISTENING, READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(22, 2, 10, 'Practice Test: Writing & Speaking', 'Complete practice test', '{WRITING, SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(23, 2, 11, 'Review and Feedback', 'Review all skills', '{GENERAL}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(24, 2, 12, 'Final Assessment', 'Complete final test', '{GENERAL, READING, WRITING, SPEAKING, LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
--- Course Session Skills (JPA @ElementCollection mapping)
-INSERT INTO course_session_skills (course_session_id, skill) VALUES
--- Session 1: GENERAL, LISTENING
-(1, 'GENERAL'), (1, 'LISTENING'),
--- Session 2: SPEAKING
-(2, 'SPEAKING'),
--- Session 3: READING
-(3, 'READING'),
--- Session 4: WRITING
-(4, 'WRITING'),
--- Session 5: LISTENING
-(5, 'LISTENING'),
--- Session 6: SPEAKING
-(6, 'SPEAKING'),
--- Session 7: READING
-(7, 'READING'),
--- Session 8: WRITING
-(8, 'WRITING'),
--- Session 9: LISTENING
-(9, 'LISTENING'),
--- Session 10: SPEAKING
-(10, 'SPEAKING'),
--- Session 11: READING
-(11, 'READING'),
--- Session 12: WRITING
-(12, 'WRITING'),
--- Session 13: LISTENING
-(13, 'LISTENING'),
--- Session 14: SPEAKING
-(14, 'SPEAKING'),
--- Session 15: READING
-(15, 'READING'),
--- Session 16: WRITING
-(16, 'WRITING'),
--- Session 17: LISTENING
-(17, 'LISTENING'),
--- Session 18: SPEAKING
-(18, 'SPEAKING'),
--- Session 19: READING
-(19, 'READING'),
--- Session 20: WRITING
-(20, 'WRITING'),
--- Session 21: LISTENING, READING
-(21, 'LISTENING'), (21, 'READING'),
--- Session 22: WRITING, SPEAKING
-(22, 'WRITING'), (22, 'SPEAKING'),
--- Session 23: GENERAL
-(23, 'GENERAL'),
--- Session 24: GENERAL, READING, WRITING, SPEAKING, LISTENING
-(24, 'GENERAL'), (24, 'READING'), (24, 'WRITING'), (24, 'SPEAKING'), (24, 'LISTENING');
+
 
 -- CLOs for Foundation Course
 INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
@@ -638,62 +591,62 @@ INSERT INTO course_session_clo_mapping (course_session_id, clo_id, status) VALUE
 -- Course Materials for Foundation Course
 INSERT INTO course_material (course_id, phase_id, course_session_id, title, description, material_type, url, uploaded_by) VALUES
 -- Course-level materials
-(1, NULL, NULL, 'IELTS Foundation - Course Syllabus', 'The complete syllabus for the course.', 'PDF', '/materials/courses/1/syllabus.pdf', 5),
-(1, NULL, NULL, 'Introductory Video', 'A welcome video from the head teacher.', 'VIDEO', '/materials/courses/1/intro.mp4', 5),
+(1, NULL, NULL, 'IELTS Foundation - Course Syllabus', 'The complete syllabus for the course.', 'DOCUMENT', '/materials/courses/1/syllabus.pdf', 5),
+(1, NULL, NULL, 'Introductory Video', 'A welcome video from the head teacher.', 'MEDIA', '/materials/courses/1/intro.mp4', 5),
 -- Phase 1 materials
 (1, 1, NULL, 'Phase 1 Vocabulary List', 'Key vocabulary for the first 4 weeks.', 'DOCUMENT', '/materials/phases/1/vocab.docx', 5),
 -- Session-specific materials
 -- Session 1
-(1, 1, 1, 'Introduction to IELTS Slides', 'Overview of the IELTS exam structure.', 'SLIDE', '/materials/sessions/1/intro-slides.pptx', 5),
-(1, 1, 1, 'Basic Listening Audio', 'Audio tracks for basic listening exercises.', 'AUDIO', '/materials/sessions/1/audio.mp3', 5),
+(1, 1, 1, 'Introduction to IELTS Slides', 'Overview of the IELTS exam structure.', 'DOCUMENT', '/materials/sessions/1/intro-slides.pptx', 5),
+(1, 1, 1, 'Basic Listening Audio', 'Audio tracks for basic listening exercises.', 'MEDIA', '/materials/sessions/1/audio.mp3', 5),
 -- Session 2
 (1, 1, 2, 'Greetings & Introductions Vocabulary', 'List of common phrases for introductions.', 'DOCUMENT', '/materials/sessions/2/vocab.pdf', 5),
 -- Session 3
-(1, 1, 3, 'Reading Passage: Daily Life', 'Simple reading text about daily routines.', 'PDF', '/materials/sessions/3/reading.pdf', 5),
+(1, 1, 3, 'Reading Passage: Daily Life', 'Simple reading text about daily routines.', 'DOCUMENT', '/materials/sessions/3/reading.pdf', 5),
 -- Session 4
-(1, 1, 4, 'Sentence Structure Guide', 'Basics of English sentence structure.', 'PDF', '/materials/sessions/4/grammar.pdf', 5),
+(1, 1, 4, 'Sentence Structure Guide', 'Basics of English sentence structure.', 'DOCUMENT', '/materials/sessions/4/grammar.pdf', 5),
 -- Session 5
-(1, 1, 5, 'Numbers & Dates Audio', 'Listening practice for numbers and dates.', 'AUDIO', '/materials/sessions/5/numbers.mp3', 5),
+(1, 1, 5, 'Numbers & Dates Audio', 'Listening practice for numbers and dates.', 'MEDIA', '/materials/sessions/5/numbers.mp3', 5),
 -- Session 6
 (1, 1, 6, 'Daily Activities Worksheet', 'Exercises for describing daily routines.', 'DOCUMENT', '/materials/sessions/6/worksheet.docx', 5),
 -- Session 7
-(1, 1, 7, 'Main Idea Identification', 'Strategies for finding the main idea.', 'SLIDE', '/materials/sessions/7/strategies.pptx', 5),
+(1, 1, 7, 'Main Idea Identification', 'Strategies for finding the main idea.', 'DOCUMENT', '/materials/sessions/7/strategies.pptx', 5),
 -- Session 8
 (1, 1, 8, 'Paragraph Writing Template', 'Template for writing simple paragraphs.', 'DOCUMENT', '/materials/sessions/8/template.docx', 5),
 -- Session 9
-(1, 1, 9, 'Conversation Practice Audio', 'Dialogues for listening practice.', 'AUDIO', '/materials/sessions/9/conversations.mp3', 5),
+(1, 1, 9, 'Conversation Practice Audio', 'Dialogues for listening practice.', 'MEDIA', '/materials/sessions/9/conversations.mp3', 5),
 -- Session 10
-(1, 1, 10, 'Likes & Dislikes Phrases', 'Vocabulary for expressing preferences.', 'PDF', '/materials/sessions/10/phrases.pdf', 5),
+(1, 1, 10, 'Likes & Dislikes Phrases', 'Vocabulary for expressing preferences.', 'DOCUMENT', '/materials/sessions/10/phrases.pdf', 5),
 -- Session 11
-(1, 1, 11, 'Scanning Techniques', 'How to scan for details and facts.', 'SLIDE', '/materials/sessions/11/scanning.pptx', 5),
+(1, 1, 11, 'Scanning Techniques', 'How to scan for details and facts.', 'DOCUMENT', '/materials/sessions/11/scanning.pptx', 5),
 -- Session 12
-(1, 1, 12, 'Linking Words Chart', 'Common connecting words and their usage.', 'PDF', '/materials/sessions/12/linking-words.pdf', 5),
+(1, 1, 12, 'Linking Words Chart', 'Common connecting words and their usage.', 'DOCUMENT', '/materials/sessions/12/linking-words.pdf', 5),
 
 -- Phase 2 materials
-(1, 2, NULL, 'Phase 2 Grammar Guide', 'Advanced grammar rules for the last 4 weeks.', 'PDF', '/materials/phases/2/grammar.pdf', 5),
+(1, 2, NULL, 'Phase 2 Grammar Guide', 'Advanced grammar rules for the last 4 weeks.', 'DOCUMENT', '/materials/phases/2/grammar.pdf', 5),
 -- Session 13
-(1, 2, 13, 'Map Labeling Audio', 'Audio for map labeling exercises.', 'AUDIO', '/materials/sessions/13/maps.mp3', 5),
+(1, 2, 13, 'Map Labeling Audio', 'Audio for map labeling exercises.', 'MEDIA', '/materials/sessions/13/maps.mp3', 5),
 -- Session 14
-(1, 2, 14, 'Question Formation Rules', 'Grammar guide for asking questions.', 'PDF', '/materials/sessions/14/questions.pdf', 5),
+(1, 2, 14, 'Question Formation Rules', 'Grammar guide for asking questions.', 'DOCUMENT', '/materials/sessions/14/questions.pdf', 5),
 -- Session 15
-(1, 2, 15, 'Short Story: The Adventure', 'Reading material for the session.', 'PDF', '/materials/sessions/15/story.pdf', 5),
+(1, 2, 15, 'Short Story: The Adventure', 'Reading material for the session.', 'DOCUMENT', '/materials/sessions/15/story.pdf', 5),
 -- Session 16
 (1, 2, 16, 'Descriptive Adjectives List', 'Vocabulary for describing people and places.', 'DOCUMENT', '/materials/sessions/16/adjectives.docx', 5),
 -- Session 17
-(1, 2, 17, 'News Report Audio', 'Listening practice with news reports.', 'AUDIO', '/materials/sessions/17/news.mp3', 5),
+(1, 2, 17, 'News Report Audio', 'Listening practice with news reports.', 'MEDIA', '/materials/sessions/17/news.mp3', 5),
 -- Session 18
-(1, 2, 18, 'Opinion Phrases Cheat Sheet', 'Useful phrases for giving opinions.', 'PDF', '/materials/sessions/18/opinions.pdf', 5),
+(1, 2, 18, 'Opinion Phrases Cheat Sheet', 'Useful phrases for giving opinions.', 'DOCUMENT', '/materials/sessions/18/opinions.pdf', 5),
 -- Session 19
 (1, 2, 19, 'Context Clues Worksheet', 'Exercises on using context clues.', 'DOCUMENT', '/materials/sessions/19/context.docx', 5),
 -- Session 20
-(1, 2, 20, 'Informal Letter Sample', 'Example of a personal letter.', 'PDF', '/materials/sessions/20/letter.pdf', 5),
+(1, 2, 20, 'Informal Letter Sample', 'Example of a personal letter.', 'DOCUMENT', '/materials/sessions/20/letter.pdf', 5),
 -- Session 21
-(1, 2, 21, 'Mock Test 1: Listening & Reading', 'Practice test questions.', 'PDF', '/materials/sessions/21/test1.pdf', 5),
-(1, 2, 21, 'Mock Test 1 Audio', 'Audio for the listening section.', 'AUDIO', '/materials/sessions/21/audio.mp3', 5),
+(1, 2, 21, 'Mock Test 1: Listening & Reading', 'Practice test questions.', 'DOCUMENT', '/materials/sessions/21/test1.pdf', 5),
+(1, 2, 21, 'Mock Test 1 Audio', 'Audio for the listening section.', 'MEDIA', '/materials/sessions/21/audio.mp3', 5),
 -- Session 22
-(1, 2, 22, 'Mock Test 1: Writing & Speaking', 'Prompts for writing and speaking.', 'PDF', '/materials/sessions/22/test2.pdf', 5),
+(1, 2, 22, 'Mock Test 1: Writing & Speaking', 'Prompts for writing and speaking.', 'DOCUMENT', '/materials/sessions/22/test2.pdf', 5),
 -- Session 23
-(1, 2, 23, 'Course Review Slides', 'Summary of key course concepts.', 'SLIDE', '/materials/sessions/23/review.pptx', 5),
+(1, 2, 23, 'Course Review Slides', 'Summary of key course concepts.', 'DOCUMENT', '/materials/sessions/23/review.pptx', 5),
 -- Session 24
 (1, 2, 24, 'Final Exam Instructions', 'Guidelines for the final assessment.', 'DOCUMENT', '/materials/sessions/24/instructions.docx', 5);
 
@@ -702,7 +655,7 @@ INSERT INTO course_assessment (id, course_id, name, kind, duration_minutes, max_
 (1, 1, 'Listening Quiz 1', 'QUIZ', 30, 20, ARRAY['LISTENING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (2, 1, 'Speaking Quiz 1', 'QUIZ', 15, 20, ARRAY['SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (3, 1, 'Reading Quiz 1', 'QUIZ', 30, 20, ARRAY['READING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(4, 1, 'Writing Assignment 1', 'ASSIGNMENT', 60, 20, ARRAY['WRITING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(4, 1, 'Writing Assignment 1', 'HOMEWORK', 60, 20, ARRAY['WRITING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (5, 1, 'Midterm Exam', 'MIDTERM', 90, 100, ARRAY['LISTENING','READING','WRITING','SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (6, 1, 'Final Exam', 'FINAL', 120, 100, ARRAY['LISTENING','READING','WRITING','SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
@@ -734,13 +687,13 @@ INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUE
 
 -- Course Assessments for Intermediate (ID 2)
 INSERT INTO course_assessment (id, course_id, name, kind, duration_minutes, max_score, skills, created_at, updated_at) VALUES
-(7, 2, 'Writing Task 2 Assignment', 'ASSIGNMENT', 60, 100, ARRAY['WRITING'], NOW(), NOW()),
+(7, 2, 'Writing Task 2 Assignment', 'HOMEWORK', 60, 100, ARRAY['WRITING'], NOW(), NOW()),
 (8, 2, 'Full Mock Test', 'FINAL', 180, 100, ARRAY['LISTENING','READING','WRITING','SPEAKING'], NOW(), NOW());
 
 -- Course Materials for Intermediate (ID 2)
 INSERT INTO course_material (course_id, phase_id, course_session_id, title, description, material_type, url, uploaded_by) VALUES
-(2, NULL, NULL, 'IELTS Intermediate Syllabus', 'Course syllabus', 'PDF', '/materials/courses/2/syllabus.pdf', 5),
-(2, 3, 25, 'Complex Grammar Guide', 'Guide to complex sentences', 'PDF', '/materials/sessions/25/grammar.pdf', 5);
+(2, NULL, NULL, 'IELTS Intermediate Syllabus', 'Course syllabus', 'DOCUMENT', '/materials/courses/2/syllabus.pdf', 5),
+(2, 3, 25, 'Complex Grammar Guide', 'Guide to complex sentences', 'DOCUMENT', '/materials/sessions/25/grammar.pdf', 5);
 
 -- ========== TIER 4: CLASSES & SESSIONS ==========
 
@@ -1170,6 +1123,7 @@ SELECT
         ELSE NULL
     END,
     s.date,
+    CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 FROM enrollment e
 CROSS JOIN session s
@@ -1581,25 +1535,25 @@ INSERT INTO assessment (id, class_id, course_assessment_id, scheduled_date, actu
 (4, 2, 6, '2025-11-27 08:00:00+07', NULL, '2025-10-15 08:00:00+07', '2025-10-15 08:00:00+07'); -- Final - scheduled
 
 -- Scores for completed assessments (Listening Quiz 1)
-INSERT INTO score (id, assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at) VALUES
-(1, 1, 1, 18.0, 'Good listening skills', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(2, 1, 2, 16.5, 'Need more practice on numbers', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(3, 1, 3, 19.0, 'Excellent performance', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(4, 1, 4, 15.0, 'Satisfactory', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(5, 1, 5, 17.5, 'Good work', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(6, 1, 6, 14.0, 'Need improvement', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(7, 1, 7, 18.5, 'Very good', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(8, 1, 8, 16.0, 'Good progress', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(9, 1, 9, 17.0, 'Well done', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(10, 1, 10, 15.5, 'Fair performance', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07');
+INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at) VALUES
+(1, 1, 18.0, 'Good listening skills', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
+(1, 2, 16.5, 'Need more practice on numbers', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
+(1, 3, 19.0, 'Excellent performance', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
+(1, 4, 15.0, 'Satisfactory', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
+(1, 5, 17.5, 'Good work', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
+(1, 6, 14.0, 'Need improvement', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
+(1, 7, 18.5, 'Very good', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
+(1, 8, 16.0, 'Good progress', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
+(1, 9, 17.0, 'Well done', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
+(1, 10, 15.5, 'Fair performance', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07');
 
 -- Scores for Speaking Quiz 1
-INSERT INTO score (id, assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at) VALUES
-(11, 2, 1, 17.0, 'Good fluency, work on pronunciation', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
-(12, 2, 2, 18.0, 'Confident speaker', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
-(13, 2, 3, 16.5, 'Good effort', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
-(14, 2, 4, 15.0, 'Need more practice', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
-(15, 2, 5, 19.0, 'Excellent speaking skills', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07');
+INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at) VALUES
+(2, 1, 17.0, 'Good fluency, work on pronunciation', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
+(2, 2, 18.0, 'Confident speaker', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
+(2, 3, 16.5, 'Good effort', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
+(2, 4, 15.0, 'Need more practice', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
+(2, 5, 19.0, 'Excellent speaking skills', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07');
 
 -- Assessments for Class 1 (COMPLETED)
 INSERT INTO assessment (id, class_id, course_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
