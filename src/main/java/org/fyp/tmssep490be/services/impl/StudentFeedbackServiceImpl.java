@@ -4,20 +4,31 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.qa.StudentFeedbackDetailDTO;
 import org.fyp.tmssep490be.dtos.qa.StudentFeedbackListResponse;
+import org.fyp.tmssep490be.dtos.studentfeedback.StudentFeedbackQuestionDTO;
+import org.fyp.tmssep490be.dtos.studentfeedback.StudentFeedbackSubmitRequest;
+import org.fyp.tmssep490be.dtos.studentfeedback.StudentFeedbackSubmitResponse;
+import org.fyp.tmssep490be.dtos.studentfeedback.StudentPendingFeedbackDTO;
 import org.fyp.tmssep490be.entities.ClassEntity;
+import org.fyp.tmssep490be.entities.FeedbackQuestion;
+import org.fyp.tmssep490be.entities.StudentFeedbackResponse;
 import org.fyp.tmssep490be.entities.StudentFeedback;
 import org.fyp.tmssep490be.exceptions.InvalidRequestException;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
+import org.fyp.tmssep490be.repositories.FeedbackQuestionRepository;
 import org.fyp.tmssep490be.repositories.ClassRepository;
 import org.fyp.tmssep490be.repositories.StudentFeedbackRepository;
 import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.fyp.tmssep490be.services.StudentFeedbackService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -29,6 +40,7 @@ public class StudentFeedbackServiceImpl implements StudentFeedbackService {
     private final StudentFeedbackRepository studentFeedbackRepository;
     private final ClassRepository classRepository;
     private final UserBranchesRepository userBranchesRepository;
+    private final FeedbackQuestionRepository feedbackQuestionRepository;
 
     private ClassEntity ensureClassAccessible(Long classId, Long userId) {
         ClassEntity classEntity = classRepository.findById(classId)
@@ -188,6 +200,113 @@ public class StudentFeedbackServiceImpl implements StudentFeedbackService {
                 .sentiment(sentiment)
                 .detailedResponses(detailedResponses)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StudentPendingFeedbackDTO> getPendingFeedbacksForStudent(Long studentId) {
+        List<StudentFeedback> pending = studentFeedbackRepository.findPendingByStudentId(studentId);
+
+        return pending.stream()
+                .map(sf -> StudentPendingFeedbackDTO.builder()
+                        .feedbackId(sf.getId())
+                        .classId(sf.getClassEntity().getId())
+                        .classCode(sf.getClassEntity().getCode())
+                        .className(sf.getClassEntity().getName())
+                        .courseName(sf.getClassEntity().getCourse().getName())
+                        .phaseId(sf.getPhase() != null ? sf.getPhase().getId() : null)
+                        .phaseName(sf.getPhase() != null ? sf.getPhase().getName() : null)
+                        .createdAt(sf.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StudentFeedbackSubmitResponse submitFeedback(Long feedbackId, Long studentId, StudentFeedbackSubmitRequest request) {
+        StudentFeedback feedback = studentFeedbackRepository.findByIdAndStudentIdWithDetails(feedbackId, studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Feedback không tồn tại hoặc không thuộc về bạn"));
+
+        if (Boolean.TRUE.equals(feedback.getIsFeedback())) {
+            throw new InvalidRequestException("Feedback này đã được nộp");
+        }
+
+        if (request.getResponses() == null || request.getResponses().isEmpty()) {
+            throw new InvalidRequestException("Bạn chưa cung cấp đánh giá");
+        }
+
+        List<Long> questionIds = request.getResponses().stream()
+                .map(StudentFeedbackSubmitRequest.ResponseItem::getQuestionId)
+                .toList();
+
+        List<FeedbackQuestion> questions = feedbackQuestionRepository.findAllById(questionIds);
+        if (questions.size() != questionIds.size()) {
+            throw new InvalidRequestException("Một số câu hỏi không hợp lệ");
+        }
+
+        Map<Long, FeedbackQuestion> questionMap = questions.stream()
+                .collect(Collectors.toMap(FeedbackQuestion::getId, q -> q));
+
+        if (feedback.getStudentFeedbackResponses() != null) {
+            feedback.getStudentFeedbackResponses().clear();
+        } else {
+            feedback.setStudentFeedbackResponses(new HashSet<>());
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        for (StudentFeedbackSubmitRequest.ResponseItem item : request.getResponses()) {
+            FeedbackQuestion question = questionMap.get(item.getQuestionId());
+            if (question == null) {
+                throw new InvalidRequestException("Câu hỏi không hợp lệ");
+            }
+
+            StudentFeedbackResponse response = StudentFeedbackResponse.builder()
+                    .feedback(feedback)
+                    .question(question)
+                    .rating(item.getRating())
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+            feedback.getStudentFeedbackResponses().add(response);
+        }
+
+        feedback.setResponse(request.getComment());
+        feedback.setIsFeedback(true);
+        feedback.setSubmittedAt(now);
+        feedback.setUpdatedAt(now);
+
+        StudentFeedback saved = studentFeedbackRepository.save(feedback);
+        Double avg = calculateAverageRatingForFeedback(saved);
+
+        return StudentFeedbackSubmitResponse.builder()
+                .feedbackId(saved.getId())
+                .isFeedback(saved.getIsFeedback())
+                .submittedAt(saved.getSubmittedAt())
+                .averageRating(avg)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countPendingFeedbacks(Long studentId) {
+        return studentFeedbackRepository.countPendingByStudentId(studentId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StudentFeedbackQuestionDTO> getFeedbackQuestions() {
+        List<FeedbackQuestion> questions = feedbackQuestionRepository.findAll(
+                Sort.by(Sort.Order.asc("displayOrder"), Sort.Order.asc("id")));
+
+        return questions.stream()
+                .map(q -> StudentFeedbackQuestionDTO.builder()
+                        .id(q.getId())
+                        .questionText(q.getQuestionText())
+                        .questionType(q.getQuestionType())
+                        .options(q.getOptions())
+                        .displayOrder(q.getDisplayOrder())
+                        .build())
+                .toList();
     }
 
     /**

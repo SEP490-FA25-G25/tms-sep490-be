@@ -157,13 +157,13 @@ FROM generate_series(1, 100) AS s(id);
 
 -- Feedback Questions (for student feedback feature)
 INSERT INTO feedback_question (id, question_text, question_type, options, display_order, created_at, updated_at) VALUES
-(1, 'How satisfied are you with the overall teaching quality?', 'rating', NULL, 1, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(2, 'How clear and well-organized were the lessons?', 'rating', NULL, 2, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(3, 'How helpful were the course materials and resources?', 'rating', NULL, 3, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(4, 'How effective was the class management and scheduling?', 'rating', NULL, 4, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(5, 'Would you recommend this course to others?', 'rating', NULL, 5, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(6, 'What did you like most about the course?', 'text', NULL, 6, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(7, 'What areas need improvement?', 'text', NULL, 7, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07');
+(1, 'Mức hài lòng với chất lượng giảng dạy tổng thể', 'rating', NULL, 1, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(2, 'Bài giảng có rõ ràng và mạch lạc không?', 'rating', NULL, 2, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(3, 'Tài liệu và nguồn lực hỗ trợ học tập hữu ích ở mức nào?', 'rating', NULL, 3, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(4, 'Lịch học và quản lý lớp có hiệu quả không?', 'rating', NULL, 4, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(5, 'Bạn có sẵn sàng giới thiệu khóa học này cho người khác?', 'rating', NULL, 5, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(6, 'Điều bạn hài lòng nhất ở phase này là gì?', 'text', NULL, 6, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(7, 'Bạn muốn cải thiện điều gì cho phase tiếp theo?', 'text', NULL, 7, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07');
 
 -- ========== TIER 2: DEPENDENT ON TIER 1 ==========
 
@@ -1854,6 +1854,19 @@ SELECT f.id, q.id,
     CASE WHEN q.question_type = 'rating' THEN 5 ELSE NULL END,
     NOW(), NOW()
 FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 2;
+
+-- Pending feedback for test student (student.0001@gmail.com -> user_id 101 -> student_id 1)
+INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, created_at, updated_at)
+VALUES (9000, 1, 2, 1, false, NOW(), NOW());
+
+-- Reset feedback 401 (student 1, class 2, phase 1) to pending for demo
+DELETE FROM student_feedback_response WHERE feedback_id = 401;
+UPDATE student_feedback
+SET is_feedback = false,
+    submitted_at = NULL,
+    response = NULL,
+    updated_at = NOW()
+WHERE id = 401;
 
 -- QA Reports (20+ Samples covering various types)
 

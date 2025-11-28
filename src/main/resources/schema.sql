@@ -620,7 +620,8 @@ CREATE TABLE student_feedback (
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_student_feedback_student FOREIGN KEY(student_id) REFERENCES student(id) ON DELETE CASCADE,
   CONSTRAINT fk_student_feedback_class FOREIGN KEY(class_id) REFERENCES "class"(id) ON DELETE CASCADE,
-  CONSTRAINT fk_student_feedback_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE SET NULL
+  CONSTRAINT fk_student_feedback_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE SET NULL,
+  CONSTRAINT uq_student_feedback_student_class_phase UNIQUE(student_id, class_id, phase_id)
 );
 
 CREATE TABLE student_feedback_response (
