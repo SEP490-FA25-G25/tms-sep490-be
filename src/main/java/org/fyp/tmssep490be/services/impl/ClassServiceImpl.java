@@ -50,6 +50,8 @@ import java.time.LocalDate;
 
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.EnumSet;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -60,6 +62,14 @@ import java.util.stream.Collectors;
 @Slf4j
 @Transactional(readOnly = true)
 public class ClassServiceImpl implements ClassService {
+
+    private static final EnumSet<Skill> ALLOWED_SKILLS = EnumSet.of(
+            Skill.READING,
+            Skill.WRITING,
+            Skill.SPEAKING,
+            Skill.LISTENING,
+            Skill.GENERAL
+    );
 
     private final ClassRepository classRepository;
     private final EnrollmentRepository enrollmentRepository;
@@ -588,6 +598,7 @@ public class ClassServiceImpl implements ClassService {
             Integer preComputedMatchPriority,
             String preComputedMatchingSkill) {
         UserAccount userAccount = student.getUserAccount();
+        List<ReplacementSkillAssessment> filteredAssessments = filterAllowedAssessments(assessments);
 
         // Get branch info (take first branch)
         String branchName = null;
@@ -598,7 +609,7 @@ public class ClassServiceImpl implements ClassService {
         }
 
         // Convert all assessments to DTOs
-        List<AvailableStudentDTO.SkillAssessmentDTO> assessmentDTOs = assessments != null ? assessments.stream()
+        List<AvailableStudentDTO.SkillAssessmentDTO> assessmentDTOs = !filteredAssessments.isEmpty() ? filteredAssessments.stream()
                 .map(this::convertToSkillAssessmentDTO)
                 .sorted((a1, a2) -> a2.getAssessmentDate().compareTo(a1.getAssessmentDate())) // Most recent first
                 .collect(Collectors.toList()) : List.of();
@@ -607,7 +618,7 @@ public class ClassServiceImpl implements ClassService {
         AvailableStudentDTO.ClassMatchInfoDTO classMatchInfo;
         if (preComputedMatchPriority != null) {
             // Use database-computed values for better performance and consistency
-            ReplacementSkillAssessment matchingAssessment = findMatchingAssessment(assessments, classSubjectId,
+            ReplacementSkillAssessment matchingAssessment = findMatchingAssessment(filteredAssessments, classSubjectId,
                     classLevelId);
             classMatchInfo = AvailableStudentDTO.ClassMatchInfoDTO.builder()
                     .matchPriority(preComputedMatchPriority)
@@ -619,7 +630,7 @@ public class ClassServiceImpl implements ClassService {
                     .build();
         } else {
             // Legacy calculation method (kept for backward compatibility)
-            ReplacementSkillAssessment matchingAssessment = findMatchingAssessment(assessments, classSubjectId,
+            ReplacementSkillAssessment matchingAssessment = findMatchingAssessment(filteredAssessments, classSubjectId,
                     classLevelId);
             classMatchInfo = calculateClassMatchInfo(matchingAssessment, classSubjectId, classLevelId);
         }
@@ -771,6 +782,16 @@ public class ClassServiceImpl implements ClassService {
                 .id(assessor.getId())
                 .fullName(assessor.getFullName())
                 .build();
+    }
+
+    private List<ReplacementSkillAssessment> filterAllowedAssessments(List<ReplacementSkillAssessment> assessments) {
+        if (assessments == null || assessments.isEmpty()) {
+            return List.of();
+        }
+
+        return assessments.stream()
+                .filter(a -> a.getSkill() != null && ALLOWED_SKILLS.contains(a.getSkill()))
+                .collect(Collectors.toList());
     }
 
     // Create Class Workflow implementations (STEP 0 - Optional, STEP 1, 3, 6, 7)

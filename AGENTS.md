@@ -15,20 +15,62 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Maven wrapper for build management
 - Docker for containerized deployment
 
-## Implementation Plan: Core Principles
+## Implementation Philosophy: Student Capstone Project
 
-**1. Code Quality & Structure:**
-- **Clean Implementation:** Avoid unnecessary code, complexity, and "code smells." Adhere to SOLID, DRY principles.
-- **No Redundancy:** Actively prevent code duplication. Abstract and reuse components, functions, and logic.
-- **Logical Soundness:** Ensure all logic is correct and algorithms are efficient.
+### Project Context
+This is a **student capstone project** (đồ án tốt nghiệp), NOT a high-enterprise production system. The focus is on delivering functional, demonstrable features that serve real user needs within academic scope.
 
-**2. System Integrity & Performance:**
-- **Prevent Race Conditions:** Ensure data integrity in concurrent operations.
-- **Avoid Over-engineering:** Implement what is necessary without speculative features.
+### Core Principles
 
-**3. Development Approach:**
-- **Maintain Holistic View:** Consider overall architecture and impact on the entire system.
-- **Focus on MVP Scope:** Deliver the user story at hand within defined scope. Primary goal is functional, demonstrable features.
+**1. User-Role-Centric Thinking**
+- Always think from the **role's perspective**: "If I am a STUDENT, what do I actually need?", "If I am a QA, what tasks do I need to complete?"
+- Example: A student needs to see their classes, schedule, and grades - NOT complex analytics or AI-powered recommendations.
+- Example: Academic Affairs needs to approve/reject student requests - NOT a multi-level approval workflow with delegation features.
+
+**2. Scope-Appropriate Complexity**
+- ✅ **Build what users actually use**: Core CRUD operations, simple workflows, clear data presentation
+- ❌ **Avoid speculative features**: "What if we need...", "In the future we might...", "Enterprise systems have..."
+- ❌ **Don't over-engineer**: Complex caching strategies, microservices, event-driven architecture, advanced design patterns when simple solutions work
+
+**3. Practical Implementation Guidelines**
+
+**Clean & Simple Code:**
+- Follow SOLID and DRY principles, but don't force design patterns where they add complexity
+- A straightforward service method is better than a complex factory-strategy-observer chain
+- Copy-paste 3 lines of code is sometimes better than premature abstraction
+
+**Real Business Logic:**
+- Understand the actual workflow: How does a student request a makeup class? What does Academic Affairs need to decide?
+- Don't add fields "just in case" - only what's needed NOW for the feature to work
+- Example: Don't build "priority levels" for requests if all requests are treated equally
+
+**Avoid Unnecessary Complexity:**
+- ❌ Don't implement multi-tenant architecture if there's only one center
+- ❌ Don't add message queues if synchronous operations work fine
+- ❌ Don't create 5-layer abstractions if 3 layers (Controller → Service → Repository) suffice
+- ❌ Don't add caching if query performance is already acceptable
+
+**Focus on MVP Delivery:**
+- Each feature should be **demonstrable and functional**
+- Student can log in → see classes → view schedule → submit request (DONE)
+- Don't add: notification preferences, request templates, bulk operations, export to 5 formats
+
+**4. Code Quality ≠ Complexity**
+- **Clean code** means readable, maintainable, correct - NOT necessarily "enterprise-grade"
+- **Best practices** for capstone projects: Clear naming, proper error handling, basic validation, working tests
+- **NOT required**: Perfect abstraction, hexagonal architecture, CQRS, domain-driven design, event sourcing
+
+**5. When in Doubt, Ask:**
+- "Do users (Student/Teacher/QA/Academic Affairs) actually need this?"
+- "Is this solving a real problem or adding 'nice-to-have' complexity?"
+- "Can this be simpler and still meet the requirement?"
+```
+
+### Remember
+- **This is a capstone project to demonstrate learning**, not a production system for 10,000 users
+- **Focus on core features working correctly**, not on scalability for future growth
+- **Deliver working software that can be demo'd**, not perfect architecture for unknown requirements
+- **Think like a user of the system**, not a software architect designing for Google-scale
 
 ## Acknowledging Correct Feedback
 

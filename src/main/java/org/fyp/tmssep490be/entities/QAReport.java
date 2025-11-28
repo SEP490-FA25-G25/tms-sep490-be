@@ -2,20 +2,27 @@ package org.fyp.tmssep490be.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.fyp.tmssep490be.entities.enums.QAReportType;
+import org.fyp.tmssep490be.entities.enums.QAReportStatus;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "qa_report")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@EntityListeners(AuditingEntityListener.class)
 public class QAReport {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -34,21 +41,51 @@ public class QAReport {
     @JoinColumn(name = "reported_by")
     private UserAccount reportedBy;
 
-    @Column(name = "report_type", length = 100)
-    private String reportType;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "report_type", length = 100, nullable = false)
+    private QAReportType reportType;
 
-    @Column(length = 50)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 50, nullable = false)
+    private QAReportStatus status;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "findings", columnDefinition = "TEXT")
     private String findings;
 
-    @Column(name = "action_items", columnDefinition = "TEXT")
-    private String actionItems;
+    @OneToMany(mappedBy = "qaReport", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<ActionItem> actionItems = new HashSet<>();
 
+    // Keep backward compatibility with existing action_items text field
+    @Column(name = "action_items", columnDefinition = "TEXT")
+    private String actionItemsText;
+
+    @CreatedDate
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @LastModifiedDate
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
+
+    // Convenience methods for business logic
+    public boolean isDraft() {
+        return QAReportStatus.DRAFT.equals(status);
+    }
+
+    public boolean isSubmitted() {
+        return QAReportStatus.SUBMITTED.equals(status);
+    }
+
+    public boolean isClassLevelReport() {
+        return session == null && phase == null;
+    }
+
+    public boolean isSessionLevelReport() {
+        return session != null;
+    }
+
+    public boolean isPhaseLevelReport() {
+        return phase != null;
+    }
 }

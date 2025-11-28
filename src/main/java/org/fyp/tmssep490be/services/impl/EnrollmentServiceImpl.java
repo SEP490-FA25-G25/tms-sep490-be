@@ -628,7 +628,8 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             throw new CustomException(ErrorCode.CLASS_NOT_APPROVED);
         }
 
-        if (!classEntity.getStatus().equals(ClassStatus.SCHEDULED)) {
+        if (classEntity.getStatus() != ClassStatus.SCHEDULED
+                && classEntity.getStatus() != ClassStatus.ONGOING) {
             throw new CustomException(ErrorCode.CLASS_INVALID_STATUS);
         }
 

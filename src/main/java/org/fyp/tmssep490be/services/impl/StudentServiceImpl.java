@@ -62,12 +62,9 @@ public class StudentServiceImpl implements StudentService {
                 .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
 
         // Check if current user has access to this branch
-        // For testing purposes, bypass branch access check for mock user ID 1
-        if (currentUserId != 1L) {
-            List<Long> userBranches = getUserAccessibleBranches(currentUserId);
-            if (!userBranches.contains(request.getBranchId())) {
-                throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
-            }
+        List<Long> userBranches = getUserAccessibleBranches(currentUserId);
+        if (!userBranches.contains(request.getBranchId())) {
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
         }
 
         // 3. VALIDATE: Level IDs exist (if skill assessments provided)
@@ -136,13 +133,10 @@ public class StudentServiceImpl implements StudentService {
         userBranch.setBranch(branch);
 
         // Set assignedBy (current academic affair user)
-        // For testing purposes, bypass UserBranches creation for mock user ID 1
-        if (currentUserId != 1L) {
-            UserAccount assignedBy = userAccountRepository.findById(currentUserId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-            userBranch.setAssignedBy(assignedBy);
-            userBranchesRepository.save(userBranch);
-        }
+        UserAccount assignedBy = userAccountRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        userBranch.setAssignedBy(assignedBy);
+        userBranchesRepository.save(userBranch);
         log.debug("Assigned user {} to branch {}", savedUser.getId(), request.getBranchId());
 
         // 8. CREATE SKILL ASSESSMENTS (if provided)
@@ -164,12 +158,10 @@ public class StudentServiceImpl implements StudentService {
                 assessment.setAssessmentType("manual_creation");
                 assessment.setNote(input.getNote());
 
-                // Set assessedBy user - For testing purposes, bypass for mock user ID 1
-                if (currentUserId != 1L) {
-                    UserAccount assessedBy = userAccountRepository.findById(currentUserId)
-                            .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-                    assessment.setAssessedBy(assessedBy);
-                }
+                // Set assessedBy user
+                UserAccount assessedBy = userAccountRepository.findById(currentUserId)
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                assessment.setAssessedBy(assessedBy);
 
                 replacementSkillAssessmentRepository.save(assessment);
                 assessmentsCreated++;
@@ -179,16 +171,8 @@ public class StudentServiceImpl implements StudentService {
         }
 
         // 9. GET CREATOR INFO
-        UserAccount creator;
-        if (currentUserId != 1L) {
-            creator = userAccountRepository.findById(currentUserId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        } else {
-            // For testing with mock user ID 1, create a minimal creator object
-            creator = new UserAccount();
-            creator.setId(currentUserId);
-            creator.setFullName("Mock User");
-        }
+        UserAccount creator = userAccountRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         // 10. BUILD RESPONSE
         CreateStudentResponse response = CreateStudentResponse.builder()

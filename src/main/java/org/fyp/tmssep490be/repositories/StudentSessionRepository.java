@@ -193,9 +193,18 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             @Param("classId") Long classId
     );
 
+    
+    /**
+     * Check if any student session for a session has isMakeup = true
+     * Used to determine if a session is a makeup session
+     */
+    boolean existsBySessionIdAndIsMakeup(Long sessionId, Boolean isMakeup);
+
+    // ========== QA Business Logic Methods ==========
+
     /**
      * Count students by session ID and attendance status
-     * Used for teacher schedule attendance summary
+     * Used for attendance rate calculation
      */
     @Query("SELECT COUNT(ss) FROM StudentSession ss WHERE ss.session.id = :sessionId AND ss.attendanceStatus = :attendanceStatus")
     long countBySessionIdAndAttendanceStatus(
@@ -204,8 +213,91 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
     );
 
     /**
-     * Check if any student session for a session has isMakeup = true
-     * Used to determine if a session is a makeup session
+     * Count students by session ID and homework status
+     * Used for homework completion rate calculation
      */
-    boolean existsBySessionIdAndIsMakeup(Long sessionId, Boolean isMakeup);
+    @Query("SELECT COUNT(ss) FROM StudentSession ss WHERE ss.session.id = :sessionId AND ss.homeworkStatus = :homeworkStatus")
+    long countBySessionIdAndHomeworkStatus(
+            @Param("sessionId") Long sessionId,
+            @Param("homeworkStatus") org.fyp.tmssep490be.entities.enums.HomeworkStatus homeworkStatus
+    );
+
+    /**
+     * Get all student sessions for a class with attendance and homework data
+     * Used for class-level metrics calculation
+     */
+    @Query("SELECT ss FROM StudentSession ss " +
+           "JOIN FETCH ss.session s " +
+           "JOIN FETCH ss.student st " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status != 'CANCELLED'")
+    List<StudentSession> findByClassIdWithSessionAndStudent(@Param("classId") Long classId);
+
+    /**
+     * Get attendance summary for a class
+     * Returns counts by attendance status
+     */
+    @Query("SELECT ss.attendanceStatus, COUNT(ss) FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status = 'DONE' " +
+           "GROUP BY ss.attendanceStatus")
+    List<Object[]> getAttendanceSummaryByClassId(@Param("classId") Long classId);
+
+    /**
+     * Get homework summary for a class
+     * Returns counts by homework status (excluding NO_HOMEWORK)
+     */
+    @Query("SELECT ss.homeworkStatus, COUNT(ss) FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status = 'DONE' " +
+           "AND ss.homeworkStatus IS NOT NULL " +
+           "AND ss.homeworkStatus != 'NO_HOMEWORK' " +
+           "GROUP BY ss.homeworkStatus")
+    List<Object[]> getHomeworkSummaryByClassId(@Param("classId") Long classId);
+
+    /**
+     * Get attendance summary for multiple classes
+     * Used for dashboard KPI calculation
+     */
+    @Query("SELECT s.classEntity.id, ss.attendanceStatus, COUNT(ss) FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE s.classEntity.id IN :classIds " +
+           "AND s.status = 'DONE' " +
+           "GROUP BY s.classEntity.id, ss.attendanceStatus")
+    List<Object[]> getAttendanceSummaryByClassIds(@Param("classIds") List<Long> classIds);
+
+    /**
+     * Get homework summary for multiple classes
+     * Used for dashboard KPI calculation
+     */
+    @Query("SELECT s.classEntity.id, ss.homeworkStatus, COUNT(ss) FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE s.classEntity.id IN :classIds " +
+           "AND s.status = 'DONE' " +
+           "AND ss.homeworkStatus IS NOT NULL " +
+           "AND ss.homeworkStatus != 'NO_HOMEWORK' " +
+           "GROUP BY s.classEntity.id, ss.homeworkStatus")
+    List<Object[]> getHomeworkSummaryByClassIds(@Param("classIds") List<Long> classIds);
+
+    /**
+     * Count total students with attendance data for a class
+     */
+    @Query("SELECT COUNT(DISTINCT ss.student.id) FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status = 'DONE' " +
+           "AND ss.attendanceStatus IN ('PRESENT', 'ABSENT')")
+    long countStudentsWithAttendanceDataByClassId(@Param("classId") Long classId);
+
+    /**
+     * Count total students with homework data for a class
+     */
+    @Query("SELECT COUNT(DISTINCT ss.student.id) FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status = 'DONE' " +
+           "AND ss.homeworkStatus IN ('COMPLETED', 'INCOMPLETE')")
+    long countStudentsWithHomeworkDataByClassId(@Param("classId") Long classId);
 }

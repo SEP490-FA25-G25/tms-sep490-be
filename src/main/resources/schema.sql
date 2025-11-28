@@ -671,7 +671,8 @@ CREATE TABLE student_feedback (
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_student_feedback_student FOREIGN KEY(student_id) REFERENCES student(id) ON DELETE CASCADE,
   CONSTRAINT fk_student_feedback_class FOREIGN KEY(class_id) REFERENCES "class"(id) ON DELETE CASCADE,
-  CONSTRAINT fk_student_feedback_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE SET NULL
+  CONSTRAINT fk_student_feedback_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE SET NULL,
+  CONSTRAINT uq_student_feedback_student_class_phase UNIQUE(student_id, class_id, phase_id)
 );
 
 CREATE TABLE student_feedback_response (
@@ -700,7 +701,9 @@ CREATE TABLE qa_report (
   CONSTRAINT fk_qa_report_class FOREIGN KEY(class_id) REFERENCES "class"(id) ON DELETE CASCADE,
   CONSTRAINT fk_qa_report_session FOREIGN KEY(session_id) REFERENCES session(id) ON DELETE CASCADE,
   CONSTRAINT fk_qa_report_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE SET NULL,
-  CONSTRAINT fk_qa_report_reported_by FOREIGN KEY(reported_by) REFERENCES user_account(id) ON DELETE SET NULL
+  CONSTRAINT fk_qa_report_reported_by FOREIGN KEY(reported_by) REFERENCES user_account(id) ON DELETE SET NULL,
+  CONSTRAINT chk_qa_report_type CHECK (report_type IN ('CLASSROOM_OBSERVATION', 'PHASE_REVIEW', 'CLO_ACHIEVEMENT_ANALYSIS', 'STUDENT_FEEDBACK_ANALYSIS', 'ATTENDANCE_ENGAGEMENT_REVIEW', 'TEACHING_QUALITY_ASSESSMENT')),
+  CONSTRAINT chk_qa_report_status CHECK (status IN ('DRAFT', 'SUBMITTED'))
 );
 
 -- TIER 6: Notifications
