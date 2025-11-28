@@ -145,7 +145,7 @@ tms:
     email:
       from:
         email: ${GMAIL_USERNAME:t03612977@gmail.com}
-        name: ${TMS_FROM_NAME:Hệ thống TMS}
+        name: ${TMS_FROM_NAME:Anh ngữ Pinnacle}
       rate:
         limit: ${GMAIL_RATE_LIMIT:20}  # 20 emails per second for Gmail
         limit-duration: ${GMAIL_RATE_LIMIT_DURATION:1}  # 1 second

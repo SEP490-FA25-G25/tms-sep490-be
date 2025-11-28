@@ -1,5 +1,5 @@
 -- =========================================
--- TMS-SEP490-BE: COMPREHENSIVE SEED DATA FOR TESTING
+-- Anh ngữ Pinnacle - SEP490-BE: COMPREHENSIVE SEED DATA FOR TESTING
 -- =========================================
 -- Author: QA Team
 -- Date: 2025-11-02
