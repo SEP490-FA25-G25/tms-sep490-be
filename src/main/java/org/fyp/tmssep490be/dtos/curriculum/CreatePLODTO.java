@@ -1,5 +1,6 @@
 package org.fyp.tmssep490be.dtos.curriculum;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,14 +10,10 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LevelResponseDTO {
-    private String id;
+public class CreatePLODTO {
+    @NotBlank(message = "PLO code is required")
     private String code;
-    private String name;
+
+    @NotBlank(message = "PLO description is required")
     private String description;
-    private Integer durationHours;
-    private String subjectName;
-    private String subjectCode;
-    private String status;
-    private Integer sortOrder;
 }

@@ -2,11 +2,12 @@ package org.fyp.tmssep490be.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.fyp.tmssep490be.entities.enums.Skill;
-
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import org.hibernate.annotations.Type;
 
 @Entity
 @Table(name = "course_session", uniqueConstraints = {
@@ -17,6 +18,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EntityListeners(org.springframework.data.jpa.domain.support.AuditingEntityListener.class)
 public class CourseSession {
 
     @Id
@@ -36,12 +38,10 @@ public class CourseSession {
     @Column(name = "student_task", columnDefinition = "TEXT")
     private String studentTask;
 
-    @ElementCollection
-    @Enumerated(EnumType.STRING)
-    @CollectionTable(name = "course_session_skills", joinColumns = @JoinColumn(name = "course_session_id"))
-    @Column(name = "skill")
+    @Type(io.hypersistence.utils.hibernate.type.array.ListArrayType.class)
+    @Column(name = "skill_set", columnDefinition = "varchar[]")
     @Builder.Default
-    private Set<Skill> skillSet = new HashSet<>();
+    private List<String> skillSet = new ArrayList<>();
 
     @OneToMany(mappedBy = "courseSession", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -55,9 +55,11 @@ public class CourseSession {
     @Builder.Default
     private Set<Session> sessions = new HashSet<>();
 
+    @org.springframework.data.annotation.CreatedDate
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @org.springframework.data.annotation.LastModifiedDate
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 }

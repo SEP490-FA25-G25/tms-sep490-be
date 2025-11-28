@@ -18,4 +18,7 @@ public class CourseDTO {
     private String name;
     private String code;
     private String status;
+    private String requesterName;
+    private String approvalStatus;
+    private String rejectionReason;
 }

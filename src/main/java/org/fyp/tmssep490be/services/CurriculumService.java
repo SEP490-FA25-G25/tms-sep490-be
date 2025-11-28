@@ -26,4 +26,22 @@ public interface CurriculumService {
     List<LevelResponseDTO> getLevels(Long subjectId);
 
     java.math.BigDecimal getStandardTimeslotDuration();
+
+    SubjectResponseDTO getSubject(Long id);
+
+    SubjectResponseDTO updateSubject(Long id, CreateSubjectDTO request);
+
+    void deactivateSubject(Long id);
+
+    void reactivateSubject(Long id);
+
+    LevelResponseDTO getLevel(Long id);
+
+    LevelResponseDTO updateLevel(Long id, CreateLevelDTO request);
+
+    void deactivateLevel(Long id);
+
+    void reactivateLevel(Long id);
+
+    void updateLevelSortOrder(Long subjectId, java.util.List<Long> levelIds);
 }

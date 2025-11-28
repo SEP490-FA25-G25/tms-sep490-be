@@ -9,13 +9,14 @@ import java.util.Set;
 
 @Entity
 @Table(name = "plo", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_plo_subject_code", columnNames = {"subject_id", "code"})
+        @UniqueConstraint(name = "uq_plo_subject_code", columnNames = { "subject_id", "code" })
 })
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EntityListeners(org.springframework.data.jpa.domain.support.AuditingEntityListener.class)
 public class PLO {
 
     @Id
@@ -36,9 +37,11 @@ public class PLO {
     @Builder.Default
     private Set<PLOCLOMapping> ploCloMappings = new HashSet<>();
 
+    @org.springframework.data.annotation.CreatedDate
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @org.springframework.data.annotation.LastModifiedDate
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 }

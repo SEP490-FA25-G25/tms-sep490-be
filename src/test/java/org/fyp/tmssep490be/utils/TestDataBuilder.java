@@ -12,10 +12,11 @@ import java.time.OffsetDateTime;
  * Provides fluent API for building test data with sensible defaults.
  *
  * Usage:
+ * 
  * <pre>
  * Center center = TestDataBuilder.buildCenter()
- *     .name("Test Center")
- *     .build();
+ *         .name("Test Center")
+ *         .build();
  * </pre>
  */
 public class TestDataBuilder {
@@ -234,8 +235,6 @@ public class TestDataBuilder {
             course.setName("English A1 Course");
             course.setDescription("Beginner English course");
             course.setTotalHours(80);
-            course.setDurationWeeks(10);
-            course.setSessionPerWeek(2);
             course.setHoursPerSession(new BigDecimal("2.00"));
             course.setVersion(1);
             course.setStatus(CourseStatus.DRAFT);

@@ -9,7 +9,7 @@ import org.fyp.tmssep490be.services.MaterialAccessService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
+
 import java.util.List;
 
 @Service
@@ -36,7 +36,8 @@ public class MaterialAccessServiceImpl implements MaterialAccessService {
 
         // Check if student is enrolled in the course
         Enrollment enrollment = enrollmentRepository
-                .findByStudentIdAndCourseIdAndStatus(studentId, material.getCourse().getId(), EnrollmentStatus.ENROLLED);
+                .findByStudentIdAndCourseIdAndStatus(studentId, material.getCourse().getId(),
+                        EnrollmentStatus.ENROLLED);
         if (enrollment == null) {
             log.debug("Student {} not enrolled in course {}", studentId, material.getCourse().getId());
             return false;
@@ -101,7 +102,8 @@ public class MaterialAccessServiceImpl implements MaterialAccessService {
 
         // Check if student is enrolled in the course
         Enrollment enrollment = enrollmentRepository
-                .findByStudentIdAndCourseIdAndStatus(studentId, session.getPhase().getCourse().getId(), EnrollmentStatus.ENROLLED);
+                .findByStudentIdAndCourseIdAndStatus(studentId, session.getPhase().getCourse().getId(),
+                        EnrollmentStatus.ENROLLED);
         if (enrollment == null) {
             return false;
         }
@@ -110,7 +112,8 @@ public class MaterialAccessServiceImpl implements MaterialAccessService {
     }
 
     private boolean isPhaseStarted(Enrollment enrollment, CoursePhase phase) {
-        // A phase is considered started if the class has started and we've reached the phase
+        // A phase is considered started if the class has started and we've reached the
+        // phase
         LocalDate classStartDate = enrollment.getClassEntity().getStartDate();
         if (classStartDate == null) {
             return false;
@@ -128,8 +131,10 @@ public class MaterialAccessServiceImpl implements MaterialAccessService {
         }
 
         // Calculate the theoretical start date of this phase
-        int sessionsPerWeek = enrollment.getClassEntity().getCourse().getSessionPerWeek();
-        int weeksOffset = sessionsBeforePhase.get(0).getSequenceNo() / sessionsPerWeek;
+        // int sessionPerWeek = course.getSessionPerWeek() != null ?
+        // course.getSessionPerWeek() : 3;
+        int sessionPerWeek = 3; // Default or calculate from schedule if needed
+        int weeksOffset = sessionsBeforePhase.get(0).getSequenceNo() / sessionPerWeek;
 
         LocalDate phaseStartDate = classStartDate.plusWeeks(weeksOffset);
         LocalDate today = LocalDate.now();
@@ -147,9 +152,10 @@ public class MaterialAccessServiceImpl implements MaterialAccessService {
             return false;
         }
 
-        // Session is considered completed if student attended or it's marked as completed
+        // Session is considered completed if student attended or it's marked as
+        // completed
         return AttendanceStatus.PRESENT.equals(studentSession.getAttendanceStatus()) ||
-               (studentSession.getAttendanceStatus() != null &&
-                studentSession.getUpdatedAt() != null);
+                (studentSession.getAttendanceStatus() != null &&
+                        studentSession.getUpdatedAt() != null);
     }
 }

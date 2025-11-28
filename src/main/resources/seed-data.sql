@@ -522,11 +522,9 @@ INSERT INTO plo (id, subject_id, code, description, created_at, updated_at) VALU
 (5, 1, 'PLO5', 'Produce coherent, well-structured academic essays and reports', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
 
 -- Course: IELTS Foundation
-INSERT INTO course (id, subject_id, level_id, logical_course_code, version, code, name, description, total_hours, duration_weeks, session_per_week, hours_per_session, prerequisites, target_audience, teaching_methods, score_scale, status, approval_status, decided_by_manager, decided_at, rejection_reason, created_by, created_at, updated_at) VALUES
-(1, 1, 1, 'IELTS-FOUND-2025', 1, 'IELTS-FOUND-2025-V1', 'IELTS Foundation 2025', 'Foundation course for IELTS beginners targeting band 3.0-4.0', 60, 8, 3, 2.5, 'None', 'Beginners', 'Interactive', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-20 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-20 14:00:00+07'),
-(2, 1, 2, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Intermediate course', 75, 10, 3, 2.5, 'IELTS 4.0', 'Intermediate students', 'Advanced drills', '0-9', 'DRAFT', 'PENDING', NULL, NULL, NULL, 5, NOW(), NOW()),
-(3, 1, 3, 'IELTS-ADV-2025', 1, 'IELTS-ADV-2025-V1', 'IELTS Advanced 2025', 'Advanced course', 90, 12, 3, 2.5, 'IELTS 6.0', 'Advanced students', 'Intensive', '0-9', 'DRAFT', 'REJECTED', 2, NOW(), 'Curriculum needs more focus on speaking.', 5, NOW(), NOW());
-
+INSERT INTO course (id, subject_id, level_id, logical_course_code, version, code, name, description, total_hours, hours_per_session, prerequisites, target_audience, teaching_methods, score_scale, status, approval_status, decided_by_manager, decided_at, rejection_reason, created_by, created_at, updated_at) VALUES
+(1, 1, 1, 'IELTS-FOUND-2025', 1, 'IELTS-FOUND-2025-V1', 'IELTS Foundation 2025', 'Khóa học nền tảng cho người mới bắt đầu, mục tiêu band 3.0-4.0', 60, 2.5, 'Không yêu cầu kiến thức nền tảng. Phù hợp cho người mới bắt đầu.', 'Học viên mất gốc hoặc mới bắt đầu học tiếng Anh, mong muốn đạt band 3.0-4.0 IELTS.', 'Phương pháp Communicative Language Teaching (CLT) kết hợp bài tập thực hành tương tác.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-20 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-20 14:00:00+07'),
+(2, 1, 2, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 75, 2.5, 'Đã hoàn thành khóa Foundation hoặc có trình độ tương đương IELTS 4.0.', 'Học viên đã có nền tảng cơ bản, mục tiêu đạt band 5.0-5.5.', 'Tập trung vào kỹ năng làm bài thi, chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'SUBMITTED', 'PENDING', NULL, NULL, NULL, 5, NOW(), NOW());
 -- Course Phases for Foundation
 INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
 (1, 1, 1, 'Foundation Basics', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
@@ -716,6 +714,33 @@ INSERT INTO course_assessment_clo_mapping (course_assessment_id, clo_id, status)
 (4, 4, 'ACTIVE'),
 (5, 1, 'ACTIVE'), (5, 2, 'ACTIVE'), (5, 3, 'ACTIVE'), (5, 4, 'ACTIVE'),
 (6, 1, 'ACTIVE'), (6, 2, 'ACTIVE'), (6, 3, 'ACTIVE'), (6, 4, 'ACTIVE');
+
+-- Course Phases for Intermediate (ID 2)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+(3, 2, 1, 'Intermediate Skills', 5, NOW(), NOW()),
+(4, 2, 2, 'Advanced Practice', 5, NOW(), NOW());
+
+-- Course Sessions for Intermediate (ID 2)
+INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skill_set, created_at, updated_at) VALUES
+(25, 3, 1, 'Complex Sentence Structures', 'Analyze complex sentences', ARRAY['WRITING','READING'], NOW(), NOW()),
+(26, 3, 2, 'Advanced Listening Strategies', 'Listen for specific details', ARRAY['LISTENING'], NOW(), NOW()),
+(27, 4, 1, 'Speaking Part 2 & 3', 'Long turn speaking practice', ARRAY['SPEAKING'], NOW(), NOW()),
+(28, 4, 2, 'Essay Writing Task 2', 'Write an argumentative essay', ARRAY['WRITING'], NOW(), NOW());
+
+-- CLOs for Intermediate (ID 2)
+INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
+(5, 2, 'CLO1', 'Apply complex grammar structures in writing and speaking', NOW(), NOW()),
+(6, 2, 'CLO2', 'Analyze and synthesize information from academic texts', NOW(), NOW());
+
+-- Course Assessments for Intermediate (ID 2)
+INSERT INTO course_assessment (id, course_id, name, kind, duration_minutes, max_score, skills, created_at, updated_at) VALUES
+(7, 2, 'Writing Task 2 Assignment', 'ASSIGNMENT', 60, 100, ARRAY['WRITING'], NOW(), NOW()),
+(8, 2, 'Full Mock Test', 'FINAL', 180, 100, ARRAY['LISTENING','READING','WRITING','SPEAKING'], NOW(), NOW());
+
+-- Course Materials for Intermediate (ID 2)
+INSERT INTO course_material (course_id, phase_id, course_session_id, title, description, material_type, url, uploaded_by) VALUES
+(2, NULL, NULL, 'IELTS Intermediate Syllabus', 'Course syllabus', 'PDF', '/materials/courses/2/syllabus.pdf', 5),
+(2, 3, 25, 'Complex Grammar Guide', 'Guide to complex sentences', 'PDF', '/materials/sessions/25/grammar.pdf', 5);
 
 -- ========== TIER 4: CLASSES & SESSIONS ==========
 

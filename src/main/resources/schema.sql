@@ -247,10 +247,12 @@ CREATE TABLE level (
   expected_duration_hours INTEGER, -- ví dụ: 80 giờ cho HSK1, 100 giờ cho HSK2, ...
   sort_order INTEGER, -- sắp xếp theo thứ tự để hiển thị trong UI (ví dụ: A1, A2, B1, B2, ...)
   description TEXT, -- ví dụ: "Beginner (A1)", "Intermediate (B1)", "Advanced (C1)", ...
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_level_subject FOREIGN KEY(subject_id) REFERENCES subject(id) ON DELETE CASCADE,
-  CONSTRAINT uq_level_subject_code UNIQUE(subject_id,code)
+  CONSTRAINT uq_level_subject_code UNIQUE(subject_id,code),
+  CONSTRAINT chk_level_status CHECK (status IN ('ACTIVE', 'INACTIVE'))
 );
 
 CREATE TABLE replacement_skill_assessment (
@@ -286,8 +288,8 @@ CREATE TABLE course (
   description TEXT,
   score_scale VARCHAR(100), -- ví dụ: IELTS: 0-9, TOEFL: 0-120, HSK: 0-600, etc.
   total_hours INTEGER, -- ví dụ: 120 hours cho HSK3
-  duration_weeks INTEGER, -- ví dụ: 4 tuần cho HSK3
-  session_per_week INTEGER, -- ví dụ: 3 session/week cho HSK3
+
+  number_of_sessions INTEGER, -- tổng số buổi học
   hours_per_session DECIMAL(5,2), -- ví dụ: 2.5 hours/session cho HSK3
   prerequisites TEXT,-- ví dụ: HSK2 or equivalent
   target_audience TEXT,-- ví dụ: learners targeting HSK3 certification
@@ -309,7 +311,7 @@ CREATE TABLE course (
   CONSTRAINT fk_course_level FOREIGN KEY(level_id) REFERENCES level(id) ON DELETE SET NULL,
   CONSTRAINT fk_course_decided_by_manager FOREIGN KEY(decided_by_manager) REFERENCES user_account(id) ON DELETE SET NULL,
   CONSTRAINT fk_course_created_by FOREIGN KEY(created_by) REFERENCES user_account(id) ON DELETE SET NULL,
-  CONSTRAINT chk_course_status CHECK (status IN ('DRAFT', 'ACTIVE', 'INACTIVE')),
+  CONSTRAINT chk_course_status CHECK (status IN ('DRAFT', 'SUBMITTED', 'ACTIVE', 'INACTIVE')),
   CONSTRAINT chk_course_approval_status CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED'))
 );
 
@@ -318,6 +320,7 @@ CREATE TABLE course_phase (
   course_id BIGINT NOT NULL,
   phase_number INTEGER NOT NULL, -- ví dụ: Phase 1, Phase 2, Phase 3, ...
   name VARCHAR(255),
+  description TEXT,
   duration_weeks INTEGER,
   learning_focus TEXT, -- kiểu description
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -335,7 +338,8 @@ CREATE TABLE course_session (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_course_session_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE CASCADE,
-  CONSTRAINT uq_course_session_phase_sequence UNIQUE(phase_id,sequence_no)
+  CONSTRAINT uq_course_session_phase_sequence UNIQUE(phase_id,sequence_no),
+  CONSTRAINT chk_course_session_skill_set CHECK (skill_set <@ ARRAY['GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI']::varchar[])
 );
 
 -- Bảng mapping cho skills của course_session (JPA @ElementCollection)
@@ -355,7 +359,7 @@ CREATE TABLE course_material (
   title VARCHAR(500) NOT NULL, -- tiêu đề tài liệu
   description TEXT,
   material_type VARCHAR(20) NOT NULL, -- loại tài liệu: video, pdf, slide, audio, document, other
-  url VARCHAR(1000) NOT NULL, -- link đến tài liệu (có thể là link nội bộ hoặc link bên ngoài)
+  url TEXT NOT NULL, -- link đến tài liệu (có thể là link nội bộ hoặc link bên ngoài)
   uploaded_by BIGINT, -- người upload tài liệu
   uploaded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -364,7 +368,7 @@ CREATE TABLE course_material (
   CONSTRAINT fk_course_material_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE CASCADE,
   CONSTRAINT fk_course_material_session FOREIGN KEY(course_session_id) REFERENCES course_session(id) ON DELETE CASCADE,
   CONSTRAINT fk_course_material_uploaded_by FOREIGN KEY(uploaded_by) REFERENCES user_account(id) ON DELETE SET NULL,
-  CONSTRAINT chk_material_type CHECK (material_type IN ('VIDEO', 'PDF', 'SLIDE', 'AUDIO', 'DOCUMENT', 'OTHER'))
+  CONSTRAINT chk_material_type CHECK (material_type IN ('DOCUMENT', 'MEDIA', 'ARCHIVE', 'LINK', 'OTHER'))
 );
 
 CREATE TABLE plo (
@@ -422,7 +426,7 @@ CREATE TABLE course_assessment (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_course_assessment_course FOREIGN KEY(course_id) REFERENCES course(id) ON DELETE CASCADE,
-  CONSTRAINT chk_assessment_kind CHECK (kind IN ('QUIZ', 'MIDTERM', 'FINAL', 'ASSIGNMENT', 'PROJECT', 'ORAL', 'PRACTICE', 'OTHER'))
+  CONSTRAINT chk_assessment_kind CHECK (kind IN ('QUIZ', 'MIDTERM', 'FINAL', 'MOCK_TEST', 'PHASE_TEST', 'ORAL', 'PRACTICE', 'OTHER', 'PLACEMENT_TEST', 'HOMEWORK'))
 );
 
 CREATE TABLE course_assessment_clo_mapping (

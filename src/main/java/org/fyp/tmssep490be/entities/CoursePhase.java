@@ -8,13 +8,14 @@ import java.util.Set;
 
 @Entity
 @Table(name = "course_phase", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_course_phase_course_number", columnNames = {"course_id", "phase_number"})
+        @UniqueConstraint(name = "uq_course_phase_course_number", columnNames = { "course_id", "phase_number" })
 })
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EntityListeners(org.springframework.data.jpa.domain.support.AuditingEntityListener.class)
 public class CoursePhase {
 
     @Id
@@ -37,6 +38,9 @@ public class CoursePhase {
     @Column(name = "learning_focus", columnDefinition = "TEXT")
     private String learningFocus;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @OneToMany(mappedBy = "phase", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private Set<CourseSession> courseSessions = new HashSet<>();
@@ -53,9 +57,11 @@ public class CoursePhase {
     @Builder.Default
     private Set<QAReport> qaReports = new HashSet<>();
 
+    @org.springframework.data.annotation.CreatedDate
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @org.springframework.data.annotation.LastModifiedDate
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 }

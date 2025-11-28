@@ -5,6 +5,7 @@ import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.fyp.tmssep490be.entities.enums.LevelStatus;
 
 import java.time.OffsetDateTime;
 import java.util.HashSet;
@@ -44,6 +45,11 @@ public class Level {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private LevelStatus status = LevelStatus.ACTIVE;
 
     @OneToMany(mappedBy = "level", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

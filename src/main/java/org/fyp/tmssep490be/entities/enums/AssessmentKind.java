@@ -4,9 +4,11 @@ public enum AssessmentKind {
     QUIZ,
     MIDTERM,
     FINAL,
-    ASSIGNMENT,
-    PROJECT,
+    MOCK_TEST,
+    PHASE_TEST,
     ORAL,
     PRACTICE,
-    OTHER
+    OTHER,
+    PLACEMENT_TEST,
+    HOMEWORK
 }

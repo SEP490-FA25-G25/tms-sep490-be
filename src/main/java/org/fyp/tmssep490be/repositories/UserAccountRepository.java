@@ -16,141 +16,142 @@ import java.util.Optional;
 
 @Repository
 public interface UserAccountRepository extends JpaRepository<UserAccount, Long> {
-    
-    /**
-     * Count users by status
-     */
-    long countByStatus(UserStatus status);
-    
-    /**
-     * Count users created between two dates
-     */
-    long countByCreatedAtBetween(OffsetDateTime start, OffsetDateTime end);
-    
-    /**
-     * Count students that have STUDENT role
-     * Chỉ đếm những user có cả role STUDENT và profile student
-     */
-    @Query("SELECT COUNT(DISTINCT u.id) FROM UserAccount u " +
-           "INNER JOIN u.userRoles ur " +
-           "INNER JOIN ur.role r " +
-           "INNER JOIN u.student s " +
-           "WHERE r.code = 'STUDENT'")
-    long countStudentsWithRole();
-    
-    /**
-     * Count teachers that have TEACHER role
-     * Chỉ đếm những user có cả role TEACHER và profile teacher
-     */
-    @Query("SELECT COUNT(DISTINCT u.id) FROM UserAccount u " +
-           "INNER JOIN u.userRoles ur " +
-           "INNER JOIN ur.role r " +
-           "INNER JOIN u.teacher t " +
-           "WHERE r.code = 'TEACHER'")
-    long countTeachersWithRole();
 
-    /**
-     * Find user account by email (email is used for login)
-     * Eagerly fetch userRoles and their associated roles for authentication
-     */
-    @EntityGraph(attributePaths = {"userRoles", "userRoles.role"})
-    Optional<UserAccount> findByEmail(String email);
+       /**
+        * Count users by status
+        */
+       long countByStatus(UserStatus status);
 
-    /**
-     * Check if email exists
-     */
-    boolean existsByEmail(String email);
+       /**
+        * Count users created between two dates
+        */
+       long countByCreatedAtBetween(OffsetDateTime start, OffsetDateTime end);
 
-    /**
-     * Find user account by ID with roles eagerly fetched
-     * Override default findById to include roles for token refresh
-     */
-    @EntityGraph(attributePaths = {"userRoles", "userRoles.role"})
-    Optional<UserAccount> findById(Long id);
+       /**
+        * Count students that have STUDENT role
+        * Chỉ đếm những user có cả role STUDENT và profile student
+        */
+       @Query("SELECT COUNT(DISTINCT u.id) FROM UserAccount u " +
+                     "INNER JOIN u.userRoles ur " +
+                     "INNER JOIN ur.role r " +
+                     "INNER JOIN u.student s " +
+                     "WHERE r.code = 'STUDENT'")
+       long countStudentsWithRole();
 
-    /**
-     * Find all users with a specific role in given branches
-     * Used for AA staff listing in request filters
-     */
-    @Query("SELECT DISTINCT u FROM UserAccount u " +
-           "JOIN u.userRoles ur " +
-           "JOIN u.userBranches ub " +
-           "WHERE ur.role.code = :roleCode " +
-           "AND ub.branch.id IN :branchIds")
-    List<UserAccount> findByRoleCodeAndBranches(
-            @Param("roleCode") String roleCode,
-            @Param("branchIds") List<Long> branchIds);
+       /**
+        * Count teachers that have TEACHER role
+        * Chỉ đếm những user có cả role TEACHER và profile teacher
+        */
+       @Query("SELECT COUNT(DISTINCT u.id) FROM UserAccount u " +
+                     "INNER JOIN u.userRoles ur " +
+                     "INNER JOIN ur.role r " +
+                     "INNER JOIN u.teacher t " +
+                     "WHERE r.code = 'TEACHER'")
+       long countTeachersWithRole();
 
-    // ============== SCHEDULER JOB METHODS ==============
+       /**
+        * Find user account by email (email is used for login)
+        * Eagerly fetch userRoles and their associated roles for authentication
+        */
+       @EntityGraph(attributePaths = { "userRoles", "userRoles.role" })
+       Optional<UserAccount> findByEmail(String email);
 
-    /**
-     * Find all users with specific role (no branch filtering)
-     * Used by scheduler jobs to send notifications to specific user roles
-     */
-    @Query("SELECT u FROM UserAccount u JOIN u.userRoles ur WHERE ur.role.code = :roleCode")
-    List<UserAccount> findUsersByRole(@Param("roleCode") String roleCode);
+       /**
+        * Check if email exists
+        */
+       boolean existsByEmail(String email);
 
-    // ============== PASSWORD RESET METHODS ==============
+       /**
+        * Find user account by ID with roles eagerly fetched
+        * Override default findById to include roles for token refresh
+        */
+       @EntityGraph(attributePaths = { "userRoles", "userRoles.role" })
+       Optional<UserAccount> findById(Long id);
 
-    /**
-     * Find active user by email for password reset
-     * Only returns users with ACTIVE status
-     */
-    Optional<UserAccount> findActiveUserByEmail(String email);
+       // ============== SCHEDULER JOB METHODS ==============
 
-    /**
-     * Update password hash by user ID
-     * Used for password reset functionality
-     */
-    @Modifying
-    @Transactional
-    @Query("UPDATE UserAccount u SET u.passwordHash = :passwordHash WHERE u.id = :userId")
-    int updatePasswordById(@Param("userId") Long userId, @Param("passwordHash") String passwordHash);
+       /**
+        * Find all users with specific role (no branch filtering)
+        * Used by scheduler jobs to send notifications to specific user roles
+        */
+       @Query("SELECT u FROM UserAccount u JOIN u.userRoles ur WHERE ur.role.code = :roleCode")
+       List<UserAccount> findUsersByRole(@Param("roleCode") String roleCode);
 
-    /**
-     * Find all users with roles and branches eagerly fetched
-     * Used for admin user management listing
-     * Override default findAll to include roles and branches
-     */
-    @Override
-    @EntityGraph(attributePaths = {"userRoles", "userRoles.role", "userBranches", "userBranches.branch"})
-    org.springframework.data.domain.Page<UserAccount> findAll(org.springframework.data.domain.Pageable pageable);
+       // ============== PASSWORD RESET METHODS ==============
 
-    /**
-     * Find all users with filtering support
-     * Supports search by email, fullName, phone and filtering by role and status
-     */
-    @EntityGraph(attributePaths = {"userRoles", "userRoles.role", "userBranches", "userBranches.branch"})
-    @Query("SELECT DISTINCT u FROM UserAccount u " +
-           "LEFT JOIN u.userRoles ur " +
-           "LEFT JOIN u.userBranches ub " +
-           "WHERE (:search IS NULL OR :search = '' OR " +
-           "       LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "       LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "       (u.phone IS NOT NULL AND LOWER(u.phone) LIKE LOWER(CONCAT('%', :search, '%')))) " +
-           "AND (:role IS NULL OR :role = '' OR ur.role.code = :role) " +
-           "AND (:statusEnum IS NULL OR u.status = :statusEnum)")
-    org.springframework.data.domain.Page<UserAccount> findAllWithFilters(
-            @Param("search") String search,
-            @Param("role") String role,
-            @Param("statusEnum") UserStatus statusEnum,
-            org.springframework.data.domain.Pageable pageable);
+       /**
+        * Find active user by email for password reset
+        * Only returns users with ACTIVE status
+        */
+       Optional<UserAccount> findActiveUserByEmail(String email);
 
-    /**
-     * Count active users in specific branches
-     */
-    @Query("SELECT COUNT(DISTINCT u) FROM UserAccount u " +
-           "INNER JOIN u.userBranches ub " +
-           "WHERE ub.branch.id IN :branchIds " +
-           "AND u.status = org.fyp.tmssep490be.entities.enums.UserStatus.ACTIVE")
-    long countActiveUsersInBranches(@Param("branchIds") List<Long> branchIds);
+       /**
+        * Update password hash by user ID
+        * Used for password reset functionality
+        */
+       @Modifying
+       @Transactional
+       @Query("UPDATE UserAccount u SET u.passwordHash = :passwordHash WHERE u.id = :userId")
+       int updatePasswordById(@Param("userId") Long userId, @Param("passwordHash") String passwordHash);
 
-    /**
-     * Count inactive users in specific branches
-     */
-    @Query("SELECT COUNT(DISTINCT u) FROM UserAccount u " +
-           "INNER JOIN u.userBranches ub " +
-           "WHERE ub.branch.id IN :branchIds " +
-           "AND u.status = org.fyp.tmssep490be.entities.enums.UserStatus.INACTIVE")
-    long countInactiveUsersInBranches(@Param("branchIds") List<Long> branchIds);
+       /**
+        * Find all users with roles and branches eagerly fetched
+        * Used for admin user management listing
+        * Override default findAll to include roles and branches
+        */
+       @Override
+       @EntityGraph(attributePaths = { "userRoles", "userRoles.role", "userBranches", "userBranches.branch" })
+       org.springframework.data.domain.Page<UserAccount> findAll(org.springframework.data.domain.Pageable pageable);
+
+       /**
+        * Find all users with filtering support
+        * Supports search by email, fullName, phone and filtering by role and status
+        */
+       @EntityGraph(attributePaths = { "userRoles", "userRoles.role", "userBranches", "userBranches.branch" })
+       @Query("SELECT DISTINCT u FROM UserAccount u " +
+                     "LEFT JOIN u.userRoles ur " +
+                     "LEFT JOIN u.userBranches ub " +
+                     "WHERE (:search IS NULL OR :search = '' OR " +
+                     "       LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                     "       LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                     "       (u.phone IS NOT NULL AND LOWER(u.phone) LIKE LOWER(CONCAT('%', :search, '%')))) " +
+                     "AND (:role IS NULL OR :role = '' OR ur.role.code = :role) " +
+                     "AND (:statusEnum IS NULL OR u.status = :statusEnum)")
+       org.springframework.data.domain.Page<UserAccount> findAllWithFilters(
+                     @Param("search") String search,
+                     @Param("role") String role,
+                     @Param("statusEnum") UserStatus statusEnum,
+                     org.springframework.data.domain.Pageable pageable);
+
+       /**
+        * Count active users in specific branches
+        */
+       @Query("SELECT COUNT(DISTINCT u) FROM UserAccount u " +
+                     "INNER JOIN u.userBranches ub " +
+                     "WHERE ub.branch.id IN :branchIds " +
+                     "AND u.status = org.fyp.tmssep490be.entities.enums.UserStatus.ACTIVE")
+       long countActiveUsersInBranches(@Param("branchIds") List<Long> branchIds);
+
+       /**
+        * Count inactive users in specific branches
+        */
+       @Query("SELECT COUNT(DISTINCT u) FROM UserAccount u " +
+                     "INNER JOIN u.userBranches ub " +
+                     "WHERE ub.branch.id IN :branchIds " +
+                     "AND u.status = org.fyp.tmssep490be.entities.enums.UserStatus.INACTIVE")
+       long countInactiveUsersInBranches(@Param("branchIds") List<Long> branchIds);
+
+       /**
+        * Find all users with a specific role in given branches
+        * Used for AA staff listing in request filters
+        */
+       @Query("SELECT DISTINCT u FROM UserAccount u " +
+                     "JOIN u.userRoles ur " +
+                     "JOIN u.userBranches ub " +
+                     "WHERE ur.role.code = :roleCode " +
+                     "AND ub.branch.id IN :branchIds")
+       List<UserAccount> findByRoleCodeAndBranches(
+                     @Param("roleCode") String roleCode,
+                     @Param("branchIds") List<Long> branchIds);
+
 }

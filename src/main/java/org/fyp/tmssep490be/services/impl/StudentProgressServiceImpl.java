@@ -14,7 +14,7 @@ import java.util.Optional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -60,19 +60,16 @@ public class StudentProgressServiceImpl implements StudentProgressService {
         // Get completed sessions for the student
         List<StudentSession> studentSessions = studentSessionRepository.findByStudentIdAndClassId(
                 enrollment.getStudentId(),
-                enrollment.getClassId()
-        );
+                enrollment.getClassId());
         long completedSessions = studentSessions.stream()
                 .filter(ss -> AttendanceStatus.PRESENT.equals(ss.getAttendanceStatus()))
                 .count();
 
         // Calculate attendance rate
-        double attendanceRate = totalSessions > 0 ?
-                (double) completedSessions / totalSessions * 100 : 0.0;
+        double attendanceRate = totalSessions > 0 ? (double) completedSessions / totalSessions * 100 : 0.0;
 
         // Calculate progress percentage
-        double progressPercentage = totalSessions > 0 ?
-                (double) completedSessions / totalSessions * 100 : 0.0;
+        double progressPercentage = totalSessions > 0 ? (double) completedSessions / totalSessions * 100 : 0.0;
 
         // Get materials information
         List<CourseMaterial> allMaterials = courseMaterialRepository.findByCourseId(courseId);
@@ -152,10 +149,9 @@ public class StudentProgressServiceImpl implements StudentProgressService {
     private boolean isSessionAccessible(Long studentId, CourseSession session) {
         Enrollment enrollment = enrollmentRepository
                 .findByStudentIdAndCourseIdAndStatus(
-                    studentId,
-                    session.getPhase().getCourse().getId(),
-                    EnrollmentStatus.ENROLLED
-                );
+                        studentId,
+                        session.getPhase().getCourse().getId(),
+                        EnrollmentStatus.ENROLLED);
 
         if (enrollment == null) {
             return false;
@@ -165,7 +161,7 @@ public class StudentProgressServiceImpl implements StudentProgressService {
                 .findByStudentIdAndCourseSessionId(enrollment.getStudentId(), session.getId());
 
         return studentSession.isPresent() &&
-            AttendanceStatus.PRESENT.equals(studentSession.get().getAttendanceStatus());
+                AttendanceStatus.PRESENT.equals(studentSession.get().getAttendanceStatus());
     }
 
     private List<CLOProgressDTO> calculateCLOProgress(Enrollment enrollment, List<CourseSession> sessions) {
@@ -173,11 +169,12 @@ public class StudentProgressServiceImpl implements StudentProgressService {
 
         return clos.stream()
                 .map(clo -> {
-                    List<CourseAssessment> assessments = courseAssessmentRepository.findByCourseId(enrollment.getClassEntity().getCourse().getId())
+                    List<CourseAssessment> assessments = courseAssessmentRepository
+                            .findByCourseId(enrollment.getClassEntity().getCourse().getId())
                             .stream()
                             .filter(assessment -> assessment.getCourseAssessmentCLOMappings().stream()
-                                .map(mapping -> mapping.getClo())
-                                .anyMatch(mappedClo -> mappedClo.getId().equals(clo.getId())))
+                                    .map(mapping -> mapping.getClo())
+                                    .anyMatch(mappedClo -> mappedClo.getId().equals(clo.getId())))
                             .collect(Collectors.toList());
 
                     int totalAssessments = assessments.size();
@@ -186,7 +183,8 @@ public class StudentProgressServiceImpl implements StudentProgressService {
                     double totalMaxScore = 0.0;
 
                     for (CourseAssessment assessment : assessments) {
-                        Score score = scoreRepository.findByEnrollmentAndAssessment(enrollment.getStudentId(), assessment.getId())
+                        Score score = scoreRepository
+                                .findByEnrollmentAndAssessment(enrollment.getStudentId(), assessment.getId())
                                 .orElse(null);
 
                         if (score != null && score.getScore() != null) {
@@ -196,11 +194,11 @@ public class StudentProgressServiceImpl implements StudentProgressService {
                         }
                     }
 
-                    double averageScore = totalMaxScore > 0 ?
-                            (totalScore / totalMaxScore) * 100 : 0.0;
+                    double averageScore = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0.0;
 
-                    double achievementRate = totalAssessments > 0 ?
-                            (double) completedAssessments / totalAssessments * 100 : 0.0;
+                    double achievementRate = totalAssessments > 0
+                            ? (double) completedAssessments / totalAssessments * 100
+                            : 0.0;
 
                     boolean isAchieved = achievementRate >= 70.0 && averageScore >= 70.0;
 
@@ -219,17 +217,20 @@ public class StudentProgressServiceImpl implements StudentProgressService {
     }
 
     private List<AssessmentProgressDTO> calculateAssessmentProgress(Enrollment enrollment) {
-        List<CourseAssessment> assessments = courseAssessmentRepository.findByCourseId(enrollment.getClassEntity().getCourse().getId());
+        List<CourseAssessment> assessments = courseAssessmentRepository
+                .findByCourseId(enrollment.getClassEntity().getCourse().getId());
 
         return assessments.stream()
                 .map(assessment -> {
-                    Score score = scoreRepository.findByEnrollmentAndAssessment(enrollment.getStudentId(), assessment.getId())
+                    Score score = scoreRepository
+                            .findByEnrollmentAndAssessment(enrollment.getStudentId(), assessment.getId())
                             .orElse(null);
 
                     boolean isCompleted = score != null && score.getScore() != null;
                     BigDecimal achievedScore = isCompleted ? score.getScore() : BigDecimal.ZERO;
-                    double percentageScore = assessment.getMaxScore().doubleValue() > 0 ?
-                            achievedScore.doubleValue() / assessment.getMaxScore().doubleValue() * 100 : 0.0;
+                    double percentageScore = assessment.getMaxScore().doubleValue() > 0
+                            ? achievedScore.doubleValue() / assessment.getMaxScore().doubleValue() * 100
+                            : 0.0;
 
                     return AssessmentProgressDTO.builder()
                             .assessmentId(assessment.getId())
@@ -239,8 +240,8 @@ public class StudentProgressServiceImpl implements StudentProgressService {
                             .maxScore(assessment.getMaxScore())
                             .achievedScore(achievedScore)
                             .isCompleted(isCompleted)
-                            .completedAt(score != null && score.getUpdatedAt() != null ?
-                                    score.getUpdatedAt().toString() : null)
+                            .completedAt(score != null && score.getUpdatedAt() != null ? score.getUpdatedAt().toString()
+                                    : null)
                             .percentageScore(round(percentageScore, 1))
                             .build();
                 })
@@ -250,8 +251,7 @@ public class StudentProgressServiceImpl implements StudentProgressService {
     private String determineCurrentPhase(Enrollment enrollment, List<CourseSession> sessions) {
         List<StudentSession> completedSessions = studentSessionRepository.findByStudentIdAndClassId(
                 enrollment.getStudentId(),
-                enrollment.getClassId()
-        )
+                enrollment.getClassId())
                 .stream()
                 .filter(ss -> AttendanceStatus.PRESENT.equals(ss.getAttendanceStatus()))
                 .collect(Collectors.toList());
@@ -281,8 +281,7 @@ public class StudentProgressServiceImpl implements StudentProgressService {
     private String determineNextSession(Enrollment enrollment, List<CourseSession> sessions) {
         List<StudentSession> completedSessions = studentSessionRepository.findByStudentIdAndClassId(
                 enrollment.getStudentId(),
-                enrollment.getClassId()
-        )
+                enrollment.getClassId())
                 .stream()
                 .filter(ss -> AttendanceStatus.PRESENT.equals(ss.getAttendanceStatus()))
                 .collect(Collectors.toList());
@@ -315,7 +314,9 @@ public class StudentProgressServiceImpl implements StudentProgressService {
             return null;
         }
 
-        int sessionsPerWeek = enrollment.getClassEntity().getCourse().getSessionPerWeek();
+        // int sessionsPerWeek =
+        // enrollment.getClassEntity().getCourse().getSessionPerWeek();
+        int sessionsPerWeek = 3; // Default or calculate from schedule
         if (sessionsPerWeek <= 0) {
             return null;
         }

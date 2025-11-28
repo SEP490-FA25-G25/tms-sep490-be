@@ -18,4 +18,6 @@ public class CreateSubjectDTO {
     private String name;
 
     private String description;
+
+    private java.util.List<CreatePLODTO> plos;
 }

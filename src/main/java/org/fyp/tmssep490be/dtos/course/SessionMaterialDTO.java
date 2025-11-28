@@ -16,5 +16,6 @@ public class SessionMaterialDTO {
     private Integer sequenceNo;
     private String topic;
     private List<CourseMaterialDTO> materials;
+    private List<String> skillSet;
     private Integer totalMaterials;
 }

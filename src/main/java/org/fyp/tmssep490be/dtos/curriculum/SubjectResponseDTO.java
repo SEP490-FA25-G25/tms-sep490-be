@@ -17,4 +17,6 @@ public class SubjectResponseDTO {
     private int levelCount;
     private String status;
     private String createdAt;
+    private java.util.List<CreatePLODTO> plos;
+    private java.util.List<LevelResponseDTO> levels;
 }

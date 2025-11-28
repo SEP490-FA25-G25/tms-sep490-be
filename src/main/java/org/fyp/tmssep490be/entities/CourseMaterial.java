@@ -13,6 +13,7 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EntityListeners(org.springframework.data.jpa.domain.support.AuditingEntityListener.class)
 public class CourseMaterial {
 
     @Id
@@ -48,9 +49,11 @@ public class CourseMaterial {
     @JoinColumn(name = "uploaded_by")
     private UserAccount uploadedBy;
 
+    @org.springframework.data.annotation.CreatedDate
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @org.springframework.data.annotation.LastModifiedDate
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 }

@@ -17,6 +17,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EntityListeners(org.springframework.data.jpa.domain.support.AuditingEntityListener.class)
 public class CourseAssessment {
 
     @Id
@@ -40,14 +41,10 @@ public class CourseAssessment {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @ElementCollection
-    @Enumerated(EnumType.STRING)
-    @CollectionTable(
-        name = "course_assessment_skills",
-        joinColumns = @JoinColumn(name = "course_assessment_id")
-    )
-    @Column(name = "skill")
-    private Set<Skill> skills;
+    @org.hibernate.annotations.Type(io.hypersistence.utils.hibernate.type.array.ListArrayType.class)
+    @Column(name = "skills", columnDefinition = "varchar[]", nullable = false)
+    @Builder.Default
+    private java.util.List<String> skills = new java.util.ArrayList<>();
 
     @Column(name = "max_score", nullable = false, precision = 5, scale = 2)
     private BigDecimal maxScore;
@@ -63,9 +60,11 @@ public class CourseAssessment {
     @Builder.Default
     private Set<Assessment> assessments = new HashSet<>();
 
+    @org.springframework.data.annotation.CreatedDate
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @org.springframework.data.annotation.LastModifiedDate
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 }

@@ -25,13 +25,14 @@ public class CourseDetailDTO {
     private CourseStructureDTO structure;
 
     // Main fields (Student/Viewer view)
+    private Long subjectId;
     private String subjectName;
+    private Long levelId;
     private String levelName;
     private String logicalCourseCode;
     private Integer version;
     private Integer totalHours;
-    private Integer durationWeeks;
-    private Integer sessionPerWeek;
+
     private BigDecimal hoursPerSession;
     private String scoreScale;
     private String prerequisites;

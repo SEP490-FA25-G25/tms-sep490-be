@@ -57,11 +57,8 @@ public class Course {
     @Column(name = "total_hours")
     private Integer totalHours;
 
-    @Column(name = "duration_weeks")
-    private Integer durationWeeks;
-
-    @Column(name = "session_per_week")
-    private Integer sessionPerWeek;
+    @Column(name = "number_of_sessions")
+    private Integer numberOfSessions;
 
     @Column(name = "hours_per_session", precision = 5, scale = 2)
     private BigDecimal hoursPerSession;
