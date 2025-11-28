@@ -261,6 +261,18 @@ public class QAReportServiceImpl implements QAReportService {
         QAReportType reportType = request.getReportType();
         QAReportStatus status = request.getStatus();
 
+        // FIXED: Validate reportType change against current sessionId/phaseId
+        if (!report.getReportType().equals(reportType)) {
+            Long currentSessionId = report.getSession() != null ? report.getSession().getId() : null;
+            Long currentPhaseId = report.getPhase() != null ? report.getPhase().getId() : null;
+
+            log.info("Report type change detected: {} -> {}. Validating against sessionId={}, phaseId={}",
+                    report.getReportType(), reportType, currentSessionId, currentPhaseId);
+
+            // Re-validate the new reportType against existing context
+            validateReportTypeAndLevel(reportType, currentSessionId, currentPhaseId);
+        }
+
         report.setReportType(reportType);  // Direct enum assignment
         report.setFindings(request.getFindings());
         report.setActionItemsText(request.getActionItems());

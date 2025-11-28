@@ -64,5 +64,17 @@ public interface QAReportRepository extends JpaRepository<QAReport, Long> {
                                           @Param("endDate") OffsetDateTime endDate,
                                           Pageable pageable);
 
+    @Query("SELECT qar FROM QAReport qar " +
+           "LEFT JOIN FETCH qar.classEntity c " +
+           "LEFT JOIN FETCH qar.session " +
+           "LEFT JOIN FETCH qar.reportedBy " +
+           "WHERE qar.createdAt BETWEEN :startDate AND :endDate " +
+           "AND (:branchIds IS NULL OR c.branch.id IN :branchIds) " +
+           "ORDER BY qar.createdAt DESC")
+    List<QAReport> findReportsByDateRangeAndBranches(@Param("startDate") OffsetDateTime startDate,
+                                                      @Param("endDate") OffsetDateTime endDate,
+                                                      @Param("branchIds") List<Long> branchIds,
+                                                      Pageable pageable);
+
     List<QAReport> findByClassEntityId(Long classId);
 }

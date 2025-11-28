@@ -288,7 +288,13 @@ public class QAServiceImpl implements QAService {
             isDefaultRange = true;
         }
 
-        List<QAReport> recentReports = qaReportRepository.findReportsByDateRange(dateRangeStart, dateRangeEnd, PageRequest.of(0, 1000));
+        // Recent reports - WITH branch filtering (FIXED)
+        List<QAReport> recentReports = qaReportRepository.findReportsByDateRangeAndBranches(
+            dateRangeStart,
+            dateRangeEnd,
+            branchIds,  // Apply branch filtering
+            PageRequest.of(0, 1000)
+        );
         int qaReportsCreatedThisMonth = recentReports.size();
 
         // Create date range info for frontend
