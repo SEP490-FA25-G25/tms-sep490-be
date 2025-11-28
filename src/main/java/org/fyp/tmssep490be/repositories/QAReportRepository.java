@@ -27,7 +27,8 @@ public interface QAReportRepository extends JpaRepository<QAReport, Long> {
            "AND (:phaseId IS NULL OR p.id = :phaseId) " +
            "AND (:reportType IS NULL OR qar.reportType = :reportType) " +
            "AND (:status IS NULL OR qar.status = :status) " +
-           "AND (:reportedBy IS NULL OR u.id = :reportedBy)")
+           "AND (:reportedBy IS NULL OR u.id = :reportedBy) " +
+           "AND (:branchIds IS NULL OR c.branch.id IN :branchIds)")
     Page<QAReport> findWithFilters(
         @Param("classId") Long classId,
         @Param("sessionId") Long sessionId,
@@ -35,6 +36,7 @@ public interface QAReportRepository extends JpaRepository<QAReport, Long> {
         @Param("reportType") QAReportType reportType,
         @Param("status") QAReportStatus status,
         @Param("reportedBy") Long reportedBy,
+        @Param("branchIds") List<Long> branchIds,
         Pageable pageable
     );
 

@@ -1859,47 +1859,47 @@ FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 2;
 
 -- 1. Classroom Observation (Dự giờ) - Class 2 (Good)
 INSERT INTO qa_report (id, class_id, session_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
-(1, 2, 105, 10, 'CLASSROOM_OBSERVATION', 'submitted', 'Giáo viên chuẩn bị bài kỹ lưỡng. Tương tác với học viên tốt. Không khí lớp học sôi nổi.', 'Đề xuất giáo viên chia sẻ kinh nghiệm giảng dạy cho các giáo viên mới.', '2025-10-15 10:00:00+07', '2025-10-15 10:00:00+07'),
-(2, 2, 110, 10, 'CLASSROOM_OBSERVATION', 'submitted', 'Học viên tham gia đầy đủ. Bài giảng đi đúng trọng tâm.', 'Tiếp tục phát huy.', '2025-10-25 10:00:00+07', '2025-10-25 10:00:00+07');
+(1, 2, 105, 10, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Giáo viên chuẩn bị bài kỹ lưỡng. Tương tác với học viên tốt. Không khí lớp học sôi nổi.', 'Đề xuất giáo viên chia sẻ kinh nghiệm giảng dạy cho các giáo viên mới.', '2025-10-15 10:00:00+07', '2025-10-15 10:00:00+07'),
+(2, 2, 110, 10, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Học viên tham gia đầy đủ. Bài giảng đi đúng trọng tâm.', 'Tiếp tục phát huy.', '2025-10-25 10:00:00+07', '2025-10-25 10:00:00+07');
 
 -- 2. Classroom Observation - Class 15 (Issues)
 INSERT INTO qa_report (id, class_id, session_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
-(3, 15, 1005, 11, 'CLASSROOM_OBSERVATION', 'submitted', 'Giáo viên vào lớp muộn 10 phút. Lớp học ồn ào, thiếu kiểm soát.', 'Nhắc nhở giáo viên về quy định giờ giấc. Cần có biện pháp quản lý lớp học tốt hơn.', '2025-07-25 10:00:00+07', '2025-07-25 10:00:00+07'),
-(4, 15, 1010, 11, 'CLASSROOM_OBSERVATION', 'draft', 'Học viên ít tương tác. Giáo viên chỉ giảng bài một chiều.', 'Cần tổ chức training về phương pháp giảng dạy tương tác.', '2025-08-05 10:00:00+07', '2025-08-05 10:00:00+07');
+(3, 15, 1005, 11, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Giáo viên vào lớp muộn 10 phút. Lớp học ồn ào, thiếu kiểm soát.', 'Nhắc nhở giáo viên về quy định giờ giấc. Cần có biện pháp quản lý lớp học tốt hơn.', '2025-07-25 10:00:00+07', '2025-07-25 10:00:00+07'),
+(4, 15, 1010, 11, 'CLASSROOM_OBSERVATION', 'DRAFT', 'Học viên ít tương tác. Giáo viên chỉ giảng bài một chiều.', 'Cần tổ chức training về phương pháp giảng dạy tương tác.', '2025-08-05 10:00:00+07', '2025-08-05 10:00:00+07');
 
 -- 3. Student Feedback Analysis (Phân tích phản hồi)
 INSERT INTO qa_report (id, class_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
-(5, 13, 10, 'STUDENT_FEEDBACK_ANALYSIS', 'submitted', '100% học viên hài lòng với khóa học. Điểm đánh giá trung bình 4.8/5.', 'Khen thưởng giáo viên.', '2025-08-25 10:00:00+07', '2025-08-25 10:00:00+07'),
-(6, 14, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'submitted', 'Phản hồi trái chiều. Một số học viên phàn nàn về tốc độ giảng dạy.', 'Trao đổi với giáo viên để điều chỉnh tốc độ phù hợp với trình độ học viên.', '2025-08-30 10:00:00+07', '2025-08-30 10:00:00+07'),
-(7, 15, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'submitted', 'Nhiều phản hồi tiêu cực về thái độ giáo viên và chất lượng bài giảng.', 'Cần họp khẩn với giáo viên và Academic Manager để xem xét vấn đề.', '2025-08-05 10:00:00+07', '2025-08-05 10:00:00+07');
+(5, 13, 10, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', '100% học viên hài lòng với khóa học. Điểm đánh giá trung bình 4.8/5.', 'Khen thưởng giáo viên.', '2025-08-25 10:00:00+07', '2025-08-25 10:00:00+07'),
+(6, 14, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', 'Phản hồi trái chiều. Một số học viên phàn nàn về tốc độ giảng dạy.', 'Trao đổi với giáo viên để điều chỉnh tốc độ phù hợp với trình độ học viên.', '2025-08-30 10:00:00+07', '2025-08-30 10:00:00+07'),
+(7, 15, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', 'Nhiều phản hồi tiêu cực về thái độ giáo viên và chất lượng bài giảng.', 'Cần họp khẩn với giáo viên và Academic Manager để xem xét vấn đề.', '2025-08-05 10:00:00+07', '2025-08-05 10:00:00+07');
 
 -- 4. CLO Achievement Analysis (Đánh giá CLO)
 INSERT INTO qa_report (id, class_id, phase_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
-(8, 13, 1, 10, 'CLO_ACHIEVEMENT_ANALYSIS', 'submitted', 'Học viên đạt 90% chuẩn đầu ra Phase 1.', 'Cho phép chuyển sang Phase 2.', '2025-08-15 10:00:00+07', '2025-08-15 10:00:00+07'),
-(9, 15, 1, 11, 'CLO_ACHIEVEMENT_ANALYSIS', 'submitted', 'Chỉ 60% học viên đạt chuẩn đầu ra. Kỹ năng Viết còn yếu.', 'Tổ chức các buổi phụ đạo thêm về kỹ năng Viết.', '2025-08-01 10:00:00+07', '2025-08-01 10:00:00+07');
+(8, 13, 1, 10, 'CLO_ACHIEVEMENT_ANALYSIS', 'SUBMITTED', 'Học viên đạt 90% chuẩn đầu ra Phase 1.', 'Cho phép chuyển sang Phase 2.', '2025-08-15 10:00:00+07', '2025-08-15 10:00:00+07'),
+(9, 15, 1, 11, 'CLO_ACHIEVEMENT_ANALYSIS', 'SUBMITTED', 'Chỉ 60% học viên đạt chuẩn đầu ra. Kỹ năng Viết còn yếu.', 'Tổ chức các buổi phụ đạo thêm về kỹ năng Viết.', '2025-08-01 10:00:00+07', '2025-08-01 10:00:00+07');
 
 -- 5. Attendance & Engagement Review (Đánh giá chuyên cần)
 INSERT INTO qa_report (id, class_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
-(10, 7, 11, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'submitted', 'Tỷ lệ chuyên cần thấp (dưới 80%). Nhiều học viên nghỉ không phép.', 'Liên hệ phụ huynh để thông báo tình hình. Cảnh báo học viên về nguy cơ cấm thi.', '2025-10-25 10:00:00+07', '2025-10-25 10:00:00+07'),
-(11, 2, 10, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'submitted', 'Tỷ lệ chuyên cần cao (>95%).', 'Tiếp tục duy trì.', '2025-10-20 10:00:00+07', '2025-10-20 10:00:00+07');
+(10, 7, 11, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'SUBMITTED', 'Tỷ lệ chuyên cần thấp (dưới 80%). Nhiều học viên nghỉ không phép.', 'Liên hệ phụ huynh để thông báo tình hình. Cảnh báo học viên về nguy cơ cấm thi.', '2025-10-25 10:00:00+07', '2025-10-25 10:00:00+07'),
+(11, 2, 10, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'SUBMITTED', 'Tỷ lệ chuyên cần cao (>95%).', 'Tiếp tục duy trì.', '2025-10-20 10:00:00+07', '2025-10-20 10:00:00+07');
 
 -- 6. Teaching Quality Assessment (Đánh giá chất lượng giảng dạy)
 INSERT INTO qa_report (id, class_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
-(12, 1, 10, 'TEACHING_QUALITY_ASSESSMENT', 'submitted', 'Giáo viên có chuyên môn vững, phương pháp sư phạm tốt.', 'Đề xuất tăng lương hoặc thăng cấp bậc.', '2025-09-05 10:00:00+07', '2025-09-05 10:00:00+07'),
-(13, 16, 10, 'TEACHING_QUALITY_ASSESSMENT', 'draft', 'Giáo viên còn lúng túng khi xử lý tình huống sư phạm.', 'Cần tham gia khóa đào tạo kỹ năng quản lý lớp học.', '2025-10-30 10:00:00+07', '2025-10-30 10:00:00+07');
+(12, 1, 10, 'TEACHING_QUALITY_ASSESSMENT', 'SUBMITTED', 'Giáo viên có chuyên môn vững, phương pháp sư phạm tốt.', 'Đề xuất tăng lương hoặc thăng cấp bậc.', '2025-09-05 10:00:00+07', '2025-09-05 10:00:00+07'),
+(13, 16, 10, 'TEACHING_QUALITY_ASSESSMENT', 'DRAFT', 'Giáo viên còn lúng túng khi xử lý tình huống sư phạm.', 'Cần tham gia khóa đào tạo kỹ năng quản lý lớp học.', '2025-10-30 10:00:00+07', '2025-10-30 10:00:00+07');
 
 -- 7. Phase Review (Đánh giá giai đoạn)
 INSERT INTO qa_report (id, class_id, phase_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
-(14, 2, 1, 10, 'PHASE_REVIEW', 'submitted', 'Hoàn thành Phase 1 đúng tiến độ. Kết quả kiểm tra giữa kỳ khả quan.', 'Chuẩn bị tài liệu cho Phase 2.', '2025-10-28 10:00:00+07', '2025-10-28 10:00:00+07'),
-(15, 16, 1, 10, 'PHASE_REVIEW', 'draft', 'Tiến độ chậm hơn dự kiến 2 buổi.', 'Cần bố trí lịch học bù để đuổi kịp chương trình.', '2025-10-30 10:00:00+07', '2025-10-30 10:00:00+07');
+(14, 2, 1, 10, 'PHASE_REVIEW', 'SUBMITTED', 'Hoàn thành Phase 1 đúng tiến độ. Kết quả kiểm tra giữa kỳ khả quan.', 'Chuẩn bị tài liệu cho Phase 2.', '2025-10-28 10:00:00+07', '2025-10-28 10:00:00+07'),
+(15, 16, 1, 10, 'PHASE_REVIEW', 'DRAFT', 'Tiến độ chậm hơn dự kiến 2 buổi.', 'Cần bố trí lịch học bù để đuổi kịp chương trình.', '2025-10-30 10:00:00+07', '2025-10-30 10:00:00+07');
 
 -- 8. General Reports
 INSERT INTO qa_report (id, class_id, reported_by, report_type, status, findings, action_items, created_at, updated_at) VALUES
-(16, 5, 11, 'CLASSROOM_OBSERVATION', 'submitted', 'Lớp học trực tuyến (Online) diễn ra suôn sẻ, đường truyền ổn định.', 'Đảm bảo duy trì chất lượng kỹ thuật.', '2025-10-15 10:00:00+07', '2025-10-15 10:00:00+07'),
-(17, 18, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'submitted', 'Học viên đánh giá cao sự nhiệt tình của trợ giảng (TA).', 'Khen thưởng đội ngũ TA.', '2025-10-28 10:00:00+07', '2025-10-28 10:00:00+07'),
-(18, 3, 10, 'CLO_ACHIEVEMENT_ANALYSIS', 'submitted', 'Kỹ năng Nói của học viên lớp Online thấp hơn so với lớp Offline.', 'Tăng cường các hoạt động Speaking trong giờ học Online.', '2025-10-20 10:00:00+07', '2025-10-20 10:00:00+07'),
-(19, 6, 11, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'submitted', 'Lớp buổi tối thường xuyên có học viên đến muộn do tắc đường.', 'Xem xét lùi giờ học xuống 15 phút nếu khả thi.', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
-(20, 4, 10, 'TEACHING_QUALITY_ASSESSMENT', 'draft', 'Chưa có dữ liệu đánh giá (Lớp chưa bắt đầu).', 'Lên kế hoạch dự giờ ngay tuần đầu tiên.', '2025-11-01 10:00:00+07', '2025-11-01 10:00:00+07');
+(16, 5, 11, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Lớp học trực tuyến (Online) diễn ra suôn sẻ, đường truyền ổn định.', 'Đảm bảo duy trì chất lượng kỹ thuật.', '2025-10-15 10:00:00+07', '2025-10-15 10:00:00+07'),
+(17, 18, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', 'Học viên đánh giá cao sự nhiệt tình của trợ giảng (TA).', 'Khen thưởng đội ngũ TA.', '2025-10-28 10:00:00+07', '2025-10-28 10:00:00+07'),
+(18, 3, 10, 'CLO_ACHIEVEMENT_ANALYSIS', 'SUBMITTED', 'Kỹ năng Nói của học viên lớp Online thấp hơn so với lớp Offline.', 'Tăng cường các hoạt động Speaking trong giờ học Online.', '2025-10-20 10:00:00+07', '2025-10-20 10:00:00+07'),
+(19, 6, 11, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'SUBMITTED', 'Lớp buổi tối thường xuyên có học viên đến muộn do tắc đường.', 'Xem xét lùi giờ học xuống 15 phút nếu khả thi.', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
+(20, 4, 10, 'TEACHING_QUALITY_ASSESSMENT', 'DRAFT', 'Chưa có dữ liệu đánh giá (Lớp chưa bắt đầu).', 'Lên kế hoạch dự giờ ngay tuần đầu tiên.', '2025-11-01 10:00:00+07', '2025-11-01 10:00:00+07');
 
 -- ========== EDGE CASES & BOUNDARY CONDITIONS ==========
 

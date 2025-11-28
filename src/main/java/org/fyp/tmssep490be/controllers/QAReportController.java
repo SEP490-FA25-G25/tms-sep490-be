@@ -138,7 +138,7 @@ public class QAReportController {
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sort));
 
         Page<QAReportListItemDTO> reports = qaReportService.getQAReports(
-            classId, sessionId, phaseId, reportType, status, reportedBy, pageable
+            classId, sessionId, phaseId, reportType, status, reportedBy, pageable, currentUser.getId()
         );
 
         return ResponseEntity.ok(ResponseObject.<Page<QAReportListItemDTO>>builder()

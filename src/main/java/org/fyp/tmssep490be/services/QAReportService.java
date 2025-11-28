@@ -15,7 +15,7 @@ public interface QAReportService {
 
     Page<QAReportListItemDTO> getQAReports(Long classId, Long sessionId, Long phaseId,
                                             QAReportType reportType, QAReportStatus status, Long reportedBy,
-                                            Pageable pageable);
+                                            Pageable pageable, Long userId);
 
     QAReportDetailDTO getQAReportDetail(Long reportId);
 

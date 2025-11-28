@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +31,16 @@ public class QAReportServiceImpl implements QAReportService {
     private final CoursePhaseRepository coursePhaseRepository;
     private final UserAccountRepository userAccountRepository;
     private final StudentSessionRepository studentSessionRepository;
+    private final UserBranchesRepository userBranchesRepository;
+
+    // ========== Helper Methods ==========
+
+    /**
+     * Get user accessible branch IDs for permission filtering
+     */
+    private List<Long> getUserAccessibleBranches(Long userId) {
+        return userBranchesRepository.findBranchIdsByUserId(userId);
+    }
 
     // ========== Enhanced Validation Methods ==========
 
@@ -304,11 +315,20 @@ public class QAReportServiceImpl implements QAReportService {
     @Transactional(readOnly = true)
     public Page<QAReportListItemDTO> getQAReports(Long classId, Long sessionId, Long phaseId,
                                                     QAReportType reportType, QAReportStatus status, Long reportedBy,
-                                                    Pageable pageable) {
-        log.info("Getting QA reports with filters");
+                                                    Pageable pageable, Long userId) {
+        log.info("Getting QA reports with filters - userId={}", userId);
+
+        // Get current user's accessible branches
+        List<Long> branchIds = getUserAccessibleBranches(userId);
+
+        // Handle empty branches case - user has no accessible branches
+        if (branchIds.isEmpty()) {
+            log.warn("User {} không có branch nào được phân quyền, trả về danh sách rỗng", userId);
+            return Page.empty(pageable);
+        }
 
         Page<QAReport> reports = qaReportRepository.findWithFilters(
-                classId, sessionId, phaseId, reportType, status, reportedBy, pageable
+                classId, sessionId, phaseId, reportType, status, reportedBy, branchIds, pageable
         );
 
         return reports.map(this::mapToListItemDTO);

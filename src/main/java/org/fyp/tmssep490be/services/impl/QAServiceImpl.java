@@ -254,6 +254,27 @@ public class QAServiceImpl implements QAService {
             branchIds = getUserAccessibleBranches(userId);
         }
 
+        // Handle empty branches case - user has no accessible branches
+        if (branchIds.isEmpty()) {
+            log.warn("User {} không có branch nào được phân quyền, trả về dashboard rỗng", userId);
+            return QADashboardDTO.builder()
+                    .kpiMetrics(QADashboardDTO.KPIMetrics.builder()
+                            .ongoingClassesCount(0)
+                            .qaReportsCreatedThisMonth(0)
+                            .averageAttendanceRate(0.0)
+                            .averageHomeworkCompletionRate(0.0)
+                            .build())
+                    .classesRequiringAttention(java.util.Collections.emptyList())
+                    .recentQAReports(java.util.Collections.emptyList())
+                    .dateRangeInfo(QADashboardDTO.DateRangeInfo.builder()
+                            .dateFrom(LocalDate.now().withDayOfMonth(1))
+                            .dateTo(LocalDate.now())
+                            .displayText("Tháng " + LocalDate.now().getMonthValue() + "/" + LocalDate.now().getYear())
+                            .isDefaultRange(true)
+                            .build())
+                    .build();
+        }
+
         // Get ongoing classes with branch filtering using existing method
         List<ClassEntity> ongoingClasses = classRepository.findClassesForAcademicAffairs(
                 branchIds, null, ClassStatus.ONGOING, null, null, null,
@@ -637,7 +658,7 @@ public class QAServiceImpl implements QAService {
 
                     // Check QA reports for this session using existing method
                     long qaReportCount = qaReportRepository.findWithFilters(
-                        null, s.getId(), null, null, null, null, Pageable.unpaged()).getTotalElements();
+                        null, s.getId(), null, null, null, null, null, Pageable.unpaged()).getTotalElements();
 
                     // Get session info from related entities
                     Integer sequenceNumber = s.getCourseSession() != null ? s.getCourseSession().getSequenceNo() : null;
