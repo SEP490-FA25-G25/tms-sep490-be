@@ -1,11 +1,11 @@
-name: CI/CD Staging
+name: CI/CD
 
 on:
   push:
-    branches: [staging]
+    branches: ["**"]
 
 concurrency:
-  group: staging-be
+  group: cicd-be-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -30,6 +30,7 @@ jobs:
     name: Deploy to VPS
     runs-on: ubuntu-latest
     needs: backend
+    if: github.ref == 'refs/heads/staging'
     env:
       BACKEND_REPO: git@github.com:SEP490-FA25-G25/tms-sep490-be.git
       FRONTEND_REPO: git@github.com:SEP490-FA25-G25/tms-sep490-fe.git
