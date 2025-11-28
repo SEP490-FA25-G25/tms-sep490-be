@@ -507,9 +507,9 @@ FROM generate_series(1, 60) AS s(id);
 -- JLPT Sample Assessments (for students 1-5 as examples)
 -- Student 1: JLPT N5 Placement Test
 INSERT INTO replacement_skill_assessment (student_id, skill, level_id, raw_score, scaled_score, score_scale, assessment_category, assessment_date, assessment_type, assessed_by, note, created_at, updated_at) VALUES
-(1, 'VOCABULARY', 10, 45, 75.0, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Vocabulary Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
-(1, 'GRAMMAR', 10, 38, 63.3, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Grammar Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
-(1, 'KANJI', 10, 50, 83.3, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Kanji Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
+(1, 'GENERAL', 10, 45, 75.0, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Vocabulary Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
+(1, 'GENERAL', 10, 38, 63.3, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Grammar Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
+(1, 'GENERAL', 10, 50, 83.3, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Kanji Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
 (1, 'READING', 10, 42, 70.0, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Reading Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
 (1, 'LISTENING', 10, 48, 80.0, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Listening Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07');
 
