@@ -2,9 +2,9 @@
 -- Anh ngữ Pinnacle - SEP490-BE: COMPREHENSIVE SEED DATA FOR TESTING
 -- =========================================
 -- Author: QA Team
--- Date: 2025-11-02
+-- Date: 2025-11-28
 -- Purpose: High-quality, logically consistent dataset covering all business flows and edge cases
--- Reference Date: 2025-11-02 (today's date for testing)
+-- Reference Date: 2025-11-28 (today's date for testing)
 -- =========================================
 -- COVERAGE:
 -- - Happy paths: Course creation → Class → Enrollment → Attendance → Requests
@@ -67,12 +67,12 @@ SELECT setval('student_id_seq', 1, false);
 SELECT setval('subject_id_seq', 1, false);
 SELECT setval('level_id_seq', 1, false);
 SELECT setval('plo_id_seq', 1, false);
-SELECT setval('course_id_seq', 1, false);
-SELECT setval('course_phase_id_seq', 1, false);
-SELECT setval('clo_id_seq', 1, false);
+SELECT setval('course_id_seq', 10, false);
+SELECT setval('course_phase_id_seq', 23, false);
+SELECT setval('clo_id_seq', 29, false);
 SELECT setval('course_session_id_seq', 1, false);
 SELECT setval('course_assessment_id_seq', 1, false);
-SELECT setval('class_id_seq', 1, false);
+SELECT setval('class_id_seq', 31, false);
 SELECT setval('session_id_seq', 1, false);
 SELECT setval('assessment_id_seq', 1, false);
 SELECT setval('score_id_seq', 1, false);
@@ -82,7 +82,7 @@ SELECT setval('student_feedback_id_seq', 1, false);
 SELECT setval('student_feedback_response_id_seq', 1, false);
 SELECT setval('qa_report_id_seq', 1, false);
 SELECT setval('course_material_id_seq', 1, false);
-SELECT setval('time_slot_template_id_seq', 1, false);
+SELECT setval('time_slot_template_id_seq', 16, false);
 SELECT setval('resource_id_seq', 1, false);
 SELECT setval('replacement_skill_assessment_id_seq', 1, false);
 SELECT setval('feedback_question_id_seq', 1, false);
@@ -178,18 +178,35 @@ INSERT INTO branch (id, center_id, code, name, address, phone, email, district, 
 INSERT INTO subject (id, code, name, description, status, created_by, created_at, updated_at) VALUES
 (1, 'IELTS', 'International English Language Testing System', 'Comprehensive IELTS preparation courses', 'ACTIVE', 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
 
--- Time Slot Templates
+-- Time Slot Templates - REALISTIC SCHEDULES FOR LANGUAGE CENTER
 INSERT INTO time_slot_template (id, branch_id, name, start_time, end_time, created_at, updated_at) VALUES
--- Ha Noi Branch
-(1, 1, 'HN Morning 1', '08:00:00', '10:00:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(2, 1, 'HN Morning 2', '10:00:00', '12:00:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(3, 1, 'HN Afternoon 1', '13:30:00', '15:30:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(4, 1, 'HN Afternoon 2', '15:30:00', '17:30:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(5, 1, 'HN Evening', '18:00:00', '20:00:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
--- Ho Chi Minh Branch
-(6, 2, 'HCM Morning', '08:30:00', '10:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
-(7, 2, 'HCM Afternoon', '14:00:00', '16:00:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
-(8, 2, 'HCM Evening', '18:30:00', '20:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
+-- Ha Noi Branch - Comprehensive Time Slots
+-- Morning Slots
+(1, 1, 'HN Early Morning 1.5h', '07:00:00', '08:30:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(2, 1, 'HN Morning Standard 2.5h', '09:00:00', '11:30:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+-- Afternoon Slots
+(3, 1, 'HN Afternoon Standard 2.5h', '14:00:00', '16:30:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(4, 1, 'HN Late Afternoon 2h', '16:00:00', '18:00:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+-- Evening Slots
+(5, 1, 'HN Evening Standard 2.5h', '18:30:00', '21:00:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(6, 1, 'HN Evening Late 2.5h', '19:00:00', '21:30:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+-- Weekend Special Slots
+(7, 1, 'HN Weekend Morning 2.5h', '08:30:00', '11:00:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(8, 1, 'HN Weekend Afternoon 2.5h', '14:00:00', '16:30:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+
+-- Ho Chi Minh Branch - Same Structure
+-- Morning Slots
+(9, 2, 'HCM Early Morning 1.5h', '07:00:00', '08:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(10, 2, 'HCM Morning Standard 2.5h', '09:00:00', '11:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+-- Afternoon Slots
+(11, 2, 'HCM Afternoon Standard 2.5h', '14:00:00', '16:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(12, 2, 'HCM Late Afternoon 2h', '16:00:00', '18:00:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+-- Evening Slots
+(13, 2, 'HCM Evening Standard 2.5h', '18:30:00', '21:00:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(14, 2, 'HCM Evening Late 2.5h', '19:00:00', '21:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+-- Weekend Special Slots
+(15, 2, 'HCM Weekend Morning 2.5h', '08:30:00', '11:00:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(16, 2, 'HCM Weekend Afternoon 2.5h', '14:00:00', '16:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
 
 -- Resources (Rooms & Zoom)
 INSERT INTO resource (id, branch_id, resource_type, code, name, capacity, capacity_override, created_at, updated_at) VALUES
@@ -530,11 +547,32 @@ INSERT INTO plo (id, subject_id, code, description, created_at, updated_at) VALU
 (4, 1, 'PLO4', 'Analyze and evaluate complex English texts across various topics', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
 (5, 1, 'PLO5', 'Produce coherent, well-structured academic essays and reports', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
 
--- Course: IELTS Foundation
+-- =========================================
+-- COMPREHENSIVE COURSE OFFERINGS - REALISTIC LANGUAGE CENTER STRUCTURE
+-- =========================================
+
+-- IELTS Series - Complete Learning Path
 INSERT INTO course (id, subject_id, level_id, logical_course_code, version, code, name, description, total_hours, hours_per_session, prerequisites, target_audience, teaching_methods, score_scale, status, approval_status, decided_by_manager, decided_at, rejection_reason, created_by, created_at, updated_at) VALUES
 (1, 1, 1, 'IELTS-FOUND-2025', 1, 'IELTS-FOUND-2025-V1', 'IELTS Foundation 2025', 'Khóa học nền tảng cho người mới bắt đầu, mục tiêu band 3.0-4.0', 60, 2.5, 'Không yêu cầu kiến thức nền tảng. Phù hợp cho người mới bắt đầu.', 'Học viên mất gốc hoặc mới bắt đầu học tiếng Anh, mong muốn đạt band 3.0-4.0 IELTS.', 'Phương pháp Communicative Language Teaching (CLT) kết hợp bài tập thực hành tương tác.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-20 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-20 14:00:00+07'),
-(2, 1, 2, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 75, 2.5, 'Đã hoàn thành khóa Foundation hoặc có trình độ tương đương IELTS 4.0.', 'Học viên đã có nền tảng cơ bản, mục tiêu đạt band 5.0-5.5.', 'Tập trung vào kỹ năng làm bài thi, chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'SUBMITTED', 'PENDING', NULL, NULL, NULL, 5, NOW(), NOW()),
-(3, 1, 3, 'IELTS-ADV-2025', 1, 'IELTS-ADV-2025-V1', 'IELTS Advanced 2025', 'Khóa học nâng cao, mục tiêu band 6.5 trở lên với luyện đề chuyên sâu.', 90, 2.5, 'Hoàn thành khóa Intermediate hoặc tương đương IELTS 5.5.', 'Học viên muốn đạt band 6.5+ để du học hoặc làm việc.', 'Luyện đề cường độ cao, phản hồi cá nhân hóa và workshop kỹ năng.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-08-25 14:00:00+07');
+(2, 1, 2, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 75, 2.5, 'Đã hoàn thành khóa Foundation hoặc có trình độ tương đương IELTS 4.0.', 'Học viên đã có nền tảng cơ bản, mục tiêu đạt band 5.0-5.5.', 'Tập trung vào kỹ năng làm bài thi, chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-25 14:00:00+07'),
+(3, 1, 3, 'IELTS-ADV-2025', 1, 'IELTS-ADV-2025-V1', 'IELTS Advanced 2025', 'Khóa học nâng cao, mục tiêu band 6.5 trở lên với luyện đề chuyên sâu.', 100, 2.5, 'Hoàn thành khóa Intermediate hoặc tương đương IELTS 5.5.', 'Học viên muốn đạt band 6.5+ để du học hoặc làm việc.', 'Luyện đề cường độ cao, phản hồi cá nhân hóa và workshop kỹ năng.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-08-25 14:00:00+07'),
+
+-- TOEIC Series - Business English Focus
+(4, 1, 2, 'TOEIC-INT-2025', 1, 'TOEIC-INT-2025-V1', 'TOEIC Intermediate 2025', 'Chuẩn bị thi TOEIC mục tiêu 500-650+', 50, 2.5, 'Nền tảng tiếng Anh cơ bản, tương đương IELTS 4.0.', 'Người đi làm muốn nâng cao kỹ năng tiếng Anh công sở.', 'Tập trung vào từ vựng kinh doanh, ngữ pháp thực tế và chiến thuật làm bài.', '0-990', 'ACTIVE', 'APPROVED', 2, '2024-09-01 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-09-01 14:00:00+07'),
+(5, 1, 3, 'TOEIC-ADV-2025', 1, 'TOEIC-ADV-2025-V1', 'TOEIC Advanced 2025', 'Luyện thi TOEIC mục tiêu 750+ cho vị trí quản lý.', 60, 2.5, 'Đã hoàn thành TOEIC Intermediate hoặc đạt 500+', 'Quản lý cấp trung và cấp cao muốn chứng minh năng lực tiếng Anh.', 'Case study thực tế, presentation skills và business negotiation.', '0-990', 'ACTIVE', 'APPROVED', 2, '2024-09-05 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-09-05 14:00:00+07'),
+
+-- Business English - Professional Communication
+(6, 1, 2, 'BUS-ENG-2025', 1, 'BUS-ENG-2025-V1', 'Business English Professional 2025', 'Kỹ năng giao tiếp chuyên nghiệp trong môi trường công sở quốc tế.', 45, 2.5, 'Tiếng Anh giao tiếp cơ bản (IELTS 4.0+).', 'Nhân viên văn phòng, chuyên viên muốn làm việc trong công ty đa quốc gia.', 'Role-playing, case study và simulated business meetings.', 'N/A', 'ACTIVE', 'APPROVED', 2, '2024-09-10 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-09-10 14:00:00+07'),
+
+-- Conversation & Speaking Skills
+(7, 1, 2, 'CONV-FLUENT-2025', 1, 'CONV-FLUENT-2025-V1', 'English Conversation - Fluency Building 2025', 'Tăng cường lưu loát giao tiếp trong đời sống hàng ngày.', 30, 2.0, 'Phát âm cơ bản, có thể giao tiếp đơn giản.', 'Học viên muốn cải thiện sự tự tin và lưu loát khi nói.', 'Discussions, debates và real-life conversation practice.', 'N/A', 'ACTIVE', 'APPROVED', 2, '2024-09-15 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-09-15 14:00:00+07'),
+
+-- Skill-Specific Courses
+(8, 1, 2, 'PRON-WORK-2025', 1, 'PRON-WORK-2025-V1', 'Pronunciation Workshop 2025', 'Khắc phục lỗi phát âm và luyện nói chuẩn giọng Anh-Mỹ.', 20, 2.0, 'Không yêu cầu điều kiện tiên quyết.', 'Học viên mọi trình độ muốn cải thiện phát âm.', 'Phonics practice, minimal pairs và shadow recording techniques.', 'N/A', 'ACTIVE', 'APPROVED', 2, '2024-09-20 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-09-20 14:00:00+07'),
+(9, 1, 2, 'WRITING-ACAD-2025', 1, 'WRITING-ACAD-2025-V1', 'Academic Writing Workshop 2025', 'Nâng cao kỹ năng viết học thuật và luận văn.', 25, 2.5, 'IELTS 5.0+ hoặc tương đương.', 'Sinh viên, học viên cao học muốn chuẩn bị du học.', 'Essay structure, academic vocabulary và citation styles.', 'N/A', 'SUBMITTED', 'PENDING', NULL, NULL, NULL, 5, '2024-09-25 00:00:00+07', '2024-09-25 00:00:00+07'),
+
+-- Intensive Programs
+(10, 1, 2, 'IELTS-INTENSIVE-2025', 1, 'IELTS-INTENSIVE-2025-V1', 'IELTS Intensive Preparation 2025', 'Luyện thi IELTS cường độ cao trong 8 tuần.', 80, 4.0, 'IELTS 5.0+ hoặc tương đương.', 'Học viên cần đạt band 6.5+ trong thời gian ngắn.', 'Daily practice tests, intensive feedback và crash course techniques.', '0-9', 'SUBMITTED', 'PENDING', NULL, NULL, NULL, 5, '2024-10-01 00:00:00+07', '2024-10-01 00:00:00+07');
 -- Course Phases for Foundation
 INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
 (1, 1, 1, 'Foundation Basics', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
@@ -584,6 +622,66 @@ INSERT INTO plo_clo_mapping (plo_id, clo_id, status) VALUES
 (1, 2, 'ACTIVE'),
 (2, 3, 'ACTIVE'),
 (2, 4, 'ACTIVE');
+
+-- =========================================
+-- COMPREHENSIVE COURSE PHASES FOR ALL COURSES
+-- =========================================
+
+-- Course Phases for IELTS Intermediate (Course 2)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+-- Extending from previous: IDs 3-6 for Intermediate
+(3, 2, 1, 'Skill Building', 5, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(4, 2, 2, 'Test Strategies', 5, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(5, 2, 3, 'Mock Tests & Review', 3, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+
+-- Course Phases for IELTS Advanced (Course 3)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+-- IDs 7-10 for Advanced
+(7, 3, 1, 'Advanced Techniques', 6, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(8, 3, 2, 'Intensive Practice', 6, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(9, 3, 3, 'Test Mastery', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(10, 3, 4, 'Final Preparation', 2, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+
+-- Course Phases for TOEIC Intermediate (Course 4)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+-- IDs 11-12 for TOEIC Intermediate
+(11, 4, 1, 'Business Vocabulary & Grammar', 4, '2024-09-01 00:00:00+07', '2024-09-01 00:00:00+07'),
+(12, 4, 2, 'Test Techniques & Practice', 4, '2024-09-01 00:00:00+07', '2024-09-01 00:00:00+07');
+
+-- Course Phases for TOEIC Advanced (Course 5)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+-- IDs 13-14 for TOEIC Advanced
+(13, 5, 1, 'Advanced Business Communication', 4, '2024-09-05 00:00:00+07', '2024-09-05 00:00:00+07'),
+(14, 5, 2, 'Executive Test Preparation', 4, '2024-09-05 00:00:00+07', '2024-09-05 00:00:00+07');
+
+-- Course Phases for Business English (Course 6)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+-- IDs 15-17 for Business English
+(15, 6, 1, 'Workplace Communication', 3, '2024-09-10 00:00:00+07', '2024-09-10 00:00:00+07'),
+(16, 6, 2, 'Business Meetings & Presentations', 3, '2024-09-10 00:00:00+07', '2024-09-10 00:00:00+07'),
+(17, 6, 3, 'Professional Writing', 3, '2024-09-10 00:00:00+07', '2024-09-10 00:00:00+07');
+
+-- Course Phases for Conversation (Course 7)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+-- IDs 18-19 for Conversation
+(18, 7, 1, 'Confidence Building', 4, '2024-09-15 00:00:00+07', '2024-09-15 00:00:00+07'),
+(19, 7, 2, 'Fluency Practice', 4, '2024-09-15 00:00:00+07', '2024-09-15 00:00:00+07');
+
+-- Course Phases for Pronunciation Workshop (Course 8)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+-- ID 20 for Pronunciation
+(20, 8, 1, 'Sound System & Practice', 5, '2024-09-20 00:00:00+07', '2024-09-20 00:00:00+07');
+
+-- Course Phases for Academic Writing (Course 9)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+-- ID 21 for Academic Writing
+(21, 9, 1, 'Academic Writing Fundamentals', 5, '2024-09-25 00:00:00+07', '2024-09-25 00:00:00+07');
+
+-- Course Phases for IELTS Intensive (Course 10)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+-- IDs 22-23 for IELTS Intensive
+(22, 10, 1, 'Crash Course Foundation', 4, '2024-10-01 00:00:00+07', '2024-10-01 00:00:00+07'),
+(23, 10, 2, 'High-Intensity Practice', 4, '2024-10-01 00:00:00+07', '2024-10-01 00:00:00+07');
 
 -- Course Session-CLO Mappings (Sample - map each CLO to relevant sessions)
 INSERT INTO course_session_clo_mapping (course_session_id, clo_id, status) VALUES
@@ -676,11 +774,6 @@ INSERT INTO course_assessment_clo_mapping (course_assessment_id, clo_id, status)
 (5, 1, 'ACTIVE'), (5, 2, 'ACTIVE'), (5, 3, 'ACTIVE'), (5, 4, 'ACTIVE'),
 (6, 1, 'ACTIVE'), (6, 2, 'ACTIVE'), (6, 3, 'ACTIVE'), (6, 4, 'ACTIVE');
 
--- Course Phases for Intermediate (ID 2)
-INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
-(3, 2, 1, 'Intermediate Skills', 5, NOW(), NOW()),
-(4, 2, 2, 'Advanced Practice', 5, NOW(), NOW());
-
 -- Course Sessions for Intermediate (ID 2)
 INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skill_set, created_at, updated_at) VALUES
 (25, 3, 1, 'Complex Sentence Structures', 'Analyze complex sentences', ARRAY['WRITING','READING'], NOW(), NOW()),
@@ -691,7 +784,54 @@ INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skil
 -- CLOs for Intermediate (ID 2)
 INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
 (5, 2, 'CLO1', 'Apply complex grammar structures in writing and speaking', NOW(), NOW()),
-(6, 2, 'CLO2', 'Analyze and synthesize information from academic texts', NOW(), NOW());
+(6, 2, 'CLO2', 'Analyze and synthesize information from academic texts', NOW(), NOW()),
+(7, 2, 'CLO3', 'Develop coherent speaking responses for IELTS topics', NOW(), NOW()),
+(8, 2, 'CLO4', 'Master listening comprehension for academic contexts', NOW(), NOW());
+
+-- CLOs for IELTS Advanced (ID 3)
+INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
+(9, 3, 'CLO1', 'Demonstrate mastery of academic vocabulary and discourse', NOW(), NOW()),
+(10, 3, 'CLO2', 'Produce well-structured academic essays with complex arguments', NOW(), NOW()),
+(11, 3, 'CLO3', 'Analyze and critique complex academic texts', NOW(), NOW()),
+(12, 3, 'CLO4', 'Deliver sophisticated oral presentations on academic topics', NOW(), NOW());
+
+-- CLOs for TOEIC Intermediate (ID 4)
+INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
+(13, 4, 'CLO1', 'Master business English vocabulary for workplace communication', NOW(), NOW()),
+(14, 4, 'CLO2', 'Comprehend business correspondence and reports', NOW(), NOW()),
+(15, 4, 'CLO3', 'Write effective business emails and memos', NOW(), NOW());
+
+-- CLOs for TOEIC Advanced (ID 5)
+INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
+(16, 5, 'CLO1', 'Demonstrate executive-level business communication skills', NOW(), NOW()),
+(17, 5, 'CLO2', 'Analyze complex business cases and propose solutions', NOW(), NOW()),
+(18, 5, 'CLO3', 'Lead business meetings and negotiations effectively', NOW(), NOW());
+
+-- CLOs for Business English (ID 6)
+INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
+(19, 6, 'CLO1', 'Communicate professionally in international business environments', NOW(), NOW()),
+(20, 6, 'CLO2', 'Deliver effective business presentations', NOW(), NOW()),
+(21, 6, 'CLO3', 'Write professional business documents', NOW(), NOW());
+
+-- CLOs for Conversation (ID 7)
+INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
+(22, 7, 'CLO1', 'Communicate fluently in everyday social situations', NOW(), NOW()),
+(23, 7, 'CLO2', 'Express opinions and discuss abstract topics confidently', NOW(), NOW());
+
+-- CLOs for Pronunciation Workshop (ID 8)
+INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
+(24, 8, 'CLO1', 'Produce clear and accurate English pronunciation', NOW(), NOW()),
+(25, 8, 'CLO2', 'Identify and correct common pronunciation errors', NOW(), NOW());
+
+-- CLOs for Academic Writing (ID 9)
+INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
+(26, 9, 'CLO1', 'Write well-structured academic essays with proper citation', NOW(), NOW()),
+(27, 9, 'CLO2', 'Apply academic writing conventions and research skills', NOW(), NOW());
+
+-- CLOs for IELTS Intensive (ID 10)
+INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
+(28, 10, 'CLO1', 'Achieve target IELTS band score through intensive practice', NOW(), NOW()),
+(29, 10, 'CLO2', 'Apply advanced test-taking strategies under time pressure', NOW(), NOW());
 
 -- Course Assessments for Intermediate (ID 2)
 INSERT INTO course_assessment (id, course_id, name, kind, duration_minutes, max_score, skills, created_at, updated_at) VALUES
@@ -708,41 +848,41 @@ INSERT INTO course_material (course_id, phase_id, course_session_id, title, desc
 -- Classes (Test scenarios: completed, ongoing, scheduled, cancelled, various performance levels)
 INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
 -- 1. COMPLETED CLASSES (Diverse Performance)
-(1, 1, 1, 'HN-FOUND-C1', 'HN Foundation 1 (High Perf)', 'OFFLINE', '2025-07-07', '2025-09-01', '2025-09-01', ARRAY[1,3,5]::smallint[], 20, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-07-01 10:00:00+07', '2025-07-02 14:00:00+07', '2025-07-01 10:00:00+07', '2025-09-01 18:00:00+07'),
-(13, 1, 2, 'HN-INT-C1', 'HN Intermediate 1 (Good)', 'OFFLINE', '2025-08-04', '2025-10-10', '2025-10-10', ARRAY[2,4,6]::smallint[], 20, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-07-28 10:00:00+07', '2025-07-29 14:00:00+07', '2025-07-28 10:00:00+07', '2025-10-10 18:00:00+07'),
-(14, 2, 2, 'HCM-INT-C1', 'HCM Intermediate 1 (Average)', 'OFFLINE', '2025-08-11', '2025-10-17', '2025-10-17', ARRAY[1,3,5]::smallint[], 20, 'COMPLETED', 'APPROVED', NULL, 8, 4, '2025-08-04 10:00:00+07', '2025-08-05 14:00:00+07', '2025-08-04 10:00:00+07', '2025-10-17 18:00:00+07'),
-(15, 1, 3, 'HN-ADV-C1', 'HN Advanced 1 (At Risk)', 'ONLINE', '2025-07-14', '2025-09-29', '2025-09-29', ARRAY[2,4,6]::smallint[], 15, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-07-07 10:00:00+07', '2025-07-08 14:00:00+07', '2025-07-07 10:00:00+07', '2025-09-29 18:00:00+07'),
+(1, 1, 1, 'HN-FOUND-C1', 'HN Foundation 1 (High Perf)', 'OFFLINE', '2025-09-01', '2025-10-24', '2025-10-24', ARRAY[1,3,5]::smallint[], 20, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-08-24 10:00:00+07', '2025-08-25 14:00:00+07', '2025-08-24 10:00:00+07', '2025-10-24 18:00:00+07'),
+(13, 1, 2, 'HN-INT-C1', 'HN Intermediate 1 (Good)', 'OFFLINE', '2025-09-08', '2025-11-01', '2025-11-01', ARRAY[2,4,6]::smallint[], 20, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-08-31 10:00:00+07', '2025-09-01 14:00:00+07', '2025-08-31 10:00:00+07', '2025-11-01 18:00:00+07'),
+(14, 2, 2, 'HCM-INT-C1', 'HCM Intermediate 1 (Average)', 'OFFLINE', '2025-09-15', '2025-11-08', '2025-11-08', ARRAY[1,3,5]::smallint[], 20, 'COMPLETED', 'APPROVED', NULL, 8, 4, '2025-09-07 10:00:00+07', '2025-09-08 14:00:00+07', '2025-09-07 10:00:00+07', '2025-11-08 18:00:00+07'),
+(15, 1, 3, 'HN-ADV-C1', 'HN Advanced 1 (At Risk)', 'ONLINE', '2025-09-22', '2025-11-15', '2025-11-15', ARRAY[2,4,6]::smallint[], 15, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-09-15 10:00:00+07', '2025-09-16 14:00:00+07', '2025-09-15 10:00:00+07', '2025-11-15 18:00:00+07'),
 
 -- 2. ONGOING CLASSES (Diverse Performance)
-(2, 1, 1, 'HN-FOUND-O1', 'HN Foundation 2 (High Perf)', 'OFFLINE', '2025-10-06', '2025-11-28', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-09-30 10:00:00+07', '2025-10-01 14:00:00+07', '2025-09-30 10:00:00+07', '2025-10-06 08:00:00+07'),
-(3, 1, 1, 'HN-FOUND-O2', 'HN Foundation 3 (Average)', 'ONLINE', '2025-10-07', '2025-11-29', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-10-01 10:00:00+07', '2025-10-02 14:00:00+07', '2025-10-01 10:00:00+07', '2025-10-07 08:00:00+07'),
-(5, 2, 1, 'HCM-FOUND-O1', 'HCM Foundation 1 (High Perf)', 'OFFLINE', '2025-10-13', '2025-12-05', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-10-06 10:00:00+07', '2025-10-07 14:00:00+07', '2025-10-06 10:00:00+07', '2025-10-13 08:00:00+07'),
-(6, 2, 1, 'HCM-FOUND-E1', 'HCM Foundation 2 (Average)', 'OFFLINE', '2025-10-14', '2025-12-06', NULL, ARRAY[2,4,6]::smallint[], 18, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-10-08 10:00:00+07', '2025-10-09 14:00:00+07', '2025-10-08 10:00:00+07', '2025-10-14 08:00:00+07'),
-(7, 2, 1, 'HCM-FOUND-M1', 'HCM Foundation Micro (At Risk)', 'OFFLINE', '2025-10-20', '2025-12-12', NULL, ARRAY[1,3,5]::smallint[], 5, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-10-10 10:00:00+07', '2025-10-11 14:00:00+07', '2025-10-10 10:00:00+07', '2025-10-20 08:00:00+07'),
-(16, 1, 2, 'HN-INT-O1', 'HN Intermediate 2 (At Risk)', 'OFFLINE', '2025-10-15', '2025-12-19', NULL, ARRAY[1,3,5]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-10-05 10:00:00+07', '2025-10-06 14:00:00+07', '2025-10-05 10:00:00+07', '2025-10-15 08:00:00+07'),
-(17, 2, 2, 'HCM-INT-O1', 'HCM Intermediate 2 (At Risk)', 'ONLINE', '2025-10-21', '2025-12-25', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-10-15 10:00:00+07', '2025-10-16 14:00:00+07', '2025-10-15 10:00:00+07', '2025-10-21 08:00:00+07'),
-(18, 2, 3, 'HCM-ADV-O1', 'HCM Advanced 1 (Good)', 'OFFLINE', '2025-10-22', '2026-01-07', NULL, ARRAY[1,3,5]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-10-15 10:00:00+07', '2025-10-16 14:00:00+07', '2025-10-15 10:00:00+07', '2025-10-22 08:00:00+07'),
+(2, 1, 1, 'HN-FOUND-O1', 'HN Foundation 2 (High Perf)', 'OFFLINE', '2025-11-10', '2026-01-02', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-01 10:00:00+07', '2025-11-02 14:00:00+07', '2025-11-01 10:00:00+07', '2025-11-10 08:00:00+07'),
+(3, 1, 1, 'HN-FOUND-O2', 'HN Foundation 3 (Average)', 'ONLINE', '2025-11-11', '2026-01-03', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-02 10:00:00+07', '2025-11-03 14:00:00+07', '2025-11-02 10:00:00+07', '2025-11-11 08:00:00+07'),
+(5, 2, 1, 'HCM-FOUND-O1', 'HCM Foundation 1 (High Perf)', 'OFFLINE', '2025-11-17', '2026-01-09', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-08 10:00:00+07', '2025-11-09 14:00:00+07', '2025-11-08 10:00:00+07', '2025-11-17 08:00:00+07'),
+(6, 2, 1, 'HCM-FOUND-E1', 'HCM Foundation 2 (Average)', 'OFFLINE', '2025-11-18', '2026-01-10', NULL, ARRAY[2,4,6]::smallint[], 18, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-09 10:00:00+07', '2025-11-10 14:00:00+07', '2025-11-09 10:00:00+07', '2025-11-18 08:00:00+07'),
+(7, 2, 1, 'HCM-FOUND-M1', 'HCM Foundation Micro (At Risk)', 'OFFLINE', '2025-11-24', '2026-01-16', NULL, ARRAY[1,3,5]::smallint[], 5, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-14 10:00:00+07', '2025-11-15 14:00:00+07', '2025-11-14 10:00:00+07', '2025-11-24 08:00:00+07'),
+(16, 1, 2, 'HN-INT-O1', 'HN Intermediate 2 (At Risk)', 'OFFLINE', '2025-11-17', '2026-01-09', NULL, ARRAY[1,3,5]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-07 10:00:00+07', '2025-11-08 14:00:00+07', '2025-11-07 10:00:00+07', '2025-11-17 08:00:00+07'),
+(17, 2, 2, 'HCM-INT-O1', 'HCM Intermediate 2 (At Risk)', 'ONLINE', '2025-11-18', '2026-01-10', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-08 10:00:00+07', '2025-11-09 14:00:00+07', '2025-11-08 10:00:00+07', '2025-11-18 08:00:00+07'),
+(18, 2, 3, 'HCM-ADV-O1', 'HCM Advanced 1 (Good)', 'OFFLINE', '2025-11-24', '2026-01-16', NULL, ARRAY[1,3,5]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-09 10:00:00+07', '2025-11-10 14:00:00+07', '2025-11-09 10:00:00+07', '2025-11-24 08:00:00+07'),
 
 -- 3. FUTURE/SCHEDULED CLASSES
-(4, 1, 1, 'HN-FOUND-S1', 'HN Foundation 4 (Scheduled)', 'HYBRID', '2025-11-18', '2026-01-10', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 7, 3, '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07', '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07'),
+(4, 1, 1, 'HN-FOUND-S1', 'HN Foundation 4 (Scheduled)', 'HYBRID', '2025-12-15', '2026-02-06', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 7, 3, '2025-12-05 10:00:00+07', '2025-12-06 14:00:00+07', '2025-12-05 10:00:00+07', '2025-12-06 14:00:00+07'),
 
 -- 4. MAKEUP CLASSES (Special Scenarios)
-(8, 1, 1, 'HN-FOUND-MAKEUP-O', 'HN Foundation Makeup (Offline)', 'OFFLINE', '2025-11-05', '2025-12-21', NULL, ARRAY[3,5]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07', '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07'),
-(9, 2, 1, 'HCM-FOUND-MAKEUP-ON', 'HCM Foundation Makeup (Online)', 'ONLINE', '2025-11-06', '2025-12-22', NULL, ARRAY[4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07', '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07'),
-(10, 2, 1, 'HCM-FOUND-MAKEUP-OFF', 'HCM Foundation Makeup (Offline)', 'OFFLINE', '2025-11-04', '2025-12-20', NULL, ARRAY[2,4]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07', '2025-11-01 10:00:00+07', '2025-11-01 14:00:00+07'),
+(8, 1, 1, 'HN-FOUND-MAKEUP-O', 'HN Foundation Makeup (Offline)', 'OFFLINE', '2025-12-03', '2025-12-31', NULL, ARRAY[3,5]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', '2025-11-25 14:00:00+07'),
+(9, 2, 1, 'HCM-FOUND-MAKEUP-ON', 'HCM Foundation Makeup (Online)', 'ONLINE', '2025-12-04', '2026-01-02', NULL, ARRAY[4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', '2025-11-25 14:00:00+07'),
+(10, 2, 1, 'HCM-FOUND-MAKEUP-OFF', 'HCM Foundation Makeup (Offline)', 'OFFLINE', '2025-12-02', '2025-12-30', NULL, ARRAY[2,4]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', '2025-11-25 14:00:00+07'),
 
 -- 5. DRAFT/REJECTED/CANCELLED
-(11, 1, 1, 'HN-FOUND-D1', 'HN Foundation Draft', 'OFFLINE', '2026-01-01', '2026-03-01', NULL, ARRAY[2,4,6]::smallint[], 20, 'DRAFT', 'PENDING', NULL, 6, NULL, NULL, NULL, NOW(), NOW()),
-(12, 1, 1, 'HN-FOUND-R1', 'HN Foundation Rejected', 'ONLINE', '2026-02-01', '2026-04-01', NULL, ARRAY[1,3,5]::smallint[], 20, 'DRAFT', 'REJECTED', 'Schedule conflict with other classes', 6, 3, '2025-11-01 10:00:00+07', '2025-11-02 10:00:00+07', NOW(), NOW()),
-(19, 2, 1, 'HCM-FOUND-R1', 'HCM Foundation Cancelled', 'OFFLINE', '2025-11-01', '2026-01-01', NULL, ARRAY[1,3,5]::smallint[], 20, 'DRAFT', 'REJECTED', 'Insufficient enrollment', 8, 4, '2025-10-20 10:00:00+07', '2025-10-25 10:00:00+07', NOW(), NOW()),
-(20, 1, 2, 'HN-INT-R1', 'HN Intermediate Rejected', 'HYBRID', '2025-12-01', '2026-02-01', NULL, ARRAY[2,4,6]::smallint[], 20, 'DRAFT', 'REJECTED', 'Teacher unavailable', 6, 3, '2025-11-05 10:00:00+07', '2025-11-06 10:00:00+07', NOW(), NOW());
+(11, 1, 1, 'HN-FOUND-D1', 'HN Foundation Draft', 'OFFLINE', '2026-02-10', '2026-04-10', NULL, ARRAY[2,4,6]::smallint[], 20, 'DRAFT', 'PENDING', NULL, 6, NULL, NULL, NULL, NOW(), NOW()),
+(12, 1, 1, 'HN-FOUND-R1', 'HN Foundation Rejected', 'ONLINE', '2026-03-01', '2026-05-01', NULL, ARRAY[1,3,5]::smallint[], 20, 'DRAFT', 'REJECTED', 'Schedule conflict with other classes', 6, 3, '2025-12-01 10:00:00+07', '2025-12-02 10:00:00+07', NOW(), NOW()),
+(19, 2, 1, 'HCM-FOUND-R1', 'HCM Foundation Cancelled', 'OFFLINE', '2025-12-05', '2026-01-25', NULL, ARRAY[1,3,5]::smallint[], 20, 'DRAFT', 'REJECTED', 'Insufficient enrollment', 8, 4, '2025-11-25 10:00:00+07', '2025-11-28 10:00:00+07', NOW(), NOW()),
+(20, 1, 2, 'HN-INT-R1', 'HN Intermediate Rejected', 'HYBRID', '2026-01-10', '2026-02-20', NULL, ARRAY[2,4,6]::smallint[], 20, 'DRAFT', 'REJECTED', 'Teacher unavailable', 6, 3, '2025-12-05 10:00:00+07', '2025-12-06 10:00:00+07', NOW(), NOW());
 
 -- Generate Sessions for Class 1 (HN-FOUND-C1) - COMPLETED
--- Start: 2025-07-07 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
+-- Start: 2025-09-01 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
 DO $$
 DECLARE
     v_class_id BIGINT := 1;
-    v_start_date DATE := '2025-07-07';
+    v_start_date DATE := '2025-09-01';
     v_session_count INT := 24;
     v_course_session_id INT;
     v_date DATE;
@@ -776,12 +916,12 @@ SELECT id, 3, 'SCHEDULED' FROM session WHERE class_id = 1;
 
 
 -- Generate Sessions for Class 2 (HN-FOUND-O1) - Main testing class
--- Start: 2025-10-06 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
--- Today: 2025-11-02 (Sat) - Week 5 completed
+-- Start: 2025-11-10 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
+-- Reference today: 2025-11-28 (Fri) - mid-course mix DONE/PLANNED
 DO $$
 DECLARE
     v_class_id BIGINT := 2;
-    v_start_date DATE := '2025-10-06';
+    v_start_date DATE := '2025-11-10';
     v_schedule_days INT[] := ARRAY[1,3,5]; -- Mon/Wed/Fri
     v_session_count INT := 24;
     v_course_session_id INT;
@@ -798,8 +938,8 @@ BEGIN
             v_course_session_id := v_session_idx;
             v_date := v_start_date + (v_week * 7 + (v_day_idx - 1) * 2); -- Mon, Wed, Fri spacing
             
-            -- Set status based on reference date (2025-11-02)
-            IF v_date < '2025-11-02' THEN
+            -- Set status based on reference date (2025-11-28)
+            IF v_date < '2025-11-28' THEN
                 v_status := 'DONE';
             ELSE
                 v_status := 'PLANNED';
@@ -814,11 +954,11 @@ BEGIN
 END $$;
 
 -- Generate Sessions for Class 3 (HN-FOUND-O2) - For transfer scenario
--- Start: 2025-10-07 (Tue), Schedule: Tue/Thu/Sat
+-- Start: 2025-11-11 (Tue), Schedule: Tue/Thu/Sat
 DO $$
 DECLARE
     v_class_id BIGINT := 3;
-    v_start_date DATE := '2025-10-07';
+    v_start_date DATE := '2025-11-11';
     v_session_count INT := 24;
     v_course_session_id INT;
     v_date DATE;
@@ -834,7 +974,7 @@ BEGIN
             v_course_session_id := v_session_idx;
             v_date := v_start_date + (v_week * 7 + (v_day_idx - 1) * 2);
             
-            IF v_date < '2025-11-02' THEN
+            IF v_date < '2025-11-28' THEN
                 v_status := 'DONE';
             ELSE
                 v_status := 'PLANNED';
@@ -865,11 +1005,11 @@ INSERT INTO teaching_slot (session_id, teacher_id, status)
 SELECT id, 2, 'SCHEDULED' FROM session WHERE class_id = 3;
 
 -- Generate Sessions for Class 5 (HCM-FOUND-O1) - ONGOING
--- Start: 2025-10-13 (Mon), Schedule: Mon/Wed/Fri
+-- Start: 2025-11-17 (Mon), Schedule: Mon/Wed/Fri
 DO $$
 DECLARE
     v_class_id BIGINT := 5;
-    v_start_date DATE := '2025-10-13';
+    v_start_date DATE := '2025-11-17';
     v_session_count INT := 24;
     v_course_session_id INT;
     v_date DATE;
@@ -885,7 +1025,7 @@ BEGIN
             v_course_session_id := v_session_idx;
             v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
             
-            IF v_date < '2025-11-02' THEN
+            IF v_date < '2025-11-28' THEN
                 v_status := 'DONE';
             ELSE
                 v_status := 'PLANNED';
@@ -908,12 +1048,12 @@ INSERT INTO teaching_slot (session_id, teacher_id, status)
 SELECT id, 9, 'SCHEDULED' FROM session WHERE class_id = 5;
 
 -- Generate Sessions for Class 4 (HN-FOUND-S1) - SCHEDULED (Future class)
--- Start: 2025-11-18 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
+-- Start: 2025-12-15 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
 -- All sessions are PLANNED (in the future)
 DO $$
 DECLARE
     v_class_id BIGINT := 4;
-    v_start_date DATE := '2025-11-18'; -- 18/11/2025 (Monday)
+    v_start_date DATE := '2025-12-15'; -- 15/12/2025 (Monday)
     v_session_count INT := 24;
     v_course_session_id INT;
     v_date DATE;
@@ -935,7 +1075,7 @@ BEGIN
             
             -- Insert session with ID range 400-423 (to avoid conflict with other classes)
             INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (400 + v_session_idx, v_class_id, v_course_session_id, 3, v_date, 'CLASS', v_status, '2025-11-10 10:00:00+07', CURRENT_TIMESTAMP);
+            VALUES (400 + v_session_idx, v_class_id, v_course_session_id, 3, v_date, 'CLASS', v_status, '2025-12-05 10:00:00+07', CURRENT_TIMESTAMP);
             
             v_session_idx := v_session_idx + 1;
         END LOOP;
@@ -953,11 +1093,11 @@ INSERT INTO teaching_slot (session_id, teacher_id, status)
 SELECT id, 3, 'SCHEDULED' FROM session WHERE class_id = 4;
 
 -- Generate Sessions for Class 6 (HCM-FOUND-E1) - ONGOING evening class
--- Start: 2025-10-14 (Tue), Schedule: Tue/Thu/Sat, Evening slot
+-- Start: 2025-11-18 (Tue), Schedule: Tue/Thu/Sat, Evening slot
 DO $$
 DECLARE
     v_class_id BIGINT := 6;
-    v_start_date DATE := '2025-10-14';
+    v_start_date DATE := '2025-11-18';
     v_session_count INT := 24;
     v_course_session_id INT;
     v_date DATE;
@@ -973,14 +1113,14 @@ BEGIN
             v_course_session_id := v_session_idx;
             v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
 
-            IF v_date < '2025-11-02' THEN
+            IF v_date < '2025-11-28' THEN
                 v_status := 'DONE';
             ELSE
                 v_status := 'PLANNED';
             END IF;
 
             INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (500 + v_session_idx, v_class_id, v_course_session_id, 8, v_date, 'CLASS', v_status, '2025-10-08 10:00:00+07', CURRENT_TIMESTAMP);
+            VALUES (500 + v_session_idx, v_class_id, v_course_session_id, 8, v_date, 'CLASS', v_status, '2025-11-09 10:00:00+07', CURRENT_TIMESTAMP);
 
             v_session_idx := v_session_idx + 1;
         END LOOP;
@@ -996,11 +1136,11 @@ INSERT INTO teaching_slot (session_id, teacher_id, status)
 SELECT id, 10, 'SCHEDULED' FROM session WHERE class_id = 6;
 
 -- Generate Sessions for Class 7 (HCM-FOUND-M1) - Micro cohort kept at capacity
--- Start: 2025-10-20 (Mon), Schedule: Mon/Wed/Fri, Afternoon slot
+-- Start: 2025-11-24 (Mon), Schedule: Mon/Wed/Fri, Afternoon slot
 DO $$
 DECLARE
     v_class_id BIGINT := 7;
-    v_start_date DATE := '2025-10-20';
+    v_start_date DATE := '2025-11-24';
     v_session_count INT := 24;
     v_course_session_id INT;
     v_date DATE;
@@ -1016,14 +1156,14 @@ BEGIN
             v_course_session_id := v_session_idx;
             v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
 
-            IF v_date < '2025-11-02' THEN
+            IF v_date < '2025-11-28' THEN
                 v_status := 'DONE';
             ELSE
                 v_status := 'PLANNED';
             END IF;
 
             INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (600 + v_session_idx, v_class_id, v_course_session_id, 7, v_date, 'CLASS', v_status, '2025-10-10 10:00:00+07', CURRENT_TIMESTAMP);
+            VALUES (600 + v_session_idx, v_class_id, v_course_session_id, 7, v_date, 'CLASS', v_status, '2025-11-14 10:00:00+07', CURRENT_TIMESTAMP);
 
             v_session_idx := v_session_idx + 1;
         END LOOP;
@@ -1043,11 +1183,11 @@ SELECT id, 11, 'SCHEDULED' FROM session WHERE class_id = 7;
 -- ================================================================================================
 
 -- Class 13 (HN-INT-C1) - COMPLETED (Good)
--- Start: 2025-08-04, Mon/Wed/Fri
+-- Start: 2025-09-08, Mon/Wed/Fri
 DO $$
 DECLARE
     v_class_id BIGINT := 13;
-    v_start_date DATE := '2025-08-04';
+    v_start_date DATE := '2025-09-08';
     v_session_count INT := 24;
     v_session_idx INT := 1;
 BEGIN
@@ -1064,11 +1204,11 @@ INSERT INTO session_resource (session_id, resource_id) SELECT id, 1 FROM session
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 4, 'SCHEDULED' FROM session WHERE class_id = 13;
 
 -- Class 14 (HCM-INT-C1) - COMPLETED (Average)
--- Start: 2025-08-11, Mon/Wed/Fri
+-- Start: 2025-09-15, Mon/Wed/Fri
 DO $$
 DECLARE
     v_class_id BIGINT := 14;
-    v_start_date DATE := '2025-08-11';
+    v_start_date DATE := '2025-09-15';
     v_session_count INT := 24;
     v_session_idx INT := 1;
 BEGIN
@@ -1085,11 +1225,11 @@ INSERT INTO session_resource (session_id, resource_id) SELECT id, 5 FROM session
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 12, 'SCHEDULED' FROM session WHERE class_id = 14;
 
 -- Class 15 (HN-ADV-C1) - COMPLETED (At Risk)
--- Start: 2025-07-14, Tue/Thu/Sat
+-- Start: 2025-09-22, Tue/Thu/Sat
 DO $$
 DECLARE
     v_class_id BIGINT := 15;
-    v_start_date DATE := '2025-07-14';
+    v_start_date DATE := '2025-09-22';
     v_session_count INT := 24;
     v_session_idx INT := 1;
 BEGIN
@@ -1106,11 +1246,11 @@ INSERT INTO session_resource (session_id, resource_id) SELECT id, 4 FROM session
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 2, 'SCHEDULED' FROM session WHERE class_id = 15;
 
 -- Class 16 (HN-INT-O1) - ONGOING (At Risk)
--- Start: 2025-10-15, Mon/Wed/Fri
+-- Start: 2025-11-17, Mon/Wed/Fri
 DO $$
 DECLARE
     v_class_id BIGINT := 16;
-    v_start_date DATE := '2025-10-15';
+    v_start_date DATE := '2025-11-17';
     v_session_count INT := 24;
     v_session_idx INT := 1;
     v_date DATE;
@@ -1120,7 +1260,7 @@ BEGIN
             EXIT WHEN v_session_idx > v_session_count;
             v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
             INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (1100 + v_session_idx, v_class_id, v_session_idx, 1, v_date, 'CLASS', CASE WHEN v_date < '2025-11-02' THEN 'DONE' ELSE 'PLANNED' END, NOW(), NOW());
+            VALUES (1100 + v_session_idx, v_class_id, v_session_idx, 1, v_date, 'CLASS', CASE WHEN v_date < '2025-11-28' THEN 'DONE' ELSE 'PLANNED' END, NOW(), NOW());
             v_session_idx := v_session_idx + 1;
         END LOOP;
     END LOOP;
@@ -1129,11 +1269,11 @@ INSERT INTO session_resource (session_id, resource_id) SELECT id, 2 FROM session
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 5, 'SCHEDULED' FROM session WHERE class_id = 16;
 
 -- Class 17 (HCM-INT-O1) - ONGOING (At Risk)
--- Start: 2025-10-21, Tue/Thu/Sat
+-- Start: 2025-11-18, Tue/Thu/Sat
 DO $$
 DECLARE
     v_class_id BIGINT := 17;
-    v_start_date DATE := '2025-10-21';
+    v_start_date DATE := '2025-11-18';
     v_session_count INT := 24;
     v_session_idx INT := 1;
     v_date DATE;
@@ -1143,7 +1283,7 @@ BEGIN
             EXIT WHEN v_session_idx > v_session_count;
             v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END; -- Logic check: Tue start. +0=Tue, +2=Thu, +4=Sat. Correct.
             INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (1200 + v_session_idx, v_class_id, v_session_idx, 8, v_date, 'CLASS', CASE WHEN v_date < '2025-11-02' THEN 'DONE' ELSE 'PLANNED' END, NOW(), NOW());
+            VALUES (1200 + v_session_idx, v_class_id, v_session_idx, 8, v_date, 'CLASS', CASE WHEN v_date < '2025-11-28' THEN 'DONE' ELSE 'PLANNED' END, NOW(), NOW());
             v_session_idx := v_session_idx + 1;
         END LOOP;
     END LOOP;
@@ -1152,11 +1292,11 @@ INSERT INTO session_resource (session_id, resource_id) SELECT id, 8 FROM session
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 13, 'SCHEDULED' FROM session WHERE class_id = 17;
 
 -- Class 18 (HCM-ADV-O1) - ONGOING (Good)
--- Start: 2025-10-22, Mon/Wed/Fri
+-- Start: 2025-11-24, Mon/Wed/Fri
 DO $$
 DECLARE
     v_class_id BIGINT := 18;
-    v_start_date DATE := '2025-10-22';
+    v_start_date DATE := '2025-11-24';
     v_session_count INT := 24;
     v_session_idx INT := 1;
     v_date DATE;
@@ -1166,7 +1306,7 @@ BEGIN
             EXIT WHEN v_session_idx > v_session_count;
             v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
             INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (1300 + v_session_idx, v_class_id, v_session_idx, 6, v_date, 'CLASS', CASE WHEN v_date < '2025-11-02' THEN 'DONE' ELSE 'PLANNED' END, NOW(), NOW());
+            VALUES (1300 + v_session_idx, v_class_id, v_session_idx, 6, v_date, 'CLASS', CASE WHEN v_date < '2025-11-28' THEN 'DONE' ELSE 'PLANNED' END, NOW(), NOW());
             v_session_idx := v_session_idx + 1;
         END LOOP;
     END LOOP;
@@ -1178,49 +1318,43 @@ INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 9, 'SCHEDU
 -- ========== MAKEUP OPTIONS TEST DATA ==========
 -- Generate makeup sessions for student 1's absences (2025-11-03 to 2025-11-16)
 
--- Classes 8, 9, 10 are defined in Tier 4
+-- =========================================
+-- NEW CLASSES FOR COURSES 4-10 - REALISTIC SCHEDULING
+-- =========================================
 
--- Sessions for makeup classes
-DO $$
-DECLARE
-    -- Course session IDs corresponding to student 1's recent absences
-    v_absent_course_session_ids INT[] := ARRAY[10, 11, 12, 16]; -- Added 16 for the user's test case
-    v_session_id_counter INT := 700;
-BEGIN
-    -- Class 8 Sessions (HN, OFFLINE) - Wed, Fri
-    INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at) VALUES
-    (v_session_id_counter + 1, 8, v_absent_course_session_ids[1], 3, '2025-11-05', 'CLASS', 'PLANNED', NOW(), NOW()),
-    (v_session_id_counter + 2, 8, v_absent_course_session_ids[2], 3, '2025-11-07', 'CLASS', 'PLANNED', NOW(), NOW()),
-    (v_session_id_counter + 3, 8, v_absent_course_session_ids[3], 3, '2025-11-12', 'CLASS', 'PLANNED', NOW(), NOW()),
-    (v_session_id_counter + 10, 8, v_absent_course_session_ids[4], 3, '2025-11-14', 'CLASS', 'PLANNED', NOW(), NOW()); -- Makeup for session 116 (course_session_id 16)
+-- Classes for TOEIC Intermediate (Course 4)
+INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+(21, 1, 4, 'HN-TOEIC-I1', 'HN TOEIC Intermediate 1 (Business)', 'OFFLINE', '2025-12-02', '2026-02-15', NULL, ARRAY[2,4]::smallint[], 18, 'ONGOING', 'APPROVED', NULL, 8, 3, '2025-11-20 10:00:00+07', '2025-11-21 14:00:00+07', '2025-11-20 10:00:00+07', '2025-12-02 08:00:00+07'),
+(22, 2, 4, 'HCM-TOEIC-I1', 'HCM TOEIC Intermediate 1 (Online)', 'ONLINE', '2025-12-09', '2026-02-24', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 9, 4, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', '2025-12-09 08:00:00+07');
 
-    -- Class 9 Sessions (HCM, ONLINE) - Thu, Sat
-    INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at) VALUES
-    (v_session_id_counter + 4, 9, v_absent_course_session_ids[1], 7, '2025-11-06', 'CLASS', 'PLANNED', NOW(), NOW()),
-    (v_session_id_counter + 5, 9, v_absent_course_session_ids[2], 7, '2025-11-08', 'CLASS', 'PLANNED', NOW(), NOW()),
-    (v_session_id_counter + 6, 9, v_absent_course_session_ids[3], 7, '2025-11-13', 'CLASS', 'PLANNED', NOW(), NOW()),
-    (v_session_id_counter + 11, 9, v_absent_course_session_ids[4], 7, '2025-11-15', 'CLASS', 'PLANNED', NOW(), NOW()); -- Makeup for session 116 (course_session_id 16)
+-- Classes for TOEIC Advanced (Course 5)
+INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+(23, 1, 5, 'HN-TOEIC-A1', 'HN TOEIC Advanced 1 (Executive)', 'HYBRID', '2025-12-16', '2026-02-20', NULL, ARRAY[6,7]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 8, 3, '2025-12-05 10:00:00+07', '2025-12-06 14:00:00+07', '2025-12-05 10:00:00+07', '2025-12-16 08:00:00+07');
 
-    -- Class 10 Sessions (HCM, OFFLINE) - Tue, Thu
-    INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at) VALUES
-    (v_session_id_counter + 7, 10, v_absent_course_session_ids[1], 7, '2025-11-04', 'CLASS', 'PLANNED', NOW(), NOW()),
-    (v_session_id_counter + 8, 10, v_absent_course_session_ids[2], 7, '2025-11-06', 'CLASS', 'PLANNED', NOW(), NOW()),
-    (v_session_id_counter + 9, 10, v_absent_course_session_ids[3], 7, '2025-11-11', 'CLASS', 'PLANNED', NOW(), NOW()),
-    (v_session_id_counter + 12, 10, v_absent_course_session_ids[4], 7, '2025-11-13', 'CLASS', 'PLANNED', NOW(), NOW()); -- Makeup for session 116 (course_session_id 16)
-END $$;
+-- Classes for Business English (Course 6)
+INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+(24, 1, 6, 'HN-BUS-1', 'HN Business English 1 (Weekend)', 'OFFLINE', '2025-12-07', '2026-02-01', NULL, ARRAY[6,7]::smallint[], 12, 'ONGOING', 'APPROVED', NULL, 7, 3, '2025-11-28 10:00:00+07', '2025-11-29 14:00:00+07', '2025-11-28 10:00:00+07', '2025-12-07 08:00:00+07'),
+(25, 2, 6, 'HCM-BUS-1', 'HCM Business English 1 (Evening)', 'ONLINE', '2025-12-09', '2026-02-03', NULL, ARRAY[2,4]::smallint[], 16, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', '2025-12-09 08:00:00+07');
 
--- Assign resources and teachers for makeup classes
--- Class 8 (HN Offline) -> Room 102, Teacher 4
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 2 FROM session WHERE class_id = 8;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 4, 'SCHEDULED' FROM session WHERE class_id = 8;
+-- Classes for Conversation (Course 7)
+INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+(26, 1, 7, 'HN-CONV-1', 'HN Conversation 1 (Evening)', 'OFFLINE', '2025-12-06', '2026-01-25', NULL, ARRAY[1,3,5]::smallint[], 10, 'ONGOING', 'APPROVED', NULL, 7, 3, '2025-11-27 10:00:00+07', '2025-11-28 14:00:00+07', '2025-11-27 10:00:00+07', '2025-12-06 08:00:00+07'),
+(27, 2, 7, 'HCM-CONV-1', 'HCM Conversation 1 (Morning)', 'ONLINE', '2025-12-08', '2026-01-27', NULL, ARRAY[2,4,6]::smallint[], 12, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-28 10:00:00+07', '2025-11-29 14:00:00+07', '2025-11-28 10:00:00+07', '2025-12-08 08:00:00+07');
 
--- Class 9 (HCM Online) -> Zoom 01, Teacher 12
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 8 FROM session WHERE class_id = 9;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 12, 'SCHEDULED' FROM session WHERE class_id = 9;
+-- Classes for Pronunciation Workshop (Course 8)
+INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+(28, 1, 8, 'HN-PRON-1', 'HN Pronunciation Workshop 1 (Weekend)', 'OFFLINE', '2025-12-14', '2026-01-18', NULL, ARRAY[6,7]::smallint[], 8, 'SCHEDULED', 'APPROVED', NULL, 7, 3, '2025-12-05 10:00:00+07', '2025-12-06 14:00:00+07', '2025-12-05 10:00:00+07', '2025-12-05 08:00:00+07');
 
--- Class 10 (HCM Offline) -> Room 101, Teacher 13
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 5 FROM session WHERE class_id = 10;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 13, 'SCHEDULED' FROM session WHERE class_id = 10;
+-- Classes for Academic Writing (Course 9)
+INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+(29, 1, 9, 'HN-WRIT-1', 'HN Academic Writing 1 (Evening)', 'HYBRID', '2026-01-05', '2026-02-20', NULL, ARRAY[3,5]::smallint[], 15, 'SCHEDULED', 'PENDING', NULL, 7, NULL, '2025-12-20 10:00:00+07', NULL, '2025-12-20 10:00:00+07', '2025-12-20 10:00:00+07');
+
+-- Classes for IELTS Intensive (Course 10)
+INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+(30, 1, 10, 'HN-IELTS-INT-1', 'HN IELTS Intensive 1 (Daily)', 'OFFLINE', '2026-01-08', '2026-02-28', NULL, ARRAY[1,2,3,4,5]::smallint[], 18, 'SCHEDULED', 'APPROVED', NULL, 7, 3, '2025-12-15 10:00:00+07', '2025-12-16 14:00:00+07', '2025-12-15 10:00:00+07', '2025-12-15 08:00:00+07'),
+(31, 2, 10, 'HCM-IELTS-INT-1', 'HCM IELTS Intensive 1 (Online)', 'ONLINE', '2026-01-10', '2026-03-05', NULL, ARRAY[2,3,4,5,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-20 10:00:00+07', '2025-12-21 14:00:00+07', '2025-12-20 10:00:00+07', '2025-12-20 08:00:00+07');
+
+-- Sessions for classes 8, 9, 10 are defined in Tier 4; no additional makeup batch here.
 
 -- ========== TIER 5: ENROLLMENTS & ATTENDANCE ==========
 
@@ -1345,7 +1479,7 @@ WHERE e.class_id = 2
   AND (e.join_session_id IS NULL OR s.id >= e.join_session_id);
 
 -- MAKEUP FLOW TEST DATA: Create recent absences for student 1
--- Mark student 1 as ABSENT for 3 recent sessions (last week of Oct 2025)
+-- Mark student 1 as ABSENT for 3 recent sessions (late Nov 2025 near ref date)
 UPDATE student_session 
 SET attendance_status = 'ABSENT', note = 'Missed session, eligible for makeup.'
 WHERE student_id = 1 
@@ -1353,8 +1487,8 @@ WHERE student_id = 1
     SELECT id FROM session 
     WHERE class_id = 2 
       AND status = 'DONE'
-      AND date >= '2025-10-27'  -- Last week
-      AND date <= '2025-11-01'  -- Before reference date
+      AND date >= '2025-11-20'  -- Last week relative to ref date 2025-11-28
+      AND date <= '2025-11-26'  -- Before reference date
     ORDER BY date DESC
     LIMIT 3
   );
