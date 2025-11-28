@@ -15,6 +15,8 @@ import lombok.NoArgsConstructor;
 public class BranchStatDTO {
     private Long branchId;
     private String branchName;
+    private Long centerId;
+    private String centerName;
     private Long studentCount;
     private Long teacherCount;
     private Long classCount;
