@@ -1,5 +1,6 @@
 package org.fyp.tmssep490be.repositories;
 
+import org.fyp.tmssep490be.dtos.FeedbackReminderDTO;
 import org.fyp.tmssep490be.entities.StudentFeedback;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,28 +14,6 @@ import java.util.Optional;
 
 @Repository
 public interface StudentFeedbackRepository extends JpaRepository<StudentFeedback, Long> {
-
-    /**
-     * Find all feedbacks for a specific session
-     * Used for QA session detail functionality
-     */
-    @Query("SELECT sf FROM StudentFeedback sf " +
-           "JOIN FETCH sf.student s " +
-           "JOIN FETCH s.userAccount ua " +
-           "JOIN sf.classEntity c " +
-           "JOIN c.sessions sess " +
-           "WHERE sess.id = :sessionId " +
-           "ORDER BY s.userAccount.fullName")
-    List<StudentFeedback> findBySessionIdWithDetails(@Param("sessionId") Long sessionId);
-
-    /**
-     * Count feedback submissions for a session
-     */
-    @Query("SELECT COUNT(sf) FROM StudentFeedback sf " +
-           "JOIN sf.classEntity c " +
-           "JOIN c.sessions sess " +
-           "WHERE sess.id = :sessionId")
-    long countBySessionId(@Param("sessionId") Long sessionId);
 
     // ============== SCHEDULER JOB METHODS ==============
 
@@ -59,7 +38,7 @@ public interface StudentFeedbackRepository extends JpaRepository<StudentFeedback
         AND e.status = 'COMPLETED'
         AND (sf.id IS NULL OR sf.isFeedback = false)
         """)
-    List<org.fyp.tmssep490be.dtos.FeedbackReminderDTO> findPendingFeedbackReminders();
+    List<FeedbackReminderDTO> findPendingFeedbackReminders();
 
     // ============== QA METHODS ==============
 
@@ -79,6 +58,13 @@ public interface StudentFeedbackRepository extends JpaRepository<StudentFeedback
 
     @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.classEntity.id = :classId AND e.status = 'ACTIVE'")
     long countActiveStudentsByClassId(@Param("classId") Long classId);
+
+    @Query("SELECT COUNT(sf) FROM StudentFeedback sf " +
+           "WHERE sf.classEntity.id = :classId " +
+           "AND (:phaseId IS NULL OR sf.phase.id = :phaseId) " +
+           "AND sf.isFeedback = true")
+    long countSubmittedFeedbacksByClassIdAndPhase(@Param("classId") Long classId,
+                                                  @Param("phaseId") Long phaseId);
 
     @Query("SELECT COUNT(sf) FROM StudentFeedback sf " +
            "WHERE sf.classEntity.id = :classId AND sf.isFeedback = true")

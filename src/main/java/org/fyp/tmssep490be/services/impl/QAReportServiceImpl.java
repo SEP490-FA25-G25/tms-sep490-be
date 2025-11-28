@@ -42,6 +42,10 @@ public class QAReportServiceImpl implements QAReportService {
         return userBranchesRepository.findBranchIdsByUserId(userId);
     }
 
+    private boolean userHasBranchAccess(Long userId, Long branchId) {
+        return getUserAccessibleBranches(userId).stream().anyMatch(id -> id.equals(branchId));
+    }
+
     // ========== Enhanced Validation Methods ==========
 
     /**
@@ -124,6 +128,13 @@ public class QAReportServiceImpl implements QAReportService {
 
         if (!hasPermission) {
             throw new InvalidRequestException("Bạn không có quyền tạo QA report");
+        }
+
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new ResourceNotFoundException("Class không tồn tại"));
+
+        if (classEntity.getBranch() == null || !userHasBranchAccess(userId, classEntity.getBranch().getId())) {
+            throw new InvalidRequestException("Bạn không có quyền truy cập lớp thuộc chi nhánh này");
         }
 
         log.info("Validated user {} permission for class {} - Has QA role: {}",
@@ -259,6 +270,11 @@ public class QAReportServiceImpl implements QAReportService {
         QAReport report = qaReportRepository.findById(reportId)
                 .orElseThrow(() -> new ResourceNotFoundException("QA Report không tồn tại"));
 
+        if (report.getClassEntity() == null || report.getClassEntity().getBranch() == null ||
+            !userHasBranchAccess(userId, report.getClassEntity().getBranch().getId())) {
+            throw new InvalidRequestException("Bạn không có quyền sửa report của lớp thuộc chi nhánh này");
+        }
+
         if (!report.getReportedBy().getId().equals(userId)) {
             throw new InvalidRequestException("Bạn không có quyền sửa report này");
         }
@@ -300,6 +316,11 @@ public class QAReportServiceImpl implements QAReportService {
 
         QAReport report = qaReportRepository.findById(reportId)
                 .orElseThrow(() -> new ResourceNotFoundException("QA Report không tồn tại"));
+
+        if (report.getClassEntity() == null || report.getClassEntity().getBranch() == null ||
+            !userHasBranchAccess(userId, report.getClassEntity().getBranch().getId())) {
+            throw new InvalidRequestException("Bạn không có quyền thay đổi status report của lớp thuộc chi nhánh này");
+        }
 
         if (!report.getReportedBy().getId().equals(userId)) {
             throw new InvalidRequestException("Bạn không có quyền thay đổi status report này");
@@ -352,6 +373,11 @@ public class QAReportServiceImpl implements QAReportService {
 
         QAReport report = qaReportRepository.findById(reportId)
                 .orElseThrow(() -> new ResourceNotFoundException("QA Report không tồn tại"));
+
+        if (report.getClassEntity() == null || report.getClassEntity().getBranch() == null ||
+            !userHasBranchAccess(userId, report.getClassEntity().getBranch().getId())) {
+            throw new InvalidRequestException("Bạn không có quyền xóa report của lớp thuộc chi nhánh này");
+        }
 
         if (!report.getReportedBy().getId().equals(userId)) {
             throw new InvalidRequestException("Bạn không có quyền xóa report này");

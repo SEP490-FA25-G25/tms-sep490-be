@@ -6,7 +6,7 @@ import org.springframework.data.domain.Pageable;
 
 public interface StudentFeedbackService {
     StudentFeedbackListResponse getClassFeedbacks(Long classId, Long phaseId, Boolean isFeedback,
-                                                   Pageable pageable);
+                                                  Pageable pageable, Long userId);
 
-    StudentFeedbackDetailDTO getFeedbackDetail(Long feedbackId);
+    StudentFeedbackDetailDTO getFeedbackDetail(Long feedbackId, Long userId);
 }

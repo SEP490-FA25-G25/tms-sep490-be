@@ -67,7 +67,7 @@ public class StudentFeedbackController {
         Pageable pageable = PageRequest.of(page, size);
 
         StudentFeedbackListResponse response = studentFeedbackService.getClassFeedbacks(
-            classId, phaseId, isFeedback, pageable
+            classId, phaseId, isFeedback, pageable, currentUser.getId()
         );
 
         return ResponseEntity.ok(ResponseObject.<StudentFeedbackListResponse>builder()
@@ -93,11 +93,12 @@ public class StudentFeedbackController {
         @ApiResponse(responseCode = "404", description = "Feedback not found")
     })
     public ResponseEntity<ResponseObject<StudentFeedbackDetailDTO>> getFeedbackDetail(
-        @PathVariable Long feedbackId
+        @PathVariable Long feedbackId,
+        @AuthenticationPrincipal UserPrincipal currentUser
     ) {
         log.info("Requesting feedback detail for feedbackId={}", feedbackId);
 
-        StudentFeedbackDetailDTO feedback = studentFeedbackService.getFeedbackDetail(feedbackId);
+        StudentFeedbackDetailDTO feedback = studentFeedbackService.getFeedbackDetail(feedbackId, currentUser.getId());
 
         return ResponseEntity.ok(ResponseObject.<StudentFeedbackDetailDTO>builder()
             .success(true)

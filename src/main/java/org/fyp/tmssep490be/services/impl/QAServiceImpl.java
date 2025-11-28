@@ -19,12 +19,12 @@ import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.HomeworkStatus;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
+import org.fyp.tmssep490be.exceptions.InvalidRequestException;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
 import org.fyp.tmssep490be.repositories.ClassRepository;
 import org.fyp.tmssep490be.repositories.QAReportRepository;
 import org.fyp.tmssep490be.repositories.ScoreRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
-import org.fyp.tmssep490be.repositories.StudentFeedbackRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.fyp.tmssep490be.services.QAService;
@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import java.time.LocalDate;
@@ -52,7 +53,6 @@ public class QAServiceImpl implements QAService {
     private final QAReportRepository qaReportRepository;
     private final ScoreRepository scoreRepository;
     private final SessionRepository sessionRepository;
-    private final StudentFeedbackRepository studentFeedbackRepository;
     private final StudentSessionRepository studentSessionRepository;
     private final UserBranchesRepository userBranchesRepository;
 
@@ -137,6 +137,17 @@ public class QAServiceImpl implements QAService {
      */
     private List<Long> getUserAccessibleBranches(Long userId) {
         return userBranchesRepository.findBranchIdsByUserId(userId);
+    }
+
+    private void ensureUserHasAccessToClass(ClassEntity classEntity, Long userId) {
+        if (classEntity.getBranch() == null) {
+            throw new InvalidRequestException("Lớp không có thông tin chi nhánh");
+        }
+
+        List<Long> accessibleBranches = getUserAccessibleBranches(userId);
+        if (accessibleBranches.isEmpty() || accessibleBranches.stream().noneMatch(id -> id.equals(classEntity.getBranch().getId()))) {
+            throw new InvalidRequestException("Bạn không có quyền truy cập lớp thuộc chi nhánh này");
+        }
     }
 
     /**
@@ -484,6 +495,8 @@ public class QAServiceImpl implements QAService {
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found with id: " + classId));
 
+        ensureUserHasAccessToClass(classEntity, userId);
+
         // Session summary
         long totalSessions = sessionRepository.countByClassEntityId(classId);
         long completedSessions = sessionRepository.countByClassEntityIdExcludingCancelled(classId); // Use existing method
@@ -624,6 +637,8 @@ public class QAServiceImpl implements QAService {
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found with id: " + classId));
 
+        ensureUserHasAccessToClass(classEntity, userId);
+
         // Get all sessions for this class using existing method
         List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
 
@@ -719,6 +734,8 @@ public class QAServiceImpl implements QAService {
 
         ClassEntity classEntity = session.getClassEntity();
 
+        ensureUserHasAccessToClass(classEntity, userId);
+
         // Get student sessions for attendance and homework data
         List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(sessionId);
 
@@ -762,53 +779,19 @@ public class QAServiceImpl implements QAService {
                 .homeworkCompletionRate(homeworkCompletionRate)
                 .build();
 
-        // Get CLO information if available
+        // Get CLO information mapped to this session (courseSession mappings)
         List<SessionDetailDTO.CLOInfo> closCovered = new ArrayList<>();
-        if (session.getCourseSession() != null && session.getCourseSession().getPhase() != null) {
-            // Get CLOs from course phase
-            CoursePhase phase = session.getCourseSession().getPhase();
-            if (phase.getCourse() != null) {
-                closCovered = phase.getCourse().getClos().stream()
-                        .map(clo -> SessionDetailDTO.CLOInfo.builder()
-                                .cloId(clo.getId())
-                                .cloCode(clo.getCode())
-                                .description(clo.getDescription())
-                                .build())
-                        .collect(java.util.stream.Collectors.toList());
-            }
+        if (session.getCourseSession() != null && session.getCourseSession().getCourseSessionCLOMappings() != null) {
+            closCovered = session.getCourseSession().getCourseSessionCLOMappings().stream()
+                    .map(mapping -> mapping.getClo())
+                    .filter(java.util.Objects::nonNull)
+                    .map(clo -> SessionDetailDTO.CLOInfo.builder()
+                            .cloId(clo.getId())
+                            .cloCode(clo.getCode())
+                            .description(clo.getDescription())
+                            .build())
+                    .collect(Collectors.toList());
         }
-
-        // Get student feedback summary
-        long feedbackSubmissions = studentFeedbackRepository.countBySessionId(sessionId);
-        double feedbackRate = totalStudents > 0 ? (feedbackSubmissions * 100.0 / totalStudents) : 0.0;
-
-        // Get detailed feedback data for average rating and common feedback
-        List<org.fyp.tmssep490be.entities.StudentFeedback> sessionFeedbacks =
-                studentFeedbackRepository.findBySessionIdWithDetails(sessionId);
-
-        Double averageRating = sessionFeedbacks.stream()
-                .filter(sf -> sf.getResponse() != null && !sf.getResponse().trim().isEmpty())
-                .mapToDouble(sf -> {
-                    // Simple rating extraction from feedback text (if numeric)
-                    try {
-                        String response = sf.getResponse().toLowerCase();
-                        if (response.contains("1") || response.contains("kém")) return 1.0;
-                        if (response.contains("2") || response.contains("tb")) return 2.0;
-                        if (response.contains("3") || response.contains("khá")) return 3.0;
-                        if (response.contains("4") || response.contains("tốt")) return 4.0;
-                        if (response.contains("5") || response.contains("rất tốt")) return 5.0;
-                        return 3.0; // Default rating
-                    } catch (Exception e) {
-                        return 3.0;
-                    }
-                })
-                .average()
-                .orElse(0.0);
-
-        String commonFeedback = sessionFeedbacks.stream()
-                .filter(sf -> sf.getResponse() != null && sf.getResponse().length() > 10)
-                .map(org.fyp.tmssep490be.entities.StudentFeedback::getResponse)
-                .collect(java.util.stream.Collectors.joining("; "));
 
         String teacherName = session.getTeachingSlots() != null && !session.getTeachingSlots().isEmpty()
                 ? session.getTeachingSlots().stream()
@@ -829,15 +812,7 @@ public class QAServiceImpl implements QAService {
                 totalStudents, presentCount,
                 String.format("%.1f", attendanceRate),
                 String.format("%.1f", homeworkCompletionRate),
-                feedbackSubmissions);
-
-        SessionDetailDTO.StudentFeedbackSummary feedbackSummary = SessionDetailDTO.StudentFeedbackSummary.builder()
-                .totalStudents((int) totalStudents)
-                .feedbackSubmissions((int) feedbackSubmissions)
-                .feedbackRate(feedbackRate)
-                .averageRating(averageRating)
-                .commonFeedback(commonFeedback)
-                .build();
+                0);
 
         return SessionDetailDTO.builder()
                 .sessionId(session.getId())
@@ -854,7 +829,7 @@ public class QAServiceImpl implements QAService {
                 .attendanceStats(attendanceStats)
                 .students(studentAttendanceList)
                 .closCovered(closCovered)
-                .studentFeedbackSummary(feedbackSummary)
+                .studentFeedbackSummary(null)
                 .build();
     }
 }

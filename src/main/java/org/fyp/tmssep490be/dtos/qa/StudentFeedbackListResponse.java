@@ -40,5 +40,7 @@ public class StudentFeedbackListResponse {
         private Boolean isFeedback;
         private OffsetDateTime submittedAt;
         private String responsePreview;
+        private Double rating;
+        private String sentiment;
     }
 }

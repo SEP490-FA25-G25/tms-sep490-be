@@ -23,6 +23,8 @@ public class StudentFeedbackDetailDTO {
     private Boolean isFeedback;
     private OffsetDateTime submittedAt;
     private String response;
+    private Double rating;
+    private String sentiment;
     private List<FeedbackResponseItem> detailedResponses;
 
     @Data
