@@ -13,14 +13,17 @@ import java.util.List;
 @AllArgsConstructor
 public class CoursePhaseDTO {
     private Long id;
-    private String name;
+    private Long courseId;
+    private String courseName;
     private Integer phaseNumber;
+    private String name;
+    private Integer durationWeeks;
+    private String learningFocus;
+
+    // Legacy fields for compatibility
     private String description;
     private Integer sequenceNo;
-
     private List<CourseSessionDTO> sessions;
-
-    // Main fields
     private List<CourseMaterialDTO> materials;
     private Integer totalSessions;
     private Integer totalMaterials;
