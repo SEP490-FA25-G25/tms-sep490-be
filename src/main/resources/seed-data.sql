@@ -484,9 +484,9 @@ INSERT INTO level (id, subject_id, code, name, expected_duration_hours, sort_ord
 (7, 1, 'DUMMY7', 'Dummy Level 7', 0, 7, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
 (8, 1, 'DUMMY8', 'Dummy Level 8', 0, 8, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
 (9, 1, 'DUMMY9', 'Dummy Level 9', 0, 9, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(10, 1, 'DUMMY10', 'Dummy Level 10 (JLPT N5)', 0, 10, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
-(5, 1, 'TOEIC-500', 'TOEIC 500+', 60, 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(10, 1, 'JLPT-N5', 'JLPT N5', 60, 10, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
+(10, 1, 'DUMMY10', 'Dummy Level 10 (JLPT N5)', 0, 10, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
+(11, 1, 'TOEIC-500', 'TOEIC 500+', 60, 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
+(12, 1, 'JLPT-N5', 'JLPT N5', 60, 10, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
 
 -- Replacement Skill Assessments for initial students
 -- Simulates placement test results before their first enrollment.
@@ -506,14 +506,14 @@ SELECT
     'Initial IELTS placement test score.',
     '2025-06-15 00:00:00+07',
     '2025-06-15 00:00:00+07'
-FROM generate_series(1, 60) AS s(id);
+FROM generate_series(2, 60) AS s(id);
 
 -- JLPT Sample Assessments (for students 1-5 as examples)
 -- Student 1: JLPT N5 Placement Test
 INSERT INTO replacement_skill_assessment (student_id, skill, level_id, raw_score, scaled_score, score_scale, assessment_category, assessment_date, assessment_type, assessed_by, note, created_at, updated_at) VALUES
 (1, 'GENERAL', 10, 45, 75.0, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Vocabulary Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
-(1, 'GENERAL', 10, 38, 63.3, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Grammar Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
-(1, 'GENERAL', 10, 50, 83.3, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Kanji Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
+(1, 'GENERAL', 10, 38, 63.3, '0-100', 'PRACTICE', '2025-06-16', 'jlpt_n5_placement', 6, 'JLPT N5 Grammar Assessment', '2025-06-16 00:00:00+07', '2025-06-16 00:00:00+07'),
+(1, 'GENERAL', 10, 50, 83.3, '0-100', 'MOCK', '2025-06-17', 'jlpt_n5_placement', 6, 'JLPT N5 Kanji Assessment', '2025-06-17 00:00:00+07', '2025-06-17 00:00:00+07'),
 (1, 'READING', 10, 42, 70.0, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Reading Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
 (1, 'LISTENING', 10, 48, 80.0, '0-100', 'PLACEMENT', '2025-06-15', 'jlpt_n5_placement', 6, 'JLPT N5 Listening Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07');
 
@@ -533,7 +533,8 @@ INSERT INTO plo (id, subject_id, code, description, created_at, updated_at) VALU
 -- Course: IELTS Foundation
 INSERT INTO course (id, subject_id, level_id, logical_course_code, version, code, name, description, total_hours, hours_per_session, prerequisites, target_audience, teaching_methods, score_scale, status, approval_status, decided_by_manager, decided_at, rejection_reason, created_by, created_at, updated_at) VALUES
 (1, 1, 1, 'IELTS-FOUND-2025', 1, 'IELTS-FOUND-2025-V1', 'IELTS Foundation 2025', 'Khóa học nền tảng cho người mới bắt đầu, mục tiêu band 3.0-4.0', 60, 2.5, 'Không yêu cầu kiến thức nền tảng. Phù hợp cho người mới bắt đầu.', 'Học viên mất gốc hoặc mới bắt đầu học tiếng Anh, mong muốn đạt band 3.0-4.0 IELTS.', 'Phương pháp Communicative Language Teaching (CLT) kết hợp bài tập thực hành tương tác.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-20 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-20 14:00:00+07'),
-(2, 1, 2, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 75, 2.5, 'Đã hoàn thành khóa Foundation hoặc có trình độ tương đương IELTS 4.0.', 'Học viên đã có nền tảng cơ bản, mục tiêu đạt band 5.0-5.5.', 'Tập trung vào kỹ năng làm bài thi, chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'SUBMITTED', 'PENDING', NULL, NULL, NULL, 5, NOW(), NOW());
+(2, 1, 2, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 75, 2.5, 'Đã hoàn thành khóa Foundation hoặc có trình độ tương đương IELTS 4.0.', 'Học viên đã có nền tảng cơ bản, mục tiêu đạt band 5.0-5.5.', 'Tập trung vào kỹ năng làm bài thi, chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'SUBMITTED', 'PENDING', NULL, NULL, NULL, 5, NOW(), NOW()),
+(3, 1, 3, 'IELTS-ADV-2025', 1, 'IELTS-ADV-2025-V1', 'IELTS Advanced 2025', 'Khóa học nâng cao, mục tiêu band 6.5 trở lên với luyện đề chuyên sâu.', 90, 2.5, 'Hoàn thành khóa Intermediate hoặc tương đương IELTS 5.5.', 'Học viên muốn đạt band 6.5+ để du học hoặc làm việc.', 'Luyện đề cường độ cao, phản hồi cá nhân hóa và workshop kỹ năng.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-08-25 14:00:00+07');
 -- Course Phases for Foundation
 INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
 (1, 1, 1, 'Foundation Basics', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
@@ -1834,10 +1835,6 @@ SELECT f.id, q.id,
     CASE WHEN q.question_type = 'rating' THEN 5 ELSE NULL END,
     NOW(), NOW()
 FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 2;
-
--- Pending feedback for test student (student.0001@gmail.com -> user_id 101 -> student_id 1)
-INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, created_at, updated_at)
-VALUES (9000, 1, 2, 1, false, NOW(), NOW());
 
 -- Reset feedback 401 (student 1, class 2, phase 1) to pending for demo
 DELETE FROM student_feedback_response WHERE feedback_id = 401;
