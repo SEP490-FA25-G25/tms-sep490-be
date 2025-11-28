@@ -17,4 +17,6 @@ public class LevelResponseDTO {
     private Integer durationHours;
     private String subjectName;
     private String subjectCode;
+    private String status;
+    private Integer sortOrder;
 }

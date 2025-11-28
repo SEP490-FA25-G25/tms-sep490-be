@@ -9,10 +9,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
+    
+    /**
+     * Count enrollments created between two dates
+     */
+    long countByEnrolledAtBetween(OffsetDateTime start, OffsetDateTime end);
+    
     /**
      * Count enrolled students của một class với status cụ thể
      */
@@ -197,4 +204,34 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
         @Param("weekEnd") java.time.LocalDate weekEnd,
         @Param("threshold") Double threshold
     );
+
+    /**
+     * Count enrollments by date range in specific branches
+     */
+    @Query("SELECT COUNT(e) FROM Enrollment e " +
+           "INNER JOIN e.classEntity c " +
+           "WHERE e.enrolledAt BETWEEN :start AND :end " +
+           "AND c.branch.id IN :branchIds")
+    long countByEnrolledAtBetweenAndBranchIdIn(
+            @Param("start") OffsetDateTime start,
+            @Param("end") OffsetDateTime end,
+            @Param("branchIds") List<Long> branchIds);
+
+    /**
+     * Count enrollments in specific branches
+     */
+    @Query("SELECT COUNT(e) FROM Enrollment e " +
+           "INNER JOIN e.classEntity c " +
+           "WHERE c.branch.id IN :branchIds")
+    long countByBranchIdIn(@Param("branchIds") List<Long> branchIds);
+
+    /**
+     * Calculate average enrollment rate for branches
+     */
+    @Query("SELECT COALESCE(AVG(CAST(e.classEntity.maxCapacity AS DOUBLE) / NULLIF(e.classEntity.maxCapacity, 0)), 0.0) " +
+           "FROM Enrollment e " +
+           "INNER JOIN e.classEntity c " +
+           "WHERE c.branch.id IN :branchIds " +
+           "AND e.status = org.fyp.tmssep490be.entities.enums.EnrollmentStatus.ENROLLED")
+    double calculateAverageEnrollmentRateForBranches(@Param("branchIds") List<Long> branchIds);
 }

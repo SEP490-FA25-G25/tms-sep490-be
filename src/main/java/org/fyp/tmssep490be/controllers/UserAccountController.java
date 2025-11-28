@@ -84,14 +84,18 @@ public class UserAccountController {
     }
 
     /**
-     * Get all users with pagination
-     * GET /api/v1/users?page=0&size=20&sort=id,desc
+     * Get all users with pagination and filters
+     * GET /api/v1/users?page=0&size=20&sort=id,desc&search=keyword&role=TEACHER&status=ACTIVE
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CENTER_HEAD')")
-    public ResponseEntity<ResponseObject<Page<UserResponse>>> getAllUsers(Pageable pageable) {
+    public ResponseEntity<ResponseObject<Page<UserResponse>>> getAllUsers(
+            Pageable pageable,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String status) {
 
-        Page<UserResponse> users = userAccountService.getAllUsers(pageable);
+        Page<UserResponse> users = userAccountService.getAllUsers(pageable, search, role, status);
 
         return ResponseEntity.ok(
                 ResponseObject.<Page<UserResponse>>builder()
@@ -118,6 +122,28 @@ public class UserAccountController {
                 ResponseObject.<UserResponse>builder()
                         .success(true)
                         .message("User status updated successfully")
+                        .data(userResponse)
+                        .build()
+        );
+    }
+
+    /**
+     * Update user information (admin only)
+     * PUT /api/v1/users/{id}
+     * Note: Email and password cannot be changed via this endpoint
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ResponseObject<UserResponse>> updateUser(
+            @PathVariable Long id,
+            @Valid @RequestBody org.fyp.tmssep490be.dtos.user.UpdateUserRequest request) {
+
+        UserResponse userResponse = userAccountService.updateUser(id, request);
+
+        return ResponseEntity.ok(
+                ResponseObject.<UserResponse>builder()
+                        .success(true)
+                        .message("User updated successfully")
                         .data(userResponse)
                         .build()
         );

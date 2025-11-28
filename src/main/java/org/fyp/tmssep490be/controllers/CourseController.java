@@ -122,13 +122,92 @@ public class CourseController {
         @PostMapping
         @Operation(summary = "Create a new course (Syllabus)")
         @PreAuthorize("hasRole('SUBJECT_LEADER')")
-        public ResponseEntity<ResponseObject<CourseDTO>> createCourse(@RequestBody CreateCourseRequestDTO request) {
+        public ResponseEntity<ResponseObject<CourseDTO>> createCourse(@RequestBody CreateCourseRequestDTO request,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
                 log.info("Creating new course: {}", request.getBasicInfo().getName());
-                CourseDTO createdCourse = courseService.createCourse(request);
+                Long userId = currentUser != null ? currentUser.getId() : null;
+                CourseDTO createdCourse = courseService.createCourse(request, userId);
                 return ResponseEntity.ok(ResponseObject.<CourseDTO>builder()
                                 .success(true)
                                 .message("Course created successfully")
                                 .data(createdCourse)
+                                .build());
+        }
+
+        @PutMapping("/{id}")
+        @Operation(summary = "Update course")
+        @PreAuthorize("hasRole('SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<CourseDetailDTO>> updateCourse(@PathVariable Long id,
+                        @RequestBody CreateCourseRequestDTO request,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                log.info("Updating course with ID: {}", id);
+                Long userId = currentUser != null ? currentUser.getId() : null;
+                CourseDetailDTO updatedCourse = courseService.updateCourse(id, request, userId);
+                return ResponseEntity.ok(ResponseObject.<CourseDetailDTO>builder()
+                                .success(true)
+                                .message("Course updated successfully")
+                                .data(updatedCourse)
+                                .build());
+        }
+
+        @PostMapping("/{id}/submit")
+        @Operation(summary = "Submit course for approval")
+        @PreAuthorize("hasRole('SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<Void>> submitCourse(@PathVariable Long id) {
+                log.info("Submitting course with ID: {}", id);
+                courseService.submitCourse(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Course submitted for approval successfully")
+                                .build());
+        }
+
+        @PostMapping("/{id}/approve")
+        @Operation(summary = "Approve course")
+        @PreAuthorize("hasRole('MANAGER') or hasRole('ADMIN')")
+        public ResponseEntity<ResponseObject<Void>> approveCourse(@PathVariable Long id) {
+                log.info("Approving course with ID: {}", id);
+                courseService.approveCourse(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Course approved successfully")
+                                .build());
+        }
+
+        @PostMapping("/{id}/reject")
+        @Operation(summary = "Reject course")
+        @PreAuthorize("hasRole('MANAGER') or hasRole('ADMIN')")
+        public ResponseEntity<ResponseObject<Void>> rejectCourse(@PathVariable Long id,
+                        @RequestBody(required = false) String reason) {
+                log.info("Rejecting course with ID: {}", id);
+                courseService.rejectCourse(id, reason);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Course rejected successfully")
+                                .build());
+        }
+
+        @PatchMapping("/{id}/deactivate")
+        @Operation(summary = "Deactivate course")
+        @PreAuthorize("hasRole('SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<Void>> deactivateCourse(@PathVariable Long id) {
+                log.info("Deactivating course with ID: {}", id);
+                courseService.deactivateCourse(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Course deactivated successfully")
+                                .build());
+        }
+
+        @PatchMapping("/{id}/reactivate")
+        @Operation(summary = "Reactivate course")
+        @PreAuthorize("hasRole('SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<Void>> reactivateCourse(@PathVariable Long id) {
+                log.info("Reactivating course with ID: {}", id);
+                courseService.reactivateCourse(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Course reactivated successfully")
                                 .build());
         }
 

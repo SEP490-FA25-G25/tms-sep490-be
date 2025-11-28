@@ -17,12 +17,14 @@ import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.EmailService;
+import org.fyp.tmssep490be.services.PolicyService;
 import org.fyp.tmssep490be.services.TeacherRequestService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -34,6 +36,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -51,6 +54,10 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
     private final StudentSessionRepository studentSessionRepository;
     private final TeacherSkillRepository teacherSkillRepository;
     private final EmailService emailService;
+    private final PolicyService policyService;
+
+    private static final List<RequestStatus> ACTIVE_REQUEST_STATUSES =
+            List.of(RequestStatus.PENDING, RequestStatus.WAITING_CONFIRM, RequestStatus.APPROVED);
 
     @Override
     @Transactional
@@ -74,12 +81,25 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         // 3. Validate teacher owns session
         validateTeacherOwnsSession(session.getId(), teacher.getId());
 
-        // 4. Validate time window (session must be within 7 days from today)
+        // 4. Enforce daily request limit (applies to all request types)
+        enforceDailyRequestLimit(teacher.getId());
+
+        // 4. Validate time window (session must be within X days from today - configured by policy)
         validateTimeWindow(session.getDate());
 
         // 5. Validate request type specific requirements
         if (createDTO.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
-            // newResourceId là optional - teacher có thể không chọn, staff sẽ chọn khi approve
+            enforceModalityChangeCourseLimit(teacher, session);
+            enforceModalityChangeTimingConstraints(session);
+
+            // Policy: teacher.modality_change.require_resource (GLOBAL, default = true)
+            boolean requireResource = policyService.getGlobalBoolean(
+                    "teacher.modality_change.require_resource", true);
+
+            if (requireResource && createDTO.getNewResourceId() == null) {
+                throw new CustomException(ErrorCode.INVALID_INPUT);
+            }
+
             if (createDTO.getNewResourceId() != null) {
                 // Get new resource
                 Resource newResource = resourceRepository.findById(createDTO.getNewResourceId())
@@ -102,8 +122,25 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
                 validateResourceCapacity(newResource, session.getId());
             }
         } else if (createDTO.getRequestType() == TeacherRequestType.RESCHEDULE) {
+            enforceMonthlyLimit(
+                    teacher,
+                    TeacherRequestType.RESCHEDULE,
+                    "teacher.reschedule.max_per_month",
+                    2,
+                    ErrorCode.TEACHER_RESCHEDULE_MONTHLY_LIMIT_REACHED
+            );
+            validateMinDaysBeforeSession(
+                    session.getDate(),
+                    "teacher.reschedule.min_days_before_session",
+                    1,
+                    ErrorCode.TEACHER_RESCHEDULE_MIN_DAYS_NOT_MET);
+            enforceRescheduleCourseLimit(teacher, session);
             // Validate required fields for RESCHEDULE
-            if (createDTO.getNewDate() == null || createDTO.getNewTimeSlotId() == null || createDTO.getNewResourceId() == null) {
+            boolean requireResource = policyService.getGlobalBoolean(
+                    "teacher.reschedule.require_resource_at_create", true);
+
+            if (createDTO.getNewDate() == null || createDTO.getNewTimeSlotId() == null ||
+                    (requireResource && createDTO.getNewResourceId() == null)) {
                 throw new CustomException(ErrorCode.INVALID_INPUT);
             }
 
@@ -112,11 +149,45 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
                 throw new CustomException(ErrorCode.INVALID_INPUT);
             }
 
-            // Validate newDate is within time window (7 days from today)
+            LocalDate today = LocalDate.now();
+            boolean allowSameDay = policyService.getGlobalBoolean(
+                    "teacher.reschedule.allow_same_day", false);
+            if (createDTO.getNewDate().isEqual(today) && !allowSameDay) {
+                throw new CustomException(ErrorCode.TEACHER_RESCHEDULE_MIN_DAYS_NOT_MET);
+            }
+
+            if (!createDTO.getNewDate().isEqual(today)) {
+                int minDaysAhead = policyService.getGlobalInt(
+                        "teacher.reschedule.min_days_ahead", 1);
+                if (minDaysAhead > 0) {
+                    LocalDate minAllowedDate = today.plusDays(minDaysAhead);
+                    if (createDTO.getNewDate().isBefore(minAllowedDate)) {
+                        throw new CustomException(ErrorCode.TEACHER_RESCHEDULE_MIN_DAYS_NOT_MET);
+                    }
+                }
+            }
+
+            // Validate newDate is within time window (X days from today - configured by policy)
             validateTimeWindow(createDTO.getNewDate());
+        } else if (createDTO.getRequestType() == TeacherRequestType.REPLACEMENT) {
+            enforceMonthlyLimit(
+                    teacher,
+                    TeacherRequestType.REPLACEMENT,
+                    "teacher.replacement.max_per_month",
+                    3,
+                    ErrorCode.TEACHER_REPLACEMENT_MONTHLY_LIMIT_REACHED
+            );
+            validateMinDaysBeforeSession(
+                    session.getDate(),
+                    "teacher.replacement.min_days_before_session",
+                    1,
+                    ErrorCode.TEACHER_REPLACEMENT_MIN_DAYS_NOT_MET);
         }
 
-        // 6. Check for duplicate request
+        // 6. Validate reason requirement and length
+        validateRequestReason(createDTO.getReason());
+
+        // 7. Check for duplicate request
         if (teacherRequestRepository.existsBySessionIdAndRequestTypeAndStatus(
                 createDTO.getSessionId(), 
                 createDTO.getRequestType(), 
@@ -1019,14 +1090,180 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
     }
 
     /**
-     * Validate session is within 7 days window
+     * Validate session is within window X ngày (đọc từ policy).
+     * Policy: teacher.session.suggestion.max_days (GLOBAL), default = 14 ngày.
      */
     private void validateTimeWindow(LocalDate sessionDate) {
         LocalDate today = LocalDate.now();
-        LocalDate maxDate = today.plusDays(14);
+        int maxDays = policyService.getGlobalInt("teacher.session.suggestion.max_days", 14);
+        if (maxDays < 0) {
+            maxDays = 0;
+        }
+        LocalDate maxDate = today.plusDays(maxDays);
 
         if (sessionDate.isBefore(today) || sessionDate.isAfter(maxDate)) {
             throw new CustomException(ErrorCode.SESSION_NOT_IN_TIME_WINDOW);
+        }
+    }
+
+    private void validateMinDaysBeforeSession(LocalDate sessionDate, String policyKey, int defaultValue, ErrorCode errorCode) {
+        int minDays = policyService.getGlobalInt(policyKey, defaultValue);
+        if (minDays <= 0) {
+            return;
+        }
+        long daysUntilSession = ChronoUnit.DAYS.between(LocalDate.now(), sessionDate);
+        if (daysUntilSession < minDays) {
+            throw new CustomException(errorCode);
+        }
+    }
+
+    private void enforceMonthlyLimit(
+            Teacher teacher,
+            TeacherRequestType requestType,
+            String policyKey,
+            int defaultValue,
+            ErrorCode errorCode
+    ) {
+        int maxAllowed = policyService.getGlobalInt(policyKey, defaultValue);
+        if (maxAllowed <= 0) {
+            return;
+        }
+
+        OffsetDateTime monthStart = LocalDate.now()
+                .withDayOfMonth(1)
+                .atStartOfDay(ZoneId.systemDefault())
+                .toOffsetDateTime();
+
+        long currentCount = teacherRequestRepository
+                .countByTeacherIdAndRequestTypeAndStatusInAndSubmittedAtGreaterThanEqual(
+                        teacher.getId(),
+                        requestType,
+                        ACTIVE_REQUEST_STATUSES,
+                        monthStart
+                );
+
+        if (currentCount >= maxAllowed) {
+            throw new CustomException(errorCode);
+        }
+    }
+
+    private void enforceDailyRequestLimit(Long teacherId) {
+        int maxPerDay = policyService.getGlobalInt("teacher.request.max_per_day", 5);
+        if (maxPerDay <= 0) {
+            return;
+        }
+
+        ZoneId zoneId = ZoneId.systemDefault();
+        OffsetDateTime dayStart = LocalDate.now().atStartOfDay(zoneId).toOffsetDateTime();
+        OffsetDateTime dayEnd = dayStart.plusDays(1);
+
+        long countToday = teacherRequestRepository.countByTeacherIdAndStatusInAndSubmittedAtBetween(
+                teacherId,
+                ACTIVE_REQUEST_STATUSES,
+                dayStart,
+                dayEnd
+        );
+
+        if (countToday >= maxPerDay) {
+            throw new CustomException(ErrorCode.TEACHER_REQUEST_DAILY_LIMIT_REACHED);
+        }
+    }
+
+    private void enforceModalityChangeCourseLimit(Teacher teacher, Session session) {
+        ClassEntity classEntity = session.getClassEntity();
+        if (classEntity == null || classEntity.getCourse() == null) {
+            return;
+        }
+
+        int maxPerCourse = policyService.getGlobalInt("teacher.modality_change.max_per_course", 1);
+        if (maxPerCourse <= 0) {
+            return;
+        }
+
+        long currentCount = teacherRequestRepository.countByTeacherAndTypeForCourse(
+                teacher.getId(),
+                TeacherRequestType.MODALITY_CHANGE,
+                ACTIVE_REQUEST_STATUSES,
+                classEntity.getCourse().getId()
+        );
+
+        if (currentCount >= maxPerCourse) {
+            throw new CustomException(ErrorCode.TEACHER_MODALITY_CHANGE_COURSE_LIMIT_REACHED);
+        }
+    }
+
+    private void enforceModalityChangeTimingConstraints(Session session) {
+        ClassEntity classEntity = session.getClassEntity();
+        if (classEntity == null) {
+            return;
+        }
+
+        LocalDate classStartDate = classEntity.getStartDate();
+        if (classStartDate == null) {
+            return;
+        }
+
+        LocalDate today = LocalDate.now();
+        boolean allowAfterStart = policyService.getGlobalBoolean(
+                "teacher.modality_change.allow_after_start", false);
+
+        if (!allowAfterStart && !classStartDate.isAfter(today)) {
+            throw new CustomException(ErrorCode.SESSION_NOT_IN_TIME_WINDOW);
+        }
+
+        if (classStartDate.isAfter(today)) {
+            int minDaysBeforeStart = policyService.getGlobalInt(
+                    "teacher.modality_change.min_days_before_start", 7);
+            if (minDaysBeforeStart > 0) {
+                long daysUntilStart = ChronoUnit.DAYS.between(today, classStartDate);
+                if (daysUntilStart < minDaysBeforeStart) {
+                    throw new CustomException(ErrorCode.SESSION_NOT_IN_TIME_WINDOW);
+                }
+            }
+        }
+    }
+
+    private void enforceRescheduleCourseLimit(Teacher teacher, Session session) {
+        ClassEntity classEntity = session.getClassEntity();
+        if (classEntity == null || classEntity.getCourse() == null) {
+            return;
+        }
+
+        int maxPerCourse = policyService.getGlobalInt("teacher.reschedule.max_per_course", 5);
+        if (maxPerCourse <= 0) {
+            return;
+        }
+
+        long currentCount = teacherRequestRepository.countByTeacherAndTypeForCourse(
+                teacher.getId(),
+                TeacherRequestType.RESCHEDULE,
+                ACTIVE_REQUEST_STATUSES,
+                classEntity.getCourse().getId()
+        );
+
+        if (currentCount >= maxPerCourse) {
+            throw new CustomException(ErrorCode.TEACHER_RESCHEDULE_COURSE_LIMIT_REACHED);
+        }
+    }
+
+    /**
+     * Validate request reason requirement and minimum length
+     * Policies: teacher.request.require_reason, teacher.request.reason_min_length
+     */
+    private void validateRequestReason(String reason) {
+        // Policy: teacher.request.require_reason (GLOBAL, default = true)
+        boolean requireReason = policyService.getGlobalBoolean("teacher.request.require_reason", true);
+        
+        if (requireReason) {
+            if (reason == null || reason.trim().isEmpty()) {
+                throw new CustomException(ErrorCode.TEACHER_REQUEST_REASON_REQUIRED);
+            }
+            
+            // Policy: teacher.request.reason_min_length (GLOBAL, default = 15)
+            int minLength = policyService.getGlobalInt("teacher.request.reason_min_length", 15);
+            if (minLength > 0 && reason.trim().length() < minLength) {
+                throw new CustomException(ErrorCode.TEACHER_REQUEST_REASON_TOO_SHORT);
+            }
         }
     }
 
@@ -1302,8 +1539,8 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<TeacherSessionDTO> getMySessions(Long userId, LocalDate date) {
-        log.info("Getting sessions for user {} with date filter {}", userId, date);
+    public List<TeacherSessionDTO> getMySessions(Long userId, LocalDate date, Long classId) {
+        log.info("Getting sessions for user {} with date filter {} and classId {}", userId, date, classId);
 
         // 1. Get teacher from user account
         Teacher teacher = teacherRepository.findByUserAccountId(userId)
@@ -1311,25 +1548,40 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
         // 2. Calculate date range
         LocalDate today = LocalDate.now();
+        int maxDays = policyService.getGlobalInt("teacher.session.suggestion.max_days", 14);
+        if (maxDays < 0) {
+            maxDays = 0;
+        }
+        LocalDate maxDate = today.plusDays(maxDays);
         LocalDate fromDate;
         LocalDate toDate;
 
         if (date != null) {
             // Filter by specific date
-            if (date.isBefore(today)) {
-                throw new CustomException(ErrorCode.INVALID_INPUT);
+            if (date.isBefore(today) || date.isAfter(maxDate)) {
+                throw new CustomException(ErrorCode.SESSION_NOT_IN_TIME_WINDOW);
             }
             fromDate = date;
             toDate = date;
         } else {
-            // Default: next 7 days
+            // Default: next X days (đọc từ policy)
             fromDate = today;
-            toDate = today.plusDays(14);
+            toDate = maxDate;
         }
 
         // 3. Query teaching slots
         List<TeachingSlot> teachingSlots = teachingSlotRepository.findByTeacherIdAndDateRange(
                 teacher.getId(), fromDate, toDate);
+        
+        // 4. Filter by classId if provided
+        if (classId != null) {
+            teachingSlots = teachingSlots.stream()
+                    .filter(ts -> ts.getSession() != null 
+                            && ts.getSession().getClassEntity() != null
+                            && ts.getSession().getClassEntity().getId().equals(classId))
+                    .collect(Collectors.toList());
+        }
+        java.time.LocalTime currentTime = java.time.LocalTime.now();
 
         // 4. Get all pending/waiting requests for these sessions to check hasPendingRequest
         // Only check PENDING and WAITING_CONFIRM - APPROVED requests are already processed
@@ -1350,6 +1602,19 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
         // 5. Map to DTO
         return teachingSlots.stream()
+                .filter(ts -> {
+                    Session session = ts.getSession();
+                    if (session == null || session.getDate() == null) {
+                        return true;
+                    }
+                    if (session.getDate().isEqual(today)) {
+                        TimeSlotTemplate slot = session.getTimeSlotTemplate();
+                        if (slot != null && slot.getStartTime() != null) {
+                            return slot.getStartTime().isAfter(currentTime);
+                        }
+                    }
+                    return true;
+                })
                 .map(ts -> {
                     Session session = ts.getSession();
                     ClassEntity classEntity = session.getClassEntity();

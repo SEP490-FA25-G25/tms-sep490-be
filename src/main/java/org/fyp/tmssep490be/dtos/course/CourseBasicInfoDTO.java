@@ -17,11 +17,10 @@ public class CourseBasicInfoDTO {
     private String description;
     private String prerequisites;
     private Integer durationHours;
-    private Integer durationWeeks;
     private String scoreScale;
     private String targetAudience;
     private String teachingMethods;
     private java.time.LocalDate effectiveDate;
-    private Integer sessionPerWeek;
+    private Integer numberOfSessions;
     private java.math.BigDecimal hoursPerSession;
 }

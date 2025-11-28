@@ -50,6 +50,8 @@ DROP TABLE IF EXISTS replacement_skill_assessment CASCADE;
 DROP TABLE IF EXISTS feedback_question CASCADE;
 DROP TABLE IF EXISTS student_feedback_response CASCADE;
 DROP TABLE IF EXISTS notification CASCADE;
+DROP TABLE IF EXISTS policy_history CASCADE;
+DROP TABLE IF EXISTS system_policy CASCADE;
 
 -- Drop existing enum types (to ensure clean recreation)
 DROP TYPE IF EXISTS session_status_enum CASCADE;
@@ -121,7 +123,7 @@ CREATE TABLE user_account (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_user_gender CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
-  CONSTRAINT chk_user_status CHECK (status IN ('ACTIVE', 'INACTIVE'))
+  CONSTRAINT chk_user_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED'))
 );
 
 -- TIER 2
@@ -245,10 +247,12 @@ CREATE TABLE level (
   expected_duration_hours INTEGER, -- ví dụ: 80 giờ cho HSK1, 100 giờ cho HSK2, ...
   sort_order INTEGER, -- sắp xếp theo thứ tự để hiển thị trong UI (ví dụ: A1, A2, B1, B2, ...)
   description TEXT, -- ví dụ: "Beginner (A1)", "Intermediate (B1)", "Advanced (C1)", ...
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_level_subject FOREIGN KEY(subject_id) REFERENCES subject(id) ON DELETE CASCADE,
-  CONSTRAINT uq_level_subject_code UNIQUE(subject_id,code)
+  CONSTRAINT uq_level_subject_code UNIQUE(subject_id,code),
+  CONSTRAINT chk_level_status CHECK (status IN ('ACTIVE', 'INACTIVE'))
 );
 
 CREATE TABLE replacement_skill_assessment (
@@ -284,8 +288,8 @@ CREATE TABLE course (
   description TEXT,
   score_scale VARCHAR(100), -- ví dụ: IELTS: 0-9, TOEFL: 0-120, HSK: 0-600, etc.
   total_hours INTEGER, -- ví dụ: 120 hours cho HSK3
-  duration_weeks INTEGER, -- ví dụ: 4 tuần cho HSK3
-  session_per_week INTEGER, -- ví dụ: 3 session/week cho HSK3
+
+  number_of_sessions INTEGER, -- tổng số buổi học
   hours_per_session DECIMAL(5,2), -- ví dụ: 2.5 hours/session cho HSK3
   prerequisites TEXT,-- ví dụ: HSK2 or equivalent
   target_audience TEXT,-- ví dụ: learners targeting HSK3 certification
@@ -307,7 +311,7 @@ CREATE TABLE course (
   CONSTRAINT fk_course_level FOREIGN KEY(level_id) REFERENCES level(id) ON DELETE SET NULL,
   CONSTRAINT fk_course_decided_by_manager FOREIGN KEY(decided_by_manager) REFERENCES user_account(id) ON DELETE SET NULL,
   CONSTRAINT fk_course_created_by FOREIGN KEY(created_by) REFERENCES user_account(id) ON DELETE SET NULL,
-  CONSTRAINT chk_course_status CHECK (status IN ('DRAFT', 'ACTIVE', 'INACTIVE')),
+  CONSTRAINT chk_course_status CHECK (status IN ('DRAFT', 'SUBMITTED', 'ACTIVE', 'INACTIVE', 'APPROVED', 'REJECTED')),
   CONSTRAINT chk_course_approval_status CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED'))
 );
 
@@ -316,6 +320,7 @@ CREATE TABLE course_phase (
   course_id BIGINT NOT NULL,
   phase_number INTEGER NOT NULL, -- ví dụ: Phase 1, Phase 2, Phase 3, ...
   name VARCHAR(255),
+  description TEXT,
   duration_weeks INTEGER,
   learning_focus TEXT, -- kiểu description
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -330,19 +335,12 @@ CREATE TABLE course_session (
   sequence_no INTEGER NOT NULL, -- ví dụ: Session 1, Session 2, Session 3, ...
   topic VARCHAR(500),
   student_task TEXT,
+  skill_set VARCHAR(20)[],
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_course_session_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE CASCADE,
-  CONSTRAINT uq_course_session_phase_sequence UNIQUE(phase_id,sequence_no)
-);
-
--- Bảng mapping cho skills của course_session (JPA @ElementCollection)
-CREATE TABLE course_session_skills (
-  course_session_id BIGINT NOT NULL,
-  skill VARCHAR(20) NOT NULL,
-  PRIMARY KEY (course_session_id, skill),
-  CONSTRAINT fk_course_session_skills_session FOREIGN KEY(course_session_id) REFERENCES course_session(id) ON DELETE CASCADE,
-  CONSTRAINT chk_course_session_skill CHECK (skill IN ('GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI'))
+  CONSTRAINT uq_course_session_phase_sequence UNIQUE(phase_id,sequence_no),
+  CONSTRAINT chk_course_session_skill_set CHECK (skill_set <@ ARRAY['GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI']::varchar[])
 );
 
 CREATE TABLE course_material (
@@ -353,7 +351,7 @@ CREATE TABLE course_material (
   title VARCHAR(500) NOT NULL, -- tiêu đề tài liệu
   description TEXT,
   material_type VARCHAR(20) NOT NULL, -- loại tài liệu: video, pdf, slide, audio, document, other
-  url VARCHAR(1000) NOT NULL, -- link đến tài liệu (có thể là link nội bộ hoặc link bên ngoài)
+  url TEXT NOT NULL, -- link đến tài liệu (có thể là link nội bộ hoặc link bên ngoài)
   uploaded_by BIGINT, -- người upload tài liệu
   uploaded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -362,7 +360,7 @@ CREATE TABLE course_material (
   CONSTRAINT fk_course_material_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE CASCADE,
   CONSTRAINT fk_course_material_session FOREIGN KEY(course_session_id) REFERENCES course_session(id) ON DELETE CASCADE,
   CONSTRAINT fk_course_material_uploaded_by FOREIGN KEY(uploaded_by) REFERENCES user_account(id) ON DELETE SET NULL,
-  CONSTRAINT chk_material_type CHECK (material_type IN ('VIDEO', 'PDF', 'SLIDE', 'AUDIO', 'DOCUMENT', 'OTHER'))
+  CONSTRAINT chk_material_type CHECK (material_type IN ('DOCUMENT', 'MEDIA', 'ARCHIVE', 'LINK', 'OTHER'))
 );
 
 CREATE TABLE plo (
@@ -420,7 +418,7 @@ CREATE TABLE course_assessment (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_course_assessment_course FOREIGN KEY(course_id) REFERENCES course(id) ON DELETE CASCADE,
-  CONSTRAINT chk_assessment_kind CHECK (kind IN ('QUIZ', 'MIDTERM', 'FINAL', 'ASSIGNMENT', 'PROJECT', 'ORAL', 'PRACTICE', 'OTHER'))
+  CONSTRAINT chk_assessment_kind CHECK (kind IN ('QUIZ', 'MIDTERM', 'FINAL', 'MOCK_TEST', 'PHASE_TEST', 'ORAL', 'PRACTICE', 'OTHER', 'PLACEMENT_TEST', 'HOMEWORK'))
 );
 
 CREATE TABLE course_assessment_clo_mapping (
@@ -465,6 +463,59 @@ CREATE TABLE "class" (
   CONSTRAINT chk_class_approval_status CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED'))
 );
 
+CREATE TABLE system_policy (
+  id BIGSERIAL PRIMARY KEY,
+  policy_key VARCHAR(100) NOT NULL,
+  policy_category VARCHAR(50) NOT NULL,
+  policy_name VARCHAR(200) NOT NULL,
+  description TEXT,
+  value_type VARCHAR(20) NOT NULL,
+  default_value TEXT NOT NULL,
+  current_value TEXT NOT NULL,
+  min_value TEXT,
+  max_value TEXT,
+  unit VARCHAR(20),
+  scope VARCHAR(20) NOT NULL DEFAULT 'GLOBAL',
+  branch_id BIGINT,
+  course_id BIGINT,
+  class_id BIGINT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_by BIGINT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updated_by BIGINT,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  CONSTRAINT fk_policy_branch FOREIGN KEY(branch_id) REFERENCES branch(id) ON DELETE CASCADE,
+  CONSTRAINT fk_policy_course FOREIGN KEY(course_id) REFERENCES course(id) ON DELETE CASCADE,
+  CONSTRAINT fk_policy_class FOREIGN KEY(class_id) REFERENCES "class"(id) ON DELETE CASCADE,
+  CONSTRAINT fk_policy_created_by FOREIGN KEY(created_by) REFERENCES user_account(id) ON DELETE SET NULL,
+  CONSTRAINT fk_policy_updated_by FOREIGN KEY(updated_by) REFERENCES user_account(id) ON DELETE SET NULL,
+  CONSTRAINT chk_policy_value_type CHECK (value_type IN ('INTEGER', 'DOUBLE', 'BOOLEAN', 'STRING', 'JSON')),
+  CONSTRAINT chk_policy_scope CHECK (scope IN ('GLOBAL', 'BRANCH', 'COURSE', 'CLASS')),
+  CONSTRAINT chk_policy_scope_hierarchy CHECK (
+    (scope = 'GLOBAL' AND branch_id IS NULL AND course_id IS NULL AND class_id IS NULL) OR
+    (scope = 'BRANCH' AND branch_id IS NOT NULL AND course_id IS NULL AND class_id IS NULL) OR
+    (scope = 'COURSE' AND course_id IS NOT NULL AND class_id IS NULL) OR
+    (scope = 'CLASS' AND class_id IS NOT NULL)
+  ),
+  CONSTRAINT uq_policy_key_scope UNIQUE (policy_key, scope, branch_id, course_id, class_id)
+);
+
+CREATE TABLE policy_history (
+  id BIGSERIAL PRIMARY KEY,
+  policy_id BIGINT NOT NULL,
+  old_value TEXT,
+  new_value TEXT NOT NULL,
+  changed_by BIGINT,
+  changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  reason TEXT,
+  version INTEGER NOT NULL,
+  change_type VARCHAR(20) DEFAULT 'UPDATE',
+  CONSTRAINT fk_history_policy FOREIGN KEY(policy_id) REFERENCES system_policy(id) ON DELETE CASCADE,
+  CONSTRAINT fk_history_changed_by FOREIGN KEY(changed_by) REFERENCES user_account(id) ON DELETE SET NULL,
+  CONSTRAINT chk_history_change_type CHECK (change_type IN ('CREATE', 'UPDATE', 'DELETE', 'ENABLE', 'DISABLE'))
+);
+
 CREATE TABLE session (
   id BIGSERIAL PRIMARY KEY,
   class_id BIGINT,
@@ -491,7 +542,7 @@ CREATE TABLE teacher_skill (
   level SMALLINT,
   PRIMARY KEY(teacher_id, skill, specialization),
   CONSTRAINT fk_teacher_skill_teacher FOREIGN KEY(teacher_id) REFERENCES teacher(id) ON DELETE CASCADE,
-  CONSTRAINT chk_teacher_skill CHECK (skill IN ('GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING'))
+  CONSTRAINT chk_teacher_skill CHECK (skill IN ('GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI'))
 );
 
 CREATE TABLE teacher_availability (
@@ -740,7 +791,7 @@ CREATE TABLE teacher_request (
   CONSTRAINT fk_teacher_request_new_resource FOREIGN KEY(new_resource_id) REFERENCES resource(id) ON DELETE SET NULL,
   CONSTRAINT fk_teacher_request_new_session FOREIGN KEY(new_session_id) REFERENCES session(id) ON DELETE SET NULL,
   CONSTRAINT chk_teacher_request_type CHECK (request_type IN ('REPLACEMENT', 'RESCHEDULE', 'MODALITY_CHANGE')),
-  CONSTRAINT chk_teacher_request_status CHECK (status IN ('PENDING', 'WAITING_CONFIRM', 'APPROVED', 'REJECTED'))
+  CONSTRAINT chk_teacher_request_status CHECK (status IN ('PENDING', 'WAITING_CONFIRM', 'APPROVED', 'REJECTED', 'CANCELLED'))
 );
 
 -- ========== SECTION 4: INDEXES ==========
@@ -938,6 +989,24 @@ CREATE INDEX idx_class_name_gin ON "class" USING gin(to_tsvector('english', name
 
 -- User account name search
 CREATE INDEX idx_user_account_fullname_gin ON user_account USING gin(to_tsvector('english', full_name));
+
+-- ==================== POLICY MANAGEMENT INDEXES ====================
+
+-- Policy lookup indexes
+CREATE INDEX idx_policy_key ON system_policy(policy_key);
+CREATE INDEX idx_policy_category ON system_policy(policy_category);
+CREATE INDEX idx_policy_scope ON system_policy(scope, branch_id, course_id, class_id);
+CREATE INDEX idx_policy_branch ON system_policy(branch_id) WHERE branch_id IS NOT NULL;
+CREATE INDEX idx_policy_course ON system_policy(course_id) WHERE course_id IS NOT NULL;
+CREATE INDEX idx_policy_class ON system_policy(class_id) WHERE class_id IS NOT NULL;
+CREATE INDEX idx_policy_active ON system_policy(is_active) WHERE is_active = true;
+CREATE INDEX idx_policy_scope_key ON system_policy(scope, policy_key);
+
+-- Policy history indexes
+CREATE INDEX idx_history_policy ON policy_history(policy_id, changed_at DESC);
+CREATE INDEX idx_history_user ON policy_history(changed_by, changed_at DESC) WHERE changed_by IS NOT NULL;
+CREATE INDEX idx_history_date ON policy_history(changed_at DESC);
+CREATE INDEX idx_history_policy_date ON policy_history(policy_id, changed_at DESC);
 
 -- ==================== PARTIAL UNIQUE INDEX ====================
 -- Thay thế unique constraint để cho phép multiple enrollment records với status khác nhau

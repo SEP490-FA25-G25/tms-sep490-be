@@ -5,9 +5,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+
 /**
- * DTO for branch basic information
- * Used for dropdowns and listing
+ * DTO for branch information
+ * Used for dropdowns, listing, and detail views
  */
 @Data
 @Builder
@@ -15,10 +18,17 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class BranchDTO {
     private Long id;
+    private Long centerId;
+    private String centerName;
     private String code;
     private String name;
     private String address;
     private String city;
     private String district;
+    private String phone;
+    private String email;
     private String status;
+    private LocalDate openingDate;
+    private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
 }

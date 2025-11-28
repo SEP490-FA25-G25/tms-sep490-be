@@ -19,6 +19,7 @@ public class CourseAssessmentDTO {
 
     // HEAD fields
     private String type; // Enum name
+    private java.math.BigDecimal maxScore;
     private Integer durationMinutes;
     private List<String> mappedCLOs; // List of CLO codes
 
@@ -26,11 +27,12 @@ public class CourseAssessmentDTO {
     private String assessmentType;
     private BigDecimal weight; // Shared name but different type in Main (BigDecimal) vs HEAD (Double). Using
                                // BigDecimal as it's safer.
-    private BigDecimal maxScore;
     private String duration;
     private List<Long> sessionIds;
     private List<String> cloMappings;
     private Boolean isCompleted;
     private BigDecimal achievedScore;
     private String completedAt;
+    private List<String> skills;
+    private String note;
 }

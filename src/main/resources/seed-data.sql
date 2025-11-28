@@ -17,6 +17,8 @@
 TRUNCATE TABLE student_feedback_response CASCADE;
 TRUNCATE TABLE student_feedback CASCADE;
 TRUNCATE TABLE qa_report CASCADE;
+TRUNCATE TABLE policy_history CASCADE;
+TRUNCATE TABLE system_policy CASCADE;
 TRUNCATE TABLE score CASCADE;
 TRUNCATE TABLE assessment CASCADE;
 TRUNCATE TABLE course_assessment_clo_mapping CASCADE;
@@ -483,6 +485,8 @@ INSERT INTO level (id, subject_id, code, name, expected_duration_hours, sort_ord
 (8, 1, 'DUMMY8', 'Dummy Level 8', 0, 8, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
 (9, 1, 'DUMMY9', 'Dummy Level 9', 0, 9, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
 (10, 1, 'DUMMY10', 'Dummy Level 10 (JLPT N5)', 0, 10, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
+(5, 1, 'TOEIC-500', 'TOEIC 500+', 60, 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
+(10, 1, 'JLPT-N5', 'JLPT N5', 60, 10, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
 
 -- Replacement Skill Assessments for initial students
 -- Simulates placement test results before their first enrollment.
@@ -527,95 +531,44 @@ INSERT INTO plo (id, subject_id, code, description, created_at, updated_at) VALU
 (5, 1, 'PLO5', 'Produce coherent, well-structured academic essays and reports', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
 
 -- Course: IELTS Foundation
-INSERT INTO course (id, subject_id, level_id, logical_course_code, version, code, name, description, total_hours, duration_weeks, session_per_week, hours_per_session, prerequisites, target_audience, teaching_methods, score_scale, status, approval_status, decided_by_manager, decided_at, rejection_reason, created_by, created_at, updated_at) VALUES
-(1, 1, 1, 'IELTS-FOUND-2025', 1, 'IELTS-FOUND-2025-V1', 'IELTS Foundation 2025', 'Foundation course for IELTS beginners targeting band 3.0-4.0', 60, 8, 3, 2.5, 'None', 'Beginners', 'Interactive', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-20 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-20 14:00:00+07'),
-(2, 1, 2, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Intermediate course', 75, 10, 3, 2.5, 'IELTS 4.0', 'Intermediate students', 'Advanced drills', '0-9', 'DRAFT', 'PENDING', NULL, NULL, NULL, 5, NOW(), NOW()),
-(3, 1, 3, 'IELTS-ADV-2025', 1, 'IELTS-ADV-2025-V1', 'IELTS Advanced 2025', 'Advanced course', 90, 12, 3, 2.5, 'IELTS 6.0', 'Advanced students', 'Intensive', '0-9', 'DRAFT', 'REJECTED', 2, NOW(), 'Curriculum needs more focus on speaking.', 5, NOW(), NOW());
-
+INSERT INTO course (id, subject_id, level_id, logical_course_code, version, code, name, description, total_hours, hours_per_session, prerequisites, target_audience, teaching_methods, score_scale, status, approval_status, decided_by_manager, decided_at, rejection_reason, created_by, created_at, updated_at) VALUES
+(1, 1, 1, 'IELTS-FOUND-2025', 1, 'IELTS-FOUND-2025-V1', 'IELTS Foundation 2025', 'Khóa học nền tảng cho người mới bắt đầu, mục tiêu band 3.0-4.0', 60, 2.5, 'Không yêu cầu kiến thức nền tảng. Phù hợp cho người mới bắt đầu.', 'Học viên mất gốc hoặc mới bắt đầu học tiếng Anh, mong muốn đạt band 3.0-4.0 IELTS.', 'Phương pháp Communicative Language Teaching (CLT) kết hợp bài tập thực hành tương tác.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-20 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-20 14:00:00+07'),
+(2, 1, 2, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 75, 2.5, 'Đã hoàn thành khóa Foundation hoặc có trình độ tương đương IELTS 4.0.', 'Học viên đã có nền tảng cơ bản, mục tiêu đạt band 5.0-5.5.', 'Tập trung vào kỹ năng làm bài thi, chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'SUBMITTED', 'PENDING', NULL, NULL, NULL, 5, NOW(), NOW());
 -- Course Phases for Foundation
 INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
 (1, 1, 1, 'Foundation Basics', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (2, 1, 2, 'Foundation Practice', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
 -- Course Sessions for Foundation (24 sessions = 8 weeks × 3 sessions/week)
-INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, created_at, updated_at) VALUES
+INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skill_set, created_at, updated_at) VALUES
 -- Phase 1: Foundation Basics (Sessions 1-12)
-(1, 1, 1, 'Introduction to IELTS & Basic Listening', 'Listen to simple dialogues', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(2, 1, 2, 'Basic Speaking: Greetings and Introductions', 'Practice self-introduction', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(3, 1, 3, 'Basic Reading: Short Passages', 'Read and answer simple questions', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(4, 1, 4, 'Basic Writing: Simple Sentences', 'Write about yourself', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(5, 1, 5, 'Listening: Numbers and Dates', 'Complete listening exercises', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(6, 1, 6, 'Speaking: Daily Activities', 'Describe your daily routine', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(7, 1, 7, 'Reading: Understanding Main Ideas', 'Identify main ideas', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(8, 1, 8, 'Writing: Simple Paragraphs', 'Write a short paragraph', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(9, 1, 9, 'Listening: Conversations', 'Listen to basic conversations', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(10, 1, 10, 'Speaking: Expressing Likes and Dislikes', 'Talk about preferences', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(11, 1, 11, 'Reading: Details and Facts', 'Find specific information', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(12, 1, 12, 'Writing: Connecting Ideas', 'Use simple connectors', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(1, 1, 1, 'Introduction to IELTS & Basic Listening', 'Listen to simple dialogues', '{GENERAL, LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(2, 1, 2, 'Basic Speaking: Greetings and Introductions', 'Practice self-introduction', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(3, 1, 3, 'Basic Reading: Short Passages', 'Read and answer simple questions', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(4, 1, 4, 'Basic Writing: Simple Sentences', 'Write about yourself', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(5, 1, 5, 'Listening: Numbers and Dates', 'Complete listening exercises', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(6, 1, 6, 'Speaking: Daily Activities', 'Describe your daily routine', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(7, 1, 7, 'Reading: Understanding Main Ideas', 'Identify main ideas', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(8, 1, 8, 'Writing: Simple Paragraphs', 'Write a short paragraph', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(9, 1, 9, 'Listening: Conversations', 'Listen to basic conversations', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(10, 1, 10, 'Speaking: Expressing Likes and Dislikes', 'Talk about preferences', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(11, 1, 11, 'Reading: Details and Facts', 'Find specific information', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(12, 1, 12, 'Writing: Connecting Ideas', 'Use simple connectors', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 -- Phase 2: Foundation Practice (Sessions 13-24)
-(13, 2, 1, 'Listening: Following Instructions', 'Complete tasks from audio', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(14, 2, 2, 'Speaking: Asking Questions', 'Practice question forms', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(15, 2, 3, 'Reading: Short Stories', 'Read and summarize', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(16, 2, 4, 'Writing: Describing People and Places', 'Write descriptions', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(17, 2, 5, 'Listening: News and Announcements', 'Understand main points', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(18, 2, 6, 'Speaking: Giving Opinions', 'Express simple opinions', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(19, 2, 7, 'Reading: Understanding Context', 'Use context clues', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(20, 2, 8, 'Writing: Personal Letters', 'Write informal letters', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(21, 2, 9, 'Practice Test: Listening & Reading', 'Complete practice test', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(22, 2, 10, 'Practice Test: Writing & Speaking', 'Complete practice test', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(23, 2, 11, 'Review and Feedback', 'Review all skills', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(24, 2, 12, 'Final Assessment', 'Complete final test', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+(13, 2, 1, 'Listening: Following Instructions', 'Complete tasks from audio', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(14, 2, 2, 'Speaking: Asking Questions', 'Practice question forms', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(15, 2, 3, 'Reading: Short Stories', 'Read and summarize', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(16, 2, 4, 'Writing: Describing People and Places', 'Write descriptions', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(17, 2, 5, 'Listening: News and Announcements', 'Understand main points', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(18, 2, 6, 'Speaking: Giving Opinions', 'Express simple opinions', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(19, 2, 7, 'Reading: Understanding Context', 'Use context clues', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(20, 2, 8, 'Writing: Personal Letters', 'Write informal letters', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(21, 2, 9, 'Practice Test: Listening & Reading', 'Complete practice test', '{LISTENING, READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(22, 2, 10, 'Practice Test: Writing & Speaking', 'Complete practice test', '{WRITING, SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(23, 2, 11, 'Review and Feedback', 'Review all skills', '{GENERAL}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(24, 2, 12, 'Final Assessment', 'Complete final test', '{GENERAL, READING, WRITING, SPEAKING, LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
--- Course Session Skills (JPA @ElementCollection mapping)
-INSERT INTO course_session_skills (course_session_id, skill) VALUES
--- Session 1: GENERAL, LISTENING
-(1, 'GENERAL'), (1, 'LISTENING'),
--- Session 2: SPEAKING
-(2, 'SPEAKING'),
--- Session 3: READING
-(3, 'READING'),
--- Session 4: WRITING
-(4, 'WRITING'),
--- Session 5: LISTENING
-(5, 'LISTENING'),
--- Session 6: SPEAKING
-(6, 'SPEAKING'),
--- Session 7: READING
-(7, 'READING'),
--- Session 8: WRITING
-(8, 'WRITING'),
--- Session 9: LISTENING
-(9, 'LISTENING'),
--- Session 10: SPEAKING
-(10, 'SPEAKING'),
--- Session 11: READING
-(11, 'READING'),
--- Session 12: WRITING
-(12, 'WRITING'),
--- Session 13: LISTENING
-(13, 'LISTENING'),
--- Session 14: SPEAKING
-(14, 'SPEAKING'),
--- Session 15: READING
-(15, 'READING'),
--- Session 16: WRITING
-(16, 'WRITING'),
--- Session 17: LISTENING
-(17, 'LISTENING'),
--- Session 18: SPEAKING
-(18, 'SPEAKING'),
--- Session 19: READING
-(19, 'READING'),
--- Session 20: WRITING
-(20, 'WRITING'),
--- Session 21: LISTENING, READING
-(21, 'LISTENING'), (21, 'READING'),
--- Session 22: WRITING, SPEAKING
-(22, 'WRITING'), (22, 'SPEAKING'),
--- Session 23: GENERAL
-(23, 'GENERAL'),
--- Session 24: GENERAL, READING, WRITING, SPEAKING, LISTENING
-(24, 'GENERAL'), (24, 'READING'), (24, 'WRITING'), (24, 'SPEAKING'), (24, 'LISTENING');
+
 
 -- CLOs for Foundation Course
 INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
@@ -645,62 +598,62 @@ INSERT INTO course_session_clo_mapping (course_session_id, clo_id, status) VALUE
 -- Course Materials for Foundation Course
 INSERT INTO course_material (course_id, phase_id, course_session_id, title, description, material_type, url, uploaded_by) VALUES
 -- Course-level materials
-(1, NULL, NULL, 'IELTS Foundation - Course Syllabus', 'The complete syllabus for the course.', 'PDF', '/materials/courses/1/syllabus.pdf', 5),
-(1, NULL, NULL, 'Introductory Video', 'A welcome video from the head teacher.', 'VIDEO', '/materials/courses/1/intro.mp4', 5),
+(1, NULL, NULL, 'IELTS Foundation - Course Syllabus', 'The complete syllabus for the course.', 'DOCUMENT', '/materials/courses/1/syllabus.pdf', 5),
+(1, NULL, NULL, 'Introductory Video', 'A welcome video from the head teacher.', 'MEDIA', '/materials/courses/1/intro.mp4', 5),
 -- Phase 1 materials
 (1, 1, NULL, 'Phase 1 Vocabulary List', 'Key vocabulary for the first 4 weeks.', 'DOCUMENT', '/materials/phases/1/vocab.docx', 5),
 -- Session-specific materials
 -- Session 1
-(1, 1, 1, 'Introduction to IELTS Slides', 'Overview of the IELTS exam structure.', 'SLIDE', '/materials/sessions/1/intro-slides.pptx', 5),
-(1, 1, 1, 'Basic Listening Audio', 'Audio tracks for basic listening exercises.', 'AUDIO', '/materials/sessions/1/audio.mp3', 5),
+(1, 1, 1, 'Introduction to IELTS Slides', 'Overview of the IELTS exam structure.', 'DOCUMENT', '/materials/sessions/1/intro-slides.pptx', 5),
+(1, 1, 1, 'Basic Listening Audio', 'Audio tracks for basic listening exercises.', 'MEDIA', '/materials/sessions/1/audio.mp3', 5),
 -- Session 2
 (1, 1, 2, 'Greetings & Introductions Vocabulary', 'List of common phrases for introductions.', 'DOCUMENT', '/materials/sessions/2/vocab.pdf', 5),
 -- Session 3
-(1, 1, 3, 'Reading Passage: Daily Life', 'Simple reading text about daily routines.', 'PDF', '/materials/sessions/3/reading.pdf', 5),
+(1, 1, 3, 'Reading Passage: Daily Life', 'Simple reading text about daily routines.', 'DOCUMENT', '/materials/sessions/3/reading.pdf', 5),
 -- Session 4
-(1, 1, 4, 'Sentence Structure Guide', 'Basics of English sentence structure.', 'PDF', '/materials/sessions/4/grammar.pdf', 5),
+(1, 1, 4, 'Sentence Structure Guide', 'Basics of English sentence structure.', 'DOCUMENT', '/materials/sessions/4/grammar.pdf', 5),
 -- Session 5
-(1, 1, 5, 'Numbers & Dates Audio', 'Listening practice for numbers and dates.', 'AUDIO', '/materials/sessions/5/numbers.mp3', 5),
+(1, 1, 5, 'Numbers & Dates Audio', 'Listening practice for numbers and dates.', 'MEDIA', '/materials/sessions/5/numbers.mp3', 5),
 -- Session 6
 (1, 1, 6, 'Daily Activities Worksheet', 'Exercises for describing daily routines.', 'DOCUMENT', '/materials/sessions/6/worksheet.docx', 5),
 -- Session 7
-(1, 1, 7, 'Main Idea Identification', 'Strategies for finding the main idea.', 'SLIDE', '/materials/sessions/7/strategies.pptx', 5),
+(1, 1, 7, 'Main Idea Identification', 'Strategies for finding the main idea.', 'DOCUMENT', '/materials/sessions/7/strategies.pptx', 5),
 -- Session 8
 (1, 1, 8, 'Paragraph Writing Template', 'Template for writing simple paragraphs.', 'DOCUMENT', '/materials/sessions/8/template.docx', 5),
 -- Session 9
-(1, 1, 9, 'Conversation Practice Audio', 'Dialogues for listening practice.', 'AUDIO', '/materials/sessions/9/conversations.mp3', 5),
+(1, 1, 9, 'Conversation Practice Audio', 'Dialogues for listening practice.', 'MEDIA', '/materials/sessions/9/conversations.mp3', 5),
 -- Session 10
-(1, 1, 10, 'Likes & Dislikes Phrases', 'Vocabulary for expressing preferences.', 'PDF', '/materials/sessions/10/phrases.pdf', 5),
+(1, 1, 10, 'Likes & Dislikes Phrases', 'Vocabulary for expressing preferences.', 'DOCUMENT', '/materials/sessions/10/phrases.pdf', 5),
 -- Session 11
-(1, 1, 11, 'Scanning Techniques', 'How to scan for details and facts.', 'SLIDE', '/materials/sessions/11/scanning.pptx', 5),
+(1, 1, 11, 'Scanning Techniques', 'How to scan for details and facts.', 'DOCUMENT', '/materials/sessions/11/scanning.pptx', 5),
 -- Session 12
-(1, 1, 12, 'Linking Words Chart', 'Common connecting words and their usage.', 'PDF', '/materials/sessions/12/linking-words.pdf', 5),
+(1, 1, 12, 'Linking Words Chart', 'Common connecting words and their usage.', 'DOCUMENT', '/materials/sessions/12/linking-words.pdf', 5),
 
 -- Phase 2 materials
-(1, 2, NULL, 'Phase 2 Grammar Guide', 'Advanced grammar rules for the last 4 weeks.', 'PDF', '/materials/phases/2/grammar.pdf', 5),
+(1, 2, NULL, 'Phase 2 Grammar Guide', 'Advanced grammar rules for the last 4 weeks.', 'DOCUMENT', '/materials/phases/2/grammar.pdf', 5),
 -- Session 13
-(1, 2, 13, 'Map Labeling Audio', 'Audio for map labeling exercises.', 'AUDIO', '/materials/sessions/13/maps.mp3', 5),
+(1, 2, 13, 'Map Labeling Audio', 'Audio for map labeling exercises.', 'MEDIA', '/materials/sessions/13/maps.mp3', 5),
 -- Session 14
-(1, 2, 14, 'Question Formation Rules', 'Grammar guide for asking questions.', 'PDF', '/materials/sessions/14/questions.pdf', 5),
+(1, 2, 14, 'Question Formation Rules', 'Grammar guide for asking questions.', 'DOCUMENT', '/materials/sessions/14/questions.pdf', 5),
 -- Session 15
-(1, 2, 15, 'Short Story: The Adventure', 'Reading material for the session.', 'PDF', '/materials/sessions/15/story.pdf', 5),
+(1, 2, 15, 'Short Story: The Adventure', 'Reading material for the session.', 'DOCUMENT', '/materials/sessions/15/story.pdf', 5),
 -- Session 16
 (1, 2, 16, 'Descriptive Adjectives List', 'Vocabulary for describing people and places.', 'DOCUMENT', '/materials/sessions/16/adjectives.docx', 5),
 -- Session 17
-(1, 2, 17, 'News Report Audio', 'Listening practice with news reports.', 'AUDIO', '/materials/sessions/17/news.mp3', 5),
+(1, 2, 17, 'News Report Audio', 'Listening practice with news reports.', 'MEDIA', '/materials/sessions/17/news.mp3', 5),
 -- Session 18
-(1, 2, 18, 'Opinion Phrases Cheat Sheet', 'Useful phrases for giving opinions.', 'PDF', '/materials/sessions/18/opinions.pdf', 5),
+(1, 2, 18, 'Opinion Phrases Cheat Sheet', 'Useful phrases for giving opinions.', 'DOCUMENT', '/materials/sessions/18/opinions.pdf', 5),
 -- Session 19
 (1, 2, 19, 'Context Clues Worksheet', 'Exercises on using context clues.', 'DOCUMENT', '/materials/sessions/19/context.docx', 5),
 -- Session 20
-(1, 2, 20, 'Informal Letter Sample', 'Example of a personal letter.', 'PDF', '/materials/sessions/20/letter.pdf', 5),
+(1, 2, 20, 'Informal Letter Sample', 'Example of a personal letter.', 'DOCUMENT', '/materials/sessions/20/letter.pdf', 5),
 -- Session 21
-(1, 2, 21, 'Mock Test 1: Listening & Reading', 'Practice test questions.', 'PDF', '/materials/sessions/21/test1.pdf', 5),
-(1, 2, 21, 'Mock Test 1 Audio', 'Audio for the listening section.', 'AUDIO', '/materials/sessions/21/audio.mp3', 5),
+(1, 2, 21, 'Mock Test 1: Listening & Reading', 'Practice test questions.', 'DOCUMENT', '/materials/sessions/21/test1.pdf', 5),
+(1, 2, 21, 'Mock Test 1 Audio', 'Audio for the listening section.', 'MEDIA', '/materials/sessions/21/audio.mp3', 5),
 -- Session 22
-(1, 2, 22, 'Mock Test 1: Writing & Speaking', 'Prompts for writing and speaking.', 'PDF', '/materials/sessions/22/test2.pdf', 5),
+(1, 2, 22, 'Mock Test 1: Writing & Speaking', 'Prompts for writing and speaking.', 'DOCUMENT', '/materials/sessions/22/test2.pdf', 5),
 -- Session 23
-(1, 2, 23, 'Course Review Slides', 'Summary of key course concepts.', 'SLIDE', '/materials/sessions/23/review.pptx', 5),
+(1, 2, 23, 'Course Review Slides', 'Summary of key course concepts.', 'DOCUMENT', '/materials/sessions/23/review.pptx', 5),
 -- Session 24
 (1, 2, 24, 'Final Exam Instructions', 'Guidelines for the final assessment.', 'DOCUMENT', '/materials/sessions/24/instructions.docx', 5);
 
@@ -709,7 +662,7 @@ INSERT INTO course_assessment (id, course_id, name, kind, duration_minutes, max_
 (1, 1, 'Listening Quiz 1', 'QUIZ', 30, 20, ARRAY['LISTENING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (2, 1, 'Speaking Quiz 1', 'QUIZ', 15, 20, ARRAY['SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (3, 1, 'Reading Quiz 1', 'QUIZ', 30, 20, ARRAY['READING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(4, 1, 'Writing Assignment 1', 'ASSIGNMENT', 60, 20, ARRAY['WRITING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(4, 1, 'Writing Assignment 1', 'HOMEWORK', 60, 20, ARRAY['WRITING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (5, 1, 'Midterm Exam', 'MIDTERM', 90, 100, ARRAY['LISTENING','READING','WRITING','SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (6, 1, 'Final Exam', 'FINAL', 120, 100, ARRAY['LISTENING','READING','WRITING','SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
@@ -721,6 +674,33 @@ INSERT INTO course_assessment_clo_mapping (course_assessment_id, clo_id, status)
 (4, 4, 'ACTIVE'),
 (5, 1, 'ACTIVE'), (5, 2, 'ACTIVE'), (5, 3, 'ACTIVE'), (5, 4, 'ACTIVE'),
 (6, 1, 'ACTIVE'), (6, 2, 'ACTIVE'), (6, 3, 'ACTIVE'), (6, 4, 'ACTIVE');
+
+-- Course Phases for Intermediate (ID 2)
+INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
+(3, 2, 1, 'Intermediate Skills', 5, NOW(), NOW()),
+(4, 2, 2, 'Advanced Practice', 5, NOW(), NOW());
+
+-- Course Sessions for Intermediate (ID 2)
+INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skill_set, created_at, updated_at) VALUES
+(25, 3, 1, 'Complex Sentence Structures', 'Analyze complex sentences', ARRAY['WRITING','READING'], NOW(), NOW()),
+(26, 3, 2, 'Advanced Listening Strategies', 'Listen for specific details', ARRAY['LISTENING'], NOW(), NOW()),
+(27, 4, 1, 'Speaking Part 2 & 3', 'Long turn speaking practice', ARRAY['SPEAKING'], NOW(), NOW()),
+(28, 4, 2, 'Essay Writing Task 2', 'Write an argumentative essay', ARRAY['WRITING'], NOW(), NOW());
+
+-- CLOs for Intermediate (ID 2)
+INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
+(5, 2, 'CLO1', 'Apply complex grammar structures in writing and speaking', NOW(), NOW()),
+(6, 2, 'CLO2', 'Analyze and synthesize information from academic texts', NOW(), NOW());
+
+-- Course Assessments for Intermediate (ID 2)
+INSERT INTO course_assessment (id, course_id, name, kind, duration_minutes, max_score, skills, created_at, updated_at) VALUES
+(7, 2, 'Writing Task 2 Assignment', 'HOMEWORK', 60, 100, ARRAY['WRITING'], NOW(), NOW()),
+(8, 2, 'Full Mock Test', 'FINAL', 180, 100, ARRAY['LISTENING','READING','WRITING','SPEAKING'], NOW(), NOW());
+
+-- Course Materials for Intermediate (ID 2)
+INSERT INTO course_material (course_id, phase_id, course_session_id, title, description, material_type, url, uploaded_by) VALUES
+(2, NULL, NULL, 'IELTS Intermediate Syllabus', 'Course syllabus', 'DOCUMENT', '/materials/courses/2/syllabus.pdf', 5),
+(2, 3, 25, 'Complex Grammar Guide', 'Guide to complex sentences', 'DOCUMENT', '/materials/sessions/25/grammar.pdf', 5);
 
 -- ========== TIER 4: CLASSES & SESSIONS ==========
 
@@ -2020,6 +2000,574 @@ INSERT INTO notification (recipient_id, type, title, message, priority, status, 
 ((SELECT id FROM user_account WHERE email = 'emma.wilson@tms-edu.vn'), 'REQUEST_APPROVAL', 'Yêu cầu thay thế đã duyệt', 'Yêu cầu dạy thay lớp HSK2-201 ngày 2025-11-15 đã được duyệt', 'MEDIUM', 'READ', 'TeacherRequest', 1, '{"replacementTeacher":"Teacher HSK1","sessionDate":"2025-11-15","status":"APPROVED"}', CURRENT_TIMESTAMP - INTERVAL '5 days', CURRENT_TIMESTAMP + INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '4 days');
 
 -- =========================================
+-- POLICY MANAGEMENT: System Policies
+-- =========================================
+
+-- 1. Absence Request Lead Time (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'request.absence.lead_time_days',
+    'REQUEST',
+    'Số ngày tối thiểu trước khi xin nghỉ',
+    'Học viên phải xin nghỉ trước tối thiểu X ngày so với ngày session. Nếu xin nghỉ muộn hơn, hệ thống sẽ từ chối hoặc cảnh báo.',
+    'INTEGER',
+    '1',
+    '1',
+    '1',
+    '7',
+    'days',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2. Teacher Session Suggestion Max Days (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.session.suggestion.max_days',
+    'TEACHER',
+    'Số ngày tối đa gợi ý session cho giáo viên',
+    'Số ngày tối đa mà hệ thống sẽ gợi ý sessions cho giáo viên khi họ xem lịch dạy. Giá trị này xác định phạm vi thời gian từ ngày hiện tại.',
+    'INTEGER',
+    '14',
+    '14',
+    '1',
+    '30',
+    'days',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2b. Teacher Modality Change - Require Resource at Create (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.modality_change.require_resource',
+    'TEACHER',
+    'Bắt buộc chọn phòng/link khi đổi hình thức dạy',
+    'Nếu true, giáo viên bắt buộc phải chọn resource (phòng hoặc lớp online) khi tạo yêu cầu đổi modality. Nếu false, giáo vụ có thể chọn resource khi duyệt.',
+    'BOOLEAN',
+    'true',
+    'true',
+    NULL,
+    NULL,
+    NULL,
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2c. Teacher Reschedule - Require Resource at Create (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.reschedule.require_resource_at_create',
+    'TEACHER',
+    'Bắt buộc chọn phòng/link khi xin dời buổi dạy',
+    'Nếu true, giáo viên phải chọn đầy đủ ngày, khung giờ và resource khi tạo yêu cầu dời buổi. Nếu false, giáo viên chỉ cần chọn ngày + khung giờ, resource do giáo vụ chọn khi duyệt.',
+    'BOOLEAN',
+    'true',
+    'true',
+    NULL,
+    NULL,
+    NULL,
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2d. Teacher Reschedule - Minimum Days Before Session (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.reschedule.min_days_before_session',
+    'TEACHER',
+    'Số ngày tối thiểu trước khi xin dời buổi',
+    'Giáo viên phải gửi yêu cầu dời buổi trước ít nhất X ngày so với ngày diễn ra session gốc.',
+    'INTEGER',
+    '1',
+    '1',
+    '0',
+    '30',
+    'days',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2d.1 Teacher Reschedule - Allow Same Day (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.reschedule.allow_same_day',
+    'TEACHER',
+    'Cho phép xin dời buổi trong cùng ngày',
+    'Nếu true, giáo viên được phép tạo yêu cầu dời buổi trong ngày diễn ra session. Nếu false, bắt buộc xin trước ngày diễn ra session.',
+    'BOOLEAN',
+    'false',
+    'false',
+    NULL,
+    NULL,
+    NULL,
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2d.2 Teacher Reschedule - Minimum Days Ahead for New Date (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.reschedule.min_days_ahead',
+    'TEACHER',
+    'Số ngày tối thiểu cho ngày dời mới',
+    'Ngày được chọn để dời buổi phải cách ngày hiện tại ít nhất X ngày (trừ khi cho phép same-day).',
+    'INTEGER',
+    '1',
+    '1',
+    '0',
+    '7',
+    'days',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2d.3 Teacher Reschedule - Max Requests Per Course (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.reschedule.max_per_course',
+    'TEACHER',
+    'Số lần tối đa xin dời trong một khóa học',
+    'Giới hạn số lượng yêu cầu dời buổi cho cùng một khóa học để tránh thay đổi lịch quá nhiều.',
+    'INTEGER',
+    '2',
+    '2',
+    '0',
+    '20',
+    'times',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2e. Teacher Replacement - Minimum Days Before Session (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.replacement.min_days_before_session',
+    'TEACHER',
+    'Số ngày tối thiểu trước khi xin thay giáo viên',
+    'Giáo viên phải gửi yêu cầu thay người dạy trước ít nhất X ngày để giáo vụ có thời gian sắp xếp.',
+    'INTEGER',
+    '1',
+    '1',
+    '0',
+    '14',
+    'days',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2f. Teacher Reschedule - Max Requests Per Month (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.reschedule.max_per_month',
+    'TEACHER',
+    'Số lần tối đa xin dời buổi mỗi tháng',
+    'Giới hạn số lượng yêu cầu dời buổi mà giáo viên có thể gửi trong một tháng (tính cả yêu cầu đang chờ duyệt và đã duyệt).',
+    'INTEGER',
+    '2',
+    '2',
+    '0',
+    '10',
+    'times',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2g. Teacher Modality Change - Max Requests Per Course (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.modality_change.max_per_course',
+    'TEACHER',
+    'Số lần tối đa đổi hình thức dạy trên một khóa học',
+    'Giới hạn số lượng yêu cầu đổi hình thức dạy mà giáo viên có thể gửi trong cùng một khóa học.',
+    'INTEGER',
+    '1',
+    '1',
+    '0',
+    '5',
+    'times',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2g.1 Teacher Modality Change - Minimum Days Before Course Start (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.modality_change.min_days_before_start',
+    'TEACHER',
+    'Số ngày tối thiểu trước khi khóa học bắt đầu',
+    'Giáo viên chỉ được phép đổi hình thức dạy nếu yêu cầu được gửi trước ngày khai giảng ít nhất X ngày.',
+    'INTEGER',
+    '7',
+    '7',
+    '0',
+    '30',
+    'days',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2g.2 Teacher Modality Change - Allow After Start (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.modality_change.allow_after_start',
+    'TEACHER',
+    'Cho phép đổi hình thức sau khi khóa học bắt đầu',
+    'Nếu bật, giáo viên vẫn có thể gửi yêu cầu đổi hình thức dạy sau khi khóa học đã khai giảng.',
+    'BOOLEAN',
+    'false',
+    'false',
+    NULL,
+    NULL,
+    NULL,
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2h. Teacher Replacement - Max Requests Per Month (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.replacement.max_per_month',
+    'TEACHER',
+    'Số lần tối đa xin thay giáo viên mỗi tháng',
+    'Giới hạn số lượng yêu cầu nhờ giáo viên khác dạy thay mà giáo viên có thể gửi trong một tháng.',
+    'INTEGER',
+    '3',
+    '3',
+    '0',
+    '10',
+    'times',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2i. Teacher Request - Require Reason (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.request.require_reason',
+    'TEACHER',
+    'Bắt buộc nhập lý do cho tất cả yêu cầu',
+    'Nếu bật (true), giáo viên bắt buộc phải nhập lý do khi tạo bất kỳ yêu cầu nào (dời buổi, đổi hình thức, nhờ dạy thay). Nếu tắt (false), có thể để trống lý do.',
+    'BOOLEAN',
+    'true',
+    'true',
+    NULL,
+    NULL,
+    NULL,
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2j. Teacher Request - Minimum Reason Length (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.request.reason_min_length',
+    'TEACHER',
+    'Độ dài tối thiểu lý do yêu cầu',
+    'Giáo viên phải nhập lý do có độ dài tối thiểu X ký tự khi tạo yêu cầu để đảm bảo thông tin đủ chi tiết cho giáo vụ xem xét.',
+    'INTEGER',
+    '15',
+    '15',
+    '10',
+    '500',
+    'characters',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 2k. Teacher Request - Maximum Requests Per Day (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'teacher.request.max_per_day',
+    'TEACHER',
+    'Số lượng yêu cầu tối đa mỗi ngày',
+    'Giới hạn số yêu cầu giáo viên có thể tạo trong một ngày để tránh spam hoặc thao tác quá nhiều.',
+    'INTEGER',
+    '2',
+    '2',
+    '1',
+    '20',
+    'times',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 3. Max Transfers Per Course (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'request.transfer.max_per_course',
+    'REQUEST',
+    'Số lần chuyển lớp tối đa mỗi khóa học',
+    'Học viên chỉ được chuyển lớp tối đa X lần trong một khóa học. Sau đó phải hoàn thành khóa học hiện tại hoặc hủy đăng ký.',
+    'INTEGER',
+    '1',
+    '1',
+    '0',
+    '5',
+    'times',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 4. Attendance Lock Time (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'attendance.lock.hours_after_session',
+    'ATTENDANCE',
+    'Thời gian khóa điểm danh sau khi session kết thúc',
+    'Sau X giờ kể từ khi session kết thúc, hệ thống sẽ khóa việc chỉnh sửa điểm danh. Giáo viên không thể sửa điểm danh sau thời gian này.',
+    'INTEGER',
+    '24',
+    '24',
+    '1',
+    '168',
+    'hours',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 5. Auto Mark Absent (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'attendance.auto_absent.enabled',
+    'ATTENDANCE',
+    'Tự động đánh vắng mặt khi chưa điểm danh',
+    'Nếu bật (true), hệ thống sẽ tự động đánh học viên là vắng mặt (ABSENT) nếu giáo viên chưa điểm danh sau khi session kết thúc.',
+    'BOOLEAN',
+    'true',
+    'true',
+    NULL,
+    NULL,
+    NULL,
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 6. Absence Threshold Percent (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'request.absence.threshold_percent',
+    'REQUEST',
+    'Ngưỡng vắng mặt cảnh báo (%)',
+    'Nếu học viên vắng mặt vượt quá X% tổng số sessions, hệ thống sẽ cảnh báo và có thể từ chối yêu cầu nghỉ tiếp.',
+    'DOUBLE',
+    '20.0',
+    '20.0',
+    '0.0',
+    '100.0',
+    'percent',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 7. Request Reason Min Length (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'request.absence.reason_min_length',
+    'REQUEST',
+    'Độ dài tối thiểu lý do xin nghỉ',
+    'Học viên phải nhập lý do xin nghỉ tối thiểu X ký tự.',
+    'INTEGER',
+    '10',
+    '10',
+    '5',
+    '500',
+    'characters',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- 8. Class Min Enrollment (GLOBAL)
+INSERT INTO system_policy (
+    policy_key, policy_category, policy_name, description,
+    value_type, default_value, current_value, min_value, max_value, unit,
+    scope, branch_id, course_id, class_id,
+    is_active, version, created_by, updated_by
+) VALUES (
+    'class.min_enrollment',
+    'CLASS',
+    'Số học viên tối thiểu để mở lớp',
+    'Lớp học phải có tối thiểu X học viên đăng ký mới được mở. Nếu dưới ngưỡng này, hệ thống sẽ cảnh báo hoặc tự động hủy lớp.',
+    'INTEGER',
+    '5',
+    '5',
+    '1',
+    '50',
+    'students',
+    'GLOBAL',
+    NULL, NULL, NULL,
+    true, 1,
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
+    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
+);
+
+-- Insert initial CREATE history records for all policies
+INSERT INTO policy_history (policy_id, old_value, new_value, changed_by, reason, version, change_type)
+SELECT 
+    id,
+    NULL,
+    current_value,
+    created_by,
+    'Initial policy creation',
+    version,
+    'CREATE'
+FROM system_policy;
+
+-- =========================================
 -- END OF SEED DATA
 -- =========================================
 -- Summary:
@@ -2034,6 +2582,7 @@ INSERT INTO notification (recipient_id, type, title, message, priority, status, 
 -- - Assessments with scores
 -- - Student feedback and QA reports
 -- - 10 Sample notifications covering all types and priorities
+-- - 17 System Policies (REQUEST, ATTENDANCE, CLASS, TEACHER categories)
 -- - Edge cases: capacity limits, mid-course enrollment, transfers, perfect attendance
 -- =========================================
 

@@ -15,6 +15,11 @@ import java.util.Optional;
 
 @Repository
 public interface SessionRepository extends JpaRepository<Session, Long> {
+    
+    /**
+     * Count sessions by date
+     */
+    long countByDate(LocalDate date);
     /**
      * Tìm tất cả sessions của class, ordered by date ascending
      * Dùng cho STEP 2: Review sessions (Xem lại buổi học)
@@ -390,4 +395,11 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
      */
     @Query("SELECT s FROM Session s WHERE s.classEntity.id = :classId")
     List<Session> findByClassId(@Param("classId") Long classId);
+    /**
+     * Count sessions by date in specific branches
+     */
+    @Query("SELECT COUNT(s) FROM Session s " +
+           "INNER JOIN s.classEntity c " +
+           "WHERE s.date = :date AND c.branch.id IN :branchIds")
+    long countByDateAndBranchIdIn(@Param("date") LocalDate date, @Param("branchIds") List<Long> branchIds);
 }

@@ -162,8 +162,11 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
                 .findByStudentIdAndStatus(studentId, EnrollmentStatus.ENROLLED);
 
         if (activeEnrollments.isEmpty()) {
-            log.warn("Student {} has no active enrollments", studentId);
-            throw new CustomException(ErrorCode.STUDENT_NOT_ENROLLED_IN_CLASS);
+            // Instead of failing the whole API, just return an empty list.
+            // This allows the frontend to display a friendly "no classes" state
+            // for students who have not been enrolled in any class yet.
+            log.warn("Student {} has no active enrollments. Returning empty time slot list.", studentId);
+            return Collections.emptyList();
         }
 
         // 2. Extract unique branch IDs from enrollments

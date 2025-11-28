@@ -17,11 +17,26 @@ public interface CourseService {
      */
     List<CourseDTO> getAllCourses(Long subjectId, Long levelId);
 
-    CourseDTO createCourse(CreateCourseRequestDTO request);
+    CourseDTO createCourse(CreateCourseRequestDTO request, Long userId);
 
     CourseDetailDTO getCourseDetails(Long id);
 
-    void updateCourse(Long id, CreateCourseRequestDTO request);
+    CourseDetailDTO updateCourse(Long id, CreateCourseRequestDTO request, Long userId);
+
+    /**
+     * Submit a course for approval
+     * 
+     * @param id Course ID
+     */
+    void submitCourse(Long id);
+
+    void approveCourse(Long id);
+
+    void rejectCourse(Long id, String reason);
+
+    void deactivateCourse(Long id);
+
+    void reactivateCourse(Long id);
 
     // Student/View methods
     List<StudentCourseDTO> getStudentCourses(Long studentId);

@@ -21,8 +21,7 @@ public class StudentCourseDTO {
     private String levelName;
     private String logicalCourseCode;
     private Integer totalHours;
-    private Integer durationWeeks;
-    private Integer sessionPerWeek;
+
     private String targetAudience;
     private String teachingMethods;
     private LocalDate effectiveDate;

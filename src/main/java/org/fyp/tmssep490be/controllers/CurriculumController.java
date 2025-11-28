@@ -105,4 +105,120 @@ public class CurriculumController {
                                 .data(duration)
                                 .build());
         }
+
+        @GetMapping("/subjects/{id}")
+        @Operation(summary = "Get subject details")
+        @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<SubjectResponseDTO>> getSubject(@PathVariable Long id) {
+                log.info("Fetching subject details for ID: {}", id);
+                SubjectResponseDTO subject = curriculumService.getSubject(id);
+                return ResponseEntity.ok(ResponseObject.<SubjectResponseDTO>builder()
+                                .success(true)
+                                .message("Subject details retrieved successfully")
+                                .data(subject)
+                                .build());
+        }
+
+        @PutMapping("/subjects/{id}")
+        @Operation(summary = "Update subject")
+        @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<SubjectResponseDTO>> updateSubject(@PathVariable Long id,
+                        @RequestBody CreateSubjectDTO request) {
+                log.info("Updating subject with ID: {}", id);
+                SubjectResponseDTO subject = curriculumService.updateSubject(id, request);
+                return ResponseEntity.ok(ResponseObject.<SubjectResponseDTO>builder()
+                                .success(true)
+                                .message("Subject updated successfully")
+                                .data(subject)
+                                .build());
+        }
+
+        @PatchMapping("/subjects/{id}/deactivate")
+        @Operation(summary = "Deactivate subject")
+        @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<Void>> deactivateSubject(@PathVariable Long id) {
+                log.info("Deactivating subject with ID: {}", id);
+                curriculumService.deactivateSubject(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Subject deactivated successfully")
+                                .build());
+        }
+
+        @PatchMapping("/subjects/{id}/reactivate")
+        @Operation(summary = "Reactivate subject")
+        @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<Void>> reactivateSubject(@PathVariable Long id) {
+                log.info("Reactivating subject with ID: {}", id);
+                curriculumService.reactivateSubject(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Subject reactivated successfully")
+                                .build());
+        }
+
+        @GetMapping("/levels/{id}")
+        @Operation(summary = "Get level details")
+        @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<LevelResponseDTO>> getLevel(@PathVariable Long id) {
+                log.info("Fetching level details for ID: {}", id);
+                LevelResponseDTO level = curriculumService.getLevel(id);
+                return ResponseEntity.ok(ResponseObject.<LevelResponseDTO>builder()
+                                .success(true)
+                                .message("Level details retrieved successfully")
+                                .data(level)
+                                .build());
+        }
+
+        @PutMapping("/levels/{id}")
+        @Operation(summary = "Update level")
+        @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<LevelResponseDTO>> updateLevel(@PathVariable Long id,
+                        @RequestBody CreateLevelDTO request) {
+                log.info("Updating level with ID: {}", id);
+                LevelResponseDTO level = curriculumService.updateLevel(id, request);
+                return ResponseEntity.ok(ResponseObject.<LevelResponseDTO>builder()
+                                .success(true)
+                                .message("Level updated successfully")
+                                .data(level)
+                                .build());
+        }
+
+        @PatchMapping("/levels/{id}/deactivate")
+        @Operation(summary = "Deactivate level")
+        @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<Void>> deactivateLevel(@PathVariable Long id) {
+                log.info("Deactivating level with ID: {}", id);
+                curriculumService.deactivateLevel(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Level deactivated successfully")
+                                .build());
+        }
+
+        @PatchMapping("/levels/{id}/reactivate")
+        @Operation(summary = "Reactivate level")
+        @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<Void>> reactivateLevel(@PathVariable Long id) {
+                log.info("Reactivating level with ID: {}", id);
+                curriculumService.reactivateLevel(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Level reactivated successfully")
+                                .build());
+        }
+
+        @PutMapping("/subjects/{id}/levels/sort-order")
+        @Operation(summary = "Update level sort order for a subject")
+        @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+        public ResponseEntity<ResponseObject<Void>> updateLevelSortOrder(
+                        @PathVariable Long id,
+                        @RequestBody List<Long> levelIds) {
+                log.info("Updating level sort order for subject ID: {}", id);
+                curriculumService.updateLevelSortOrder(id, levelIds);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Level sort order updated successfully")
+                                .build());
+        }
 }

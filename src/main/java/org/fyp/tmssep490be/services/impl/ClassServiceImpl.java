@@ -461,8 +461,6 @@ public class ClassServiceImpl implements ClassService {
                 .name(course.getName())
                 .description(course.getDescription())
                 .totalHours(course.getTotalHours())
-                .durationWeeks(course.getDurationWeeks())
-                .sessionPerWeek(course.getSessionPerWeek())
                 .build();
     }
 
@@ -988,7 +986,8 @@ public class ClassServiceImpl implements ClassService {
         }
 
         // Default plannedEndDate nếu không gửi lên:
-        // - nếu scheduleChanged/regenerate: cho phép null, sẽ tính lại sau khi regenerate
+        // - nếu scheduleChanged/regenerate: cho phép null, sẽ tính lại sau khi
+        // regenerate
         // - nếu không đổi lịch: dùng giá trị hiện có
         if (request.getPlannedEndDate() == null) {
             if (scheduleChanged || Boolean.TRUE.equals(request.getRegenerateSessions())) {

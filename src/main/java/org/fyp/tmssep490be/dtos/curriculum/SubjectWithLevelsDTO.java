@@ -37,5 +37,6 @@ public class SubjectWithLevelsDTO {
         private String description;
         private Integer expectedDurationHours;
         private Integer sortOrder;
+        private String status;
     }
 }

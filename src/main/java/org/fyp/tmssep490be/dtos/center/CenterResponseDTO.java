@@ -11,7 +11,7 @@ import java.time.OffsetDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CenterResponse {
+public class CenterResponseDTO {
 
     private Long id;
     private String code;
@@ -23,3 +23,4 @@ public class CenterResponse {
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }
+
