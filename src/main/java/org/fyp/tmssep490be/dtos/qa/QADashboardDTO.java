@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.fyp.tmssep490be.entities.enums.QAReportType;
 import org.fyp.tmssep490be.entities.enums.QAReportStatus;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -18,6 +19,7 @@ public class QADashboardDTO {
     private KPIMetrics kpiMetrics;
     private List<ClassRequiringAttention> classesRequiringAttention;
     private List<QAReportSummary> recentQAReports;
+    private DateRangeInfo dateRangeInfo;
 
     @Data
     @Builder
@@ -58,5 +60,16 @@ public class QADashboardDTO {
         private String sessionDate;
         private QAReportStatus status;
         private OffsetDateTime createdAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DateRangeInfo {
+        private LocalDate dateFrom;
+        private LocalDate dateTo;
+        private String displayText;
+        private Boolean isDefaultRange;
     }
 }

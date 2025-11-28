@@ -261,10 +261,43 @@ public class QAServiceImpl implements QAService {
 
         int ongoingClassesCount = ongoingClasses.size();
 
-        // Count QA reports created this month
-        OffsetDateTime startOfMonth = OffsetDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
-        List<QAReport> recentReports = qaReportRepository.findRecentReports(startOfMonth, PageRequest.of(0, 1000));
+        // Count QA reports created in date range (default to current month if not provided)
+        OffsetDateTime dateRangeStart;
+        OffsetDateTime dateRangeEnd;
+        LocalDate actualDateFrom;
+        LocalDate actualDateTo;
+        String displayText;
+        boolean isDefaultRange;
+
+        if (dateFrom != null && dateTo != null) {
+            dateRangeStart = dateFrom.atStartOfDay().atOffset(OffsetDateTime.now().getOffset());
+            dateRangeEnd = dateTo.atTime(23, 59, 59).atOffset(OffsetDateTime.now().getOffset());
+            actualDateFrom = dateFrom;
+            actualDateTo = dateTo;
+            displayText = String.format("%s - %s", dateFrom.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                                                       dateTo.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            isDefaultRange = false;
+        } else {
+            // Default to current month if no date range provided
+            LocalDate now = LocalDate.now();
+            dateRangeStart = now.withDayOfMonth(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset());
+            dateRangeEnd = now.atTime(23, 59, 59, 999999999).atOffset(OffsetDateTime.now().getOffset());
+            actualDateFrom = now.withDayOfMonth(1);
+            actualDateTo = now;
+            displayText = String.format("Tháng %d/%d", now.getMonthValue(), now.getYear());
+            isDefaultRange = true;
+        }
+
+        List<QAReport> recentReports = qaReportRepository.findReportsByDateRange(dateRangeStart, dateRangeEnd, PageRequest.of(0, 1000));
         int qaReportsCreatedThisMonth = recentReports.size();
+
+        // Create date range info for frontend
+        QADashboardDTO.DateRangeInfo dateRangeInfo = QADashboardDTO.DateRangeInfo.builder()
+                .dateFrom(actualDateFrom)
+                .dateTo(actualDateTo)
+                .displayText(displayText)
+                .isDefaultRange(isDefaultRange)
+                .build();
 
         // Calculate real average attendance and homework completion rates
         List<Long> ongoingClassIds = ongoingClasses.stream()
@@ -348,6 +381,7 @@ public class QAServiceImpl implements QAService {
                 .kpiMetrics(kpiMetrics)
                 .classesRequiringAttention(classesRequiringAttention)
                 .recentQAReports(qaReportSummaries)
+                .dateRangeInfo(dateRangeInfo)
                 .build();
     }
 
