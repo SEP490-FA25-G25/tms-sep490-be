@@ -514,16 +514,29 @@ public class StudentPortalServiceImpl implements StudentPortalService {
         List<StudentSession> studentSessions = studentSessionRepository.findAllByStudentId(student.getId())
                 .stream()
                 .filter(ss -> ss.getSession().getClassEntity().getId().equals(enrollment.getClassId()))
+                .filter(ss -> ss.getSession().getStatus() != SessionStatus.CANCELLED)
                 .collect(Collectors.toList());
 
         BigDecimal attendanceRate = BigDecimal.ZERO;
         if (!studentSessions.isEmpty()) {
-            long attendedCount = studentSessions.stream()
+            LocalDate today = LocalDate.now();
+            List<StudentSession> completedSessions = studentSessions.stream()
+                    .filter(ss -> ss.getSession() != null && !ss.getSession().getDate().isAfter(today))
+                    .toList();
+
+            long attendedCount = completedSessions.stream()
                     .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
                     .count();
-            attendanceRate = new BigDecimal(attendedCount)
-                    .divide(new BigDecimal(studentSessions.size()), 2, RoundingMode.HALF_UP)
-                    .multiply(new BigDecimal("100"));
+            long unexcusedAbsences = completedSessions.stream()
+                    .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                    .count();
+            long denominator = attendedCount + unexcusedAbsences;
+
+            if (denominator > 0) {
+                attendanceRate = new BigDecimal(attendedCount)
+                        .divide(new BigDecimal(denominator), 2, RoundingMode.HALF_UP)
+                        .multiply(new BigDecimal("100"));
+            }
         }
 
         return ClassmateDTO.builder()

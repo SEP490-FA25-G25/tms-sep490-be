@@ -159,10 +159,15 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
      */
     @Query("""
         SELECT new org.fyp.tmssep490be.dtos.WeeklyAttendanceReportDTO(
-            c.id, c.name, COUNT(ss.id),
+            c.id, c.name,
+            COUNT(CASE WHEN ss.attendanceStatus IN ('PRESENT', 'ABSENT') THEN 1 END),
             COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END),
             COUNT(CASE WHEN ss.attendanceStatus = 'ABSENT' THEN 1 END),
-            ROUND(COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END) * 100.0 / NULLIF(COUNT(ss.id), 0), 2)
+            ROUND(
+                COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END) * 100.0
+                / NULLIF(COUNT(CASE WHEN ss.attendanceStatus IN ('PRESENT', 'ABSENT') THEN 1 END), 0),
+                2
+            )
         )
         FROM ClassEntity c
         JOIN c.sessions s
@@ -184,8 +189,12 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
         SELECT new org.fyp.tmssep490be.dtos.StudentAttendanceAlertDTO(
             u.id, u.fullName, u.email, c.name,
             COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END),
-            COUNT(ss.id),
-            ROUND(COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END) * 100.0 / COUNT(ss.id), 2)
+            COUNT(CASE WHEN ss.attendanceStatus IN ('PRESENT', 'ABSENT') THEN 1 END),
+            ROUND(
+                COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END) * 100.0
+                / NULLIF(COUNT(CASE WHEN ss.attendanceStatus IN ('PRESENT', 'ABSENT') THEN 1 END), 0),
+                2
+            )
         )
         FROM UserAccount u
         JOIN u.student s
@@ -197,7 +206,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
         AND sess.status != 'CANCELLED'
         AND e.status = 'ENROLLED'
         GROUP BY u.id, u.fullName, u.email, c.id, c.name
-        HAVING COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END) * 100.0 / COUNT(ss.id) < :threshold
+        HAVING COUNT(CASE WHEN ss.attendanceStatus = 'PRESENT' THEN 1 END) * 100.0
+               / NULLIF(COUNT(CASE WHEN ss.attendanceStatus IN ('PRESENT', 'ABSENT') THEN 1 END), 0) < :threshold
         """)
     List<org.fyp.tmssep490be.dtos.StudentAttendanceAlertDTO> findStudentsWithLowAttendance(
         @Param("weekStart") java.time.LocalDate weekStart,

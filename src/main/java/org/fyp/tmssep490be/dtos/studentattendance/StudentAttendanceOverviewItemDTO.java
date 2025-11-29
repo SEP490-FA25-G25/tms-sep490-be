@@ -22,6 +22,7 @@ public class StudentAttendanceOverviewItemDTO {
     private int totalSessions;
     private int attended;
     private int absent;
+    private int excused;
     private int upcoming;
     private String status;
     private OffsetDateTime lastUpdated;

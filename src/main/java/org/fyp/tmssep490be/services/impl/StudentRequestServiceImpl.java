@@ -632,16 +632,13 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
         // If it's an absence request, update student_session attendance
         if (request.getRequestType().equals(StudentRequestType.ABSENCE) && request.getTargetSession() != null) {
-            Optional<StudentSession> studentSession = studentSessionRepository
-                    .findById(new StudentSession.StudentSessionId(request.getStudent().getId(), request.getTargetSession().getId()));
-
-            if (studentSession.isPresent()) {
-                StudentSession ss = studentSession.get();
-                ss.setAttendanceStatus(AttendanceStatus.ABSENT);
-                ss.setNote(String.format("Excused absence approved on %s. Request ID: %d",
-                        OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME), requestId));
-                studentSessionRepository.save(ss);
-            }
+            markSessionAsExcused(
+                    request.getStudent(),
+                    request.getTargetSession(),
+                    String.format("Vắng có phép được duyệt lúc %s. Request ID: %d",
+                            OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+                            requestId)
+            );
         }
 
         // If it's a makeup request, execute makeup approval logic
@@ -757,7 +754,9 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         // Only count sessions that have occurred (date <= today) and distinguish excused vs unexcused
         LocalDate today = LocalDate.now();
         List<StudentSession> pastSessions = sessions.stream()
-                .filter(ss -> ss.getSession() != null && !ss.getSession().getDate().isAfter(today))
+                .filter(ss -> ss.getSession() != null
+                        && ss.getSession().getStatus() != SessionStatus.CANCELLED
+                        && !ss.getSession().getDate().isAfter(today))
                 .toList();
 
         if (pastSessions.isEmpty()) {
@@ -769,6 +768,22 @@ public class StudentRequestServiceImpl implements StudentRequestService {
                 .count();
 
         return (double) unexcusedAbsences / pastSessions.size() * 100;
+    }
+
+    private void markSessionAsExcused(Student student, Session session, String note) {
+        StudentSession.StudentSessionId id = new StudentSession.StudentSessionId(student.getId(), session.getId());
+        StudentSession ss = studentSessionRepository.findById(id)
+                .orElseGet(() -> StudentSession.builder()
+                        .id(id)
+                        .student(student)
+                        .session(session)
+                        .build());
+
+        ss.setAttendanceStatus(AttendanceStatus.EXCUSED);
+        ss.setNote(note);
+        ss.setRecordedAt(OffsetDateTime.now());
+
+        studentSessionRepository.save(ss);
     }
 
     // Helper methods for mapping entities to DTOs
@@ -1083,7 +1098,9 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
         LocalDate today = LocalDate.now();
         List<StudentSession> pastSessions = sessions.stream()
-                .filter(ss -> ss.getSession() != null && !ss.getSession().getDate().isAfter(today))
+                .filter(ss -> ss.getSession() != null
+                        && ss.getSession().getStatus() != SessionStatus.CANCELLED
+                        && !ss.getSession().getDate().isAfter(today))
                 .toList();
 
         long totalSessions = pastSessions.size();
@@ -1093,12 +1110,10 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         long unexcusedAbsences = pastSessions.stream()
                 .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
                 .count();
-        long totalAbsences = excusedAbsences + unexcusedAbsences;
-
         return StudentRequestDetailDTO.StudentAbsenceStatsDTO.builder()
-                .totalAbsences((int) totalAbsences)
+                .totalAbsences((int) (excusedAbsences + unexcusedAbsences))
                 .totalSessions((int) totalSessions)
-                .absenceRate(totalSessions > 0 ? (double) totalAbsences / totalSessions * 100 : 0.0)
+                .absenceRate(totalSessions > 0 ? (double) unexcusedAbsences / totalSessions * 100 : 0.0)
                 .excusedAbsences((int) excusedAbsences)
                 .unexcusedAbsences((int) unexcusedAbsences)
                 .build();
@@ -1290,15 +1305,12 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         request = studentRequestRepository.save(request);
         log.info("Absence request created and auto-approved with id: {}", request.getId());
 
-        // 8. Mark student session as ABSENT (approved absence request)
-        StudentSession.StudentSessionId ssId = new StudentSession.StudentSessionId(student.getId(), session.getId());
-        StudentSession ss = studentSessionRepository.findById(ssId)
-                .orElseThrow(() -> new ResourceNotFoundException("Student session not found"));
-
-        ss.setAttendanceStatus(AttendanceStatus.ABSENT);
-        studentSessionRepository.save(ss);
-
-        log.info("Marked student session as ABSENT (approved absence) for student {} session {}", student.getId(), session.getId());
+        // 8. Mark student session as EXCUSED (approved absence request)
+        markSessionAsExcused(student, session, String.format(
+                "AA tạo nghỉ hộ - %s (ghi nhận %s)",
+                finalNote,
+                OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+        ));
 
         return mapToStudentResponseDTO(request);
     }
@@ -1478,6 +1490,10 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
     private MissedSessionDTO mapToMissedSessionDTO(Session session, Long studentId) {
         long daysAgo = ChronoUnit.DAYS.between(session.getDate(), LocalDate.now());
+        StudentSession.StudentSessionId ssId = new StudentSession.StudentSessionId(studentId, session.getId());
+        AttendanceStatus attendanceStatus = studentSessionRepository.findById(ssId)
+                .map(StudentSession::getAttendanceStatus)
+                .orElse(AttendanceStatus.ABSENT);
 
         // Check if has existing makeup request
         boolean hasExistingMakeup = studentRequestRepository.existsByStudentIdAndTargetSessionIdAndRequestTypeAndStatusIn(
@@ -1485,9 +1501,10 @@ public class StudentRequestServiceImpl implements StudentRequestService {
                 List.of(RequestStatus.PENDING, RequestStatus.APPROVED));
 
         // Check if has approved absence request
-        boolean isExcused = studentRequestRepository.existsByStudentIdAndTargetSessionIdAndRequestTypeAndStatusIn(
-                studentId, session.getId(), StudentRequestType.ABSENCE,
-                List.of(RequestStatus.APPROVED));
+        boolean isExcused = attendanceStatus == AttendanceStatus.EXCUSED ||
+                studentRequestRepository.existsByStudentIdAndTargetSessionIdAndRequestTypeAndStatusIn(
+                        studentId, session.getId(), StudentRequestType.ABSENCE,
+                        List.of(RequestStatus.APPROVED));
 
         return MissedSessionDTO.builder()
                 .sessionId(session.getId())
@@ -1505,7 +1522,7 @@ public class StudentRequestServiceImpl implements StudentRequestService {
                         .startTime(session.getTimeSlotTemplate().getStartTime())
                         .endTime(session.getTimeSlotTemplate().getEndTime())
                         .build())
-                .attendanceStatus(AttendanceStatus.ABSENT.name())
+                .attendanceStatus(attendanceStatus.name())
                 .hasExistingMakeupRequest(hasExistingMakeup)
                 .isExcusedAbsence(isExcused)
                 .build();

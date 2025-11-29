@@ -25,7 +25,7 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
      * Find weekly schedule for a student with all related data
      * Uses JOIN FETCH to prevent N+1 queries
      */
-    @Query("SELECT ss FROM StudentSession ss " +
+    @Query("SELECT DISTINCT ss FROM StudentSession ss " +
            "JOIN FETCH ss.session s " +
            "JOIN FETCH s.timeSlotTemplate tst " +
            "JOIN FETCH s.classEntity c " +
@@ -37,6 +37,7 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
            "LEFT JOIN FETCH sr.resource " +
            "WHERE ss.student.id = :studentId " +
            "AND s.date BETWEEN :startDate AND :endDate " +
+           "AND s.status != 'CANCELLED' " +
            "AND (ss.isTransferredOut IS NULL OR ss.isTransferredOut = false) " +
            "ORDER BY s.date ASC, tst.startTime ASC")
     List<StudentSession> findWeeklyScheduleByStudentId(
@@ -49,7 +50,7 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
      * Find weekly schedule for a student filtered by specific class
      * Uses JOIN FETCH to prevent N+1 queries
      */
-    @Query("SELECT ss FROM StudentSession ss " +
+    @Query("SELECT DISTINCT ss FROM StudentSession ss " +
            "JOIN FETCH ss.session s " +
            "JOIN FETCH s.timeSlotTemplate tst " +
            "JOIN FETCH s.classEntity c " +
@@ -62,6 +63,7 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
            "WHERE ss.student.id = :studentId " +
            "AND s.classEntity.id = :classId " +
            "AND s.date BETWEEN :startDate AND :endDate " +
+           "AND s.status != 'CANCELLED' " +
            "AND (ss.isTransferredOut IS NULL OR ss.isTransferredOut = false) " +
            "ORDER BY s.date ASC, tst.startTime ASC")
     List<StudentSession> findWeeklyScheduleByStudentIdAndClassId(

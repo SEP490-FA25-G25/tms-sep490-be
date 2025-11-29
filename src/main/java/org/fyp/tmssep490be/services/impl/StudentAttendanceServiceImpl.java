@@ -67,6 +67,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
                     // Calculate stats
                     int attended = 0;
                     int absent = 0;
+                    int excused = 0;
                     int upcoming = 0;
                     for (StudentSession ss : activeSessions) {
                         AttendanceStatus displayStatus = resolveDisplayStatusForStudent(ss);
@@ -76,6 +77,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
                         switch (displayStatus) {
                             case PRESENT -> attended++;
                             case ABSENT -> absent++;
+                            case EXCUSED -> excused++;
                             case PLANNED -> upcoming++;
                         }
                     }
@@ -92,6 +94,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
                             .totalSessions(activeSessions.size())
                             .attended(attended)
                             .absent(absent)
+                            .excused(excused)
                             .upcoming(upcoming)
                             .status(classEntity.getStatus().name())
                             .build();
@@ -116,6 +119,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
         // Tính summary
         int attended = 0;
         int absent = 0;
+        int excused = 0;
         int upcoming = 0;
         for (StudentSession ss : activeSessions) {
             AttendanceStatus displayStatus = resolveDisplayStatusForStudent(ss);
@@ -125,11 +129,12 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
             switch (displayStatus) {
                 case PRESENT -> attended++;
                 case ABSENT -> absent++;
+                case EXCUSED -> excused++;
                 case PLANNED -> upcoming++;
             }
         }
-        int completed = attended + absent;
-        double rate = completed == 0 ? 0d : (double) attended / (double) completed;
+        int completed = attended + absent + excused;
+        double rate = (attended + absent) == 0 ? 0d : (double) attended / (double) (attended + absent);
 
         // Map sessions DTO
         List<StudentAttendanceReportSessionDTO> sessionItems = activeSessions.stream()
@@ -208,6 +213,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
                 .totalSessions(activeSessions.size())
                 .attended(attended)
                 .absent(absent)
+                .excused(excused)
                 .upcoming(upcoming)
                 .attendanceRate(rate)
                 .build();

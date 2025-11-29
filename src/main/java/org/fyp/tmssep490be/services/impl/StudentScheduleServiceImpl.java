@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.schedule.*;
 import org.fyp.tmssep490be.entities.*;
+import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
@@ -264,6 +265,7 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
                 .location(determineLocationForSummary(classEntity, session))
                 .branchName(classEntity.getBranch().getName())
                 .attendanceStatus(studentSession.getAttendanceStatus())
+                .attendanceStatus(resolveDisplayStatus(studentSession))
                 .isMakeup(studentSession.getIsMakeup() != null ? studentSession.getIsMakeup() : false)
                 .makeupInfo(makeupInfo)
                 .build();
@@ -314,7 +316,7 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
 
         // Build StudentStatusDTO
         StudentStatusDTO studentStatus = StudentStatusDTO.builder()
-                .attendanceStatus(studentSession.getAttendanceStatus())
+                .attendanceStatus(resolveDisplayStatus(studentSession))
                 .homeworkStatus(studentSession.getHomeworkStatus())
                 .homeworkDueDate(null) // Not available in current schema
                 .homeworkDescription(studentSession.getNote()) // Use student session note
@@ -443,5 +445,26 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
                 .reason("Session rescheduled")
                 .makeupDate(studentSession.getSession().getDate())
                 .build();
+    }
+
+    /**
+     * Hiển thị trạng thái cho học viên trong lịch/chi tiết:
+     * - Nếu ngày session < hôm nay và status là null hoặc PLANNED → ABSENT (vắng không phép)
+     * - Ngược lại dùng status thực tế (PRESENT / ABSENT / EXCUSED / PLANNED / LATE)
+     */
+    private AttendanceStatus resolveDisplayStatus(StudentSession studentSession) {
+        Session session = studentSession.getSession();
+        if (session == null) {
+            return studentSession.getAttendanceStatus();
+        }
+        AttendanceStatus status = studentSession.getAttendanceStatus();
+        LocalDate today = LocalDate.now();
+
+        if (session.getDate() != null
+                && session.getDate().isBefore(today)
+                && (status == null || status == AttendanceStatus.PLANNED)) {
+            return AttendanceStatus.ABSENT;
+        }
+        return status;
     }
 }
