@@ -1,5 +1,3 @@
-
-
 spring:
   application:
     name: tms-sep490-be
@@ -25,17 +23,17 @@ spring:
     # Run init schema and seed data
     # Get-Content "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/schema.sql", "d:/Workspace/projects/tms-sep490-fa25/tms-sep490-be/src/main/resources/seed-data.sql" | docker exec -i tms-postgres psql -U postgres -d tms username: postgres
     username: postgres
-    url: jdbc:postgresql://localhost:5432/tms 
+    url: jdbc:postgresql://localhost:5432/tms
     password: 979712
 
     # Auto-initialization when starting
   sql:
-     init:
-       mode: never    # Disable since we'll use manual setup
+    init:
+      mode: never # Disable since we'll use manual setup
   jpa:
     defer-datasource-initialization: false
     hibernate:
-      ddl-auto: none   # Don't validate or create, just use existing schema
+      ddl-auto: none # Don't validate or create, just use existing schema
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -70,7 +68,6 @@ app:
 server:
   port: 8080
 
-
 # TMS Scheduler Configuration
 tms:
   scheduler:
@@ -79,7 +76,7 @@ tms:
       # Job 1: Class Status Update (SCHEDULED -> ONGOING, ONGOING -> COMPLETED)
       class-status-update:
         enabled: true
-        cron: "0 30 0 * * ?"  # Daily at 12:30 AM
+        cron: "0 30 0 * * ?" # Daily at 12:30 AM
 
       # Job 2: Transfer Request Execution (execute approved TRANSFER requests)
       transfer-request-execution:
@@ -89,46 +86,46 @@ tms:
       # Job 3: Request Expiry (auto-expire old PENDING requests)
       request-expiry:
         enabled: true
-        cron: "0 0 3 * * ?"  # Daily at 3:00 AM
-        expiry-days: 7  # Expire after 7 days
+        cron: "0 0 3 * * ?" # Daily at 3:00 AM
+        expiry-days: 7 # Expire after 7 days
 
       # Job 4: License Expiry Warning (monitor VIRTUAL resource licenses)
       license-expiry-warning:
         enabled: true
-        cron: "0 0 8 * * ?"  # Daily at 8:00 AM
-        warning-days: 30  # First warning at 30 days
-        urgent-days: 7    # Urgent warning at 7 days
+        cron: "0 0 8 * * ?" # Daily at 8:00 AM
+        warning-days: 30 # First warning at 30 days
+        urgent-days: 7 # Urgent warning at 7 days
 
       # Job 5: Course Activation (DRAFT + APPROVED -> ACTIVE on effectiveDate)
       course-activation:
         enabled: true
-        cron: "0 0 1 * * ?"  # Daily at 1:00 AM
+        cron: "0 0 1 * * ?" # Daily at 1:00 AM
 
       # ========== PHASE 2 JOBS ==========
 
       # Job 6: Enrollment Status Update (auto-complete enrollments for completed classes)
       enrollment-status-update:
         enabled: true
-        cron: "0 0 1 * * ?"  # Daily at 1:00 AM (after CourseActivationJob)
+        cron: "0 0 1 * * ?" # Daily at 1:00 AM (after CourseActivationJob)
 
       # Job 7: Pending Request Reminder (remind Academic Affairs about old pending requests)
       pending-request-reminder:
         enabled: true
-        cron: "0 0 9 * * MON-FRI"  # Weekdays at 9:00 AM
-        reminder-threshold-days: 3  # Remind about requests pending 3+ days
+        cron: "0 0 9 * * MON-FRI" # Weekdays at 9:00 AM
+        reminder-threshold-days: 3 # Remind about requests pending 3+ days
 
       # Job 8: Weekly Attendance Report (generate attendance reports and alerts)
       weekly-attendance-report:
         enabled: true
-        cron: "0 0 18 * * SUN"  # Sundays at 6:00 PM
-        low-attendance-threshold: 75.0  # Alert students with attendance below 75%
+        cron: "0 0 18 * * SUN" # Sundays at 6:00 PM
+        low-attendance-threshold: 75.0 # Alert students with attendance below 75%
 
       # Job 10: Feedback Collection Reminder (remind students to provide feedback)
       feedback-collection-reminder:
         enabled: true
-        cron: "0 0 10 * * MON,WED,FRI"  # Mon/Wed/Fri at 10:00 AM
+        cron: "0 0 10 * * MON,WED,FRI" # Mon/Wed/Fri at 10:00 AM
 
-# Gmail SMTP Configuration for Email Service
+  # Gmail SMTP Configuration for Email Service
   mail:
     host: smtp.gmail.com
     port: 587
@@ -147,17 +144,17 @@ tms:
           writetimeout: 10000
         debug: false
 
-# Email Service Configuration
+    # Email Service Configuration
     email:
       from:
         email: ${GMAIL_USERNAME:t03612977@gmail.com}
         name: ${TMS_FROM_NAME:Anh ngữ Pinnacle}
       rate:
-        limit: ${GMAIL_RATE_LIMIT:20}  # 20 emails per second for Gmail
-        limit-duration: ${GMAIL_RATE_LIMIT_DURATION:1}  # 1 second
+        limit: ${GMAIL_RATE_LIMIT:20} # 20 emails per second for Gmail
+        limit-duration: ${GMAIL_RATE_LIMIT_DURATION:1} # 1 second
       retry:
         max-attempts: ${GMAIL_RETRY_MAX_ATTEMPTS:3}
-        delay: ${GMAIL_RETRY_DELAY:1000}  # 1 second
+        delay: ${GMAIL_RETRY_DELAY:1000} # 1 second
   async:
     pool-size: ${EMAIL_ASYNC_POOL_SIZE:10}
     queue-capacity: ${EMAIL_ASYNC_QUEUE_CAPACITY:100}

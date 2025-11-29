@@ -119,6 +119,20 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
     List<TeacherRequest> findBySessionIdInAndStatusIn(List<Long> sessionIds, List<RequestStatus> statuses);
 
     /**
+     * Count requests by status and branch ID
+     * Used for branch deactivation validation
+     */
+    @Query("SELECT COUNT(tr) FROM TeacherRequest tr " +
+           "JOIN tr.session s " +
+           "JOIN s.classEntity c " +
+           "WHERE tr.status = :status " +
+           "AND c.branch.id = :branchId")
+    long countByStatusAndBranchId(
+        @Param("status") RequestStatus status,
+        @Param("branchId") Long branchId
+    );
+
+    /**
      * Count requests by teacher and type submitted after a given date (inclusive)
      */
     long countByTeacherIdAndRequestTypeAndStatusInAndSubmittedAtGreaterThanEqual(

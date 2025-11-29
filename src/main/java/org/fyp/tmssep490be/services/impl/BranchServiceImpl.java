@@ -7,12 +7,19 @@ import org.fyp.tmssep490be.dtos.branch.BranchRequestDTO;
 import org.fyp.tmssep490be.entities.Branch;
 import org.fyp.tmssep490be.entities.Center;
 import org.fyp.tmssep490be.entities.enums.BranchStatus;
+import org.fyp.tmssep490be.entities.enums.ClassStatus;
+import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.repositories.BranchRepository;
 import org.fyp.tmssep490be.repositories.CenterRepository;
+import org.fyp.tmssep490be.repositories.ClassRepository;
+import org.fyp.tmssep490be.repositories.StudentRequestRepository;
+import org.fyp.tmssep490be.repositories.TeacherRequestRepository;
 import org.fyp.tmssep490be.services.BranchService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -23,6 +30,9 @@ public class BranchServiceImpl implements BranchService {
 
     private final BranchRepository branchRepository;
     private final CenterRepository centerRepository;
+    private final ClassRepository classRepository;
+    private final StudentRequestRepository studentRequestRepository;
+    private final TeacherRequestRepository teacherRequestRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -111,9 +121,46 @@ public class BranchServiceImpl implements BranchService {
         branch.setCity(request.getCity());
         branch.setPhone(request.getPhone());
         branch.setEmail(request.getEmail());
-        
+
         if (request.getStatus() != null) {
-            branch.setStatus(BranchStatus.valueOf(request.getStatus()));
+            BranchStatus newStatus = BranchStatus.valueOf(request.getStatus());
+            BranchStatus oldStatus = branch.getStatus();
+
+            // Validate before deactivating a branch
+            if (oldStatus == BranchStatus.ACTIVE && newStatus == BranchStatus.INACTIVE) {
+                Long branchId = branch.getId();
+
+                // 1) Không có lớp SCHEDULED / ONGOING tại chi nhánh
+                long activeClasses = classRepository.countByBranchIdAndStatusIn(
+                        branchId,
+                        Arrays.asList(ClassStatus.SCHEDULED, ClassStatus.ONGOING)
+                );
+                if (activeClasses > 0) {
+                    throw new IllegalArgumentException(
+                            "Không thể tạm ngưng chi nhánh vì vẫn còn " + activeClasses + " lớp đang hoạt động"
+                    );
+                }
+
+                // 2) Không có request PENDING liên quan tới lớp/chi nhánh (student + teacher)
+                long pendingStudentRequests = studentRequestRepository.countByStatusAndBranches(
+                        RequestStatus.PENDING,
+                        Collections.singletonList(branchId)
+                );
+
+                long pendingTeacherRequests = teacherRequestRepository.countByStatusAndBranchId(
+                        RequestStatus.PENDING,
+                        branchId
+                );
+
+                long totalPendingRequests = pendingStudentRequests + pendingTeacherRequests;
+                if (totalPendingRequests > 0) {
+                    throw new IllegalArgumentException(
+                            "Không thể tạm ngưng chi nhánh vì vẫn còn " + totalPendingRequests + " yêu cầu đang chờ xử lý"
+                    );
+                }
+            }
+
+            branch.setStatus(newStatus);
         }
         
         branch.setOpeningDate(request.getOpeningDate());
