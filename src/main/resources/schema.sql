@@ -335,12 +335,12 @@ CREATE TABLE course_session (
   sequence_no INTEGER NOT NULL, -- ví dụ: Session 1, Session 2, Session 3, ...
   topic VARCHAR(500),
   student_task TEXT,
-  skill_set VARCHAR(20)[],
+  skill VARCHAR(20) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_course_session_phase FOREIGN KEY(phase_id) REFERENCES course_phase(id) ON DELETE CASCADE,
   CONSTRAINT uq_course_session_phase_sequence UNIQUE(phase_id,sequence_no),
-  CONSTRAINT chk_course_session_skill_set CHECK (skill_set <@ ARRAY['GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI']::varchar[])
+  CONSTRAINT chk_course_session_skill CHECK (skill IN ('GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI'))
 );
 
 CREATE TABLE course_material (
@@ -412,13 +412,14 @@ CREATE TABLE course_assessment (
   kind VARCHAR(20) NOT NULL, -- ví dụ: quiz, midterm, final, assignment, project, oral, practice, other
   duration_minutes INTEGER, -- thời lượng làm bài (nếu có)
   description TEXT,
-  skills VARCHAR(20)[] NOT NULL,
+  skill VARCHAR(20) NOT NULL,
   max_score DECIMAL(5,2) NOT NULL,
   note TEXT,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT fk_course_assessment_course FOREIGN KEY(course_id) REFERENCES course(id) ON DELETE CASCADE,
-  CONSTRAINT chk_assessment_kind CHECK (kind IN ('QUIZ', 'MIDTERM', 'FINAL', 'MOCK_TEST', 'PHASE_TEST', 'ORAL', 'PRACTICE', 'OTHER', 'PLACEMENT_TEST', 'HOMEWORK'))
+  CONSTRAINT chk_assessment_kind CHECK (kind IN ('QUIZ', 'MIDTERM', 'FINAL', 'MOCK_TEST', 'PHASE_TEST', 'ORAL', 'PRACTICE', 'OTHER', 'PLACEMENT_TEST', 'HOMEWORK')),
+  CONSTRAINT chk_course_assessment_skill CHECK (skill IN ('GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI'))
 );
 
 CREATE TABLE course_assessment_clo_mapping (

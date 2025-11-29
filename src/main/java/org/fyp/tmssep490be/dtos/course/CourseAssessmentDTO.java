@@ -33,6 +33,6 @@ public class CourseAssessmentDTO {
     private Boolean isCompleted;
     private BigDecimal achievedScore;
     private String completedAt;
-    private List<String> skills;
+    private String skill;
     private String note;
 }

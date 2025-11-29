@@ -38,10 +38,9 @@ public class CourseSession {
     @Column(name = "student_task", columnDefinition = "TEXT")
     private String studentTask;
 
-    @Type(io.hypersistence.utils.hibernate.type.array.ListArrayType.class)
-    @Column(name = "skill_set", columnDefinition = "varchar[]")
-    @Builder.Default
-    private List<String> skillSet = new ArrayList<>();
+    @Enumerated(EnumType.STRING)
+    @Column(name = "skill", nullable = false, length = 20)
+    private org.fyp.tmssep490be.entities.enums.Skill skill;
 
     @OneToMany(mappedBy = "courseSession", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

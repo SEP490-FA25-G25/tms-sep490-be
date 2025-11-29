@@ -1,7 +1,7 @@
 package org.fyp.tmssep490be.services.impl;
 
-import org.fyp.tmssep490be.dtos.center.CenterRequest;
-import org.fyp.tmssep490be.dtos.center.CenterResponse;
+import org.fyp.tmssep490be.dtos.center.CenterRequestDTO;
+import org.fyp.tmssep490be.dtos.center.CenterResponseDTO;
 import org.fyp.tmssep490be.entities.Center;
 import org.fyp.tmssep490be.repositories.CenterRepository;
 import org.fyp.tmssep490be.services.CenterService;
@@ -43,7 +43,7 @@ class CenterServiceImplTest {
     private CenterRepository centerRepository;
 
     private Center testCenter;
-    private CenterRequest testRequest;
+    private CenterRequestDTO testRequest;
 
     @BeforeEach
     void setUp() {
@@ -58,7 +58,7 @@ class CenterServiceImplTest {
                 .address("Test Address")
                 .build();
 
-        testRequest = CenterRequest.builder()
+        testRequest = CenterRequestDTO.builder()
                 .code("TC001")
                 .name("Test Center")
                 .description("Test Description")
@@ -75,7 +75,7 @@ class CenterServiceImplTest {
         when(centerRepository.save(any(Center.class))).thenReturn(testCenter);
 
         // Act
-        CenterResponse response = centerService.createCenter(testRequest);
+        CenterResponseDTO response = centerService.createCenter(testRequest);
 
         // Assert
         assertThat(response).isNotNull();
@@ -92,7 +92,7 @@ class CenterServiceImplTest {
         when(centerRepository.findById(1L)).thenReturn(Optional.of(testCenter));
 
         // Act
-        CenterResponse response = centerService.getCenterById(1L);
+        CenterResponseDTO response = centerService.getCenterById(1L);
 
         // Assert
         assertThat(response).isNotNull();
@@ -130,7 +130,7 @@ class CenterServiceImplTest {
         when(centerRepository.findAll(pageable)).thenReturn(centerPage);
 
         // Act
-        Page<CenterResponse> response = centerService.getAllCenters(pageable);
+        Page<CenterResponseDTO> response = centerService.getAllCenters(pageable);
 
         // Assert
         assertThat(response).isNotNull();
@@ -144,7 +144,7 @@ class CenterServiceImplTest {
     @DisplayName("Should update center successfully")
     void shouldUpdateCenterSuccessfully() {
         // Arrange
-        CenterRequest updateRequest = CenterRequest.builder()
+        CenterRequestDTO updateRequest = CenterRequestDTO.builder()
                 .code("TC001")
                 .name("Updated Center Name")
                 .description("Updated Description")
@@ -167,7 +167,7 @@ class CenterServiceImplTest {
         when(centerRepository.save(any(Center.class))).thenReturn(updatedCenter);
 
         // Act
-        CenterResponse response = centerService.updateCenter(1L, updateRequest);
+        CenterResponseDTO response = centerService.updateCenter(1L, updateRequest);
 
         // Assert
         assertThat(response).isNotNull();

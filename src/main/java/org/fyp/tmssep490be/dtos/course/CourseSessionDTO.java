@@ -23,7 +23,7 @@ public class CourseSessionDTO {
     private Integer sequenceNo;
     private String description;
     private String objectives;
-    private List<String> skillSets;
+    private String skill;
     private List<CourseMaterialDTO> materials;
     private Integer totalMaterials;
     private Boolean isCompleted;
