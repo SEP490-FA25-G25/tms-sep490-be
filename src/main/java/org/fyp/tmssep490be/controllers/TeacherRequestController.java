@@ -314,10 +314,19 @@ public class TeacherRequestController {
                 "teacher.reschedule.require_resource_at_create", true);
         boolean requireResourceAtModalityChangeCreate = policyService.getGlobalBoolean(
                 "teacher.modality_change.require_resource", true);
+        int minDaysBeforeSession = policyService.getGlobalInt(
+                "teacher.request.min_days_before_session", 1);
+        int reasonMinLength = policyService.getGlobalInt(
+                "teacher.request.reason_min_length", 15);
+        int timeWindowDays = policyService.getGlobalInt(
+                "teacher.session.suggestion.max_days", 14);
 
         TeacherRequestConfigDTO config = TeacherRequestConfigDTO.builder()
                 .requireResourceAtRescheduleCreate(requireResourceAtRescheduleCreate)
                 .requireResourceAtModalityChangeCreate(requireResourceAtModalityChangeCreate)
+                .minDaysBeforeSession(minDaysBeforeSession)
+                .reasonMinLength(reasonMinLength)
+                .timeWindowDays(timeWindowDays)
                 .build();
 
         return ResponseEntity.ok(ResponseObject.<TeacherRequestConfigDTO>builder()
