@@ -258,20 +258,14 @@ public class CourseServiceImpl implements CourseService {
                     session.setTopic(sessionDTO.getTopic());
                     session.setStudentTask(sessionDTO.getStudentTask());
                     session.setSequenceNo(sessionSeq++);
-                    if (sessionDTO.getSkillSets() != null) {
-                        session.setSkillSet(new ArrayList<>(sessionDTO.getSkillSets().stream()
-                                .map(skillName -> {
-                                    try {
-                                        org.fyp.tmssep490be.entities.enums.Skill.valueOf(skillName);
-                                        return skillName;
-                                    } catch (IllegalArgumentException e) {
-                                        return null;
-                                    }
-                                })
-                                .filter(java.util.Objects::nonNull)
-                                .toList()));
+                    if (sessionDTO.getSkill() != null) {
+                        try {
+                            session.setSkill(org.fyp.tmssep490be.entities.enums.Skill.valueOf(sessionDTO.getSkill()));
+                        } catch (IllegalArgumentException e) {
+                            session.setSkill(org.fyp.tmssep490be.entities.enums.Skill.GENERAL);
+                        }
                     } else {
-                        session.setSkillSet(new ArrayList<>());
+                        session.setSkill(org.fyp.tmssep490be.entities.enums.Skill.GENERAL);
                     }
 
                     session = courseSessionRepository.save(session); // Save session first
@@ -324,7 +318,15 @@ public class CourseServiceImpl implements CourseService {
             assessment.setDurationMinutes(dto.getDurationMinutes());
             assessment.setDescription(dto.getDescription());
             assessment.setNote(dto.getNote());
-            assessment.setSkills(dto.getSkills() != null ? dto.getSkills() : new ArrayList<>());
+            if (dto.getSkill() != null) {
+                try {
+                    assessment.setSkill(org.fyp.tmssep490be.entities.enums.Skill.valueOf(dto.getSkill()));
+                } catch (IllegalArgumentException e) {
+                    assessment.setSkill(org.fyp.tmssep490be.entities.enums.Skill.GENERAL);
+                }
+            } else {
+                assessment.setSkill(org.fyp.tmssep490be.entities.enums.Skill.GENERAL);
+            }
 
             assessment = courseAssessmentRepository.save(assessment);
 
@@ -429,9 +431,7 @@ public class CourseServiceImpl implements CourseService {
                                         .sequenceNo(session.getSequenceNo()) // Ensure sequenceNo is returned
                                         .topic(session.getTopic())
                                         .studentTask(session.getStudentTask())
-                                        .skillSets(
-                                                session.getSkillSet() != null ? new ArrayList<>(session.getSkillSet())
-                                                        : new ArrayList<>())
+                                        .skill(session.getSkill() != null ? session.getSkill().name() : null)
                                         .mappedCLOs(mappedCLOs)
                                         .build();
                             })
@@ -481,7 +481,7 @@ public class CourseServiceImpl implements CourseService {
                             .durationMinutes(assessment.getDurationMinutes())
                             .description(assessment.getDescription())
                             .note(assessment.getNote())
-                            .skills(assessment.getSkills())
+                            .skill(assessment.getSkill() != null ? assessment.getSkill().name() : null)
                             .mappedCLOs(mappedCLOs)
                             .build();
                 })
@@ -606,7 +606,7 @@ public class CourseServiceImpl implements CourseService {
                                         .sequenceNo(session.getSequenceNo())
                                         .topic(session.getTopic())
                                         .materials(sessionMaterialsList)
-                                        .skillSet(new ArrayList<>(session.getSkillSet()))
+                                        .skill(session.getSkill() != null ? session.getSkill().name() : null)
                                         .totalMaterials(sessionMaterialsList.size())
                                         .build();
                             })
@@ -871,21 +871,16 @@ public class CourseServiceImpl implements CourseService {
                             phase.getCourseSessions().add(session);
                         }
 
-                        // Update SkillSets
-                        if (sessionDTO.getSkillSets() != null) {
-                            session.setSkillSet(new java.util.ArrayList<>(sessionDTO.getSkillSets().stream()
-                                    .map(skillName -> {
-                                        try {
-                                            org.fyp.tmssep490be.entities.enums.Skill.valueOf(skillName);
-                                            return skillName;
-                                        } catch (IllegalArgumentException e) {
-                                            return null;
-                                        }
-                                    })
-                                    .filter(java.util.Objects::nonNull)
-                                    .toList()));
+                        // Update Skill
+                        if (sessionDTO.getSkill() != null) {
+                            try {
+                                session.setSkill(
+                                        org.fyp.tmssep490be.entities.enums.Skill.valueOf(sessionDTO.getSkill()));
+                            } catch (IllegalArgumentException e) {
+                                session.setSkill(org.fyp.tmssep490be.entities.enums.Skill.GENERAL);
+                            }
                         } else {
-                            session.setSkillSet(new java.util.ArrayList<>());
+                            session.setSkill(org.fyp.tmssep490be.entities.enums.Skill.GENERAL);
                         }
 
                         // Update CLO Mappings for Session
@@ -999,8 +994,16 @@ public class CourseServiceImpl implements CourseService {
                             assessmentDTO.getWeight() != null ? assessmentDTO.getWeight() : java.math.BigDecimal.ZERO);
                     assessment.setDescription(assessmentDTO.getDescription());
                     assessment.setNote(assessmentDTO.getNote());
-                    assessment.setSkills(assessmentDTO.getSkills() != null ? assessmentDTO.getSkills()
-                            : new java.util.ArrayList<>());
+                    if (assessmentDTO.getSkill() != null) {
+                        try {
+                            assessment.setSkill(
+                                    org.fyp.tmssep490be.entities.enums.Skill.valueOf(assessmentDTO.getSkill()));
+                        } catch (IllegalArgumentException e) {
+                            assessment.setSkill(org.fyp.tmssep490be.entities.enums.Skill.GENERAL);
+                        }
+                    } else {
+                        assessment.setSkill(org.fyp.tmssep490be.entities.enums.Skill.GENERAL);
+                    }
                     keptAssessmentIds.add(assessment.getId());
                 } else {
                     assessment = CourseAssessment.builder()
@@ -1012,8 +1015,7 @@ public class CourseServiceImpl implements CourseService {
                                     : java.math.BigDecimal.ZERO)
                             .description(assessmentDTO.getDescription())
                             .note(assessmentDTO.getNote())
-                            .skills(assessmentDTO.getSkills() != null ? assessmentDTO.getSkills()
-                                    : new java.util.ArrayList<>())
+                            .skill(parseSkill(assessmentDTO.getSkill()))
                             .build();
                     course.getCourseAssessments().add(assessment);
                 }
@@ -1338,7 +1340,7 @@ public class CourseServiceImpl implements CourseService {
 
     private CourseSessionDTO convertToSessionDTO(CourseSession session) {
         // Handle skillSet array properly
-        List<String> skillSets = session.getSkillSet() != null ? new ArrayList<>(session.getSkillSet()) : List.of();
+        String skill = session.getSkill() != null ? session.getSkill().name() : null;
 
         return CourseSessionDTO.builder()
                 .id(session.getId())
@@ -1346,7 +1348,7 @@ public class CourseServiceImpl implements CourseService {
                 .topic(session.getTopic())
                 .description(session.getStudentTask()) // Use studentTask instead of description
                 .objectives(null) // objectives not available in CourseSession
-                .skillSets(skillSets)
+                .skill(skill)
                 .totalMaterials((int) courseMaterialRepository.countByCourseSessionId(session.getId()))
                 .build();
     }
@@ -1430,5 +1432,15 @@ public class CourseServiceImpl implements CourseService {
                                                                                                                        // String
                 .cloMappings(cloMappings)
                 .build();
+    }
+
+    private org.fyp.tmssep490be.entities.enums.Skill parseSkill(String skillName) {
+        if (skillName == null)
+            return org.fyp.tmssep490be.entities.enums.Skill.GENERAL;
+        try {
+            return org.fyp.tmssep490be.entities.enums.Skill.valueOf(skillName);
+        } catch (IllegalArgumentException e) {
+            return org.fyp.tmssep490be.entities.enums.Skill.GENERAL;
+        }
     }
 }

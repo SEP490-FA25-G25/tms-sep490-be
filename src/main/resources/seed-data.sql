@@ -579,33 +579,33 @@ INSERT INTO course_phase (id, course_id, phase_number, name, duration_weeks, cre
 (2, 1, 2, 'Foundation Practice', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
 -- Course Sessions for Foundation (24 sessions = 8 weeks × 3 sessions/week)
-INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skill_set, created_at, updated_at) VALUES
+INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at) VALUES
 -- Phase 1: Foundation Basics (Sessions 1-12)
-(1, 1, 1, 'Introduction to IELTS & Basic Listening', 'Listen to simple dialogues', '{GENERAL, LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(2, 1, 2, 'Basic Speaking: Greetings and Introductions', 'Practice self-introduction', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(3, 1, 3, 'Basic Reading: Short Passages', 'Read and answer simple questions', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(4, 1, 4, 'Basic Writing: Simple Sentences', 'Write about yourself', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(5, 1, 5, 'Listening: Numbers and Dates', 'Complete listening exercises', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(6, 1, 6, 'Speaking: Daily Activities', 'Describe your daily routine', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(7, 1, 7, 'Reading: Understanding Main Ideas', 'Identify main ideas', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(8, 1, 8, 'Writing: Simple Paragraphs', 'Write a short paragraph', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(9, 1, 9, 'Listening: Conversations', 'Listen to basic conversations', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(10, 1, 10, 'Speaking: Expressing Likes and Dislikes', 'Talk about preferences', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(11, 1, 11, 'Reading: Details and Facts', 'Find specific information', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(12, 1, 12, 'Writing: Connecting Ideas', 'Use simple connectors', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(1, 1, 1, 'Introduction to IELTS & Basic Listening', 'Listen to simple dialogues', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(2, 1, 2, 'Basic Speaking: Greetings and Introductions', 'Practice self-introduction', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(3, 1, 3, 'Basic Reading: Short Passages', 'Read and answer simple questions', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(4, 1, 4, 'Basic Writing: Simple Sentences', 'Write about yourself', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(5, 1, 5, 'Listening: Numbers and Dates', 'Complete listening exercises', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(6, 1, 6, 'Speaking: Daily Activities', 'Describe your daily routine', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(7, 1, 7, 'Reading: Understanding Main Ideas', 'Identify main ideas', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(8, 1, 8, 'Writing: Simple Paragraphs', 'Write a short paragraph', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(9, 1, 9, 'Listening: Conversations', 'Listen to basic conversations', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(10, 1, 10, 'Speaking: Expressing Likes and Dislikes', 'Talk about preferences', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(11, 1, 11, 'Reading: Details and Facts', 'Find specific information', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(12, 1, 12, 'Writing: Connecting Ideas', 'Use simple connectors', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 -- Phase 2: Foundation Practice (Sessions 13-24)
-(13, 2, 1, 'Listening: Following Instructions', 'Complete tasks from audio', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(14, 2, 2, 'Speaking: Asking Questions', 'Practice question forms', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(15, 2, 3, 'Reading: Short Stories', 'Read and summarize', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(16, 2, 4, 'Writing: Describing People and Places', 'Write descriptions', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(17, 2, 5, 'Listening: News and Announcements', 'Understand main points', '{LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(18, 2, 6, 'Speaking: Giving Opinions', 'Express simple opinions', '{SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(19, 2, 7, 'Reading: Understanding Context', 'Use context clues', '{READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(20, 2, 8, 'Writing: Personal Letters', 'Write informal letters', '{WRITING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(21, 2, 9, 'Practice Test: Listening & Reading', 'Complete practice test', '{LISTENING, READING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(22, 2, 10, 'Practice Test: Writing & Speaking', 'Complete practice test', '{WRITING, SPEAKING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(23, 2, 11, 'Review and Feedback', 'Review all skills', '{GENERAL}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(24, 2, 12, 'Final Assessment', 'Complete final test', '{GENERAL, READING, WRITING, SPEAKING, LISTENING}', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+(13, 2, 1, 'Listening: Following Instructions', 'Complete tasks from audio', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(14, 2, 2, 'Speaking: Asking Questions', 'Practice question forms', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(15, 2, 3, 'Reading: Short Stories', 'Read and summarize', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(16, 2, 4, 'Writing: Describing People and Places', 'Write descriptions', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(17, 2, 5, 'Listening: News and Announcements', 'Understand main points', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(18, 2, 6, 'Speaking: Giving Opinions', 'Express simple opinions', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(19, 2, 7, 'Reading: Understanding Context', 'Use context clues', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(20, 2, 8, 'Writing: Personal Letters', 'Write informal letters', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(21, 2, 9, 'Practice Test: Listening & Reading', 'Complete practice test', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(22, 2, 10, 'Practice Test: Writing & Speaking', 'Complete practice test', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(23, 2, 11, 'Review and Feedback', 'Review all skills', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(24, 2, 12, 'Final Assessment', 'Complete final test', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
 
 
@@ -757,13 +757,13 @@ INSERT INTO course_material (course_id, phase_id, course_session_id, title, desc
 (1, 2, 24, 'Final Exam Instructions', 'Guidelines for the final assessment.', 'DOCUMENT', '/materials/sessions/24/instructions.docx', 5);
 
 -- Course Assessments for Foundation
-INSERT INTO course_assessment (id, course_id, name, kind, duration_minutes, max_score, skills, created_at, updated_at) VALUES
-(1, 1, 'Listening Quiz 1', 'QUIZ', 30, 20, ARRAY['LISTENING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(2, 1, 'Speaking Quiz 1', 'QUIZ', 15, 20, ARRAY['SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(3, 1, 'Reading Quiz 1', 'QUIZ', 30, 20, ARRAY['READING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(4, 1, 'Writing Assignment 1', 'HOMEWORK', 60, 20, ARRAY['WRITING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(5, 1, 'Midterm Exam', 'MIDTERM', 90, 100, ARRAY['LISTENING','READING','WRITING','SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(6, 1, 'Final Exam', 'FINAL', 120, 100, ARRAY['LISTENING','READING','WRITING','SPEAKING'], '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+INSERT INTO course_assessment (id, course_id, name, kind, duration_minutes, max_score, skill, created_at, updated_at) VALUES
+(1, 1, 'Listening Quiz 1', 'QUIZ', 30, 20, 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(2, 1, 'Speaking Quiz 1', 'QUIZ', 15, 20, 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(3, 1, 'Reading Quiz 1', 'QUIZ', 30, 20, 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(4, 1, 'Writing Assignment 1', 'HOMEWORK', 60, 20, 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(5, 1, 'Midterm Exam', 'MIDTERM', 90, 100, 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(6, 1, 'Final Exam', 'FINAL', 120, 100, 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
 -- Course Assessment-CLO Mappings
 INSERT INTO course_assessment_clo_mapping (course_assessment_id, clo_id, status) VALUES
@@ -775,11 +775,11 @@ INSERT INTO course_assessment_clo_mapping (course_assessment_id, clo_id, status)
 (6, 1, 'ACTIVE'), (6, 2, 'ACTIVE'), (6, 3, 'ACTIVE'), (6, 4, 'ACTIVE');
 
 -- Course Sessions for Intermediate (ID 2)
-INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skill_set, created_at, updated_at) VALUES
-(25, 3, 1, 'Complex Sentence Structures', 'Analyze complex sentences', ARRAY['WRITING','READING'], NOW(), NOW()),
-(26, 3, 2, 'Advanced Listening Strategies', 'Listen for specific details', ARRAY['LISTENING'], NOW(), NOW()),
-(27, 4, 1, 'Speaking Part 2 & 3', 'Long turn speaking practice', ARRAY['SPEAKING'], NOW(), NOW()),
-(28, 4, 2, 'Essay Writing Task 2', 'Write an argumentative essay', ARRAY['WRITING'], NOW(), NOW());
+INSERT INTO course_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at) VALUES
+(25, 3, 1, 'Complex Sentence Structures', 'Analyze complex sentences', 'WRITING', NOW(), NOW()),
+(26, 3, 2, 'Advanced Listening Strategies', 'Listen for specific details', 'LISTENING', NOW(), NOW()),
+(27, 4, 1, 'Speaking Part 2 & 3', 'Long turn speaking practice', 'SPEAKING', NOW(), NOW()),
+(28, 4, 2, 'Essay Writing Task 2', 'Write an argumentative essay', 'WRITING', NOW(), NOW());
 
 -- CLOs for Intermediate (ID 2)
 INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUES
@@ -834,14 +834,14 @@ INSERT INTO clo (id, course_id, code, description, created_at, updated_at) VALUE
 (29, 10, 'CLO2', 'Apply advanced test-taking strategies under time pressure', NOW(), NOW());
 
 -- Course Assessments for Intermediate (ID 2)
-INSERT INTO course_assessment (id, course_id, name, kind, duration_minutes, max_score, skills, created_at, updated_at) VALUES
-(7, 2, 'Writing Task 2 Assignment', 'HOMEWORK', 60, 100, ARRAY['WRITING'], NOW(), NOW()),
-(8, 2, 'Full Mock Test', 'FINAL', 180, 100, ARRAY['LISTENING','READING','WRITING','SPEAKING'], NOW(), NOW());
+INSERT INTO course_assessment (id, course_id, name, kind, duration_minutes, max_score, skill, created_at, updated_at) VALUES
+(7, 2, 'Writing Task 2 Assignment', 'HOMEWORK', 60, 100, 'WRITING', NOW(), NOW()),
+(8, 2, 'Full Mock Test', 'FINAL', 180, 100, 'GENERAL', NOW(), NOW());
 
--- Course Materials for Intermediate (ID 2)
-INSERT INTO course_material (course_id, phase_id, course_session_id, title, description, material_type, url, uploaded_by) VALUES
-(2, NULL, NULL, 'IELTS Intermediate Syllabus', 'Course syllabus', 'DOCUMENT', '/materials/courses/2/syllabus.pdf', 5),
-(2, 3, 25, 'Complex Grammar Guide', 'Guide to complex sentences', 'DOCUMENT', '/materials/sessions/25/grammar.pdf', 5);
+-- -- Course Materials for Intermediate (ID 2)
+-- INSERT INTO course_material (course_id, phase_id, course_session_id, title, description, material_type, url, uploaded_by) VALUES
+-- (2, NULL, NULL, 'IELTS Intermediate Syllabus', 'Course syllabus', 'DOCUMENT', '/materials/courses/2/syllabus.pdf', 5),
+-- (2, 3, 25, 'Complex Grammar Guide', 'Guide to complex sentences', 'DOCUMENT', '/materials/sessions/25/grammar.pdf', 5);
 
 -- ========== TIER 4: CLASSES & SESSIONS ==========
 
@@ -878,33 +878,20 @@ INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date,
 (20, 1, 2, 'HN-INT-R1', 'HN Intermediate Rejected', 'HYBRID', '2026-01-10', '2026-02-20', NULL, ARRAY[2,4,6]::smallint[], 20, 'DRAFT', 'REJECTED', 'Teacher unavailable', 6, 3, '2025-12-05 10:00:00+07', '2025-12-06 10:00:00+07', NOW(), NOW());
 
 -- Generate Sessions for Class 1 (HN-FOUND-C1) - COMPLETED
--- Start: 2025-09-01 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
-DO $$
-DECLARE
-    v_class_id BIGINT := 1;
-    v_start_date DATE := '2025-09-01';
-    v_session_count INT := 24;
-    v_course_session_id INT;
-    v_date DATE;
-    v_week INT;
-    v_day_idx INT;
-    v_session_idx INT := 1;
-BEGIN
-    FOR v_week IN 0..7 LOOP -- 8 weeks
-        FOR v_day_idx IN 1..3 LOOP -- 3 days per week
-            EXIT WHEN v_session_idx > v_session_count;
-            
-            v_course_session_id := v_session_idx;
-            -- Logic to calculate date for Mon/Wed/Fri
-            v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
-            
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-            VALUES (v_session_idx, v_class_id, v_course_session_id, 1, v_date, 'CLASS', 'DONE', 'Session completed as planned.', '2025-07-01 10:00:00+07', v_date);
-            
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+-- Start: 2025-07-07 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
+SELECT
+    s.idx,
+    1,
+    s.idx,
+    1,
+    ('2025-07-07'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    'DONE',
+    'Session completed as planned.',
+    '2025-07-01 10:00:00+07',
+    ('2025-07-07'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END)
+FROM generate_series(1, 24) AS s(idx);
 
 -- Session Resources for Class 1
 INSERT INTO session_resource (session_id, resource_id)
@@ -916,77 +903,35 @@ SELECT id, 3, 'SCHEDULED' FROM session WHERE class_id = 1;
 
 
 -- Generate Sessions for Class 2 (HN-FOUND-O1) - Main testing class
--- Start: 2025-11-10 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
--- Reference today: 2025-11-28 (Fri) - mid-course mix DONE/PLANNED
-DO $$
-DECLARE
-    v_class_id BIGINT := 2;
-    v_start_date DATE := '2025-11-10';
-    v_schedule_days INT[] := ARRAY[1,3,5]; -- Mon/Wed/Fri
-    v_session_count INT := 24;
-    v_course_session_id INT;
-    v_date DATE;
-    v_week INT;
-    v_day_idx INT;
-    v_session_idx INT := 1;
-    v_status VARCHAR(20);
-BEGIN
-    FOR v_week IN 0..7 LOOP -- 8 weeks
-        FOR v_day_idx IN 1..3 LOOP -- 3 days per week
-            EXIT WHEN v_session_idx > v_session_count;
-            
-            v_course_session_id := v_session_idx;
-            v_date := v_start_date + (v_week * 7 + (v_day_idx - 1) * 2); -- Mon, Wed, Fri spacing
-            
-            -- Set status based on reference date (2025-11-28)
-            IF v_date < '2025-11-28' THEN
-                v_status := 'DONE';
-            ELSE
-                v_status := 'PLANNED';
-            END IF;
-            
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (100 + v_session_idx, v_class_id, v_course_session_id, 1, v_date, 'CLASS', v_status, '2025-09-30 10:00:00+07', CURRENT_TIMESTAMP);
-            
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+-- Start: 2025-10-06 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
+-- Today: 2025-11-02 (Sat) - Week 5 completed
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT
+    100 + s.idx,
+    2,
+    s.idx,
+    1,
+    ('2025-10-06'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    CASE WHEN ('2025-10-06'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-11-02' THEN 'DONE' ELSE 'PLANNED' END,
+    '2025-09-30 10:00:00+07',
+    CURRENT_TIMESTAMP
+FROM generate_series(1, 24) AS s(idx);
 
 -- Generate Sessions for Class 3 (HN-FOUND-O2) - For transfer scenario
--- Start: 2025-11-11 (Tue), Schedule: Tue/Thu/Sat
-DO $$
-DECLARE
-    v_class_id BIGINT := 3;
-    v_start_date DATE := '2025-11-11';
-    v_session_count INT := 24;
-    v_course_session_id INT;
-    v_date DATE;
-    v_week INT;
-    v_day_idx INT;
-    v_session_idx INT := 1;
-    v_status VARCHAR(20);
-BEGIN
-    FOR v_week IN 0..7 LOOP
-        FOR v_day_idx IN 1..3 LOOP
-            EXIT WHEN v_session_idx > v_session_count;
-            
-            v_course_session_id := v_session_idx;
-            v_date := v_start_date + (v_week * 7 + (v_day_idx - 1) * 2);
-            
-            IF v_date < '2025-11-28' THEN
-                v_status := 'DONE';
-            ELSE
-                v_status := 'PLANNED';
-            END IF;
-            
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (200 + v_session_idx, v_class_id, v_course_session_id, 4, v_date, 'CLASS', v_status, '2025-10-01 10:00:00+07', CURRENT_TIMESTAMP);
-            
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+-- Start: 2025-10-07 (Tue), Schedule: Tue/Thu/Sat
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT
+    200 + s.idx,
+    3,
+    s.idx,
+    4,
+    ('2025-10-07'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    CASE WHEN ('2025-10-07'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-11-02' THEN 'DONE' ELSE 'PLANNED' END,
+    '2025-10-01 10:00:00+07',
+    CURRENT_TIMESTAMP
+FROM generate_series(1, 24) AS s(idx);
 
 -- Session Resources for Class 2
 INSERT INTO session_resource (session_id, resource_id)
@@ -1005,39 +950,19 @@ INSERT INTO teaching_slot (session_id, teacher_id, status)
 SELECT id, 2, 'SCHEDULED' FROM session WHERE class_id = 3;
 
 -- Generate Sessions for Class 5 (HCM-FOUND-O1) - ONGOING
--- Start: 2025-11-17 (Mon), Schedule: Mon/Wed/Fri
-DO $$
-DECLARE
-    v_class_id BIGINT := 5;
-    v_start_date DATE := '2025-11-17';
-    v_session_count INT := 24;
-    v_course_session_id INT;
-    v_date DATE;
-    v_week INT;
-    v_day_idx INT;
-    v_session_idx INT := 1;
-    v_status VARCHAR(20);
-BEGIN
-    FOR v_week IN 0..7 LOOP
-        FOR v_day_idx IN 1..3 LOOP
-            EXIT WHEN v_session_idx > v_session_count;
-            
-            v_course_session_id := v_session_idx;
-            v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
-            
-            IF v_date < '2025-11-28' THEN
-                v_status := 'DONE';
-            ELSE
-                v_status := 'PLANNED';
-            END IF;
-            
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (300 + v_session_idx, v_class_id, v_course_session_id, 6, v_date, 'CLASS', v_status, '2025-10-06 10:00:00+07', CURRENT_TIMESTAMP);
-            
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+-- Start: 2025-10-13 (Mon), Schedule: Mon/Wed/Fri
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT
+    300 + s.idx,
+    5,
+    s.idx,
+    6,
+    ('2025-10-13'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    CASE WHEN ('2025-10-13'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-11-02' THEN 'DONE' ELSE 'PLANNED' END,
+    '2025-10-06 10:00:00+07',
+    CURRENT_TIMESTAMP
+FROM generate_series(1, 24) AS s(idx);
 
 -- Session Resources for Class 5
 INSERT INTO session_resource (session_id, resource_id)
@@ -1050,37 +975,18 @@ SELECT id, 9, 'SCHEDULED' FROM session WHERE class_id = 5;
 -- Generate Sessions for Class 4 (HN-FOUND-S1) - SCHEDULED (Future class)
 -- Start: 2025-12-15 (Mon), Schedule: Mon/Wed/Fri, 24 sessions over 8 weeks
 -- All sessions are PLANNED (in the future)
-DO $$
-DECLARE
-    v_class_id BIGINT := 4;
-    v_start_date DATE := '2025-12-15'; -- 15/12/2025 (Monday)
-    v_session_count INT := 24;
-    v_course_session_id INT;
-    v_date DATE;
-    v_week INT;
-    v_day_idx INT;
-    v_session_idx INT := 1;
-    v_status VARCHAR(20);
-BEGIN
-    FOR v_week IN 0..7 LOOP -- 8 weeks
-        FOR v_day_idx IN 1..3 LOOP -- Mon/Wed/Fri
-            EXIT WHEN v_session_idx > v_session_count;
-            
-            v_course_session_id := v_session_idx; -- Map to course_session 1-24
-            -- Calculate date: Mon=0, Wed=2, Fri=4 days offset from Monday
-            v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
-            
-            -- All sessions are PLANNED (future class)
-            v_status := 'PLANNED';
-            
-            -- Insert session with ID range 400-423 (to avoid conflict with other classes)
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (400 + v_session_idx, v_class_id, v_course_session_id, 3, v_date, 'CLASS', v_status, '2025-12-05 10:00:00+07', CURRENT_TIMESTAMP);
-            
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT
+    400 + s.idx,
+    4,
+    s.idx,
+    3,
+    ('2025-11-18'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    'PLANNED',
+    '2025-11-10 10:00:00+07',
+    CURRENT_TIMESTAMP
+FROM generate_series(1, 24) AS s(idx);
 
 -- Session Resources for Class 4 (Hybrid - assign Room 201)
 -- For hybrid classes, we assign a primary physical room
@@ -1093,39 +999,19 @@ INSERT INTO teaching_slot (session_id, teacher_id, status)
 SELECT id, 3, 'SCHEDULED' FROM session WHERE class_id = 4;
 
 -- Generate Sessions for Class 6 (HCM-FOUND-E1) - ONGOING evening class
--- Start: 2025-11-18 (Tue), Schedule: Tue/Thu/Sat, Evening slot
-DO $$
-DECLARE
-    v_class_id BIGINT := 6;
-    v_start_date DATE := '2025-11-18';
-    v_session_count INT := 24;
-    v_course_session_id INT;
-    v_date DATE;
-    v_week INT;
-    v_day_idx INT;
-    v_session_idx INT := 1;
-    v_status VARCHAR(20);
-BEGIN
-    FOR v_week IN 0..7 LOOP
-        FOR v_day_idx IN 1..3 LOOP
-            EXIT WHEN v_session_idx > v_session_count;
-
-            v_course_session_id := v_session_idx;
-            v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
-
-            IF v_date < '2025-11-28' THEN
-                v_status := 'DONE';
-            ELSE
-                v_status := 'PLANNED';
-            END IF;
-
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (500 + v_session_idx, v_class_id, v_course_session_id, 8, v_date, 'CLASS', v_status, '2025-11-09 10:00:00+07', CURRENT_TIMESTAMP);
-
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+-- Start: 2025-10-14 (Tue), Schedule: Tue/Thu/Sat, Evening slot
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT
+    500 + s.idx,
+    6,
+    s.idx,
+    8,
+    ('2025-10-14'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    CASE WHEN ('2025-10-14'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-11-02' THEN 'DONE' ELSE 'PLANNED' END,
+    '2025-10-08 10:00:00+07',
+    CURRENT_TIMESTAMP
+FROM generate_series(1, 24) AS s(idx);
 
 -- Session Resources for Class 6 (assign HCM Room 102)
 INSERT INTO session_resource (session_id, resource_id)
@@ -1136,39 +1022,19 @@ INSERT INTO teaching_slot (session_id, teacher_id, status)
 SELECT id, 10, 'SCHEDULED' FROM session WHERE class_id = 6;
 
 -- Generate Sessions for Class 7 (HCM-FOUND-M1) - Micro cohort kept at capacity
--- Start: 2025-11-24 (Mon), Schedule: Mon/Wed/Fri, Afternoon slot
-DO $$
-DECLARE
-    v_class_id BIGINT := 7;
-    v_start_date DATE := '2025-11-24';
-    v_session_count INT := 24;
-    v_course_session_id INT;
-    v_date DATE;
-    v_week INT;
-    v_day_idx INT;
-    v_session_idx INT := 1;
-    v_status VARCHAR(20);
-BEGIN
-    FOR v_week IN 0..7 LOOP
-        FOR v_day_idx IN 1..3 LOOP
-            EXIT WHEN v_session_idx > v_session_count;
-
-            v_course_session_id := v_session_idx;
-            v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
-
-            IF v_date < '2025-11-28' THEN
-                v_status := 'DONE';
-            ELSE
-                v_status := 'PLANNED';
-            END IF;
-
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (600 + v_session_idx, v_class_id, v_course_session_id, 7, v_date, 'CLASS', v_status, '2025-11-14 10:00:00+07', CURRENT_TIMESTAMP);
-
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+-- Start: 2025-10-20 (Mon), Schedule: Mon/Wed/Fri, Afternoon slot
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT
+    600 + s.idx,
+    7,
+    s.idx,
+    7,
+    ('2025-10-20'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    CASE WHEN ('2025-10-20'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-11-02' THEN 'DONE' ELSE 'PLANNED' END,
+    '2025-10-10 10:00:00+07',
+    CURRENT_TIMESTAMP
+FROM generate_series(1, 24) AS s(idx);
 
 -- Session Resources for Class 7 (assign HCM Room 201)
 INSERT INTO session_resource (session_id, resource_id)
@@ -1184,133 +1050,106 @@ SELECT id, 11, 'SCHEDULED' FROM session WHERE class_id = 7;
 
 -- Class 13 (HN-INT-C1) - COMPLETED (Good)
 -- Start: 2025-09-08, Mon/Wed/Fri
-DO $$
-DECLARE
-    v_class_id BIGINT := 13;
-    v_start_date DATE := '2025-09-08';
-    v_session_count INT := 24;
-    v_session_idx INT := 1;
-BEGIN
-    FOR v_week IN 0..7 LOOP
-        FOR v_day_idx IN 1..3 LOOP
-            EXIT WHEN v_session_idx > v_session_count;
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-            VALUES (800 + v_session_idx, v_class_id, v_session_idx, 1, v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END, 'CLASS', 'DONE', 'Good session.', NOW(), NOW());
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
+SELECT
+    800 + s.idx,
+    13,
+    s.idx,
+    1,
+    ('2025-09-08'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    'DONE',
+    'Good session.',
+    NOW(),
+    NOW()
+FROM generate_series(1, 24) AS s(idx);
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 1 FROM session WHERE class_id = 13;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 4, 'SCHEDULED' FROM session WHERE class_id = 13;
 
 -- Class 14 (HCM-INT-C1) - COMPLETED (Average)
 -- Start: 2025-09-15, Mon/Wed/Fri
-DO $$
-DECLARE
-    v_class_id BIGINT := 14;
-    v_start_date DATE := '2025-09-15';
-    v_session_count INT := 24;
-    v_session_idx INT := 1;
-BEGIN
-    FOR v_week IN 0..7 LOOP
-        FOR v_day_idx IN 1..3 LOOP
-            EXIT WHEN v_session_idx > v_session_count;
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-            VALUES (900 + v_session_idx, v_class_id, v_session_idx, 6, v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END, 'CLASS', 'DONE', 'Session ok.', NOW(), NOW());
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
+SELECT
+    900 + s.idx,
+    14,
+    s.idx,
+    6,
+    ('2025-09-15'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    'DONE',
+    'Session ok.',
+    NOW(),
+    NOW()
+FROM generate_series(1, 24) AS s(idx);
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 5 FROM session WHERE class_id = 14;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 12, 'SCHEDULED' FROM session WHERE class_id = 14;
 
 -- Class 15 (HN-ADV-C1) - COMPLETED (At Risk)
 -- Start: 2025-09-22, Tue/Thu/Sat
-DO $$
-DECLARE
-    v_class_id BIGINT := 15;
-    v_start_date DATE := '2025-09-22';
-    v_session_count INT := 24;
-    v_session_idx INT := 1;
-BEGIN
-    FOR v_week IN 0..7 LOOP
-        FOR v_day_idx IN 1..3 LOOP
-            EXIT WHEN v_session_idx > v_session_count;
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-            VALUES (1000 + v_session_idx, v_class_id, v_session_idx, 4, v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 1 WHEN 2 THEN 3 WHEN 3 THEN 5 END, 'CLASS', 'DONE', 'Issues noted.', NOW(), NOW());
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
+SELECT
+    1000 + s.idx,
+    15,
+    s.idx,
+    4,
+    ('2025-09-22'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END),
+    'CLASS',
+    'DONE',
+    'Issues noted.',
+    NOW(),
+    NOW()
+FROM generate_series(1, 24) AS s(idx);
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 4 FROM session WHERE class_id = 15; -- Online
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 2, 'SCHEDULED' FROM session WHERE class_id = 15;
 
 -- Class 16 (HN-INT-O1) - ONGOING (At Risk)
 -- Start: 2025-11-17, Mon/Wed/Fri
-DO $$
-DECLARE
-    v_class_id BIGINT := 16;
-    v_start_date DATE := '2025-11-17';
-    v_session_count INT := 24;
-    v_session_idx INT := 1;
-    v_date DATE;
-BEGIN
-    FOR v_week IN 0..7 LOOP
-        FOR v_day_idx IN 1..3 LOOP
-            EXIT WHEN v_session_idx > v_session_count;
-            v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (1100 + v_session_idx, v_class_id, v_session_idx, 1, v_date, 'CLASS', CASE WHEN v_date < '2025-11-28' THEN 'DONE' ELSE 'PLANNED' END, NOW(), NOW());
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT
+    1100 + s.idx,
+    16,
+    s.idx,
+    1,
+    ('2025-11-17'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    CASE WHEN ('2025-11-17'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-11-28' THEN 'DONE' ELSE 'PLANNED' END,
+    NOW(),
+    NOW()
+FROM generate_series(1, 24) AS s(idx);
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 2 FROM session WHERE class_id = 16;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 5, 'SCHEDULED' FROM session WHERE class_id = 16;
 
 -- Class 17 (HCM-INT-O1) - ONGOING (At Risk)
 -- Start: 2025-11-18, Tue/Thu/Sat
-DO $$
-DECLARE
-    v_class_id BIGINT := 17;
-    v_start_date DATE := '2025-11-18';
-    v_session_count INT := 24;
-    v_session_idx INT := 1;
-    v_date DATE;
-BEGIN
-    FOR v_week IN 0..7 LOOP
-        FOR v_day_idx IN 1..3 LOOP
-            EXIT WHEN v_session_idx > v_session_count;
-            v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END; -- Logic check: Tue start. +0=Tue, +2=Thu, +4=Sat. Correct.
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (1200 + v_session_idx, v_class_id, v_session_idx, 8, v_date, 'CLASS', CASE WHEN v_date < '2025-11-28' THEN 'DONE' ELSE 'PLANNED' END, NOW(), NOW());
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT
+    1200 + s.idx,
+    17,
+    s.idx,
+    8,
+    ('2025-11-18'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    CASE WHEN ('2025-11-18'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-11-28' THEN 'DONE' ELSE 'PLANNED' END,
+    NOW(),
+    NOW()
+FROM generate_series(1, 24) AS s(idx);
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 8 FROM session WHERE class_id = 17; -- Online
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 13, 'SCHEDULED' FROM session WHERE class_id = 17;
 
 -- Class 18 (HCM-ADV-O1) - ONGOING (Good)
 -- Start: 2025-11-24, Mon/Wed/Fri
-DO $$
-DECLARE
-    v_class_id BIGINT := 18;
-    v_start_date DATE := '2025-11-24';
-    v_session_count INT := 24;
-    v_session_idx INT := 1;
-    v_date DATE;
-BEGIN
-    FOR v_week IN 0..7 LOOP
-        FOR v_day_idx IN 1..3 LOOP
-            EXIT WHEN v_session_idx > v_session_count;
-            v_date := v_start_date + (v_week * 7) + CASE v_day_idx WHEN 1 THEN 0 WHEN 2 THEN 2 WHEN 3 THEN 4 END;
-            INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-            VALUES (1300 + v_session_idx, v_class_id, v_session_idx, 6, v_date, 'CLASS', CASE WHEN v_date < '2025-11-28' THEN 'DONE' ELSE 'PLANNED' END, NOW(), NOW());
-            v_session_idx := v_session_idx + 1;
-        END LOOP;
-    END LOOP;
-END $$;
+INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT
+    1300 + s.idx,
+    18,
+    s.idx,
+    6,
+    ('2025-11-24'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END),
+    'CLASS',
+    CASE WHEN ('2025-11-24'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-11-28' THEN 'DONE' ELSE 'PLANNED' END,
+    NOW(),
+    NOW()
+FROM generate_series(1, 24) AS s(idx);
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 6 FROM session WHERE class_id = 18;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 9, 'SCHEDULED' FROM session WHERE class_id = 18;
 
@@ -1344,6 +1183,28 @@ INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date,
 -- Classes for Pronunciation Workshop (Course 8)
 INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
 (28, 1, 8, 'HN-PRON-1', 'HN Pronunciation Workshop 1 (Weekend)', 'OFFLINE', '2025-12-14', '2026-01-18', NULL, ARRAY[6,7]::smallint[], 8, 'SCHEDULED', 'APPROVED', NULL, 7, 3, '2025-12-05 10:00:00+07', '2025-12-06 14:00:00+07', '2025-12-05 10:00:00+07', '2025-12-05 08:00:00+07');
+
+-- Sessions for makeup classes
+    -- Class 8 Sessions (HN, OFFLINE) - Wed, Fri
+    INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at) VALUES
+    (701, 8, 10, 3, '2025-11-05', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (702, 8, 11, 3, '2025-11-07', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (703, 8, 12, 3, '2025-11-12', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (710, 8, 16, 3, '2025-11-14', 'CLASS', 'PLANNED', NOW(), NOW()); -- Makeup for session 116 (course_session_id 16)
+
+    -- Class 9 Sessions (HCM, ONLINE) - Thu, Sat
+    INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at) VALUES
+    (704, 9, 10, 7, '2025-11-06', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (705, 9, 11, 7, '2025-11-08', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (706, 9, 12, 7, '2025-11-13', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (711, 9, 16, 7, '2025-11-15', 'CLASS', 'PLANNED', NOW(), NOW()); -- Makeup for session 116 (course_session_id 16)
+
+    -- Class 10 Sessions (HCM, OFFLINE) - Tue, Thu
+    INSERT INTO session (id, class_id, course_session_id, time_slot_template_id, date, type, status, created_at, updated_at) VALUES
+    (707, 10, 10, 7, '2025-11-04', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (708, 10, 11, 7, '2025-11-06', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (709, 10, 12, 7, '2025-11-11', 'CLASS', 'PLANNED', NOW(), NOW()),
+    (712, 10, 16, 7, '2025-11-13', 'CLASS', 'PLANNED', NOW(), NOW()); -- Makeup for session 116 (course_session_id 16)
 
 -- Classes for Academic Writing (Course 9)
 INSERT INTO "class" (id, branch_id, course_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES

@@ -41,10 +41,9 @@ public class CourseAssessment {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @org.hibernate.annotations.Type(io.hypersistence.utils.hibernate.type.array.ListArrayType.class)
-    @Column(name = "skills", columnDefinition = "varchar[]", nullable = false)
-    @Builder.Default
-    private java.util.List<String> skills = new java.util.ArrayList<>();
+    @Enumerated(EnumType.STRING)
+    @Column(name = "skill", nullable = false, length = 20)
+    private org.fyp.tmssep490be.entities.enums.Skill skill;
 
     @Column(name = "max_score", nullable = false, precision = 5, scale = 2)
     private BigDecimal maxScore;
