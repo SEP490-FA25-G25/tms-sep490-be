@@ -164,7 +164,6 @@ aws:
   s3:
     bucket: ${AWS_BUCKET_NAME:tms-sep490-g25}
     region: ${AWS_REGION:ap-southeast-1}
-#    access-key: ${AWS_ACCESS_KEY_ID:YOUR_ACCESS_KEY}
-#    secret-key: ${AWS_SECRET_ACCESS_KEY:YOUR_SECRET_KEY}
-    access-key: ${AWS_ACCESS_KEY_ID:AKIA3WPZU4HYHOD5NSAS}
-    secret-key: ${AWS_SECRET_ACCESS_KEY:2qPYoy88NtjDI0SBN6KSQQTczMqxHCy+nQ19TCDV}
+    access-key: ${AWS_ACCESS_KEY_ID:YOUR_ACCESS_KEY}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:YOUR_SECRET_KEY}
+
