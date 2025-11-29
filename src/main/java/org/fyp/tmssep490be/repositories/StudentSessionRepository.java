@@ -27,11 +27,11 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
      */
     @Query("SELECT DISTINCT ss FROM StudentSession ss " +
            "JOIN FETCH ss.session s " +
-           "JOIN FETCH s.timeSlotTemplate tst " +
+           "LEFT JOIN FETCH s.timeSlotTemplate tst " +
            "JOIN FETCH s.classEntity c " +
            "JOIN FETCH c.course course " +
            "JOIN FETCH c.branch branch " +
-           "JOIN FETCH s.courseSession cs " +
+           "LEFT JOIN FETCH s.courseSession cs " +
            "LEFT JOIN FETCH cs.courseMaterials " +
            "LEFT JOIN FETCH s.sessionResources sr " +
            "LEFT JOIN FETCH sr.resource " +
@@ -52,11 +52,11 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
      */
     @Query("SELECT DISTINCT ss FROM StudentSession ss " +
            "JOIN FETCH ss.session s " +
-           "JOIN FETCH s.timeSlotTemplate tst " +
+           "LEFT JOIN FETCH s.timeSlotTemplate tst " +
            "JOIN FETCH s.classEntity c " +
            "JOIN FETCH c.course course " +
            "JOIN FETCH c.branch branch " +
-           "JOIN FETCH s.courseSession cs " +
+           "LEFT JOIN FETCH s.courseSession cs " +
            "LEFT JOIN FETCH cs.courseMaterials " +
            "LEFT JOIN FETCH s.sessionResources sr " +
            "LEFT JOIN FETCH sr.resource " +
@@ -79,11 +79,11 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
      */
     @Query("SELECT ss FROM StudentSession ss " +
            "JOIN FETCH ss.session s " +
-           "JOIN FETCH s.timeSlotTemplate tst " +
+           "LEFT JOIN FETCH s.timeSlotTemplate tst " +
            "JOIN FETCH s.classEntity c " +
            "JOIN FETCH c.course course " +
            "JOIN FETCH c.branch branch " +
-           "JOIN FETCH s.courseSession cs " +
+           "LEFT JOIN FETCH s.courseSession cs " +
            "LEFT JOIN FETCH cs.courseMaterials " +
            "LEFT JOIN FETCH s.sessionResources sr " +
            "LEFT JOIN FETCH sr.resource " +

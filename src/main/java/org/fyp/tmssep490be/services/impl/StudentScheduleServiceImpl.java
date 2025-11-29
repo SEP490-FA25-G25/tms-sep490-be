@@ -264,7 +264,6 @@ public class StudentScheduleServiceImpl implements StudentScheduleService {
                 .modality(classEntity.getModality())
                 .location(determineLocationForSummary(classEntity, session))
                 .branchName(classEntity.getBranch().getName())
-                .attendanceStatus(studentSession.getAttendanceStatus())
                 .attendanceStatus(resolveDisplayStatus(studentSession))
                 .isMakeup(studentSession.getIsMakeup() != null ? studentSession.getIsMakeup() : false)
                 .makeupInfo(makeupInfo)
