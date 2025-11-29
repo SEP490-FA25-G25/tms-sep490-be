@@ -2091,31 +2091,7 @@ INSERT INTO system_policy (
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
 );
 
--- 2d. Teacher Reschedule - Minimum Days Before Session (GLOBAL)
-INSERT INTO system_policy (
-    policy_key, policy_category, policy_name, description,
-    value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
-    is_active, version, created_by, updated_by
-) VALUES (
-    'teacher.reschedule.min_days_before_session',
-    'TEACHER',
-    'Số ngày tối thiểu trước khi xin dời buổi',
-    'Giáo viên phải gửi yêu cầu dời buổi trước ít nhất X ngày so với ngày diễn ra session gốc.',
-    'INTEGER',
-    '1',
-    '1',
-    '0',
-    '30',
-    'days',
-    'GLOBAL',
-    NULL, NULL, NULL,
-    true, 1,
-    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
-    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
-);
-
--- 2d.1 Teacher Reschedule - Allow Same Day (GLOBAL)
+-- 2d. Teacher Reschedule - Allow Same Day (GLOBAL)
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
@@ -2187,22 +2163,22 @@ INSERT INTO system_policy (
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
 );
 
--- 2e. Teacher Replacement - Minimum Days Before Session (GLOBAL)
+-- 2e. Teacher Request - Min Days Before Session (GLOBAL) - Unified policy for all request types
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
     scope, branch_id, course_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
-    'teacher.replacement.min_days_before_session',
+    'teacher.request.min_days_before_session',
     'TEACHER',
-    'Số ngày tối thiểu trước khi xin thay giáo viên',
-    'Giáo viên phải gửi yêu cầu thay người dạy trước ít nhất X ngày để giáo vụ có thời gian sắp xếp.',
+    'Số ngày tối thiểu trước khi tạo yêu cầu',
+    'Giáo viên phải gửi yêu cầu (đổi lịch, dạy thay, đổi phương thức) trước ít nhất X ngày so với ngày diễn ra session hoặc ngày khai giảng.',
     'INTEGER',
     '1',
     '1',
     '0',
-    '14',
+    '30',
     'days',
     'GLOBAL',
     NULL, NULL, NULL,
@@ -2259,31 +2235,7 @@ INSERT INTO system_policy (
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
 );
 
--- 2g.1 Teacher Modality Change - Minimum Days Before Course Start (GLOBAL)
-INSERT INTO system_policy (
-    policy_key, policy_category, policy_name, description,
-    value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
-    is_active, version, created_by, updated_by
-) VALUES (
-    'teacher.modality_change.min_days_before_start',
-    'TEACHER',
-    'Số ngày tối thiểu trước khi khóa học bắt đầu',
-    'Giáo viên chỉ được phép đổi hình thức dạy nếu yêu cầu được gửi trước ngày khai giảng ít nhất X ngày.',
-    'INTEGER',
-    '7',
-    '7',
-    '0',
-    '30',
-    'days',
-    'GLOBAL',
-    NULL, NULL, NULL,
-    true, 1,
-    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
-    (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1)
-);
-
--- 2g.2 Teacher Modality Change - Allow After Start (GLOBAL)
+-- 2g. Teacher Modality Change - Allow After Start (GLOBAL)
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,

@@ -131,7 +131,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
             );
             validateMinDaysBeforeSession(
                     session.getDate(),
-                    "teacher.reschedule.min_days_before_session",
+                    "teacher.request.min_days_before_session",
                     1,
                     ErrorCode.TEACHER_RESCHEDULE_MIN_DAYS_NOT_MET);
             enforceRescheduleCourseLimit(teacher, session);
@@ -179,7 +179,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
             );
             validateMinDaysBeforeSession(
                     session.getDate(),
-                    "teacher.replacement.min_days_before_session",
+                    "teacher.request.min_days_before_session",
                     1,
                     ErrorCode.TEACHER_REPLACEMENT_MIN_DAYS_NOT_MET);
         }
@@ -1193,32 +1193,21 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
     }
 
     private void enforceModalityChangeTimingConstraints(Session session) {
-        ClassEntity classEntity = session.getClassEntity();
-        if (classEntity == null) {
+        if (session == null || session.getDate() == null) {
             return;
         }
 
-        LocalDate classStartDate = classEntity.getStartDate();
-        if (classStartDate == null) {
-            return;
-        }
-
+        LocalDate sessionDate = session.getDate();
         LocalDate today = LocalDate.now();
-        boolean allowAfterStart = policyService.getGlobalBoolean(
-                "teacher.modality_change.allow_after_start", false);
-
-        if (!allowAfterStart && !classStartDate.isAfter(today)) {
-            throw new CustomException(ErrorCode.SESSION_NOT_IN_TIME_WINDOW);
-        }
-
-        if (classStartDate.isAfter(today)) {
-            int minDaysBeforeStart = policyService.getGlobalInt(
-                    "teacher.modality_change.min_days_before_start", 7);
-            if (minDaysBeforeStart > 0) {
-                long daysUntilStart = ChronoUnit.DAYS.between(today, classStartDate);
-                if (daysUntilStart < minDaysBeforeStart) {
-                    throw new CustomException(ErrorCode.SESSION_NOT_IN_TIME_WINDOW);
-                }
+        
+        // Validate with session date (not class start date)
+        // This ensures teachers can only request modality change for sessions that are far enough in the future
+        int minDaysBeforeSession = policyService.getGlobalInt(
+                "teacher.request.min_days_before_session", 1);
+        if (minDaysBeforeSession > 0) {
+            long daysUntilSession = ChronoUnit.DAYS.between(today, sessionDate);
+            if (daysUntilSession < minDaysBeforeSession) {
+                throw new CustomException(ErrorCode.SESSION_NOT_IN_TIME_WINDOW);
             }
         }
     }
@@ -1570,18 +1559,24 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         }
 
         // 3. Query teaching slots
+        log.info("Querying teaching slots for teacher {} from {} to {}", teacher.getId(), fromDate, toDate);
         List<TeachingSlot> teachingSlots = teachingSlotRepository.findByTeacherIdAndDateRange(
                 teacher.getId(), fromDate, toDate);
+        log.info("Found {} teaching slots before filtering", teachingSlots.size());
         
         // 4. Filter by classId if provided
         if (classId != null) {
+            int beforeClassFilter = teachingSlots.size();
             teachingSlots = teachingSlots.stream()
                     .filter(ts -> ts.getSession() != null 
                             && ts.getSession().getClassEntity() != null
                             && ts.getSession().getClassEntity().getId().equals(classId))
                     .collect(Collectors.toList());
+            log.info("After classId filter ({}): {} teaching slots remaining (was {})", 
+                    classId, teachingSlots.size(), beforeClassFilter);
         }
         java.time.LocalTime currentTime = java.time.LocalTime.now();
+        log.info("Current time: {}", currentTime);
 
         // 4. Get all pending/waiting requests for these sessions to check hasPendingRequest
         // Only check PENDING and WAITING_CONFIRM - APPROVED requests are already processed
@@ -1600,19 +1595,24 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
                 .map(tr -> tr.getSession().getId())
                 .collect(Collectors.toSet());
 
-        // 5. Map to DTO
-        return teachingSlots.stream()
+        // 5. Filter and map to DTO
+        List<TeacherSessionDTO> result = teachingSlots.stream()
                 .filter(ts -> {
                     Session session = ts.getSession();
+                    // Skip if session is null or date is null
                     if (session == null || session.getDate() == null) {
-                        return true;
+                        return false;
                     }
+                    // For today's sessions, only include if start time is in the future
                     if (session.getDate().isEqual(today)) {
                         TimeSlotTemplate slot = session.getTimeSlotTemplate();
                         if (slot != null && slot.getStartTime() != null) {
                             return slot.getStartTime().isAfter(currentTime);
                         }
+                        // If no time slot template or start time, exclude
+                        return false;
                     }
+                    // Include all future sessions
                     return true;
                 })
                 .map(ts -> {
@@ -1640,6 +1640,9 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
                             .build();
                 })
                 .collect(Collectors.toList());
+        
+        log.info("Returning {} sessions after all filters", result.size());
+        return result;
     }
 
     @Override

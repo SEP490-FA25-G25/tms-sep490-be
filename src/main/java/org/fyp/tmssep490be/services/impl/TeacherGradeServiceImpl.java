@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.teachergrade.*;
 import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
-import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
@@ -49,29 +48,35 @@ public class TeacherGradeServiceImpl implements TeacherGradeService {
         if (sessions == null || sessions.isEmpty()) {
             return new AttendanceSummary(0, 0, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
         }
-        long totalCompletedSessions = sessions.stream()
-                .map(StudentSession::getSession)
-                .filter(Objects::nonNull)
-                .filter(sess -> sess.getStatus() == SessionStatus.DONE)
-                .count();
+        
+        // Filter sessions that are not CANCELLED (same logic as attendance matrix)
+        // This includes PLANNED, ONGOING, and DONE sessions
+        List<StudentSession> validSessions = sessions.stream()
+                .filter(ss -> ss.getSession() != null && ss.getSession().getStatus() != SessionStatus.CANCELLED)
+                .collect(Collectors.toList());
 
-        long attendedSessions = sessions.stream()
-                .filter(ss -> ss.getSession() != null && ss.getSession().getStatus() == SessionStatus.DONE)
+        // Count attended sessions (PRESENT only)
+        long attendedSessions = validSessions.stream()
                 .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
                 .count();
 
-        if (totalCompletedSessions == 0) {
+        // Total sessions = all non-CANCELLED sessions (PRESENT + ABSENT + EXCUSED)
+        // This matches the attendance matrix calculation
+        long totalSessions = validSessions.size();
+        
+        if (totalSessions == 0) {
             return new AttendanceSummary(0, 0, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
         }
 
+        // Calculate attendance rate: attended sessions / total sessions * 100
         BigDecimal attendanceRate = BigDecimal.valueOf(attendedSessions)
-                .divide(BigDecimal.valueOf(totalCompletedSessions), 4, RoundingMode.HALF_UP)
+                .divide(BigDecimal.valueOf(totalSessions), 4, RoundingMode.HALF_UP)
                 .multiply(BigDecimal.valueOf(100))
                 .setScale(2, RoundingMode.HALF_UP);
 
         return new AttendanceSummary(
                 (int) attendedSessions,
-                (int) totalCompletedSessions,
+                (int) totalSessions,
                 attendanceRate
         );
     }
@@ -653,14 +658,12 @@ public class TeacherGradeServiceImpl implements TeacherGradeService {
             }
         }
         
-        boolean attendanceFinalized = classEntity.getStatus() == ClassStatus.COMPLETED;
+        // Always load attendance data, not just for completed classes
         Map<Long, List<StudentSession>> sessionsByStudent = Collections.emptyMap();
-        if (attendanceFinalized) {
-            List<StudentSession> classSessions = studentSessionRepository.findByClassId(classId);
-            sessionsByStudent = classSessions.stream()
-                    .filter(ss -> ss.getStudent() != null)
-                    .collect(Collectors.groupingBy(ss -> ss.getStudent().getId()));
-        }
+        List<StudentSession> classSessions = studentSessionRepository.findByClassId(classId);
+        sessionsByStudent = classSessions.stream()
+                .filter(ss -> ss.getStudent() != null)
+                .collect(Collectors.groupingBy(ss -> ss.getStudent().getId()));
 
         // Build students list with scores
         List<GradebookDTO.GradebookStudentDTO> studentDTOs = new ArrayList<>();
@@ -727,11 +730,9 @@ public class TeacherGradeServiceImpl implements TeacherGradeService {
                     .filter(GradebookDTO.GradebookScoreDTO::getIsGraded)
                     .count();
             
-            AttendanceSummary attendanceSummary = null;
-            if (attendanceFinalized) {
-                List<StudentSession> sessions = sessionsByStudent.getOrDefault(studentId, Collections.emptyList());
-                attendanceSummary = buildAttendanceSummary(sessions);
-            }
+            // Always calculate attendance summary if sessions exist
+            List<StudentSession> sessions = sessionsByStudent.getOrDefault(studentId, Collections.emptyList());
+            AttendanceSummary attendanceSummary = sessions.isEmpty() ? null : buildAttendanceSummary(sessions);
 
             studentDTOs.add(GradebookDTO.GradebookStudentDTO.builder()
                     .studentId(studentId)
