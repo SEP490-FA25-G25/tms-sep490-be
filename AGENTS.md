@@ -15,27 +15,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Maven wrapper for build management
 - Docker for containerized deployment
 
-## Acknowledging Correct Feedback
-
-When feedback IS correct:
-- ✅ "Fixed. [Brief description of what changed]"
-- ✅ "Good catch – [specific issue]. Fixed in [location]."
-- ✅ Just fix it and show in the code
-
-When feedback is correct, DO NOT use:
-- ❌ "You're absolutely right!", "Great point!", "Thanks for catching that!"
-- ❌ ANY gratitude expression
-
-**Why:** Actions speak. The code itself shows you heard the feedback.
-
-## Gracefully Correcting Your Pushback
-
-If you pushed back and were wrong:
-- ✅ "You were right – I checked [X] and it does [Y]. Implementing now."
-- ✅ "Verified this and you're correct. My initial understanding was wrong because [reason]. Fixing."
-
-Avoid long apologies, defending why you pushed back, or over-explaining. State the correction factually and move on.
-
 ## Development Commands
 
 ### Environment Setup (REQUIRED FIRST)
