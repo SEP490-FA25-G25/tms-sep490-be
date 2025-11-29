@@ -616,7 +616,7 @@ CREATE TABLE student_session (
   CONSTRAINT fk_student_session_original FOREIGN KEY(original_session_id) REFERENCES session(id) ON DELETE SET NULL,
   CONSTRAINT fk_student_session_student FOREIGN KEY(student_id) REFERENCES student(id) ON DELETE CASCADE,
   CONSTRAINT fk_student_session_session FOREIGN KEY(session_id) REFERENCES session(id) ON DELETE CASCADE,
-  CONSTRAINT chk_attendance_status CHECK (attendance_status IN ('PLANNED', 'PRESENT', 'ABSENT')),
+  CONSTRAINT chk_attendance_status CHECK (attendance_status IN ('PLANNED', 'PRESENT', 'ABSENT', 'EXCUSED')),
   CONSTRAINT chk_homework_status CHECK (homework_status IN ('COMPLETED', 'INCOMPLETE', 'NO_HOMEWORK'))
 );
 

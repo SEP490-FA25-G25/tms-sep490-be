@@ -5,6 +5,11 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
@@ -76,12 +81,32 @@ public class StudentRequestSubmissionController {
 
     // DTO for generic request submission
     public static class StudentRequestSubmissionDTO {
+        @NotBlank(message = "Request type is required")
+        @Pattern(regexp = "ABSENCE|MAKEUP|TRANSFER", message = "Request type must be ABSENCE, MAKEUP, or TRANSFER")
         private String requestType; // ABSENCE, MAKEUP, TRANSFER
+
+        @NotNull(message = "Class ID is required")
         private Long currentClassId;
+
+        @NotNull(message = "Target session ID is required")
         private Long targetSessionId;
+
         private Long makeupSessionId; // For MAKEUP requests
+
+        @NotBlank(message = "Reason is required")
+        @Size(min = 10, message = "Reason must be at least 10 characters")
         private String requestReason;
+
         private String note;
+
+        // Validation helper: makeupSessionId must be present for MAKEUP requests
+        @AssertTrue(message = "Makeup session ID is required for MAKEUP requests")
+        public boolean isMakeupSessionValid() {
+            if ("MAKEUP".equalsIgnoreCase(requestType)) {
+                return makeupSessionId != null;
+            }
+            return true;
+        }
 
         // Getters and setters
         public String getRequestType() { return requestType; }

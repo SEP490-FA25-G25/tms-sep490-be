@@ -24,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Arrays;
 import java.util.List;
 
@@ -163,6 +164,28 @@ public class StudentRequestController {
                 studentId, localDate, requestTypeEnum);
 
         return ResponseEntity.ok(ResponseObject.success("Retrieved available sessions successfully", sessions));
+    }
+
+    @GetMapping("/classes/sessions/month")
+    @Operation(summary = "Get available sessions for month", description = "Retrieve all class sessions for a specific month (used in calendar view)")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ResponseObject<List<SessionAvailabilityDTO>>> getAvailableSessionsForMonth(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "Month in format YYYY-MM", required = true)
+            @RequestParam String month,
+            @Parameter(description = "Request type: ABSENCE, MAKEUP, TRANSFER", required = true)
+            @RequestParam String requestType) {
+
+        Long studentId = currentUser.getId();
+        YearMonth yearMonth = YearMonth.parse(month);
+        LocalDate start = yearMonth.atDay(1);
+        LocalDate end = yearMonth.atEndOfMonth();
+        StudentRequestType requestTypeEnum = StudentRequestType.valueOf(requestType);
+
+        List<SessionAvailabilityDTO> sessions = studentRequestService.getAvailableSessionsForMonth(
+                studentId, start, end, requestTypeEnum);
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved monthly sessions successfully", sessions));
     }
 
     // ==================== MAKEUP REQUEST ENDPOINTS ====================

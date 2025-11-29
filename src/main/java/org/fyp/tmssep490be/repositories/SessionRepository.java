@@ -241,6 +241,20 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     List<Session> findSessionsForStudentByDate(@Param("studentId") Long studentId, @Param("date") LocalDate date);
 
     /**
+     * Find sessions for a specific student within a date range
+     */
+    @Query(value = "SELECT s.* FROM session s " +
+            "JOIN class c ON s.class_id = c.id " +
+            "JOIN enrollment e ON e.class_id = c.id " +
+            "WHERE e.student_id = :studentId " +
+            "AND s.date BETWEEN :startDate AND :endDate " +
+            "AND s.status = 'PLANNED' " +
+            "AND e.status = 'ENROLLED'", nativeQuery = true)
+    List<Session> findSessionsForStudentInRange(@Param("studentId") Long studentId,
+                                                @Param("startDate") LocalDate startDate,
+                                                @Param("endDate") LocalDate endDate);
+
+    /**
      * Find session by date and class
      */
     List<Session> findByClassEntityIdAndDate(Long classId, LocalDate date);

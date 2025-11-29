@@ -19,6 +19,7 @@ public interface StudentRequestService {
     StudentRequestResponseDTO submitTransferRequest(Long userId, TransferRequestDTO dto);
     StudentRequestResponseDTO cancelRequest(Long requestId, Long userId);
     List<SessionAvailabilityDTO> getAvailableSessionsForDate(Long userId, LocalDate date, StudentRequestType requestType);
+    List<SessionAvailabilityDTO> getAvailableSessionsForMonth(Long userId, LocalDate monthStart, LocalDate monthEnd, StudentRequestType requestType);
     MissedSessionsResponseDTO getMissedSessions(Long userId, Integer weeksBack, Boolean excludeRequested);
     MakeupOptionsResponseDTO getMakeupOptions(Long targetSessionId, Long userId);
     TransferEligibilityDTO getTransferEligibility(Long userId);

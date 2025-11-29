@@ -194,6 +194,11 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         Session session = sessionRepository.findById(dto.getTargetSessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
 
+        // 1.1 Ensure session belongs to the selected class
+        if (session.getClassEntity() == null || !session.getClassEntity().getId().equals(dto.getCurrentClassId())) {
+            throw new BusinessRuleException("SESSION_CLASS_MISMATCH", "Session does not belong to the selected class");
+        }
+
         if (session.getDate().isBefore(LocalDate.now())) {
             throw new BusinessRuleException("PAST_SESSION", "Cannot request absence for past sessions");
         }
@@ -208,6 +213,13 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
         if (enrollment == null) {
             throw new BusinessRuleException("NOT_ENROLLED", "You are not enrolled in this class");
+        }
+
+        // 2.1 Ensure student is assigned to the session (prevents cross-class submission)
+        StudentSession.StudentSessionId studentSessionId = new StudentSession.StudentSessionId(student.getId(), dto.getTargetSessionId());
+        boolean hasStudentSession = studentSessionRepository.findById(studentSessionId).isPresent();
+        if (!hasStudentSession) {
+            throw new BusinessRuleException("SESSION_NOT_ASSIGNED", "You are not assigned to this session");
         }
 
         // 3. Check duplicate request
@@ -289,11 +301,59 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         Student student = studentRepository.findByUserAccountId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
 
+        LocalDate today = LocalDate.now();
+        LocalDate maxDate = today.plusDays(30);
+
         // Find all sessions for the student's classes on the given date
-        List<Session> sessions = sessionRepository.findSessionsForStudentByDate(student.getId(), date);
+        List<Session> sessions = sessionRepository.findSessionsForStudentByDate(student.getId(), date).stream()
+                .filter(s -> !s.getDate().isBefore(today))      // Not in the past
+                .filter(s -> !s.getDate().isAfter(maxDate))     // Within next 30 days
+                .toList();
 
         return sessions.stream()
                 .collect(Collectors.groupingBy(session -> session.getClassEntity()))
+                .entrySet().stream()
+                .map(entry -> {
+                    ClassEntity classEntity = entry.getKey();
+                    List<Session> classSessions = entry.getValue();
+
+                    return SessionAvailabilityDTO.builder()
+                            .classId(classEntity.getId())
+                            .classCode(classEntity.getCode())
+                            .className(classEntity.getName())
+                            .courseId(classEntity.getCourse().getId())
+                            .courseName(classEntity.getCourse().getName())
+                            .branchId(classEntity.getBranch().getId())
+                            .branchName(classEntity.getBranch().getName())
+                            .modality(classEntity.getModality().toString())
+                            .sessionCount(classSessions.size())
+                            .sessions(classSessions.stream()
+                                    .map(this::mapToSessionDTO)
+                                    .collect(Collectors.toList()))
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<SessionAvailabilityDTO> getAvailableSessionsForMonth(Long userId, LocalDate monthStart, LocalDate monthEnd, StudentRequestType requestType) {
+        Student student = studentRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
+
+        LocalDate today = LocalDate.now();
+        LocalDate maxDate = today.plusDays(30);
+
+        LocalDate effectiveStart = monthStart.isBefore(today) ? today : monthStart;
+        LocalDate effectiveEnd = monthEnd.isAfter(maxDate) ? maxDate : monthEnd;
+
+        if (effectiveStart.isAfter(effectiveEnd)) {
+            return List.of();
+        }
+
+        List<Session> sessions = sessionRepository.findSessionsForStudentInRange(student.getId(), effectiveStart, effectiveEnd);
+
+        return sessions.stream()
+                .collect(Collectors.groupingBy(Session::getClassEntity))
                 .entrySet().stream()
                 .map(entry -> {
                     ClassEntity classEntity = entry.getKey();
@@ -689,17 +749,26 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
     @Override
     public double calculateAbsenceRate(Long studentId, Long classId) {
-        // Simplified calculation - in real implementation, would count actual absences
         List<StudentSession> sessions = studentSessionRepository.findByStudentIdAndClassEntityId(studentId, classId);
         if (sessions.isEmpty()) {
             return 0.0;
         }
 
-        long absenceCount = sessions.stream()
+        // Only count sessions that have occurred (date <= today) and distinguish excused vs unexcused
+        LocalDate today = LocalDate.now();
+        List<StudentSession> pastSessions = sessions.stream()
+                .filter(ss -> ss.getSession() != null && !ss.getSession().getDate().isAfter(today))
+                .toList();
+
+        if (pastSessions.isEmpty()) {
+            return 0.0;
+        }
+
+        long unexcusedAbsences = pastSessions.stream()
                 .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
                 .count();
 
-        return (double) absenceCount / sessions.size() * 100;
+        return (double) unexcusedAbsences / pastSessions.size() * 100;
     }
 
     // Helper methods for mapping entities to DTOs
@@ -1012,16 +1081,26 @@ public class StudentRequestServiceImpl implements StudentRequestService {
     private StudentRequestDetailDTO.StudentAbsenceStatsDTO calculateAbsenceStats(Long studentId, Long classId) {
         List<StudentSession> sessions = studentSessionRepository.findByStudentIdAndClassEntityId(studentId, classId);
 
-        long totalSessions = sessions.size();
-        long absences = sessions.stream().filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT).count();
+        LocalDate today = LocalDate.now();
+        List<StudentSession> pastSessions = sessions.stream()
+                .filter(ss -> ss.getSession() != null && !ss.getSession().getDate().isAfter(today))
+                .toList();
 
-        // For now, assuming all absences are unexcused (would need more complex logic for excused vs unexcused)
+        long totalSessions = pastSessions.size();
+        long excusedAbsences = pastSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
+                .count();
+        long unexcusedAbsences = pastSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                .count();
+        long totalAbsences = excusedAbsences + unexcusedAbsences;
+
         return StudentRequestDetailDTO.StudentAbsenceStatsDTO.builder()
-                .totalAbsences((int) absences)
+                .totalAbsences((int) totalAbsences)
                 .totalSessions((int) totalSessions)
-                .absenceRate(totalSessions > 0 ? (double) absences / totalSessions * 100 : 0.0)
-                .excusedAbsences(0)
-                .unexcusedAbsences((int) absences)
+                .absenceRate(totalSessions > 0 ? (double) totalAbsences / totalSessions * 100 : 0.0)
+                .excusedAbsences((int) excusedAbsences)
+                .unexcusedAbsences((int) unexcusedAbsences)
                 .build();
     }
 
@@ -1158,12 +1237,24 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         Session session = sessionRepository.findById(dto.getTargetSessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
 
+        // 3.1 Ensure session belongs to selected class
+        if (session.getClassEntity() == null || !session.getClassEntity().getId().equals(dto.getCurrentClassId())) {
+            throw new BusinessRuleException("SESSION_CLASS_MISMATCH", "Session does not belong to the selected class");
+        }
+
         // 4. Validate enrollment
         Enrollment enrollment = enrollmentRepository
                 .findByStudentIdAndClassIdAndStatus(student.getId(), dto.getCurrentClassId(), EnrollmentStatus.ENROLLED);
 
         if (enrollment == null) {
             throw new BusinessRuleException("NOT_ENROLLED", "Student is not enrolled in this class");
+        }
+
+        // 4.1 Ensure student is assigned to the session
+        StudentSession.StudentSessionId studentSessionId = new StudentSession.StudentSessionId(student.getId(), dto.getTargetSessionId());
+        boolean hasStudentSession = studentSessionRepository.findById(studentSessionId).isPresent();
+        if (!hasStudentSession) {
+            throw new BusinessRuleException("SESSION_NOT_ASSIGNED", "Student is not assigned to this session");
         }
 
         // 5. Check duplicate request
@@ -2540,41 +2631,33 @@ public class StudentRequestServiceImpl implements StudentRequestService {
      */
     private void sendNotificationToAcademicAffairs(StudentRequest request) {
         try {
-            // Lấy branch của student để gửi cho Academic Affairs tương ứng
-            // Student không có center trực tiếp, cần lấy qua enrollment hoặc user account
+            // Ưu tiên branch của lớp trong request để định tuyến đúng chi nhánh
             Long branchId = null;
-
-            // Cách 1: Lấy branch từ user account của student (nếu có)
             try {
-                // Thử lấy branch từ enrollment gần nhất
+                if (request.getCurrentClass() != null && request.getCurrentClass().getBranch() != null) {
+                    branchId = request.getCurrentClass().getBranch().getId();
+                }
+            } catch (Exception e) {
+                log.warn("Không lấy được branch từ currentClass của request {}", request.getId());
+            }
+
+            // Fallback: lấy branch từ enrollment (trường hợp request không có currentClass)
+            if (branchId == null) {
                 List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatus(
                         request.getStudent().getId(), EnrollmentStatus.ENROLLED);
                 if (!enrollments.isEmpty()) {
                     branchId = enrollments.get(0).getClassEntity().getBranch().getId();
                 }
-            } catch (Exception e) {
-                log.debug("Không thể lấy branch từ enrollment cho student {}", request.getStudent().getId());
             }
 
-            // Nếu không có enrollment, lấy branch từ user account (nếu có)
-            if (branchId == null && request.getStudent().getUserAccount() != null) {
-                // Giả sử user có branch assignment, cần implement logic này
-                // Tạm thời set null và log warning
-                log.warn("Không thể xác định branch cho student {}, sẽ gửi notification cho tất cả Academic Affairs",
-                        request.getStudent().getId());
+            // Nếu vẫn không xác định được branch, sẽ broadcast
+            if (branchId == null) {
+                log.warn("Không xác định được branch cho request {}, sẽ gửi notification cho tất cả Academic Affairs", request.getId());
             }
 
-            List<UserAccount> academicAffairsUsers;
-            if (branchId != null) {
-                academicAffairsUsers = userAccountRepository.findByRoleCodeAndBranches(
-                        "ACADEMIC_AFFAIRS", List.of(branchId));
-            } else {
-                // Nếu không xác định được branch, lấy tất cả Academic Affairs users
-                log.warn("Không xác định được branch cho student {}, gửi notification cho tất cả Academic Affairs users",
-                        request.getStudent().getId());
-                academicAffairsUsers = userAccountRepository.findByRoleCodeAndBranches(
-                        "ACADEMIC_AFFAIRS", List.of()); // Truyền danh sách rỗng để lấy tất cả
-            }
+            List<UserAccount> academicAffairsUsers = (branchId != null)
+                    ? userAccountRepository.findByRoleCodeAndBranches("ACADEMIC_AFFAIRS", List.of(branchId))
+                    : userAccountRepository.findByRoleCodeAndBranches("ACADEMIC_AFFAIRS", List.of()); // danh sách rỗng = tất cả
 
             if (!academicAffairsUsers.isEmpty()) {
                 String requestType = getRequestTypeDisplayName(request.getRequestType());
@@ -2862,3 +2945,6 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         return "N/A";
     }
 }
+
+
+
