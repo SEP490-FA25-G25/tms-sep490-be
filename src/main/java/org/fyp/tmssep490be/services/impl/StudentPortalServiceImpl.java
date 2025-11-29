@@ -122,8 +122,9 @@ public class StudentPortalServiceImpl implements StudentPortalService {
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
 
-        // Validate student enrollment
-        if (!enrollmentRepository.existsByStudentIdAndClassIdAndStatusIn(studentId, classId, Arrays.asList(EnrollmentStatus.ENROLLED))) {
+        // Validate student enrollment (allow both ENROLLED and COMPLETED for history access)
+        List<EnrollmentStatus> allowedStatuses = Arrays.asList(EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED);
+        if (!enrollmentRepository.existsByStudentIdAndClassIdAndStatusIn(studentId, classId, allowedStatuses)) {
             throw new CustomException(ErrorCode.STUDENT_NOT_ENROLLED_IN_CLASS);
         }
 
@@ -192,11 +193,12 @@ public class StudentPortalServiceImpl implements StudentPortalService {
     public List<StudentAssessmentScoreDTO> getStudentAssessmentScores(Long classId, Long studentId) {
         log.info("Getting assessment scores for student: {} in class: {}", studentId, classId);
 
-        // Validate class and student enrollment
+        // Validate class and student enrollment (allow both ENROLLED and COMPLETED for history access)
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
 
-        if (!enrollmentRepository.existsByStudentIdAndClassIdAndStatusIn(studentId, classId, Arrays.asList(EnrollmentStatus.ENROLLED))) {
+        List<EnrollmentStatus> allowedStatuses = Arrays.asList(EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED);
+        if (!enrollmentRepository.existsByStudentIdAndClassIdAndStatusIn(studentId, classId, allowedStatuses)) {
             throw new CustomException(ErrorCode.STUDENT_NOT_ENROLLED_IN_CLASS);
         }
 
