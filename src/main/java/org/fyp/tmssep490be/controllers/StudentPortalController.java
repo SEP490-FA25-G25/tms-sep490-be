@@ -49,7 +49,8 @@ public class StudentPortalController {
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ResponseObject<Page<StudentClassDTO>>> getStudentClasses(
             @Parameter(description = "Student ID (ignored, derived từ token)") @PathVariable Long studentId,
-            @Parameter(description = "Class status filters") @RequestParam(required = false) List<String> status,
+            @Parameter(description = "Enrollment status filters") @RequestParam(required = false) List<String> enrollmentStatus,
+            @Parameter(description = "Class status filters") @RequestParam(required = false) List<String> classStatus,
             @Parameter(description = "Branch ID filters") @RequestParam(required = false) List<Long> branchId,
             @Parameter(description = "Course ID filters") @RequestParam(required = false) List<Long> courseId,
             @Parameter(description = "Modality filters") @RequestParam(required = false) List<String> modality,
@@ -73,7 +74,7 @@ public class StudentPortalController {
 
         // Get student classes
         Page<StudentClassDTO> classes = studentPortalService.getStudentClasses(
-                authStudentId, status, branchId, courseId, modality, pageable
+                authStudentId, enrollmentStatus, classStatus, branchId, courseId, modality, pageable
         );
 
         return ResponseEntity.ok(ResponseObject.success(classes));

@@ -372,6 +372,32 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     @Query("SELECT COUNT(s) FROM Session s WHERE s.classEntity.id = :classId AND s.status != 'CANCELLED'")
     long countByClassEntityIdExcludingCancelled(@Param("classId") Long classId);
 
+    /**
+     * Count completed sessions for a class without loading all records
+     * A session is considered completed when it's not cancelled and either already in the past
+     * or no longer in PLANNED status.
+     */
+    @Query("SELECT COUNT(s) FROM Session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status <> :excludedStatus " +
+           "AND (s.date < :today OR s.status <> :plannedStatus)")
+    long countCompletedSessionsByClassId(
+            @Param("classId") Long classId,
+            @Param("today") LocalDate today,
+            @Param("excludedStatus") SessionStatus excludedStatus,
+            @Param("plannedStatus") SessionStatus plannedStatus);
+
+    /**
+     * Find the first non-cancelled session ordered by date/time (for schedule summary)
+     */
+    @Query("SELECT s FROM Session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status <> 'CANCELLED' " +
+           "ORDER BY s.date ASC, s.timeSlotTemplate.startTime ASC")
+    List<Session> findFirstActiveSession(
+            @Param("classId") Long classId,
+            Pageable pageable);
+
     // ==================== SCHEDULER JOB METHODS ====================
 
     /**

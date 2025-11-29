@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,12 +37,12 @@ public class StudentPortalServiceImpl implements StudentPortalService {
     private final StudentSessionRepository studentSessionRepository;
     private final TeachingSlotRepository teachingSlotRepository;
     private final StudentRepository studentRepository;
-    private final TimeSlotTemplateRepository timeSlotTemplateRepository;
 
     @Override
     public Page<StudentClassDTO> getStudentClasses(
             Long studentId,
-            List<String> statusFilters,
+            List<String> enrollmentStatusFilters,
+            List<String> classStatusFilters,
             List<Long> branchFilters,
             List<Long> courseFilters,
             List<String> modalityFilters,
@@ -54,41 +55,18 @@ public class StudentPortalServiceImpl implements StudentPortalService {
             throw new CustomException(ErrorCode.STUDENT_NOT_FOUND);
         }
 
-        // Get enrollments with dynamic status filters
-        List<EnrollmentStatus> enrollmentStatuses;
-        if (statusFilters != null && !statusFilters.isEmpty()) {
-            enrollmentStatuses = statusFilters.stream()
-                    .filter(status -> status != null && !status.trim().isEmpty())
-                    .map(status -> {
-                        try {
-                            return EnrollmentStatus.valueOf(status.trim().toUpperCase());
-                        } catch (IllegalArgumentException e) {
-                            log.warn("Invalid enrollment status: {}, skipping", status);
-                            return null;
-                        }
-                    })
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .collect(Collectors.toList());
-        } else {
-            // When no status filter provided, return ALL enrollment statuses
-            enrollmentStatuses = Arrays.asList(EnrollmentStatus.values());
-        }
+        List<EnrollmentStatus> enrollmentStatuses = resolveEnrollmentStatuses(enrollmentStatusFilters);
+        List<ClassStatus> classStatuses = resolveClassStatuses(classStatusFilters);
+        Set<Modality> modalities = resolveModalities(modalityFilters);
 
         List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatusIn(studentId, enrollmentStatuses);
 
-        // Filter by class status if provided
         List<Enrollment> filteredEnrollments = enrollments.stream()
                 .filter(enrollment -> {
                     ClassEntity classEntity = enrollment.getClassEntity();
 
-                    // Status filter
-                    if (statusFilters != null && !statusFilters.isEmpty()) {
-                        String classStatus = classEntity.getStatus().toString();
-                        if (!statusFilters.contains(classStatus)) {
-                            return false;
-                        }
-                    }
+                    boolean classStatusMatch = classStatuses.isEmpty() || classStatuses.contains(classEntity.getStatus());
+                    if (!classStatusMatch) return false;
 
                     // Branch filter
                     if (branchFilters != null && !branchFilters.isEmpty()) {
@@ -105,11 +83,8 @@ public class StudentPortalServiceImpl implements StudentPortalService {
                     }
 
                     // Modality filter
-                    if (modalityFilters != null && !modalityFilters.isEmpty()) {
-                        String classModality = classEntity.getModality().toString();
-                        if (!modalityFilters.contains(classModality)) {
-                            return false;
-                        }
+                    if (!modalities.isEmpty() && !modalities.contains(classEntity.getModality())) {
+                        return false;
                     }
 
                     return true;
@@ -301,11 +276,69 @@ public class StudentPortalServiceImpl implements StudentPortalService {
                 .collect(Collectors.toList());
     }
 
+    private List<EnrollmentStatus> resolveEnrollmentStatuses(List<String> enrollmentStatusFilters) {
+        if (enrollmentStatusFilters == null || enrollmentStatusFilters.isEmpty()) {
+            return Arrays.asList(EnrollmentStatus.values());
+        }
+
+        return enrollmentStatusFilters.stream()
+                .filter(status -> status != null && !status.trim().isEmpty())
+                .map(status -> {
+                    try {
+                        return EnrollmentStatus.valueOf(status.trim().toUpperCase());
+                    } catch (IllegalArgumentException ex) {
+                        log.warn("Invalid enrollment status: {}, skipping", status);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    private List<ClassStatus> resolveClassStatuses(List<String> classStatusFilters) {
+        if (classStatusFilters == null || classStatusFilters.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return classStatusFilters.stream()
+                .filter(status -> status != null && !status.trim().isEmpty())
+                .map(status -> {
+                    try {
+                        return ClassStatus.valueOf(status.trim().toUpperCase());
+                    } catch (IllegalArgumentException ex) {
+                        log.warn("Invalid class status: {}, skipping", status);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    private Set<Modality> resolveModalities(List<String> modalityFilters) {
+        if (modalityFilters == null || modalityFilters.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        return modalityFilters.stream()
+                .filter(modality -> modality != null && !modality.trim().isEmpty())
+                .map(modality -> {
+                    try {
+                        return Modality.valueOf(modality.trim().toUpperCase());
+                    } catch (IllegalArgumentException ex) {
+                        log.warn("Invalid modality: {}, skipping", modality);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+    }
+
     // Helper methods for converting entities to DTOs
 
     private StudentClassDTO convertToStudentClassDTO(Enrollment enrollment) {
         ClassEntity classEntity = enrollment.getClassEntity();
-        Student student = enrollment.getStudent();
 
         // Get instructor names from teaching slots with proper lazy loading handling
         List<TeachingSlot> teachingSlots = teachingSlotRepository.findByClassEntityIdAndStatus(classEntity.getId(), TeachingSlotStatus.SCHEDULED);
@@ -316,13 +349,14 @@ public class StudentPortalServiceImpl implements StudentPortalService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        // Calculate session statistics (only what's needed for progress bar)
-        List<Session> allSessions = sessionRepository.findAllByClassIdOrderByDateAndTime(classEntity.getId());
-        int totalSessions = allSessions.size();
-
-        int completedSessions = (int) allSessions.stream()
-                .filter(session -> session.getDate().isBefore(LocalDate.now()) || session.getStatus() != SessionStatus.PLANNED)
-                .count();
+        LocalDate today = LocalDate.now();
+        int totalSessions = Math.toIntExact(sessionRepository.countByClassEntityIdExcludingCancelled(classEntity.getId()));
+        int completedSessions = Math.toIntExact(sessionRepository.countCompletedSessionsByClassId(
+                classEntity.getId(),
+                today,
+                SessionStatus.CANCELLED,
+                SessionStatus.PLANNED
+        ));
 
         return StudentClassDTO.builder()
                 .classId(classEntity.getId())
@@ -483,13 +517,18 @@ public class StudentPortalServiceImpl implements StudentPortalService {
     }
 
     private AssessmentDTO convertToAssessmentDTO(Assessment assessment) {
-        String teacherName = null;
-        // Get teacher name from teaching slots (simplified approach)
-        List<TeachingSlot> teachingSlots = teachingSlotRepository.findByClassEntityIdAndStatus(
-                assessment.getClassEntity().getId(), TeachingSlotStatus.SCHEDULED);
-        if (!teachingSlots.isEmpty()) {
-            teacherName = teachingSlots.get(0).getTeacher().getUserAccount().getFullName();
-        }
+        // Get teacher name from teaching slots with null safety
+        String teacherName = teachingSlotRepository.findByClassEntityIdAndStatus(
+                        assessment.getClassEntity().getId(), TeachingSlotStatus.SCHEDULED)
+                .stream()
+                .map(TeachingSlot::getTeacher)
+                .filter(Objects::nonNull)
+                .map(Teacher::getUserAccount)
+                .filter(Objects::nonNull)
+                .map(UserAccount::getFullName)
+                .filter(name -> name != null && !name.trim().isEmpty())
+                .findFirst()
+                .orElse(null);
 
         return AssessmentDTO.builder()
                 .id(assessment.getId())
@@ -553,10 +592,70 @@ public class StudentPortalServiceImpl implements StudentPortalService {
     }
 
     private String generateScheduleSummary(ClassEntity classEntity) {
-        // This is a simplified implementation
-        // In a real scenario, you'd want to analyze the actual session schedule
-        // For now, return a placeholder
-        return "Lịch học tạm thời"; // Placeholder
+        Short[] scheduleDays = classEntity.getScheduleDays();
+        List<String> dayLabels = Collections.emptyList();
+        if (scheduleDays != null && scheduleDays.length > 0) {
+            dayLabels = Arrays.stream(scheduleDays)
+                    .filter(Objects::nonNull)
+                    .sorted()
+                    .map(this::formatDayLabel)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+        }
+
+        String daysPart = dayLabels.isEmpty() ? null : String.join(", ", dayLabels);
+
+        Session firstSession = sessionRepository.findFirstActiveSession(classEntity.getId(), Pageable.ofSize(1))
+                .stream()
+                .findFirst()
+                .orElse(null);
+
+        String timePart = null;
+        if (firstSession != null && firstSession.getTimeSlotTemplate() != null) {
+            timePart = formatTimeRange(
+                    firstSession.getTimeSlotTemplate().getStartTime(),
+                    firstSession.getTimeSlotTemplate().getEndTime()
+            );
+        }
+
+        if (daysPart != null && timePart != null) {
+            return daysPart + " • " + timePart;
+        }
+        if (daysPart != null) {
+            return daysPart;
+        }
+        if (timePart != null) {
+            return timePart;
+        }
+        if (firstSession != null) {
+            return "Bắt đầu " + firstSession.getDate().format(DateTimeFormatter.ofPattern("dd/MM"));
+        }
+        return "Đang cập nhật lịch";
+    }
+
+    private String formatTimeRange(LocalTime start, LocalTime end) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
+        if (start != null && end != null) {
+            return formatter.format(start) + " - " + formatter.format(end);
+        }
+        if (start != null) {
+            return formatter.format(start);
+        }
+        return null;
+    }
+
+    private String formatDayLabel(short dayOfWeek) {
+        return switch (dayOfWeek) {
+            case 1 -> "T2";
+            case 2 -> "T3";
+            case 3 -> "T4";
+            case 4 -> "T5";
+            case 5 -> "T6";
+            case 6 -> "T7";
+            case 7, 0 -> "CN";
+            default -> null;
+        };
     }
 
     private StudentTranscriptDTO convertToStudentTranscriptDTO(Enrollment enrollment) {

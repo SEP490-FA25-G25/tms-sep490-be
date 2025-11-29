@@ -16,7 +16,8 @@ public interface StudentPortalService {
      * Get classes enrolled by a student with filtering and pagination
      *
      * @param studentId Student ID
-     * @param statusFilters Optional status filters
+     * @param enrollmentStatusFilters Optional enrollment status filters
+     * @param classStatusFilters Optional class status filters
      * @param branchFilters Optional branch filters
      * @param courseFilters Optional course filters
      * @param modalityFilters Optional modality filters
@@ -25,7 +26,8 @@ public interface StudentPortalService {
      */
     Page<StudentClassDTO> getStudentClasses(
             Long studentId,
-            List<String> statusFilters,
+            List<String> enrollmentStatusFilters,
+            List<String> classStatusFilters,
             List<Long> branchFilters,
             List<Long> courseFilters,
             List<String> modalityFilters,
