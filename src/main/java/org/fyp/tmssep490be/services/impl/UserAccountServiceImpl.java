@@ -253,42 +253,61 @@ public class UserAccountServiceImpl implements UserAccountService {
         }
 
         // Update roles if provided
-        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
-            // Clear existing roles - orphanRemoval will handle deletion
-            user.getUserRoles().clear();
-            
-            // Add new roles
-            for (Long roleId : request.getRoleIds()) {
-                org.fyp.tmssep490be.entities.Role role = roleRepository.findById(roleId)
-                        .orElseThrow(() -> new IllegalArgumentException("Role not found with ID: " + roleId));
-                
-                org.fyp.tmssep490be.entities.UserRole userRole = new org.fyp.tmssep490be.entities.UserRole();
-                userRole.setUserAccount(user);
-                userRole.setRole(role);
-                // ID will be automatically set by @MapsId when saving
-                org.fyp.tmssep490be.entities.UserRole.UserRoleId userRoleId = 
-                        new org.fyp.tmssep490be.entities.UserRole.UserRoleId();
-                userRoleId.setUserId(user.getId());
-                userRoleId.setRoleId(role.getId());
-                userRole.setId(userRoleId);
-                
-                user.getUserRoles().add(userRole);
+        if (request.getRoleIds() != null) {
+            java.util.Set<Long> requestedRoleIds = new java.util.HashSet<>(request.getRoleIds());
+
+            // Remove roles that are no longer requested
+            user.getUserRoles().removeIf(
+                    userRole -> !requestedRoleIds.contains(userRole.getRole().getId())
+            );
+
+            // Compute existing role IDs after removal
+            java.util.Set<Long> existingRoleIds = user.getUserRoles().stream()
+                    .map(userRole -> userRole.getRole().getId())
+                    .collect(java.util.stream.Collectors.toSet());
+
+            // Add new roles for IDs that don't exist yet
+            for (Long roleId : requestedRoleIds) {
+                if (!existingRoleIds.contains(roleId)) {
+                    Role role = roleRepository.findById(roleId)
+                            .orElseThrow(() -> new IllegalArgumentException("Role not found with ID: " + roleId));
+
+                    UserRole userRole = new UserRole();
+                    userRole.setUserAccount(user);
+                    userRole.setRole(role);
+                    UserRole.UserRoleId userRoleId = new UserRole.UserRoleId();
+                    userRoleId.setUserId(user.getId());
+                    userRoleId.setRoleId(role.getId());
+                    userRole.setId(userRoleId);
+
+                    user.getUserRoles().add(userRole);
+                }
             }
         }
 
         // Update branches if provided
         if (request.getBranchIds() != null) {
-            // Clear existing branches - orphanRemoval will handle deletion
-            user.getUserBranches().clear();
-            
-            // Add new branches (only if not empty)
-            if (!request.getBranchIds().isEmpty()) {
-                for (Long branchId : request.getBranchIds()) {
-                    org.fyp.tmssep490be.entities.Branch branch = branchRepository.findById(branchId)
+            java.util.Set<Long> requestedBranchIds = new java.util.HashSet<>(request.getBranchIds());
+
+            // Remove associations that are no longer requested
+            user.getUserBranches().removeIf(
+                    userBranch -> !requestedBranchIds.contains(userBranch.getBranch().getId())
+            );
+
+            // Compute existing branch IDs after removal
+            java.util.Set<Long> existingBranchIds = user.getUserBranches().stream()
+                    .map(ub -> ub.getBranch().getId())
+                    .collect(java.util.stream.Collectors.toSet());
+
+            // Add new associations for branches that don't exist yet
+            for (Long branchId : requestedBranchIds) {
+                if (!existingBranchIds.contains(branchId)) {
+                    Branch branch = branchRepository.findById(branchId)
                             .orElseThrow(() -> new IllegalArgumentException("Branch not found with ID: " + branchId));
-                    org.fyp.tmssep490be.entities.UserBranches userBranch = new org.fyp.tmssep490be.entities.UserBranches();
-                    org.fyp.tmssep490be.entities.UserBranches.UserBranchesId userBranchId = 
-                            new org.fyp.tmssep490be.entities.UserBranches.UserBranchesId();
+
+                    UserBranches userBranch = new UserBranches();
+                    UserBranches.UserBranchesId userBranchId =
+                            new UserBranches.UserBranchesId();
                     userBranchId.setUserId(user.getId());
                     userBranchId.setBranchId(branchId);
                     userBranch.setId(userBranchId);
@@ -296,6 +315,49 @@ public class UserAccountServiceImpl implements UserAccountService {
                     userBranch.setBranch(branch);
                     userBranch.setAssignedAt(java.time.OffsetDateTime.now());
                     user.getUserBranches().add(userBranch);
+                }
+            }
+        }
+
+        // Ensure domain profiles (Teacher/Student) are created when roles are added later
+        // This mirrors the logic in createUser but works on existing accounts.
+        java.util.Set<Long> assignedBranchIds = user.getUserBranches().stream()
+                .map(ub -> ub.getBranch().getId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        java.util.Set<Role> updatedRoles = user.getUserRoles().stream()
+                .map(UserRole::getRole)
+                .collect(java.util.stream.Collectors.toSet());
+
+        for (Role role : updatedRoles) {
+            String roleCode = role.getCode();
+
+            if ("TEACHER".equals(roleCode)) {
+                // Auto-create Teacher profile if missing
+                if (!teacherRepository.findByUserAccountId(user.getId()).isPresent()) {
+                    Teacher teacher = new Teacher();
+                    teacher.setUserAccount(user);
+                    teacher.setEmployeeCode(generateEmployeeCode(assignedBranchIds));
+                    teacher.setHireDate(java.time.LocalDate.now());
+                    java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+                    teacher.setCreatedAt(now);
+                    teacher.setUpdatedAt(now);
+                    teacherRepository.save(teacher);
+                    log.info("Auto-created Teacher profile for existing user: {}", user.getEmail());
+                }
+            } else if ("STUDENT".equals(roleCode)) {
+                // Auto-create Student profile if missing and branch info is available
+                if (!studentRepository.findByUserAccountId(user.getId()).isPresent()) {
+                    if (assignedBranchIds.isEmpty()) {
+                        log.warn("Cannot auto-create Student profile on update: no branch assigned for user: {}", user.getEmail());
+                    } else {
+                        Student student = new Student();
+                        student.setUserAccount(user);
+                        Long branchId = assignedBranchIds.iterator().next();
+                        student.setStudentCode(generateStudentCode(branchId, user.getFullName(), user.getEmail()));
+                        studentRepository.save(student);
+                        log.info("Auto-created Student profile for existing user: {}", user.getEmail());
+                    }
                 }
             }
         }
