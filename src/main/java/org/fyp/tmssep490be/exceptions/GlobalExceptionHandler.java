@@ -54,7 +54,7 @@ public class GlobalExceptionHandler {
         log.error("NullPointerException occurred: {}", e.getMessage(), e);
         
         // Return user-friendly error message
-        String errorMessage = "Null value encountered in the application";
+        String errorMessage = "Đã gặp giá trị null trong ứng dụng";
         if (e.getMessage() != null && !e.getMessage().isEmpty()) {
             errorMessage += ": " + e.getMessage();
         }
@@ -106,31 +106,31 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ResponseObject<Void>> handleBadCredentialsException(BadCredentialsException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ResponseObject.error("Invalid username or password"));
+                .body(ResponseObject.error("Tên đăng nhập hoặc mật khẩu không hợp lệ"));
     }
 
     @ExceptionHandler(UsernameNotFoundException.class)
     public ResponseEntity<ResponseObject<Void>> handleUsernameNotFoundException(UsernameNotFoundException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ResponseObject.error("User not found"));
+                .body(ResponseObject.error("Không tìm thấy người dùng"));
     }
 
     @ExceptionHandler(DisabledException.class)
     public ResponseEntity<ResponseObject<Void>> handleDisabledException(DisabledException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ResponseObject.error("Account is disabled"));
+                .body(ResponseObject.error("Tài khoản đã bị vô hiệu hóa"));
     }
 
     @ExceptionHandler(LockedException.class)
     public ResponseEntity<ResponseObject<Void>> handleLockedException(LockedException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ResponseObject.error("Account is locked"));
+                .body(ResponseObject.error("Tài khoản đã bị khóa"));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ResponseObject<Void>> handleAccessDeniedException(AccessDeniedException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ResponseObject.error("Access denied - insufficient permissions"));
+                .body(ResponseObject.error("Truy cập bị từ chối - không đủ quyền hạn"));
     }
 
     @ExceptionHandler(InvalidTokenException.class)

@@ -294,14 +294,14 @@ public class ClassController {
       @ApiResponse(responseCode = "404", description = "Class not found", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": false,
-            "message": "Class with ID 999 not found",
+            "message": "Không tìm thấy lớp học có ID 999",
             "data": null
           }
           """))),
       @ApiResponse(responseCode = "403", description = "Forbidden - User does not have access to this class's branch", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": false,
-            "message": "Access denied - user does not have access to this class's branch",
+            "message": "Truy cập bị từ chối - người dùng không có quyền truy cập vào chi nhánh của lớp học này",
             "data": null
           }
           """)))
@@ -668,14 +668,14 @@ public class ClassController {
           @ExampleObject(name = "Class Not Found", value = """
               {
                 "success": false,
-                "message": "Class with ID 999 not found",
+                "message": "Không tìm thấy lớp học có ID 999",
                 "data": null
               }
               """),
           @ExampleObject(name = "Resource Not Found", value = """
               {
                 "success": false,
-                "message": "Resource with ID 123 not found",
+                "message": "Không tìm thấy tài nguyên có ID 123",
                 "data": null
               }
               """)
@@ -693,14 +693,14 @@ public class ClassController {
           @ExampleObject(name = "Invalid Status", description = "Class not in DRAFT status", value = """
               {
                 "success": false,
-                "message": "Cannot assign resources: class status must be DRAFT",
+                "message": "Không thể phân bổ tài nguyên: trạng thái lớp học phải là DRAFT",
                 "data": null
               }
               """),
           @ExampleObject(name = "Branch Mismatch", description = "Resource does not belong to class's branch", value = """
               {
                 "success": false,
-                "message": "Resource 123 does not belong to class's branch",
+                "message": "Tài nguyên 123 không thuộc về chi nhánh của lớp học",
                 "data": null
               }
               """)
@@ -708,14 +708,14 @@ public class ClassController {
       @ApiResponse(responseCode = "401", description = "Unauthorized - Missing or invalid JWT token", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": false,
-            "message": "Invalid username or password",
+            "message": "Tên đăng nhập hoặc mật khẩu không hợp lệ",
             "data": null
           }
           """))),
       @ApiResponse(responseCode = "403", description = "Forbidden - Insufficient permissions (requires ACADEMIC_AFFAIR role)", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": false,
-            "message": "Access denied - insufficient permissions",
+            "message": "Truy cập bị từ chối - không đủ quyền hạn",
             "data": null
           }
           """)))
@@ -834,7 +834,7 @@ public class ClassController {
       @ApiResponse(responseCode = "200", description = "Successfully retrieved teacher availability data", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ResponseObject.class), examples = @ExampleObject(name = "Teachers with Availability Breakdown", description = "List of all teachers with detailed availability metrics", value = """
           {
             "success": true,
-            "message": "Found 5 teachers. Use POST /classes/{classId}/teachers to assign.",
+            "message": "Tìm thấy 5 giáo viên. Sử dụng POST /classes/{classId}/teachers để phân công.",
             "data": [
               {
                 "teacherId": 101,
@@ -883,28 +883,28 @@ public class ClassController {
       @ApiResponse(responseCode = "404", description = "Class not found", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": false,
-            "message": "Class with ID 999 not found",
+            "message": "Không tìm thấy lớp học có ID 999",
             "data": null
           }
           """))),
       @ApiResponse(responseCode = "400", description = "Bad request - Invalid class status", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": false,
-            "message": "Cannot query teachers: class status must be DRAFT",
+            "message": "Không thể truy vấn giáo viên: trạng thái lớp học phải là DRAFT",
             "data": null
           }
           """))),
       @ApiResponse(responseCode = "401", description = "Unauthorized - Missing or invalid JWT token", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": false,
-            "message": "Invalid username or password",
+            "message": "Tên đăng nhập hoặc mật khẩu không hợp lệ",
             "data": null
           }
           """))),
       @ApiResponse(responseCode = "403", description = "Forbidden - Insufficient permissions (requires ACADEMIC_AFFAIR role)", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": false,
-            "message": "Access denied - insufficient permissions",
+            "message": "Truy cập bị từ chối - không đủ quyền hạn",
             "data": null
           }
           """)))
@@ -1072,7 +1072,7 @@ public class ClassController {
           @ExampleObject(name = "Class Not Found", value = """
               {
                 "success": false,
-                "message": "Class with ID 999 not found",
+                "message": "Không tìm thấy lớp học có ID 999",
                 "data": null
               }
               """),
@@ -1119,14 +1119,14 @@ public class ClassController {
       @ApiResponse(responseCode = "401", description = "Unauthorized - Missing or invalid JWT token", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": false,
-            "message": "Invalid username or password",
+            "message": "Tên đăng nhập hoặc mật khẩu không hợp lệ",
             "data": null
           }
           """))),
       @ApiResponse(responseCode = "403", description = "Forbidden - Insufficient permissions (requires ACADEMIC_AFFAIR role)", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": false,
-            "message": "Access denied - insufficient permissions",
+            "message": "Truy cập bị từ chối - không đủ quyền hạn",
             "data": null
           }
           """)))
