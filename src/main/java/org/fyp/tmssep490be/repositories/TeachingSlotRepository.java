@@ -27,6 +27,17 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
 
     @Query("SELECT ts FROM TeachingSlot ts WHERE ts.session.classEntity.id = :classId AND ts.status = :status")
     List<TeachingSlot> findByClassEntityIdAndStatus(@Param("classId") Long classId, @Param("status") TeachingSlotStatus status);
+
+    /**
+     * Find teaching slots by class ID and status
+     * Used for getting all teachers of a class
+     */
+    @Query("SELECT ts FROM TeachingSlot ts " +
+           "JOIN FETCH ts.teacher t " +
+           "JOIN FETCH t.userAccount " +
+           "JOIN FETCH ts.session s " +
+           "WHERE s.classEntity.id = :classId AND ts.status = :status")
+    List<TeachingSlot> findBySessionClassIdAndStatus(@Param("classId") Long classId, @Param("status") TeachingSlotStatus status);
     
     /**
      * Get all teaching slots for a specific session with given status

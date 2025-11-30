@@ -17,6 +17,7 @@ import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.services.EmailService;
+import org.fyp.tmssep490be.services.NotificationService;
 import org.fyp.tmssep490be.services.PolicyService;
 import org.fyp.tmssep490be.services.TeacherRequestService;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,7 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
     private final TeacherSkillRepository teacherSkillRepository;
     private final EmailService emailService;
     private final PolicyService policyService;
+    private final NotificationService notificationService;
 
     private static final List<RequestStatus> ACTIVE_REQUEST_STATUSES =
             List.of(RequestStatus.PENDING, RequestStatus.WAITING_CONFIRM, RequestStatus.APPROVED);
@@ -395,6 +397,15 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         // Send email notification to teacher
         sendEmailNotificationForApproval(request);
 
+        // Send in-app notification to teacher
+        sendNotificationForApproval(request);
+
+        // If REPLACEMENT request, also notify replacement teacher
+        if (request.getRequestType() == TeacherRequestType.REPLACEMENT && 
+            request.getReplacementTeacher() != null) {
+            sendNotificationForReplacementInvitation(request);
+        }
+
         return mapToResponseDTO(request);
     }
 
@@ -425,6 +436,9 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
 
         // Send email notification to teacher
         sendEmailNotificationForRejection(request);
+
+        // Send in-app notification to teacher
+        sendNotificationForRejection(request, reason);
 
         return mapToResponseDTO(request);
     }
@@ -999,6 +1013,12 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         // Cancel old session
         oldSession.setStatus(SessionStatus.CANCELLED);
         sessionRepository.save(oldSession);
+
+        // Send notification about session cancellation
+        sendNotificationForSessionCancelled(oldSession);
+
+        // Send notification about session rescheduled
+        sendNotificationForSessionRescheduled(oldSession, newSession, newDate, newTimeSlot);
 
         // Set newSessionId in request
         request.setNewSession(newSession);
@@ -2011,6 +2031,10 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         request = teacherRequestRepository.save(request);
 
         log.info("Replacement request {} confirmed successfully", requestId);
+
+        // Send notification to original teacher
+        sendNotificationForReplacementConfirmed(request, replacementTeacher);
+
         return mapToResponseDTO(request);
     }
 
@@ -2052,6 +2076,10 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
         request = teacherRequestRepository.save(request);
 
         log.info("Replacement request {} declined, status reset to PENDING", requestId);
+
+        // Send notification to original teacher
+        sendNotificationForReplacementDeclined(request, replacementTeacher, reason);
+
         return mapToResponseDTO(request);
     }
 
@@ -2323,6 +2351,311 @@ public class TeacherRequestServiceImpl implements TeacherRequestService {
     private String getCurrentModality(TeacherRequest request) {
         // TeacherRequest doesn't have currentResource field, return generic value
         return "Hiện tại";
+    }
+
+    // ==================== IN-APP NOTIFICATION METHODS ====================
+
+    /**
+     * Gửi notification cho teacher khi request được duyệt
+     */
+    private void sendNotificationForApproval(TeacherRequest request) {
+        try {
+            Long teacherUserId = request.getTeacher().getUserAccount().getId();
+            String requestTypeName = getRequestTypeDisplayName(request.getRequestType());
+            String sessionInfo = getSessionInfo(request);
+            String formattedDate = request.getSession().getDate()
+                .format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+            String title;
+            String message;
+
+            if (request.getRequestType() == TeacherRequestType.REPLACEMENT) {
+                // REPLACEMENT: status = WAITING_CONFIRM, chưa phải APPROVED
+                title = "Yêu cầu nhờ dạy thay đã được duyệt";
+                message = String.format("Yêu cầu nhờ dạy thay cho buổi học %s ngày %s đã được duyệt. " +
+                    "Đang chờ giáo viên thay thế xác nhận.",
+                    sessionInfo, formattedDate);
+            } else {
+                // MODALITY_CHANGE hoặc RESCHEDULE: status = APPROVED
+                title = String.format("Yêu cầu %s đã được duyệt", requestTypeName);
+                message = String.format("Yêu cầu %s cho buổi học %s ngày %s đã được duyệt.",
+                    requestTypeName, sessionInfo, formattedDate);
+            }
+
+            notificationService.createNotificationFromRequest(
+                org.fyp.tmssep490be.dtos.notification.NotificationRequestDTO.builder()
+                    .recipientId(teacherUserId)
+                    .type(NotificationType.REQUEST_APPROVAL)
+                    .title(title)
+                    .message(message)
+                    .priority(NotificationPriority.MEDIUM)
+                    .referenceType("TEACHER_REQUEST")
+                    .referenceId(request.getId())
+                    .actionUrl(String.format("/teacher/requests/%d", request.getId()))
+                    .metadata(String.format("{\"requestType\":\"%s\",\"status\":\"%s\"}", 
+                        request.getRequestType().name(), request.getStatus().name()))
+                    .build()
+            );
+
+            log.info("Sent approval notification to teacher {} for request {}", teacherUserId, request.getId());
+        } catch (Exception e) {
+            log.error("Failed to send approval notification for request {}: {}", request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi notification cho teacher khi request bị từ chối
+     */
+    private void sendNotificationForRejection(TeacherRequest request, String reason) {
+        try {
+            Long teacherUserId = request.getTeacher().getUserAccount().getId();
+            String requestTypeName = getRequestTypeDisplayName(request.getRequestType());
+            String sessionInfo = getSessionInfo(request);
+            String formattedDate = request.getSession().getDate()
+                .format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+            String title = String.format("Yêu cầu %s đã bị từ chối", requestTypeName);
+            String message = String.format("Yêu cầu %s cho buổi học %s ngày %s đã bị từ chối. " +
+                (reason != null && !reason.trim().isEmpty() ? "Lý do: %s" : "Vui lòng kiểm tra lại."),
+                requestTypeName, sessionInfo, formattedDate, reason != null ? reason : "");
+
+            notificationService.createNotificationFromRequest(
+                org.fyp.tmssep490be.dtos.notification.NotificationRequestDTO.builder()
+                    .recipientId(teacherUserId)
+                    .type(NotificationType.REQUEST_APPROVAL)
+                    .title(title)
+                    .message(message)
+                    .priority(NotificationPriority.HIGH)
+                    .referenceType("TEACHER_REQUEST")
+                    .referenceId(request.getId())
+                    .actionUrl(String.format("/teacher/requests/%d", request.getId()))
+                    .metadata(String.format("{\"requestType\":\"%s\",\"status\":\"REJECTED\",\"reason\":\"%s\"}", 
+                        request.getRequestType().name(), reason != null ? reason.replace("\"", "\\\"") : ""))
+                    .build()
+            );
+
+            log.info("Sent rejection notification to teacher {} for request {}", teacherUserId, request.getId());
+        } catch (Exception e) {
+            log.error("Failed to send rejection notification for request {}: {}", request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi notification cho replacement teacher khi được mời dạy thay
+     */
+    private void sendNotificationForReplacementInvitation(TeacherRequest request) {
+        try {
+            if (request.getReplacementTeacher() == null) {
+                return;
+            }
+
+            Long replacementTeacherUserId = request.getReplacementTeacher().getUserAccount().getId();
+            String originalTeacherName = request.getTeacher().getUserAccount().getFullName();
+            String className = request.getSession().getClassEntity().getName();
+            String formattedDate = request.getSession().getDate()
+                .format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String timeRange = String.format("%s - %s",
+                request.getSession().getTimeSlotTemplate().getStartTime(),
+                request.getSession().getTimeSlotTemplate().getEndTime());
+
+            String title = "Bạn được mời dạy thay";
+            String message = String.format("Bạn được mời dạy thay cho %s - lớp %s vào ngày %s (%s). " +
+                "Vui lòng xác nhận hoặc từ chối.",
+                originalTeacherName, className, formattedDate, timeRange);
+
+            notificationService.createNotificationFromRequest(
+                org.fyp.tmssep490be.dtos.notification.NotificationRequestDTO.builder()
+                    .recipientId(replacementTeacherUserId)
+                    .type(NotificationType.REQUEST_APPROVAL)
+                    .title(title)
+                    .message(message)
+                    .priority(NotificationPriority.HIGH)
+                    .referenceType("TEACHER_REQUEST")
+                    .referenceId(request.getId())
+                    .actionUrl(String.format("/teacher/requests/%d", request.getId()))
+                    .metadata(String.format("{\"requestType\":\"REPLACEMENT\",\"status\":\"WAITING_CONFIRM\",\"invitation\":true}"))
+                    .build()
+            );
+
+            log.info("Sent replacement invitation notification to teacher {} for request {}", 
+                replacementTeacherUserId, request.getId());
+        } catch (Exception e) {
+            log.error("Failed to send replacement invitation notification for request {}: {}", 
+                request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi notification cho original teacher khi replacement teacher xác nhận
+     */
+    private void sendNotificationForReplacementConfirmed(TeacherRequest request, Teacher replacementTeacher) {
+        try {
+            Long originalTeacherUserId = request.getTeacher().getUserAccount().getId();
+            String replacementTeacherName = replacementTeacher.getUserAccount().getFullName();
+            String className = request.getSession().getClassEntity().getName();
+            String formattedDate = request.getSession().getDate()
+                .format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+            String title = "Yêu cầu dạy thay đã được xác nhận";
+            String message = String.format("%s đã xác nhận dạy thay cho bạn - lớp %s ngày %s.",
+                replacementTeacherName, className, formattedDate);
+
+            notificationService.createNotificationFromRequest(
+                org.fyp.tmssep490be.dtos.notification.NotificationRequestDTO.builder()
+                    .recipientId(originalTeacherUserId)
+                    .type(NotificationType.REQUEST_APPROVAL)
+                    .title(title)
+                    .message(message)
+                    .priority(NotificationPriority.MEDIUM)
+                    .referenceType("TEACHER_REQUEST")
+                    .referenceId(request.getId())
+                    .actionUrl(String.format("/teacher/requests/%d", request.getId()))
+                    .metadata(String.format("{\"requestType\":\"REPLACEMENT\",\"status\":\"APPROVED\",\"confirmed\":true}"))
+                    .build()
+            );
+
+            log.info("Sent replacement confirmed notification to teacher {} for request {}", 
+                originalTeacherUserId, request.getId());
+        } catch (Exception e) {
+            log.error("Failed to send replacement confirmed notification for request {}: {}", 
+                request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi notification cho original teacher khi replacement teacher từ chối
+     */
+    private void sendNotificationForReplacementDeclined(TeacherRequest request, Teacher replacementTeacher, String reason) {
+        try {
+            Long originalTeacherUserId = request.getTeacher().getUserAccount().getId();
+            String replacementTeacherName = replacementTeacher.getUserAccount().getFullName();
+            String className = request.getSession().getClassEntity().getName();
+            String formattedDate = request.getSession().getDate()
+                .format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+            String title = "Yêu cầu dạy thay đã bị từ chối";
+            String message = String.format("%s đã từ chối dạy thay cho bạn - lớp %s ngày %s. " +
+                "Yêu cầu đã được chuyển về trạng thái chờ duyệt.",
+                replacementTeacherName, className, formattedDate);
+
+            notificationService.createNotificationFromRequest(
+                org.fyp.tmssep490be.dtos.notification.NotificationRequestDTO.builder()
+                    .recipientId(originalTeacherUserId)
+                    .type(NotificationType.REQUEST_APPROVAL)
+                    .title(title)
+                    .message(message)
+                    .priority(NotificationPriority.MEDIUM)
+                    .referenceType("TEACHER_REQUEST")
+                    .referenceId(request.getId())
+                    .actionUrl(String.format("/teacher/requests/%d", request.getId()))
+                    .metadata(String.format("{\"requestType\":\"REPLACEMENT\",\"status\":\"PENDING\",\"declined\":true}"))
+                    .build()
+            );
+
+            log.info("Sent replacement declined notification to teacher {} for request {}", 
+                originalTeacherUserId, request.getId());
+        } catch (Exception e) {
+            log.error("Failed to send replacement declined notification for request {}: {}", 
+                request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi notification cho teacher khi session bị hủy
+     */
+    private void sendNotificationForSessionCancelled(Session session) {
+        try {
+            // Get teachers for this session
+            List<TeachingSlot> teachingSlots = teachingSlotRepository
+                .findBySessionIdAndStatus(session.getId(), TeachingSlotStatus.SCHEDULED);
+
+            String className = session.getClassEntity().getName();
+            String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String timeRange = "";
+            if (session.getTimeSlotTemplate() != null) {
+                timeRange = String.format(" (%s - %s)",
+                    session.getTimeSlotTemplate().getStartTime(),
+                    session.getTimeSlotTemplate().getEndTime());
+            }
+
+            for (TeachingSlot slot : teachingSlots) {
+                Long teacherId = slot.getTeacher().getUserAccount().getId();
+
+                notificationService.createNotificationFromRequest(
+                    org.fyp.tmssep490be.dtos.notification.NotificationRequestDTO.builder()
+                        .recipientId(teacherId)
+                        .type(NotificationType.CLASS_REMINDER)
+                        .title("Buổi học đã bị hủy")
+                        .message(String.format("Buổi học %s ngày %s%s đã bị hủy.",
+                            className, formattedDate, timeRange))
+                        .priority(NotificationPriority.HIGH)
+                        .referenceType("SESSION")
+                        .referenceId(session.getId())
+                        .actionUrl(String.format("/teacher/schedule"))
+                        .metadata(String.format("{\"sessionStatus\":\"CANCELLED\",\"sessionId\":%d}", session.getId()))
+                        .build()
+                );
+
+                log.info("Sent session cancelled notification to teacher {} for session {}", 
+                    teacherId, session.getId());
+            }
+        } catch (Exception e) {
+            log.error("Failed to send session cancelled notification for session {}: {}", 
+                session.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gửi notification cho teacher khi session bị đổi lịch
+     */
+    private void sendNotificationForSessionRescheduled(Session oldSession, Session newSession, 
+            LocalDate newDate, TimeSlotTemplate newTimeSlot) {
+        try {
+            // Get teachers for this session
+            List<TeachingSlot> teachingSlots = teachingSlotRepository
+                .findBySessionIdAndStatus(newSession.getId(), TeachingSlotStatus.SCHEDULED);
+
+            String className = newSession.getClassEntity().getName();
+            String oldDate = oldSession.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String newDateStr = newDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            
+            String oldTime = "";
+            if (oldSession.getTimeSlotTemplate() != null) {
+                oldTime = String.format("%s - %s",
+                    oldSession.getTimeSlotTemplate().getStartTime(),
+                    oldSession.getTimeSlotTemplate().getEndTime());
+            }
+            
+            String newTime = String.format("%s - %s",
+                newTimeSlot.getStartTime(),
+                newTimeSlot.getEndTime());
+
+            for (TeachingSlot slot : teachingSlots) {
+                Long teacherId = slot.getTeacher().getUserAccount().getId();
+
+                notificationService.createNotificationFromRequest(
+                    org.fyp.tmssep490be.dtos.notification.NotificationRequestDTO.builder()
+                        .recipientId(teacherId)
+                        .type(NotificationType.CLASS_REMINDER)
+                        .title("Buổi học đã được đổi lịch")
+                        .message(String.format("Buổi học %s đã được đổi lịch từ %s (%s) sang %s (%s).",
+                            className, oldDate, oldTime, newDateStr, newTime))
+                        .priority(NotificationPriority.MEDIUM)
+                        .referenceType("SESSION")
+                        .referenceId(newSession.getId())
+                        .actionUrl(String.format("/teacher/schedule"))
+                        .metadata(String.format("{\"sessionStatus\":\"RESCHEDULED\",\"oldSessionId\":%d,\"newSessionId\":%d}", 
+                            oldSession.getId(), newSession.getId()))
+                        .build()
+                );
+
+                log.info("Sent session rescheduled notification to teacher {} for session {} -> {}", 
+                    teacherId, oldSession.getId(), newSession.getId());
+            }
+        } catch (Exception e) {
+            log.error("Failed to send session rescheduled notification for session {} -> {}: {}", 
+                oldSession.getId(), newSession.getId(), e.getMessage(), e);
+        }
     }
 
     /**

@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -260,6 +261,16 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     List<Session> findByClassEntityIdAndDate(Long classId, LocalDate date);
 
     /**
+     * Find all sessions by date (for scheduler jobs)
+     */
+    @Query("SELECT s FROM Session s " +
+           "LEFT JOIN FETCH s.timeSlotTemplate " +
+           "LEFT JOIN FETCH s.classEntity " +
+           "WHERE s.date = :date " +
+           "AND s.status != 'CANCELLED'")
+    List<Session> findByDate(@Param("date") LocalDate date);
+
+    /**
      * Find all missed (absent) sessions for a student within a time window
      * Used for makeup request - get sessions student can make up
      */
@@ -442,4 +453,40 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
            "INNER JOIN s.classEntity c " +
            "WHERE s.date = :date AND c.branch.id IN :branchIds")
     long countByDateAndBranchIdIn(@Param("date") LocalDate date, @Param("branchIds") List<Long> branchIds);
+
+    /**
+     * Find sessions that are scheduled for a specific date and whose end time falls within a given time range.
+     * Excludes sessions with a specific status (e.g., CANCELLED).
+     */
+    @Query("SELECT s FROM Session s " +
+           "JOIN FETCH s.timeSlotTemplate tst " +
+           "JOIN FETCH s.classEntity c " +
+           "WHERE s.date = :sessionDate " +
+           "AND tst.endTime > :timeFrom " +
+           "AND tst.endTime <= :timeTo " +
+           "AND s.status <> :excludedStatus")
+    List<Session> findSessionsEndingBetween(
+            @Param("sessionDate") LocalDate sessionDate,
+            @Param("timeFrom") LocalTime timeFrom,
+            @Param("timeTo") LocalTime timeTo,
+            @Param("excludedStatus") SessionStatus excludedStatus
+    );
+
+    /**
+     * Find sessions that ended on a specific date and whose end time falls within a given time range.
+     * Excludes sessions with a specific status (e.g., CANCELLED).
+     */
+    @Query("SELECT s FROM Session s " +
+           "JOIN FETCH s.timeSlotTemplate tst " +
+           "JOIN FETCH s.classEntity c " +
+           "WHERE s.date = :sessionDate " +
+           "AND tst.endTime >= :timeFrom " +
+           "AND tst.endTime <= :timeTo " +
+           "AND s.status <> :excludedStatus")
+    List<Session> findSessionsEndedBetween(
+            @Param("sessionDate") LocalDate sessionDate,
+            @Param("timeFrom") LocalTime timeFrom,
+            @Param("timeTo") LocalTime timeTo,
+            @Param("excludedStatus") SessionStatus excludedStatus
+    );
 }

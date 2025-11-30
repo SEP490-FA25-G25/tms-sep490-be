@@ -1,8 +1,6 @@
 package org.fyp.tmssep490be.repositories;
 
 import org.fyp.tmssep490be.entities.Assessment;
-import org.fyp.tmssep490be.entities.CourseAssessment;
-import org.fyp.tmssep490be.entities.Enrollment;
 import org.fyp.tmssep490be.entities.Score;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -99,4 +97,10 @@ public interface ScoreRepository extends JpaRepository<Score, Long> {
            "JOIN s.assessment a " +
            "WHERE s.student.id = :studentId AND s.gradedAt IS NOT NULL")
     java.math.BigDecimal calculateAverageScore(@Param("studentId") Long studentId);
+
+    /**
+     * Count scores that have been graded (gradedAt is not null) for an assessment
+     */
+    @Query("SELECT COUNT(s) FROM Score s WHERE s.assessment.id = :assessmentId AND s.gradedAt IS NOT NULL")
+    long countByAssessmentIdAndGradedAtIsNotNull(@Param("assessmentId") Long assessmentId);
 }
