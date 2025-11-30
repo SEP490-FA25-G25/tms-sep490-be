@@ -78,4 +78,14 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     // Check if user has notification for specific reference
     boolean existsByRecipientIdAndReferenceTypeAndReferenceId(Long recipientId, String referenceType, Long referenceId);
+
+    // Check if user has notification for specific reference with metadata containing a string
+    @Query(value = "SELECT COUNT(n) > 0 FROM notification n WHERE n.recipient_id = :recipientId " +
+           "AND n.reference_type = :referenceType AND n.reference_id = :referenceId " +
+           "AND CAST(n.metadata AS TEXT) LIKE CONCAT('%', :metadataContains, '%')", nativeQuery = true)
+    boolean existsByRecipientIdAndReferenceTypeAndReferenceIdAndMetadataContaining(
+        @Param("recipientId") Long recipientId,
+        @Param("referenceType") String referenceType,
+        @Param("referenceId") Long referenceId,
+        @Param("metadataContains") String metadataContains);
 }

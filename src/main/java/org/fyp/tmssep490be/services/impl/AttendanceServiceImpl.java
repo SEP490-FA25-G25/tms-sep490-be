@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -183,7 +185,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
-        if (session.getStatus() == SessionStatus.DONE) {
+        if (!canEditAttendance(session)) {
             throw new CustomException(ErrorCode.SESSION_ALREADY_DONE);
         }
 
@@ -232,7 +234,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         assertOwnership(teacherId, sessionId);
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
-        if (session.getStatus() == SessionStatus.DONE) {
+        if (!canEditAttendance(session)) {
             throw new CustomException(ErrorCode.SESSION_ALREADY_DONE);
         }
         List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(sessionId);
@@ -254,7 +256,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         assertOwnership(teacherId, sessionId);
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
-        if (session.getStatus() == SessionStatus.DONE) {
+        if (!canEditAttendance(session)) {
             throw new CustomException(ErrorCode.SESSION_ALREADY_DONE);
         }
         List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(sessionId);
@@ -315,7 +317,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         assertOwnership(teacherId, sessionId);
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
-        if (session.getStatus() == SessionStatus.DONE) {
+        if (!canEditAttendance(session)) {
             throw new CustomException(ErrorCode.SESSION_ALREADY_DONE);
         }
         session.setTeacherNote(request.getTeacherNote());
@@ -774,6 +776,40 @@ public class AttendanceServiceImpl implements AttendanceService {
         }
 
         return studentCount == 0 ? 0.0 : totalRate / studentCount;
+    }
+
+    /**
+     * Check if attendance can be edited for a session.
+     * Returns true if:
+     * 1. Session has already occurred (not a future session)
+     * 2. It's within 48 hours from when the session ended
+     * 3. Works regardless of session status
+     */
+    private boolean canEditAttendance(Session session) {
+        if (session == null || session.getDate() == null) {
+            return false;
+        }
+
+        // Check if session has a time slot template with end time
+        if (session.getTimeSlotTemplate() == null || session.getTimeSlotTemplate().getEndTime() == null) {
+            // If no end time, check if session date has passed
+            LocalDate today = LocalDate.now();
+            return !session.getDate().isAfter(today);
+        }
+
+        LocalDate sessionDate = session.getDate();
+        LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+        LocalDateTime sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+        LocalDateTime now = LocalDateTime.now();
+
+        // Check if session has ended (not a future session)
+        if (sessionEndDateTime.isAfter(now)) {
+            return false;
+        }
+
+        // Check if it's within 48 hours from session end time
+        LocalDateTime deadline = sessionEndDateTime.plusHours(48);
+        return now.isBefore(deadline);
     }
 }
 

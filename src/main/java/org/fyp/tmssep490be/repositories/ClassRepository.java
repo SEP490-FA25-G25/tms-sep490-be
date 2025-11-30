@@ -249,4 +249,24 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
    */
   @Query("SELECT COUNT(c) FROM ClassEntity c WHERE c.branch.id IN :branchIds AND c.approvalStatus = :approvalStatus")
   long countByApprovalStatusAndBranchIdIn(@Param("approvalStatus") ApprovalStatus approvalStatus, @Param("branchIds") List<Long> branchIds);
+
+  /**
+   * Find classes with startDate = given date and specific status
+   * Used by ClassStatusUpdateJob to notify teachers about classes starting soon
+   */
+  @Query("SELECT c FROM ClassEntity c WHERE c.startDate = :date AND c.status = :status")
+  List<ClassEntity> findByStartDateAndStatus(
+      @Param("date") LocalDate date,
+      @Param("status") ClassStatus status
+  );
+
+  /**
+   * Find classes with plannedEndDate = given date and specific status
+   * Used by ClassStatusUpdateJob to notify teachers about classes ending soon
+   */
+  @Query("SELECT c FROM ClassEntity c WHERE c.plannedEndDate = :date AND c.status = :status")
+  List<ClassEntity> findByPlannedEndDateAndStatus(
+      @Param("date") LocalDate date,
+      @Param("status") ClassStatus status
+  );
 }
