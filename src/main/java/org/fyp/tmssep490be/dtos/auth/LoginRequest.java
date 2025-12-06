@@ -7,9 +7,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Login request DTO - uses email for authentication
- */
 @Data
 @Builder
 @NoArgsConstructor
