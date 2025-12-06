@@ -1,0 +1,92 @@
+spring:
+  application:
+    name: tms-sep490-be
+
+  security:
+    jwt:
+      secret: ${JWT_SECRET:ThisIsAVerySecretKeyForJWTTokenGenerationPleaseChangeInProduction123456789}
+      access-token-expiration: 900000      # 15 minutes (in milliseconds)
+      refresh-token-expiration: 604800000  # 7 days (in milliseconds)
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    # docker run --name tms-postgres -e POSTGRES_PASSWORD=979712 -p 5432:5432 -d postgres 
+    # docker exec -it tms-postgres psql -U postgres
+    # CREATE DATABASE tms;
+    username: postgres
+    url: jdbc:postgresql://localhost:5432/tms
+    password: 979712
+
+  sql:
+    init:
+      mode: never 
+  jpa:
+    defer-datasource-initialization: false
+    hibernate:
+      ddl-auto: none 
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: alpha
+    tags-sorter: alpha
+    display-request-duration: true
+    doc-expansion: none
+    default-models-expand-depth: 1
+    default-model-expand-depth: 1
+    try-it-out-enabled: true
+  show-actuator: false
+  paths-to-match: /api/**
+  packages-to-scan: org.fyp.tmssep490be.controllers
+
+# Application Configuration
+app:
+  frontend:
+    url: ${FRONTEND_URL:http://localhost:5173}
+  email:
+    enabled: ${EMAIL_ENABLED:true}
+
+server:
+  port: 8080
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USERNAME:t03612977@gmail.com}
+    password: ${GMAIL_APP_PASSWORD:hejz yray vzsj anli}
+    protocol: smtp
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+        debug: false
+
+    email:
+      from:
+        email: ${GMAIL_USERNAME:t03612977@gmail.com}
+        name: ${TMS_FROM_NAME:Hệ thống TMS}
+      rate:
+        limit: ${GMAIL_RATE_LIMIT:20} # 20 emails per second for Gmail
+        limit-duration: ${GMAIL_RATE_LIMIT_DURATION:1} # 1 second
+      retry:
+        max-attempts: ${GMAIL_RETRY_MAX_ATTEMPTS:3}
+        delay: ${GMAIL_RETRY_DELAY:1000} # 1 second
+  async:
+    pool-size: ${EMAIL_ASYNC_POOL_SIZE:10}
+    queue-capacity: ${EMAIL_ASYNC_QUEUE_CAPACITY:100}
+    thread-name-prefix: ${EMAIL_ASYNC_THREAD_PREFIX:EmailAsync-}
