@@ -8,6 +8,7 @@ import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
+import org.fyp.tmssep490be.services.EmailService;
 import org.fyp.tmssep490be.services.PolicyService;
 import org.fyp.tmssep490be.services.StudentService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,6 +31,7 @@ public class StudentServiceImpl implements StudentService {
     private final UserRoleRepository userRoleRepository;
     private final BranchRepository branchRepository;
     private final LevelRepository levelRepository;
+    private final EmailService emailService;
     private final ReplacementSkillAssessmentRepository replacementSkillAssessmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final PolicyService policyService;
@@ -180,7 +182,14 @@ public class StudentServiceImpl implements StudentService {
         log.info("Successfully created student: {} with {} skill assessments",
                 savedStudent.getStudentCode(), assessmentsCreated);
 
-        // 11. SEND WELCOME EMAIL with login credentials -- TODO
+        emailService.sendNewStudentCredentialsAsync(
+                savedUser.getEmail(),
+                savedUser.getFullName(),
+                savedStudent.getStudentCode(),
+                savedUser.getEmail(),
+                defaultPassword,
+                branch.getName()
+        );
 
         log.info("Sent welcome email with credentials to: {}", savedUser.getEmail());
 
