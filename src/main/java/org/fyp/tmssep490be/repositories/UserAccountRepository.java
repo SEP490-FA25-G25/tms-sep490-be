@@ -20,4 +20,6 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     @EntityGraph(attributePaths = { "userRoles", "userRoles.role", "userBranches", "userBranches.branch" })
     org.springframework.data.domain.Page<UserAccount> findAll(org.springframework.data.domain.Pageable pageable);
 
+    boolean existsByPhone(String phone);
+
 }
