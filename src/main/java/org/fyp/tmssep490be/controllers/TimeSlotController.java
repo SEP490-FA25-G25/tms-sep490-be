@@ -65,5 +65,16 @@ public class TimeSlotController {
         return ResponseEntity.ok(saved);
     }
 
+    // Cập nhật khung giờ
+    @PutMapping("/time-slots/{id}")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Update time slot")
+    public ResponseEntity<TimeSlotResponseDTO> updateTimeSlot(
+            @PathVariable Long id,
+            @RequestBody TimeSlotRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        TimeSlotResponseDTO saved = timeSlotTemplateService.updateTimeSlot(id, request, currentUser.getId());
+        return ResponseEntity.ok(saved);
+    }
 
 }

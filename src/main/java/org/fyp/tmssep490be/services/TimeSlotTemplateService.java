@@ -130,6 +130,54 @@ public class TimeSlotTemplateService {
         return convertToDTO(saved);
     }
 
+    // Cập nhật khung giờ
+    @Transactional
+    public TimeSlotResponseDTO updateTimeSlot(Long id, TimeSlotRequestDTO request, Long userId) {
+        log.info("Updating time slot {}: {}", id, request);
+
+        TimeSlotTemplate timeSlot = timeSlotTemplateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found with id: " + id));
+
+        Long branchId = timeSlot.getBranch().getId();
+
+        if (request.getName() != null) {
+            String newName = request.getName().trim();
+            if (!newName.equalsIgnoreCase(timeSlot.getName())) {
+                if (timeSlotTemplateRepository.existsByBranchIdAndNameIgnoreCase(branchId, newName, id)) {
+                    throw new BusinessRuleException("Tên khung giờ đã tồn tại");
+                }
+            }
+            timeSlot.setName(newName);
+        }
+
+        if (request.getStartTime() != null || request.getEndTime() != null) {
+            LocalTime newStartTime = request.getStartTime() != null
+                    ? LocalTime.parse(request.getStartTime()) : timeSlot.getStartTime();
+            LocalTime newEndTime = request.getEndTime() != null
+                    ? LocalTime.parse(request.getEndTime()) : timeSlot.getEndTime();
+
+            if (!newEndTime.isAfter(newStartTime)) {
+                throw new BusinessRuleException("Giờ kết thúc phải lớn hơn giờ bắt đầu");
+            }
+
+            boolean isTimeChanged = !newStartTime.equals(timeSlot.getStartTime()) || !newEndTime.equals(timeSlot.getEndTime());
+            if (isTimeChanged) {
+                if (sessionRepository.existsByTimeSlotTemplateId(id)) {
+                    throw new BusinessRuleException("Không thể thay đổi thời gian vì đang được sử dụng");
+                }
+                if (timeSlotTemplateRepository.existsByBranchIdAndStartTimeAndEndTime(branchId, newStartTime, newEndTime, id)) {
+                    throw new BusinessRuleException("Khung giờ này đã tồn tại");
+                }
+                timeSlot.setStartTime(newStartTime);
+                timeSlot.setEndTime(newEndTime);
+            }
+        }
+
+        timeSlot.setUpdatedAt(OffsetDateTime.now());
+        TimeSlotTemplate saved = timeSlotTemplateRepository.save(timeSlot);
+        return convertToDTO(saved);
+    }
+
     // ==================== HELPER METHODS ====================
 
     private Long getBranchIdForUser(Long userId) {
