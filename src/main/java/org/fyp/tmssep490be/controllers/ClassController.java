@@ -1,10 +1,14 @@
 package org.fyp.tmssep490be.controllers;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.fyp.tmssep490be.dtos.classdetail.ClassDetailDTO;
+import org.fyp.tmssep490be.dtos.classmanagement.AvailableStudentDTO;
+import org.fyp.tmssep490be.dtos.classmanagement.ClassDetailDTO;
 import org.fyp.tmssep490be.dtos.classmanagement.ClassListItemDTO;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.Modality;
@@ -36,8 +40,9 @@ public class ClassController {
             @PathVariable Long classId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         
-        // Lấy thông tin chi tiết lớp học từ service
-        ClassDetailDTO classDetail = classService.getClassDetail(classId);
+        log.info("User {} requesting details for class {}", userPrincipal.getId(), classId);
+
+        ClassDetailDTO classDetail = classService.getClassDetail(classId, userPrincipal.getId());
 
         return ResponseEntity.ok(
                 ResponseObject.<ClassDetailDTO>builder()
@@ -75,6 +80,46 @@ public class ClassController {
                 .success(true)
                 .message("Classes retrieved successfully")
                 .data(classes)
+                .build());
+    }
+
+    @GetMapping("/{classId}/available-students")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER')")
+    public ResponseEntity<ResponseObject<Page<AvailableStudentDTO>>> getAvailableStudentsForClass(
+            @PathVariable Long classId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        
+        log.info("User {} requesting available students for class {} with search: {}", 
+                 currentUser.getId(), classId, search);
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<AvailableStudentDTO> availableStudents = classService.getAvailableStudentsForClass(
+                classId, search, pageable, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<Page<AvailableStudentDTO>>builder()
+                .success(true)
+                .message("Available students retrieved successfully")
+                .data(availableStudents)
+                .build());
+    }
+
+    @GetMapping("/{classId}/sessions/metrics")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER')")
+    public ResponseEntity<ResponseObject<QASessionListResponse>> getSessionsWithMetrics(
+            @PathVariable Long classId,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        
+        log.info("User {} requesting sessions with metrics for class {}", currentUser.getId(), classId);
+
+        QASessionListResponse response = classService.getSessionsWithMetrics(classId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<QASessionListResponse>builder()
+                .success(true)
+                .message("Sessions with metrics retrieved successfully")
+                .data(response)
                 .build());
     }
 }
