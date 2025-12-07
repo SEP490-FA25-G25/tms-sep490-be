@@ -13,6 +13,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import org.fyp.tmssep490be.entities.enums.ResourceStatus;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -82,6 +84,22 @@ public class TimeSlotController {
             @AuthenticationPrincipal UserPrincipal currentUser) {
         timeSlotTemplateService.deleteTimeSlot(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // Đổi trạng thái
+    @PatchMapping("/time-slots/{id}/status")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Update time slot status")
+    public ResponseEntity<TimeSlotResponseDTO> updateTimeSlotStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (!request.containsKey("status")) {
+            throw new RuntimeException("Field 'status' is required");
+        }
+        ResourceStatus status = ResourceStatus.valueOf(request.get("status"));
+        TimeSlotResponseDTO saved = timeSlotTemplateService.updateTimeSlotStatus(id, status);
+        return ResponseEntity.ok(saved);
     }
 
 }

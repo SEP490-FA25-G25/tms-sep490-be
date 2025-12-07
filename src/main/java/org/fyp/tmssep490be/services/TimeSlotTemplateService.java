@@ -211,6 +211,28 @@ public class TimeSlotTemplateService {
         timeSlotTemplateRepository.deleteById(id);
     }
 
+    // Đổi trạng thái hoạt động/ngưng hoạt động
+    @Transactional
+    public TimeSlotResponseDTO updateTimeSlotStatus(Long id, ResourceStatus status) {
+        log.info("Updating status for time slot {}: {}", id, status);
+
+        TimeSlotTemplate timeSlot = timeSlotTemplateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found with id: " + id));
+
+        // Nếu ngưng hoạt động → check không có session tương lai
+        if (status == ResourceStatus.INACTIVE) {
+            Long futureSessions = sessionRepository.countFutureSessionsByTimeSlotId(id, LocalDate.now(), LocalTime.now());
+            if (futureSessions > 0) {
+                throw new BusinessRuleException("Không thể ngưng hoạt động vì có " + futureSessions + " lớp học sắp diễn ra");
+            }
+        }
+
+        timeSlot.setStatus(status);
+        timeSlot.setUpdatedAt(OffsetDateTime.now());
+        TimeSlotTemplate saved = timeSlotTemplateRepository.save(timeSlot);
+        return convertToDTO(saved);
+    }
+
     // Lấy danh sách branchId của user
     private List<Long> getBranchIdsForUser(Long userId) {
         if (userId == null)
