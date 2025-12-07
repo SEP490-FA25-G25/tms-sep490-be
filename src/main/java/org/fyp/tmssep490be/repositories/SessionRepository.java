@@ -1,6 +1,7 @@
 package org.fyp.tmssep490be.repositories;
 
 import org.fyp.tmssep490be.entities.Session;
+import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +14,10 @@ import java.util.List;
 @Repository
 public interface SessionRepository extends JpaRepository<Session, Long> {
 
+    List<Session> findByClassEntityIdAndDateGreaterThanEqualAndStatusOrderByDateAsc(
+            Long classId,
+            LocalDate date,
+            SessionStatus status);
     // Kiểm tra khung giờ có được dùng trong session không
     boolean existsByTimeSlotTemplateId(Long timeSlotTemplateId);
 

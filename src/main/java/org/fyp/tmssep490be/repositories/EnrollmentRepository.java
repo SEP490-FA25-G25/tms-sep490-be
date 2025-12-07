@@ -35,8 +35,10 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
             @Param("search") String search,
             Pageable pageable
     );
+    int countByClassIdAndStatus(Long classId, EnrollmentStatus status);
 
+    // Kiểm tra xem student đã được enroll vào class chưa
+    boolean existsByClassIdAndStudentIdAndStatus(Long classId, Long studentId, EnrollmentStatus status);
     //Tìm kiếm tất cả đăng ký lớp học theo ID lớp học và trạng thái
     List<Enrollment> findByClassIdAndStatus(Long classId, EnrollmentStatus status);
 }
-
