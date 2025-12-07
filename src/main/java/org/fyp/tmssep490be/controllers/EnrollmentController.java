@@ -10,7 +10,6 @@ import org.fyp.tmssep490be.dtos.enrollment.EnrollExistingStudentsRequest;
 import org.fyp.tmssep490be.dtos.enrollment.EnrollmentResult;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
-import org.fyp.tmssep490be.repositories.StudentRepository;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.EnrollmentService;
 import org.fyp.tmssep490be.services.EnrollmentTemplateService;

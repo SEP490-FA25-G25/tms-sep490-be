@@ -32,9 +32,6 @@ build/
 ### VS Code ###
 .vscode/s
 
-MIGRATION_GUIDE.md
-MIGRATION_STEP_BY_STEP.md
-MIGRATION_COPY_PASTE.md
-RESOURCE_MIGRATION_COPY_PASTE.md
+migration
 
 
