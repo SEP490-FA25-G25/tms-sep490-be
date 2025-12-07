@@ -72,8 +72,8 @@ public class StudentRequest {
     private OffsetDateTime decidedAt;
 
     @Column(name = "request_reason", columnDefinition = "TEXT")
-    private String requestReason;
+    private String requestReason; // Student's reason for the request
 
     @Column(columnDefinition = "TEXT")
-    private String note;
+    private String note; // AA's decision note (approve/reject reason)
 }
