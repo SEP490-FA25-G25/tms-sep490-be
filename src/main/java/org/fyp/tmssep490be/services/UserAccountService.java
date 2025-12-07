@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.user.CreateUserRequest;
 import org.fyp.tmssep490be.dtos.user.UpdateUserRequest;
+import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.dtos.user.UserResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -159,6 +160,21 @@ public class UserAccountService {
         return mapToResponse(user);
 
 
+    }
+
+    @Transactional
+    public void deleteUser(Long userId) {
+
+        log.info("Deleting user with ID: {}", userId);
+
+        // tìm user theo userId
+        UserAccount user = userAccountRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
+
+        // xóa user
+        user.setStatus(UserStatus.INACTIVE);
+        userAccountRepository.save(user);
+
+        log.info("User set to inactive successfully with ID: {}", user.getId());
     }
 
     private UserResponse mapToResponse(UserAccount user) {
