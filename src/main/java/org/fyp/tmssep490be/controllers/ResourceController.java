@@ -22,23 +22,5 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth")
 public class ResourceController {
 
-    private final TimeSlotTemplateService timeSlotTemplateService;
 
-    @GetMapping("/time-slots")
-    @PreAuthorize("hasAnyRole('CENTER_HEAD', 'ACADEMIC_AFFAIR', 'TEACHER', 'MANAGER')")
-    @Operation(summary = "Get all time slots")
-    public ResponseEntity<List<TimeSlotResponseDTO>> getAllTimeSlots(
-            @RequestParam(required = false) Long branchId,
-            @RequestParam(required = false) String search,
-            @AuthenticationPrincipal UserPrincipal currentUser) {
-
-        boolean isCenterHead = currentUser.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_CENTER_HEAD"));
-        boolean isTeacher = currentUser.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_TEACHER"));
-
-        List<TimeSlotResponseDTO> timeSlots = timeSlotTemplateService.getAllTimeSlots(
-                branchId, search, currentUser.getId(), isCenterHead, isTeacher);
-        return ResponseEntity.ok(timeSlots);
-    }
 }
