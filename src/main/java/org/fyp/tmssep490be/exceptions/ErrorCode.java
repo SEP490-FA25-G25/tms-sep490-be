@@ -40,8 +40,23 @@ public enum ErrorCode {
     STUDENT_ROLE_NOT_FOUND(1105, "Vai trò HỌC VIÊN chưa được cấu hình trong hệ thống"),
 
     // Enrollment errors (1200-1299)
+    EXCEL_GENERATION_FAILED(1216, "Tạo tệp Excel thất bại"),
+    EXCEL_FILE_EMPTY(1205, "Tệp Excel trống hoặc định dạng không hợp lệ"),
+    INVALID_FILE_TYPE_XLSX(1214, "Chỉ hỗ trợ tệp Excel (.xlsx)"),
+    EXCEL_PARSE_FAILED(1206, "Phân tích tệp Excel thất bại"),
+    NO_STUDENTS_TO_IMPORT(1217, "Không có học viên nào để nhập"),
+    CLASS_NOT_APPROVED(1207, "Lớp học phải được phê duyệt trước khi đăng ký"),
+    CLASS_INVALID_STATUS(1208, "Lớp học phải ở trạng thái 'đã lên lịch' hoặc 'đang diễn ra' để đăng ký"),
+    NO_FUTURE_SESSIONS(1209, "Không còn buổi học nào trong tương lai để đăng ký"),
 
     // Enrollment Import errors (1205-1219)
+    CLASS_CAPACITY_EXCEEDED(1202, "Lớp học đã đủ sĩ số"),
+    OVERRIDE_REASON_REQUIRED(1210, "Yêu cầu lý do ghi đè (tối thiểu 20 ký tự)"),
+    OVERRIDE_REASON_TOO_SHORT(1215, "Lý do ghi đè phải có ít nhất 20 ký tự"),
+    ENROLLMENT_ALREADY_EXISTS(1201, "Học viên đã đăng ký vào lớp này"),
+    INVALID_ENROLLMENT_STRATEGY(1211, "Chiến lược đăng ký không hợp lệ"),
+    SELECTED_STUDENTS_EXCEED_CAPACITY(1213, "Số lượng học viên đã chọn vượt quá sức chứa"),
+    PARTIAL_STRATEGY_MISSING_IDS(1212, "Cần chọn danh sách ID học viên cho chiến lược PARTIAL"),
 
     // Class errors (4000-4099)
     CLASS_NOT_FOUND(4000, "Không tìm thấy lớp học"),
@@ -61,6 +76,7 @@ public enum ErrorCode {
     // Attendance errors (1300-1399)
 
     // Common errors (9000-9999)
+    INVALID_INPUT(9000, "Dữ liệu đầu vào không hợp lệ"),
     ;
 
     private final int code;

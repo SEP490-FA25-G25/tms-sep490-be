@@ -37,10 +37,11 @@ public class EmailService {
     private String frontendUrl;
 
     @Async
-    public CompletableFuture<Void> sendEmailAsync(String to, String subject, String htmlContent) {
+    public void sendEmailAsync(String to, String subject, String htmlContent) {
         if (mailSender == null) {
             log.warn("Email service is not configured. Skipping email to: {}", to);
-            return CompletableFuture.completedFuture(null);
+            CompletableFuture.completedFuture(null);
+            return;
         }
 
         try {
@@ -54,16 +55,16 @@ public class EmailService {
 
             mailSender.send(mimeMessage);
             log.info("Email sent successfully to: {}", to);
-            return CompletableFuture.completedFuture(null);
+            CompletableFuture.completedFuture(null);
 
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
-            return CompletableFuture.failedFuture(e);
+            CompletableFuture.failedFuture(e);
         }
     }
 
-    public CompletableFuture<Void> sendNewStudentCredentialsAsync(String to, String studentName, String studentCode,
-                                                                  String email, String defaultPassword, String branchName) {
+    public void sendNewStudentCredentialsAsync(String to, String studentName, String studentCode,
+                                               String email, String defaultPassword, String branchName) {
         String subject = "Chào mừng đến với Hệ thống Quản lý Đào tạo TMS - Thông tin đăng nhập";
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("studentName", studentName);
@@ -74,21 +75,32 @@ public class EmailService {
         templateData.put("loginUrl", frontendUrl + "/login");
         templateData.put("frontendUrl", frontendUrl);
 
-        return sendEmailWithTemplateAsync(to, subject, "emails/new-student-credentials", templateData);
+        sendEmailWithTemplateAsync(to, subject, "emails/new-student-credentials", templateData);
     }
 
-    public CompletableFuture<Void> sendEmailWithTemplateAsync(String to, String subject, String templateName, Map<String, Object> templateData) {
+    public void sendEmailWithTemplateAsync(String to, String subject, String templateName, Map<String, Object> templateData) {
         try {
             Context context = new Context();
             context.setVariables(templateData);
 
             String htmlContent = templateEngine.process(templateName, context);
-            return sendEmailAsync(to, subject, htmlContent);
+            sendEmailAsync(to, subject, htmlContent);
 
         } catch (Exception e) {
             log.error("Failed to process email template {} for recipient {}: {}", templateName, to, e.getMessage(), e);
-            return CompletableFuture.failedFuture(e);
+            CompletableFuture.failedFuture(e);
         }
+    }
+
+    public void sendClassEnrollmentNotificationAsync(String to, String studentName, String className, String centerName) {
+        String subject = "Xác nhận đăng ký lớp học thành công";
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("className", className);
+        templateData.put("centerName", centerName);
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/class-enrollment", templateData);
     }
 
 }

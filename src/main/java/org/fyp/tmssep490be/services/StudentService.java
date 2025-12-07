@@ -13,7 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +35,7 @@ public class StudentService {
     private final ReplacementSkillAssessmentRepository replacementSkillAssessmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final PolicyService policyService;
+    private final ExcelParserService excelParserService;
 
     @Transactional
     public CreateStudentResponse createStudent(CreateStudentRequest request, Long currentUserId) {
@@ -232,6 +236,334 @@ public class StudentService {
         }
 
         return studentCode;
+    }
+
+    public byte[] generateStudentImportTemplate() {
+        log.info("Generating student import template");
+
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("Students");
+
+            // Header style
+            org.apache.poi.ss.usermodel.CellStyle headerStyle = workbook.createCellStyle();
+            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(org.apache.poi.ss.usermodel.IndexedColors.LIGHT_BLUE.getIndex());
+            headerStyle.setFillPattern(org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
+
+            // Create header row
+            org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+            String[] headers = {"Họ và tên (*)", "Email (*)", "Số điện thoại", "Facebook URL", "Địa chỉ", "Giới tính (*)", "Ngày sinh"};
+            for (int i = 0; i < headers.length; i++) {
+                org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+                sheet.setColumnWidth(i, 5000);
+            }
+
+            org.apache.poi.ss.usermodel.Row sampleRow = sheet.createRow(1);
+            sampleRow.createCell(0).setCellValue("Nguyễn Văn A");
+            sampleRow.createCell(1).setCellValue("nguyenvana@email.com");
+            sampleRow.createCell(2).setCellValue("0912345678");
+            sampleRow.createCell(3).setCellValue("https://facebook.com/nguyenvana");
+            sampleRow.createCell(4).setCellValue("123 Đường ABC, Quận 1, TP.HCM");
+            sampleRow.createCell(5).setCellValue("MALE");
+            sampleRow.createCell(6).setCellValue("2000-01-15");
+
+            org.apache.poi.ss.usermodel.Row instructionRow = sheet.createRow(2);
+            instructionRow.createCell(0).setCellValue("Nguyễn Thị B");
+            instructionRow.createCell(1).setCellValue("nguyenthib@email.com");
+            instructionRow.createCell(2).setCellValue("0987654321");
+            instructionRow.createCell(3).setCellValue("");
+            instructionRow.createCell(4).setCellValue("456 Đường XYZ, Quận 2, TP.HCM");
+            instructionRow.createCell(5).setCellValue("FEMALE");
+            instructionRow.createCell(6).setCellValue("15/03/1999");
+
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            workbook.write(out);
+            return out.toByteArray();
+
+        } catch (Exception e) {
+            log.error("Failed to generate student import template", e);
+            throw new CustomException(ErrorCode.EXCEL_GENERATION_FAILED);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public StudentImportPreview previewStudentImport(Long branchId, org.springframework.web.multipart.MultipartFile file, Long currentUserId) {
+        log.info("Previewing student import for branch {} by user {}", branchId, currentUserId);
+
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
+        List<Long> userBranches = getUserAccessibleBranches(currentUserId);
+        if (!userBranches.contains(branchId)) {
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
+        }
+
+        List<StudentImportData> parsedData = excelParserService.parseStudentImport(file);
+
+        if (parsedData.isEmpty()) {
+            throw new CustomException(ErrorCode.EXCEL_FILE_EMPTY);
+        }
+
+        log.info("Parsed {} students from Excel", parsedData.size());
+
+        // 3. Resolve each student (FOUND/CREATE/ERROR)
+        resolveStudentsForImport(parsedData);
+
+        // 4. Calculate counts
+        int foundCount = (int) parsedData.stream()
+                .filter(d -> d.getStatus() == StudentImportData.StudentImportStatus.FOUND)
+                .count();
+        int createCount = (int) parsedData.stream()
+                .filter(d -> d.getStatus() == StudentImportData.StudentImportStatus.CREATE)
+                .count();
+        int errorCount = (int) parsedData.stream()
+                .filter(d -> d.getStatus() == StudentImportData.StudentImportStatus.ERROR)
+                .count();
+
+        log.info("Import preview: {} found, {} to create, {} errors", foundCount, createCount, errorCount);
+
+        // 5. Build warnings and errors
+        List<String> warnings = new java.util.ArrayList<>();
+        List<String> errors = new java.util.ArrayList<>();
+
+        if (foundCount > 0) {
+            warnings.add(String.format("%d học viên đã tồn tại trong hệ thống và sẽ bị bỏ qua", foundCount));
+        }
+        if (errorCount > 0) {
+            errors.add(String.format("%d học viên có lỗi dữ liệu", errorCount));
+        }
+
+        return StudentImportPreview.builder()
+                .branchId(branchId)
+                .branchName(branch.getName())
+                .students(parsedData)
+                .foundCount(foundCount)
+                .createCount(createCount)
+                .errorCount(errorCount)
+                .totalValid(foundCount + createCount)
+                .warnings(warnings)
+                .errors(errors)
+                .build();
+    }
+
+    @Transactional
+    public StudentImportResult executeStudentImport(StudentImportExecuteRequest request, Long currentUserId) {
+        log.info("Executing student import for branch {} by user {}", request.getBranchId(), currentUserId);
+
+        Branch branch = branchRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
+        List<Long> userBranches = getUserAccessibleBranches(currentUserId);
+        if (!userBranches.contains(request.getBranchId())) {
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
+        }
+
+        // Filter students to create (only CREATE status)
+        List<StudentImportData> studentsToCreate;
+        if (request.getSelectedIndices() != null && !request.getSelectedIndices().isEmpty()) {
+            // Only create selected students
+            studentsToCreate = new java.util.ArrayList<>();
+            for (Integer index : request.getSelectedIndices()) {
+                if (index >= 0 && index < request.getStudents().size()) {
+                    StudentImportData student = request.getStudents().get(index);
+                    if (student.getStatus() == StudentImportData.StudentImportStatus.CREATE) {
+                        studentsToCreate.add(student);
+                    }
+                }
+            }
+        } else {
+            // Create all CREATE status students
+            studentsToCreate = request.getStudents().stream()
+                    .filter(s -> s.getStatus() == StudentImportData.StudentImportStatus.CREATE)
+                    .collect(Collectors.toList());
+        }
+
+        if (studentsToCreate.isEmpty()) {
+            throw new CustomException(ErrorCode.NO_STUDENTS_TO_IMPORT);
+        }
+
+        log.info("Creating {} new students", studentsToCreate.size());
+
+        // Get default password from policy
+        String defaultPassword = policyService.getGlobalString("student.default_password", "12345678");
+
+        // Get STUDENT role
+        Role studentRole = roleRepository.findByCode("STUDENT")
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_ROLE_NOT_FOUND));
+
+        // Get current user for assignedBy
+        UserAccount assignedBy = userAccountRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // Create students
+        List<StudentImportResult.CreatedStudentInfo> createdStudents = new java.util.ArrayList<>();
+        int successCount = 0;
+        int failedCount = 0;
+
+        for (StudentImportData data : studentsToCreate) {
+            try {
+                // Double-check email uniqueness (in case of race condition)
+                if (userAccountRepository.findByEmail(data.getEmail()).isPresent()) {
+                    log.warn("Email {} already exists, skipping", data.getEmail());
+                    failedCount++;
+                    continue;
+                }
+
+                // Create UserAccount
+                UserAccount user = new UserAccount();
+                user.setEmail(data.getEmail());
+                user.setFullName(data.getFullName());
+                user.setPhone(data.getPhone());
+                user.setFacebookUrl(data.getFacebookUrl());
+                user.setAddress(data.getAddress());
+                user.setGender(data.getGender());
+                user.setDob(data.getDob());
+                user.setStatus(UserStatus.ACTIVE);
+                user.setPasswordHash(passwordEncoder.encode(defaultPassword));
+                UserAccount savedUser = userAccountRepository.save(user);
+
+                // Create Student
+                Student student = new Student();
+                student.setUserAccount(savedUser);
+                student.setStudentCode(generateStudentCode(request.getBranchId(), data.getFullName(), data.getEmail()));
+                Student savedStudent = studentRepository.save(student);
+
+                // Assign STUDENT role
+                UserRole.UserRoleId userRoleId = new UserRole.UserRoleId();
+                userRoleId.setUserId(savedUser.getId());
+                userRoleId.setRoleId(studentRole.getId());
+
+                UserRole userRole = new UserRole();
+                userRole.setId(userRoleId);
+                userRole.setUserAccount(savedUser);
+                userRole.setRole(studentRole);
+                userRoleRepository.save(userRole);
+
+                // Assign to branch
+                UserBranches.UserBranchesId userBranchId = new UserBranches.UserBranchesId();
+                userBranchId.setUserId(savedUser.getId());
+                userBranchId.setBranchId(request.getBranchId());
+
+                UserBranches userBranch = new UserBranches();
+                userBranch.setId(userBranchId);
+                userBranch.setUserAccount(savedUser);
+                userBranch.setBranch(branch);
+                userBranch.setAssignedBy(assignedBy);
+                userBranchesRepository.save(userBranch);
+
+                // Add to result
+                createdStudents.add(StudentImportResult.CreatedStudentInfo.builder()
+                        .studentId(savedStudent.getId())
+                        .studentCode(savedStudent.getStudentCode())
+                        .fullName(savedUser.getFullName())
+                        .email(savedUser.getEmail())
+                        .defaultPassword(defaultPassword)
+                        .build());
+
+                successCount++;
+                log.debug("Created student: {} ({})", savedStudent.getStudentCode(), data.getEmail());
+
+                // Send welcome email (async)
+                emailService.sendNewStudentCredentialsAsync(
+                        savedUser.getEmail(),
+                        savedUser.getFullName(),
+                        savedStudent.getStudentCode(),
+                        savedUser.getEmail(),
+                        defaultPassword,
+                        branch.getName()
+                );
+
+            } catch (Exception e) {
+                log.error("Failed to create student {}: {}", data.getEmail(), e.getMessage());
+                failedCount++;
+            }
+        }
+
+        log.info("Student import completed: {} created, {} failed", successCount, failedCount);
+
+        int skippedExisting = (int) request.getStudents().stream()
+                .filter(s -> s.getStatus() == StudentImportData.StudentImportStatus.FOUND)
+                .count();
+
+        return StudentImportResult.builder()
+                .branchId(request.getBranchId())
+                .branchName(branch.getName())
+                .totalAttempted(studentsToCreate.size())
+                .successfulCreations(successCount)
+                .skippedExisting(skippedExisting)
+                .failedCreations(failedCount)
+                .createdStudents(createdStudents)
+                .importedBy(currentUserId)
+                .importedAt(OffsetDateTime.now())
+                .build();
+    }
+
+    private void resolveStudentsForImport(List<StudentImportData> parsedData) {
+        java.util.Set<String> seenEmails = new java.util.HashSet<>();
+
+        for (StudentImportData data : parsedData) {
+            // Skip if already has error from parsing
+            if (data.getStatus() == StudentImportData.StudentImportStatus.ERROR) {
+                continue;
+            }
+
+            // Validate required fields
+            if (data.getEmail() == null || data.getEmail().isBlank()) {
+                data.setStatus(StudentImportData.StudentImportStatus.ERROR);
+                data.setErrorMessage("Email là bắt buộc");
+                continue;
+            }
+            if (data.getFullName() == null || data.getFullName().isBlank()) {
+                data.setStatus(StudentImportData.StudentImportStatus.ERROR);
+                data.setErrorMessage("Họ tên là bắt buộc");
+                continue;
+            }
+            if (data.getGender() == null) {
+                data.setStatus(StudentImportData.StudentImportStatus.ERROR);
+                data.setErrorMessage("Giới tính là bắt buộc");
+                continue;
+            }
+
+            // Validate email format
+            if (!isValidEmail(data.getEmail())) {
+                data.setStatus(StudentImportData.StudentImportStatus.ERROR);
+                data.setErrorMessage("Email không đúng định dạng");
+                continue;
+            }
+
+            // Check duplicate trong file Excel
+            String emailLower = data.getEmail().toLowerCase();
+            if (seenEmails.contains(emailLower)) {
+                data.setStatus(StudentImportData.StudentImportStatus.ERROR);
+                data.setErrorMessage("Email trùng lặp trong file Excel");
+                continue;
+            }
+            seenEmails.add(emailLower);
+
+            // Check if email already exists in system
+            Optional<UserAccount> existingUser = userAccountRepository.findByEmail(data.getEmail());
+            if (existingUser.isPresent()) {
+                Optional<Student> existingStudent = studentRepository.findByUserAccountId(existingUser.get().getId());
+                if (existingStudent.isPresent()) {
+                    data.setStatus(StudentImportData.StudentImportStatus.FOUND);
+                    data.setExistingStudentId(existingStudent.get().getId());
+                    data.setExistingStudentCode(existingStudent.get().getStudentCode());
+                    log.debug("Found existing student by email: {} -> {}", data.getEmail(), existingStudent.get().getStudentCode());
+                    continue;
+                }
+            }
+
+            data.setStatus(StudentImportData.StudentImportStatus.CREATE);
+            log.debug("Student will be created: {}", data.getEmail());
+        }
+    }
+
+    private boolean isValidEmail(String email) {
+        if (email == null || email.isBlank()) return false;
+        String emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
+        return email.matches(emailRegex);
     }
 
 }

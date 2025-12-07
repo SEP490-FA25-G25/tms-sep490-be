@@ -64,6 +64,14 @@ public class TimeSlotTemplateService {
         return timeSlots.stream().map(this::convertToDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public TimeSlotResponseDTO getTimeSlotById(Long id) {
+        log.info("Getting time slot by id: {}", id);
+        TimeSlotTemplate timeSlot = timeSlotTemplateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found with id: " + id));
+        return convertToDTO(timeSlot);
+    }
+
     // ==================== HELPER METHODS ====================
 
     private Long getBranchIdForUser(Long userId) {
