@@ -50,4 +50,15 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
         ORDER BY s.date DESC
         """, nativeQuery = true)
     List<Session> findByTimeSlotTemplateId(@Param("timeSlotId") Long timeSlotId);
+
+    @Query("""
+      SELECT s.classEntity.id, 
+             SUM(CASE WHEN s.status = 'DONE' THEN 1 ELSE 0 END),
+             COUNT(s)
+      FROM Session s
+      WHERE s.classEntity.id IN :classIds
+        AND s.status != org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED
+      GROUP BY s.classEntity.id
+      """)
+    List<Object[]> countSessionsByClassIds(@Param("classIds") List<Long> classIds);
 }
