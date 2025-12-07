@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -256,6 +257,23 @@ public class TimeSlotTemplateService {
                 .status(session.getStatus().toString())
                 .type(session.getType().toString())
                 .build();
+    }
+
+    // Lấy danh sách khung giờ cho dropdown
+    @Transactional(readOnly = true)
+    public List<TimeSlotTemplateDTO> getBranchTimeSlotTemplates(Long branchId) {
+        List<TimeSlotTemplate> timeSlots = timeSlotTemplateRepository.findByBranchIdOrderByStartTimeAsc(branchId);
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
+        return timeSlots.stream()
+                .map(ts -> TimeSlotTemplateDTO.builder()
+                        .id(ts.getId())
+                        .name(ts.getName())
+                        .startTime(ts.getStartTime().toString())
+                        .endTime(ts.getEndTime().toString())
+                        .displayName(ts.getStartTime().format(formatter) + " - " + ts.getEndTime().format(formatter))
+                        .build())
+                .collect(Collectors.toList());
     }
 
     // Lấy danh sách branchId của user
