@@ -233,6 +233,31 @@ public class TimeSlotTemplateService {
         return convertToDTO(saved);
     }
 
+    // Lấy danh sách sessions đang dùng khung giờ
+    @Transactional(readOnly = true)
+    public List<SessionInfoDTO> getSessionsByTimeSlotId(Long id) {
+        if (!timeSlotTemplateRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Time slot not found with id: " + id);
+        }
+        List<Session> sessions = sessionRepository.findByTimeSlotTemplateId(id);
+        return sessions.stream().map(this::convertSessionToDTO).collect(Collectors.toList());
+    }
+
+    // Helper: chuyển Session → DTO
+    private SessionInfoDTO convertSessionToDTO(Session session) {
+        return SessionInfoDTO.builder()
+                .id(session.getId())
+                .classId(session.getClassEntity().getId())
+                .classCode(session.getClassEntity().getCode())
+                .className(session.getClassEntity().getName())
+                .date(session.getDate().toString())
+                .startTime(session.getTimeSlotTemplate().getStartTime().toString())
+                .endTime(session.getTimeSlotTemplate().getEndTime().toString())
+                .status(session.getStatus().toString())
+                .type(session.getType().toString())
+                .build();
+    }
+
     // Lấy danh sách branchId của user
     private List<Long> getBranchIdsForUser(Long userId) {
         if (userId == null)

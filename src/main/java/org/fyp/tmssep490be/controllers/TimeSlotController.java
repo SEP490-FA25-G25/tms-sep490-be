@@ -102,4 +102,15 @@ public class TimeSlotController {
         return ResponseEntity.ok(saved);
     }
 
+    // Lấy sessions đang dùng khung giờ
+    @GetMapping("/time-slots/{id}/sessions")
+    @PreAuthorize("hasAnyRole('CENTER_HEAD', 'ACADEMIC_AFFAIR', 'MANAGER')")
+    @Operation(summary = "Get sessions using a time slot")
+    public ResponseEntity<List<SessionInfoDTO>> getSessionsByTimeSlotId(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        List<SessionInfoDTO> sessions = timeSlotTemplateService.getSessionsByTimeSlotId(id);
+        return ResponseEntity.ok(sessions);
+    }
+
 }
