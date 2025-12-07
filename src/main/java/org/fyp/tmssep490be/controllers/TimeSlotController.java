@@ -24,6 +24,7 @@ public class TimeSlotController {
 
     private final TimeSlotTemplateService timeSlotTemplateService;
 
+    // Lấy danh sách khung giờ
     @GetMapping("/time-slots")
     @PreAuthorize("hasAnyRole('CENTER_HEAD', 'ACADEMIC_AFFAIR', 'TEACHER', 'MANAGER')")
     @Operation(summary = "Get all time slots")
@@ -32,13 +33,8 @@ public class TimeSlotController {
             @RequestParam(required = false) String search,
             @AuthenticationPrincipal UserPrincipal currentUser) {
 
-        boolean isCenterHead = currentUser.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_CENTER_HEAD"));
-        boolean isTeacher = currentUser.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_TEACHER"));
-
         List<TimeSlotResponseDTO> timeSlots = timeSlotTemplateService.getAllTimeSlots(
-                branchId, search, currentUser.getId(), isCenterHead, isTeacher);
+                branchId, search, currentUser.getId());
         return ResponseEntity.ok(timeSlots);
     }
 
@@ -60,8 +56,8 @@ public class TimeSlotController {
     public ResponseEntity<TimeSlotResponseDTO> createTimeSlot(
             @RequestBody TimeSlotRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
-        Long forcedBranchId = null; // TODO: lấy từ branch của user
-        TimeSlotResponseDTO saved = timeSlotTemplateService.createTimeSlot(request, currentUser.getId(), forcedBranchId);
+
+        TimeSlotResponseDTO saved = timeSlotTemplateService.createTimeSlot(request, currentUser.getId(), null);
         return ResponseEntity.ok(saved);
     }
 
@@ -75,6 +71,17 @@ public class TimeSlotController {
             @AuthenticationPrincipal UserPrincipal currentUser) {
         TimeSlotResponseDTO saved = timeSlotTemplateService.updateTimeSlot(id, request, currentUser.getId());
         return ResponseEntity.ok(saved);
+    }
+
+    // Xóa khung giờ
+    @DeleteMapping("/time-slots/{id}")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Delete time slot")
+    public ResponseEntity<Void> deleteTimeSlot(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        timeSlotTemplateService.deleteTimeSlot(id);
+        return ResponseEntity.noContent().build();
     }
 
 }
