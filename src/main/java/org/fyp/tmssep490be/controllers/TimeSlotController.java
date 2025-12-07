@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import org.fyp.tmssep490be.entities.enums.ResourceStatus;
 import java.util.Map;
+import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import io.swagger.v3.oas.annotations.Parameter;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -111,6 +113,21 @@ public class TimeSlotController {
             @AuthenticationPrincipal UserPrincipal currentUser) {
         List<SessionInfoDTO> sessions = timeSlotTemplateService.getSessionsByTimeSlotId(id);
         return ResponseEntity.ok(sessions);
+    }
+
+    // Lấy khung giờ cho dropdown
+    @GetMapping("/branches/{branchId}/time-slot-templates")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(summary = "Get branch time slot templates for dropdown")
+    public ResponseEntity<ResponseObject<List<TimeSlotTemplateDTO>>> getBranchTimeSlotTemplates(
+            @Parameter(description = "Branch ID") @PathVariable Long branchId,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        List<TimeSlotTemplateDTO> timeSlotDTOs = timeSlotTemplateService.getBranchTimeSlotTemplates(branchId);
+        return ResponseEntity.ok(ResponseObject.<List<TimeSlotTemplateDTO>>builder()
+                .success(true)
+                .message("Time slot templates retrieved successfully")
+                .data(timeSlotDTOs)
+                .build());
     }
 
 }
