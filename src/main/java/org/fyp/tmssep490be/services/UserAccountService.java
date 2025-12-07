@@ -3,6 +3,7 @@ package org.fyp.tmssep490be.services;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.user.CreateUserRequest;
+import org.fyp.tmssep490be.dtos.user.UpdateUserRequest;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.dtos.user.UserResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -82,6 +83,81 @@ public class UserAccountService {
 
         // Chuyển entity -> response DTO và return
         return mapToResponse(user);
+
+    }
+
+    @Transactional
+    public UserResponse updateUser(Long userId, UpdateUserRequest request) {
+        log.info("Updating user with ID: {}", userId);
+
+        // Tìm user theo userId
+        UserAccount user = userAccountRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
+
+        // Cập nhật thông tin user
+        if (request.getFullName() != null) {
+            user.setFullName(request.getFullName());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getFacebookUrl() != null) {
+            user.setFacebookUrl(request.getFacebookUrl());
+        }
+        if (request.getDob() != null) {
+            user.setDob(request.getDob());
+        }
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress());
+        }
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
+        if (request.getStatus() != null) {
+            user.setStatus(request.getStatus());
+        }
+
+        // Lưu vào db
+        userAccountRepository.save(user);
+
+        // Cập nhật role
+        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+
+            // Xóa tất cả role cũ
+            userRoleRepository.deleteByUserAccount(user);
+
+            // Thêm role mới
+            for (Long roleId : request.getRoleIds()) {
+                Role role = roleRepository.findById(roleId).orElseThrow(() -> new IllegalArgumentException("Role không tồn tại: " + roleId));
+                UserRole userRole = new UserRole();
+                userRole.setUserAccount(user);
+                userRole.setRole(role);
+                userRoleRepository.save(userRole);
+            }
+        }
+
+        // Cập nhật branch
+        if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
+
+            // Xóa tất cả branch cũ
+            userBranchesRepository.deleteByUserAccount(user);
+
+            // Thêm branch mới
+            for (Long branchId : request.getBranchIds()) {
+                Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new IllegalArgumentException("Branch không tồn tại: " + branchId));
+                UserBranches userBranch = new UserBranches();
+                userBranch.setUserAccount(user);
+                userBranch.setBranch(branch);
+                userBranchesRepository.save(userBranch);
+            }
+        }
+
+        log.info("User updated successfully with ID: {}", user.getId());
+
+        return mapToResponse(user);
+
 
     }
 

@@ -4,12 +4,10 @@ package org.fyp.tmssep490be.controllers;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.fyp.tmssep490be.dtos.user.CreateUserRequest;
+import org.fyp.tmssep490be.dtos.user.UpdateUserRequest;
 import org.fyp.tmssep490be.dtos.user.UserResponse;
 import org.fyp.tmssep490be.services.UserAccountService;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,6 +24,13 @@ public class UserAccountController {
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
         UserResponse userResponse = userAccountService.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(userResponse);
+    }
+
+    @PutMapping("/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserResponse> updateUser(@PathVariable Long userId, @Valid @RequestBody UpdateUserRequest request) {
+        UserResponse userResponse = userAccountService.updateUser(userId, request);
+        return ResponseEntity.ok(userResponse);
     }
 
 

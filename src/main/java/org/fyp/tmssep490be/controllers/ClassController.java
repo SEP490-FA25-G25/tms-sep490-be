@@ -30,22 +30,22 @@ public class ClassController {
     private final ClassService classService;
 
     //Endpoint để lấy thông tin lớp học theo ID(cho TEACHER, STUDENT, ACADEMIC_AFFAIR, etc.)
-    @GetMapping("/{classId}")
-    @PreAuthorize("hasRole('TEACHER') or hasRole('STUDENT') or hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER')")
-    public ResponseEntity<ResponseObject<ClassDetailDTO>> getClassDetail(
-            @PathVariable Long classId,
-            @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        
-        // Lấy thông tin chi tiết lớp học từ service
-        ClassDetailDTO classDetail = classService.getClassDetail(classId);
-
-        return ResponseEntity.ok(
-                ResponseObject.<ClassDetailDTO>builder()
-                        .success(true)
-                        .message("Class details retrieved successfully")
-                        .data(classDetail)
-                        .build());
-    }
+//   @GetMapping("/{classId}")
+//   @PreAuthorize("hasRole('TEACHER') or hasRole('STUDENT') or hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER')")
+//   public ResponseEntity<ResponseObject<ClassDetailDTO>> getClassDetail(
+//           @PathVariable Long classId,
+//           @AuthenticationPrincipal UserPrincipal userPrincipal) {
+//
+//       // Lấy thông tin chi tiết lớp học từ service
+//       ClassDetailDTO classDetail = classService.getClassDetail(classId);
+//
+//        return ResponseEntity.ok(
+//               ResponseObject.<ClassDetailDTO>builder()
+//                       .success(true)
+//                       .message("Class details retrieved successfully")
+//                       .data(classDetail)
+//                       .build());
+//   }
 
     @GetMapping
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('TEACHER') or hasRole('MANAGER')")

@@ -1,5 +1,6 @@
 package org.fyp.tmssep490be.repositories;
 
+import org.fyp.tmssep490be.entities.UserAccount;
 import org.fyp.tmssep490be.entities.UserBranches;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -14,4 +15,5 @@ public interface UserBranchesRepository extends JpaRepository<UserBranches, User
     @Query("SELECT ub.branch.id FROM UserBranches ub WHERE ub.id.userId = :userId")
     List<Long> findBranchIdsByUserId(@Param("userId") Long userId);
 
+    void deleteByUserAccount(UserAccount userAccount);
 }
