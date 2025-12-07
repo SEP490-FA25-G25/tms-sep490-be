@@ -13,7 +13,7 @@ public class TeacherContextHelper {
 
     private final TeacherRepository teacherRepository;
 
-    //Extract teacher ID from authenticated user principal
+    //Lấy ID giáo viên từ JWT token
     public Long getTeacherId(UserPrincipal principal) {
         return teacherRepository.findByUserAccountId(principal.getId())
                 .map(teacher -> teacher.getId())
