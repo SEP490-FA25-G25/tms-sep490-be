@@ -1,6 +1,7 @@
 package org.fyp.tmssep490be.repositories;
 
 import org.fyp.tmssep490be.entities.TeachingSlot;
+import org.fyp.tmssep490be.entities.enums.TeachingSlotStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,4 +25,8 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
         """)
     List<org.fyp.tmssep490be.entities.ClassEntity> findDistinctClassesByTeacherId(
         @Param("teacherId") Long teacherId);
+
+    @Query("SELECT ts FROM TeachingSlot ts WHERE ts.session.classEntity.id = :classId AND ts.status = :status")
+    List<TeachingSlot> findByClassEntityIdAndStatus(@Param("classId") Long classId,
+                                                    @Param("status") TeachingSlotStatus status);
 }

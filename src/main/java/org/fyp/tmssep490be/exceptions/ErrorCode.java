@@ -60,6 +60,7 @@ public enum ErrorCode {
 
     // Class errors (4000-4099)
     CLASS_NOT_FOUND(4000, "Không tìm thấy lớp học"),
+    CLASS_NO_BRANCH_ACCESS(4004, "Người dùng không có quyền truy cập vào bất kỳ chi nhánh nào"),
 
     // Create Class Workflow errors (4010-4099)
 
