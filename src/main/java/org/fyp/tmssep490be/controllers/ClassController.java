@@ -27,18 +27,18 @@ public class ClassController {
         this.classRepository = classRepository;
     }
 
-    //Endpoint to get class details by ID (for TEACHER, STUDENT, ACADEMIC_AFFAIR, etc.)
+    //Endpoint để lấy thông tin lớp học theo ID(cho TEACHER, STUDENT, ACADEMIC_AFFAIR, etc.)
     @GetMapping("/{classId}")
     @PreAuthorize("hasRole('TEACHER') or hasRole('STUDENT') or hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER')")
     public ResponseEntity<ResponseObject<Map<String, Object>>> getClassDetail(
             @PathVariable Long classId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         
-        // Find class by ID
+        // Tìm lớp học theo ID
         ClassEntity classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND, "Class not found"));
 
-        // Build response map
+        // Xây dựng map response
         Map<String, Object> classDetail = new HashMap<>();
         classDetail.put("id", classEntity.getId());
         classDetail.put("code", classEntity.getCode());
@@ -52,7 +52,7 @@ public class ClassController {
         classDetail.put("scheduleDays", classEntity.getScheduleDays() != null ? 
             java.util.Arrays.asList(classEntity.getScheduleDays()) : java.util.Collections.emptyList());
         
-        // Add subject (course) information
+        // Thêm thông tin môn học
         if (classEntity.getSubject() != null) {
             Map<String, Object> course = new HashMap<>();
             course.put("id", classEntity.getSubject().getId());
@@ -61,7 +61,7 @@ public class ClassController {
             classDetail.put("course", course);
         }
         
-        // Add branch information
+        // Thêm thông tin chi nhánh
         if (classEntity.getBranch() != null) {
             Map<String, Object> branch = new HashMap<>();
             branch.put("id", classEntity.getBranch().getId());
@@ -71,7 +71,7 @@ public class ClassController {
             classDetail.put("branch", branch);
         }
         
-        // TODO: Add teachers, enrollment summary, upcoming sessions, etc.
+        // TODO: Thêm thông tin giáo viên, tóm tắt đăng ký, các buổi học sắp tới, etc.
         classDetail.put("teachers", java.util.Collections.emptyList());
         Map<String, Object> enrollmentSummary = new HashMap<>();
         enrollmentSummary.put("currentEnrolled", 0);

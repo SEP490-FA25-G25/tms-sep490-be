@@ -33,19 +33,19 @@ public class TeacherController {
         this.teacherContextHelper = teacherContextHelper;
     }
 
-    //Endpoint to get all classes that the teacher is assigned
+    //Endpoint để lấy tất cả lớp học mà giáo viên được phân công
     @GetMapping("/classes")
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ResponseObject<List<TeacherClassListItemDTO>>> getTeacherClasses(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         
-        // Extract teacher ID from JWT token
+        // Lấy ID giáo viên từ JWT token
         Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
         
-        // Get classes assigned to teacher by teacherId
+        // Lấy lớp học được phân công cho giáo viên theo teacherId
         List<TeacherClassListItemDTO> classes = teacherClassService.getTeacherClasses(teacherId);
         
-        // Return response
+        // Trả về response
         return ResponseEntity.ok(
                 ResponseObject.<List<TeacherClassListItemDTO>>builder()
                         .success(true)
@@ -54,7 +54,7 @@ public class TeacherController {
                         .build());
     }
 
-    //Endpoint to retrieve a paginated list of students enrolled in a specific class
+    //Endpoint để lấy danh sách sinh viên đăng ký lớp học theo ID lớp học
     @GetMapping("/classes/{classId}/students")
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ResponseObject<Page<ClassStudentDTO>>> getClassStudents(
@@ -66,11 +66,11 @@ public class TeacherController {
             @RequestParam(defaultValue = "desc") String sortDir,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-        // Create pageable with sort
+        // Tạo pageable với sort
         Sort.Direction direction = sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sort));
 
-        // Get students enrolled in the class
+        // Lấy sinh viên đăng ký lớp học theo ID lớp học
         Page<ClassStudentDTO> students = teacherClassService.getClassStudents(classId, search, pageable);
 
         return ResponseEntity.ok(

@@ -14,7 +14,7 @@ import java.util.List;
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
-    //Find enrolled students for a class with search and pagination
+    //Tìm kiếm sinh viên đăng ký lớp học theo ID lớp học với tìm kiếm và phân trang
     @Query("""
         SELECT e FROM Enrollment e
         INNER JOIN FETCH e.student s
@@ -36,7 +36,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
             Pageable pageable
     );
 
-    //Find all enrollments for a class with specific status
+    //Tìm kiếm tất cả đăng ký lớp học theo ID lớp học và trạng thái
     List<Enrollment> findByClassIdAndStatus(Long classId, EnrollmentStatus status);
 }
 

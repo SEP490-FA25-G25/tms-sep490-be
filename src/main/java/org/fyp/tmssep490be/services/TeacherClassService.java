@@ -30,46 +30,46 @@ public class TeacherClassService {
     private final EnrollmentRepository enrollmentRepository;
     private final ClassRepository classRepository;
 
-    //Get all classes assigned to a specific teacher
+    //Lấy tất cả lớp học được phân công cho giáo viên theo teacherId
     public List<TeacherClassListItemDTO> getTeacherClasses(Long teacherId) {
         // Query distinct classes where teacher has teaching slots with SCHEDULED status
         List<ClassEntity> classes = teachingSlotRepository.findDistinctClassesByTeacherId(teacherId);
         
-        // Convert Entity to DTO for response
+        // Chuyển đổi Entity sang DTO để trả về
         return classes.stream()
                 .map(this::mapToTeacherClassListItemDTO)
                 .collect(Collectors.toList());
     }
     
-    //Map ClassEntity to TeacherClassListItemDTO
+    //Chuyển đổi ClassEntity sang TeacherClassListItemDTO
     private TeacherClassListItemDTO mapToTeacherClassListItemDTO(ClassEntity classEntity) {
         return TeacherClassListItemDTO.builder()
                 .id(classEntity.getId())
                 .code(classEntity.getCode())
                 .name(classEntity.getName())
-                // Map subject information (subject is equivalent to course in this system)
+                // Chuyển đổi thông tin môn học
                 .courseName(classEntity.getSubject() != null ? classEntity.getSubject().getName() : null)
                 .courseCode(classEntity.getSubject() != null ? classEntity.getSubject().getCode() : null)
-                // Map branch information
+                // Chuyển đổi thông tin chi nhánh
                 .branchName(classEntity.getBranch() != null ? classEntity.getBranch().getName() : null)
                 .branchCode(classEntity.getBranch() != null ? classEntity.getBranch().getCode() : null)
-                // Map schedule and status information
+                // Chuyển đổi thông tin lịch học và trạng thái
                 .modality(classEntity.getModality())
                 .startDate(classEntity.getStartDate())
                 .plannedEndDate(classEntity.getPlannedEndDate())
                 .status(classEntity.getStatus())
-                //Calculate total sessions from SessionRepository
+                //Tính toán tổng số buổi học từ SessionRepository
                 .totalSessions(null)
                 .attendanceRate(null)
                 .build();
     }
 
-    //Map Enrollment entity to ClassStudentDTO
+    //Chuyển đổi Enrollment entity sang ClassStudentDTO
     private ClassStudentDTO convertToClassStudentDTO(Enrollment enrollment) {
         Student student = enrollment.getStudent();
         UserAccount userAccount = student.getUserAccount();
 
-        // Get student's branch name
+        // Lấy tên chi nhánh của sinh viên
         String branchName = null;
         if (userAccount.getUserBranches() != null && !userAccount.getUserBranches().isEmpty()) {
             branchName = userAccount.getUserBranches().iterator().next().getBranch().getName();
@@ -95,18 +95,18 @@ public class TeacherClassService {
                 .build();
     }
 
-    //Get paginated list of students enrolled in a class
+    //Lấy danh sách sinh viên đăng ký lớp học theo ID lớp học
     public Page<ClassStudentDTO> getClassStudents(Long classId, String search, Pageable pageable) {
         log.debug("Getting students for class {} with search: {}", classId, search);
 
-        // Validate class existence
+        // Kiểm tra xem lớp học có tồn tại
         classRepository.findById(classId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND, "Class not found"));
 
-        // Prepare search parameter (null if empty)
+        // Chuẩn bị tham số tìm kiếm (null nếu rỗng)
         String searchPattern = (search != null && !search.isBlank()) ? search : null;
 
-        // Get enrolled students
+        // Lấy danh sách sinh viên đăng ký lớp học theo ID lớp học
         Page<Enrollment> enrollments = enrollmentRepository.findEnrolledStudentsByClass(
                 classId, EnrollmentStatus.ENROLLED, searchPattern, pageable);
 

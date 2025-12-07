@@ -11,7 +11,7 @@ import java.util.List;
 @Repository
 public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, TeachingSlot.TeachingSlotId> {
 
-    //Find all classes assigned to teacher
+    //Tìm kiếm tất cả lớp học được phân công cho giáo viên theo teacherId
     @Query("""
         SELECT DISTINCT c FROM TeachingSlot ts
         JOIN ts.session s

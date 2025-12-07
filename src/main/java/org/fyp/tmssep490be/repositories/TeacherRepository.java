@@ -9,6 +9,6 @@ import java.util.Optional;
 @Repository
 public interface TeacherRepository extends JpaRepository<Teacher, Long> {
 
-    //Find teacher by user account ID
+    //Tìm kiếm giáo viên theo ID
     Optional<Teacher> findByUserAccountId(Long userAccountId);
 }
