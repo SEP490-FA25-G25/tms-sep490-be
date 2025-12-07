@@ -3,11 +3,8 @@ package org.fyp.tmssep490be.entities;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
-import org.fyp.tmssep490be.entities.enums.Skill;
 
 @Entity
 @Table(name = "subject_session", uniqueConstraints = {
@@ -39,7 +36,7 @@ public class SubjectSession {
     private String studentTask;
 
     @Column(name = "skill", nullable = false, columnDefinition = "TEXT")
-    private List<Skill> skills = new ArrayList<>();
+    private String skills; // JSON string: ["READING", "VOCABULARY"]
 
     @OneToMany(mappedBy = "subjectSession", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

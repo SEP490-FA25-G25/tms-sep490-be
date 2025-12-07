@@ -25,8 +25,7 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
 
     @Query("SELECT sr FROM StudentRequest sr " +
            "WHERE sr.status = :status " +
-           "AND sr.currentClass.branch.id IN :branchIds " +
-           "ORDER BY sr.submittedAt ASC")
+           "AND sr.currentClass.branch.id IN :branchIds")
     Page<StudentRequest> findPendingRequestsByBranches(
             @Param("status") RequestStatus status,
             @Param("branchIds") List<Long> branchIds,
@@ -34,8 +33,7 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
 
 
     @Query("SELECT sr FROM StudentRequest sr " +
-           "WHERE sr.currentClass.branch.id IN :branchIds " +
-           "ORDER BY sr.submittedAt DESC")
+           "WHERE sr.currentClass.branch.id IN :branchIds")
     Page<StudentRequest> findAllRequestsByBranches(
             @Param("branchIds") List<Long> branchIds,
             Pageable pageable);
@@ -43,8 +41,7 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
 
     @Query("SELECT sr FROM StudentRequest sr " +
            "WHERE sr.currentClass.branch.id IN :branchIds " +
-           "AND sr.decidedBy.id = :decidedBy " +
-           "ORDER BY sr.submittedAt DESC")
+           "AND sr.decidedBy.id = :decidedBy")
     Page<StudentRequest> findAllRequestsByBranchesAndDecidedBy(
             @Param("branchIds") List<Long> branchIds,
             @Param("decidedBy") Long decidedBy,
@@ -67,7 +64,7 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
             @Param("branchIds") List<Long> branchIds);
 
     // Find pending requests for AA review - simplified query
-    @Query("SELECT sr FROM StudentRequest sr WHERE sr.status = :status ORDER BY sr.submittedAt ASC")
+    @Query("SELECT sr FROM StudentRequest sr WHERE sr.status = :status")
     Page<StudentRequest> findPendingRequestsForAA(@Param("status") RequestStatus status, Pageable pageable);
 
     // Find all requests by status
