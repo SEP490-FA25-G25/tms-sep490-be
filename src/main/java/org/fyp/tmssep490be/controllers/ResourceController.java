@@ -52,4 +52,16 @@ public class ResourceController {
         ResourceDTO resource = resourceService.getResourceById(id);
         return ResponseEntity.ok(resource);
     }
+
+    // POST /resources - Tạo mới
+    @PostMapping("/resources")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Create new resource")
+    public ResponseEntity<ResourceDTO> createResource(
+            @RequestBody ResourceRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        ResourceDTO saved = resourceService.createResource(request, currentUser.getId());
+        return ResponseEntity.ok(saved);
+    }
 }

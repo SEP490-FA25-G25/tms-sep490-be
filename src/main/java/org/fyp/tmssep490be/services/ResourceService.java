@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.resource.*;
 import org.fyp.tmssep490be.entities.*;
+import org.fyp.tmssep490be.entities.enums.ResourceStatus;
 import org.fyp.tmssep490be.entities.enums.ResourceType;
 import org.fyp.tmssep490be.exceptions.*;
 import org.fyp.tmssep490be.repositories.*;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -80,6 +82,179 @@ public class ResourceService {
         Resource resource = resourceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found with id: " + id));
         return convertToDTO(resource);
+    }
+
+    // Tạo resource mới
+    @Transactional
+    public ResourceDTO createResource(ResourceRequestDTO request, Long userId) {
+        log.info("Creating resource: {}", request);
+
+        // 1. Validate request cơ bản
+        validateCreateRequest(request);
+
+        // 2. Lấy branchId và validate quyền
+        Long branchId = request.getBranchId();
+        List<Long> userBranches = getBranchIdsForUser(userId);
+        if (!userBranches.contains(branchId)) {
+            throw new BusinessRuleException("ACCESS_DENIED", "Không có quyền truy cập chi nhánh này");
+        }
+
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found with id: " + branchId));
+
+        // 3. Tạo full code với prefix branch
+        String code = request.getCode().trim();
+        String branchCode = branch.getCode();
+        String fullCode = code.startsWith(branchCode + "-") ? code : branchCode + "-" + code;
+
+        // 4. Kiểm tra trùng code
+        if (resourceRepository.existsByBranchIdAndCodeIgnoreCase(branchId, fullCode)) {
+            throw new BusinessRuleException("Mã tài nguyên '" + fullCode + "' đã tồn tại trong chi nhánh này");
+        }
+
+        // 5. Kiểm tra trùng tên
+        if (resourceRepository.existsByBranchIdAndNameIgnoreCase(branchId, request.getName().trim())) {
+            throw new BusinessRuleException("Tên tài nguyên '" + request.getName() + "' đã tồn tại trong chi nhánh này");
+        }
+
+        // 6. Validate type-specific fields
+        validateResourceTypeFields(request);
+
+        // 7. Tạo entity
+        Resource resource = new Resource();
+        resource.setBranch(branch);
+        resource.setCode(fullCode);
+        resource.setStatus(ResourceStatus.ACTIVE);
+        resource.setCreatedAt(OffsetDateTime.now());
+        resource.setUpdatedAt(OffsetDateTime.now());
+
+        updateResourceFromRequest(resource, request, userId);
+
+        Resource saved = resourceRepository.save(resource);
+        log.info("Created resource with ID: {}", saved.getId());
+        return convertToDTO(saved);
+    }
+
+    // ==================== VALIDATION METHODS ====================
+
+    private void validateCreateRequest(ResourceRequestDTO request) {
+        if (request.getCode() == null || request.getCode().trim().isEmpty()) {
+            throw new BusinessRuleException("Mã tài nguyên là bắt buộc");
+        }
+        if (request.getName() == null || request.getName().trim().isEmpty()) {
+            throw new BusinessRuleException("Tên tài nguyên là bắt buộc");
+        }
+        if (request.getResourceType() == null || request.getResourceType().trim().isEmpty()) {
+            throw new BusinessRuleException("Loại tài nguyên là bắt buộc");
+        }
+        if (request.getDescription() != null && !request.getDescription().trim().isEmpty()
+                && request.getDescription().trim().length() < 10) {
+            throw new BusinessRuleException("Mô tả phải có ít nhất 10 ký tự hoặc để trống");
+        }
+        validateCapacity(request, "VIRTUAL".equals(request.getResourceType()));
+    }
+
+    private void validateCapacity(ResourceRequestDTO request, boolean isVirtual) {
+        if (request.getCapacity() != null) {
+            int maxCapacity = isVirtual ? 100 : 40;
+            if (request.getCapacity() <= 0) {
+                throw new BusinessRuleException("Sức chứa phải là số dương lớn hơn 0");
+            }
+            if (request.getCapacity() > maxCapacity) {
+                if (isVirtual) {
+                    throw new BusinessRuleException("Sức chứa của phòng ảo (Zoom) tối đa là 100 người");
+                } else {
+                    throw new BusinessRuleException("Sức chứa của phòng học tối đa là 40 người");
+                }
+            }
+        }
+    }
+
+    private void validateResourceTypeFields(ResourceRequestDTO request) {
+        if ("VIRTUAL".equals(request.getResourceType())) {
+            boolean hasMeetingUrl = request.getMeetingUrl() != null && !request.getMeetingUrl().trim().isEmpty();
+            boolean hasAccountEmail = request.getAccountEmail() != null && !request.getAccountEmail().trim().isEmpty();
+
+            if (!hasMeetingUrl && !hasAccountEmail) {
+                throw new BusinessRuleException("Tài nguyên ảo cần có Meeting URL hoặc Account Email");
+            }
+
+            if (hasMeetingUrl && !request.getMeetingUrl().matches("^https?://.*")) {
+                throw new BusinessRuleException("Meeting URL phải bắt đầu bằng http:// hoặc https://");
+            }
+
+            if (hasAccountEmail && !request.getAccountEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+                throw new BusinessRuleException("Account Email không đúng định dạng email");
+            }
+
+            validateExpiryDate(request.getExpiryDate());
+        }
+    }
+
+    private void validateExpiryDate(String expiryDateStr) {
+        if (expiryDateStr != null && !expiryDateStr.trim().isEmpty()) {
+            try {
+                LocalDate expiryDate = LocalDate.parse(expiryDateStr);
+                if (expiryDate.isBefore(LocalDate.now())) {
+                    throw new BusinessRuleException("Ngày hết hạn phải là ngày trong tương lai");
+                }
+            } catch (DateTimeParseException e) {
+                throw new BusinessRuleException("Ngày hết hạn không đúng định dạng (YYYY-MM-DD)");
+            }
+        }
+    }
+
+    private void updateResourceFromRequest(Resource resource, ResourceRequestDTO request, Long userId) {
+        if (request.getResourceType() != null) {
+            resource.setResourceType(ResourceType.valueOf(request.getResourceType()));
+        }
+        if (request.getName() != null) {
+            resource.setName(request.getName().trim());
+        }
+        if (request.getDescription() != null) {
+            resource.setDescription(request.getDescription().trim());
+        }
+        if (request.getCapacity() != null) {
+            resource.setCapacity(request.getCapacity());
+        }
+        if (request.getCapacityOverride() != null) {
+            resource.setCapacityOverride(request.getCapacityOverride());
+        }
+        if (request.getEquipment() != null) {
+            resource.setEquipment(request.getEquipment());
+        }
+        if (request.getMeetingUrl() != null) {
+            resource.setMeetingUrl(request.getMeetingUrl());
+        }
+        if (request.getMeetingId() != null) {
+            resource.setMeetingId(request.getMeetingId());
+        }
+        if (request.getMeetingPasscode() != null) {
+            resource.setMeetingPasscode(request.getMeetingPasscode());
+        }
+        if (request.getAccountEmail() != null) {
+            resource.setAccountEmail(request.getAccountEmail());
+        }
+        if (request.getAccountPassword() != null) {
+            resource.setAccountPassword(request.getAccountPassword());
+        }
+        if (request.getLicenseType() != null) {
+            resource.setLicenseType(request.getLicenseType());
+        }
+        if (request.getStartDate() != null) {
+            resource.setStartDate(request.getStartDate().isEmpty() ? null : LocalDate.parse(request.getStartDate()));
+        }
+        if (request.getExpiryDate() != null) {
+            resource.setExpiryDate(request.getExpiryDate().isEmpty() ? null : LocalDate.parse(request.getExpiryDate()));
+        }
+        if (request.getRenewalDate() != null) {
+            resource.setRenewalDate(request.getRenewalDate().isEmpty() ? null : LocalDate.parse(request.getRenewalDate()));
+        }
+
+        if (resource.getCreatedBy() == null && userId != null) {
+            UserAccount user = userAccountRepository.findById(userId).orElse(null);
+            resource.setCreatedBy(user);
+        }
     }
 
     // ==================== HELPER METHODS ====================
