@@ -39,7 +39,7 @@ public class ClassController {
     public ResponseEntity<ResponseObject<ClassDetailDTO>> getClassDetail(
             @PathVariable Long classId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        
+
         log.info("User {} requesting details for class {}", userPrincipal.getId(), classId);
 
         ClassDetailDTO classDetail = classService.getClassDetail(classId, userPrincipal.getId());
@@ -55,13 +55,13 @@ public class ClassController {
     @GetMapping
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('TEACHER') or hasRole('MANAGER')")
     public ResponseEntity<ResponseObject<Page<ClassListItemDTO>>> getClasses(
-           @RequestParam(required = false) List<Long> branchIds,
+            @RequestParam(required = false) List<Long> branchIds,
             @RequestParam(required = false) Long courseId,
             @RequestParam(required = false) ClassStatus status,
             @RequestParam(required = false) ApprovalStatus approvalStatus,
             @RequestParam(required = false) Modality modality,
-           @RequestParam(required = false) String search,
-           @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "startDate") String sort,
             @RequestParam(defaultValue = "asc") String sortDir,
@@ -91,9 +91,9 @@ public class ClassController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal UserPrincipal currentUser) {
-        
-        log.info("User {} requesting available students for class {} with search: {}", 
-                 currentUser.getId(), classId, search);
+
+        log.info("User {} requesting available students for class {} with search: {}",
+                currentUser.getId(), classId, search);
 
         Pageable pageable = PageRequest.of(page, size);
         Page<AvailableStudentDTO> availableStudents = classService.getAvailableStudentsForClass(
@@ -111,7 +111,7 @@ public class ClassController {
     public ResponseEntity<ResponseObject<QASessionListResponse>> getSessionsWithMetrics(
             @PathVariable Long classId,
             @AuthenticationPrincipal UserPrincipal currentUser) {
-        
+
         log.info("User {} requesting sessions with metrics for class {}", currentUser.getId(), classId);
 
         QASessionListResponse response = classService.getSessionsWithMetrics(classId, currentUser.getId());
