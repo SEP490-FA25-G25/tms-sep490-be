@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,34 +25,35 @@ public class TimeSlotTemplateService {
     private final SessionRepository sessionRepository;
     private final TeacherAvailabilityRepository teacherAvailabilityRepository;
 
+    // Lấy danh sách khung giờ
     @Transactional(readOnly = true)
-    public List<TimeSlotResponseDTO> getAllTimeSlots(Long branchId, String search, Long userId, boolean isCenterHead, boolean isTeacher) {
+    public List<TimeSlotResponseDTO> getAllTimeSlots(Long branchId, String search, Long userId) {
         log.info("Getting all time slots - branchId: {}, search: {}, userId: {}", branchId, search, userId);
 
-        List<TimeSlotTemplate> timeSlots = timeSlotTemplateRepository.findAll();
-
-        if (isCenterHead) {
-            Long userBranchId = getBranchIdForUser(userId);
-            if (userBranchId != null) {
-                branchId = userBranchId;
-            }
+        // 1. Lấy tất cả branches user có quyền
+        List<Long> userBranches = getBranchIdsForUser(userId);
+        if (userBranches.isEmpty()) {
+            log.warn("User {} has no branch access", userId);
+            return List.of();
         }
 
-        if (isTeacher) {
-            List<Long> userBranchIds = getBranchIdsForUser(userId);
-            if (!userBranchIds.isEmpty()) {
-                timeSlots = timeSlots.stream()
-                        .filter(ts -> userBranchIds.contains(ts.getBranch().getId()))
-                        .collect(Collectors.toList());
-            }
+        // 2. Nếu client gửi branchId → validate quyền truy cập
+        if (branchId != null && !userBranches.contains(branchId)) {
+            throw new BusinessRuleException("ACCESS_DENIED", "Không có quyền truy cập chi nhánh này");
         }
 
+        // 3. Query theo branchId (hoặc tất cả branches của user)
+        List<TimeSlotTemplate> timeSlots;
         if (branchId != null) {
-            Long finalBranchId = branchId;
-            timeSlots = timeSlots.stream()
-                    .filter(ts -> ts.getBranch().getId().equals(finalBranchId))
+            timeSlots = timeSlotTemplateRepository.findByBranchIdOrderByStartTimeAsc(branchId);
+        } else {
+            // Nếu không có branchId → lấy từ tất cả branches user có quyền
+            timeSlots = timeSlotTemplateRepository.findAll().stream()
+                    .filter(ts -> userBranches.contains(ts.getBranch().getId()))
                     .collect(Collectors.toList());
         }
+
+        // 4. Filter by search
         if (search != null && !search.trim().isEmpty()) {
             String searchLower = search.toLowerCase().trim();
             timeSlots = timeSlots.stream()
@@ -79,8 +79,11 @@ public class TimeSlotTemplateService {
 
         // 1. Xác định branchId
         Long branchId = forcedBranchId != null ? forcedBranchId : request.getBranchId();
-        if (branchId == null) {
-            throw new BusinessRuleException("Vui lòng chọn chi nhánh");
+
+        // 2. ⚠️ VALIDATE QUYỀN TRUY CẬP (CẦN THÊM!)
+        List<Long> userBranches = getBranchIdsForUser(userId);
+        if (!userBranches.contains(branchId)) {
+            throw new BusinessRuleException("ACCESS_DENIED", "Bạn không có quyền truy cập chi nhánh này");
         }
 
         // 2. Lấy branch entity
@@ -130,19 +133,135 @@ public class TimeSlotTemplateService {
         return convertToDTO(saved);
     }
 
-    // ==================== HELPER METHODS ====================
+    // Cập nhật khung giờ
+    @Transactional
+    public TimeSlotResponseDTO updateTimeSlot(Long id, TimeSlotRequestDTO request, Long userId) {
+        log.info("Updating time slot {}: {}", id, request);
 
-    private Long getBranchIdForUser(Long userId) {
-        if (userId == null) return null;
-        UserAccount user = userAccountRepository.findById(userId).orElse(null);
-        if (user != null && !user.getUserBranches().isEmpty()) {
-            return user.getUserBranches().iterator().next().getBranch().getId();
+        TimeSlotTemplate timeSlot = timeSlotTemplateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found with id: " + id));
+
+        Long branchId = timeSlot.getBranch().getId();
+
+        if (request.getName() != null) {
+            String newName = request.getName().trim();
+            if (!newName.equalsIgnoreCase(timeSlot.getName())) {
+                if (timeSlotTemplateRepository.existsByBranchIdAndNameIgnoreCase(branchId, newName, id)) {
+                    throw new BusinessRuleException("Tên khung giờ đã tồn tại");
+                }
+            }
+            timeSlot.setName(newName);
         }
-        return null;
+
+        if (request.getStartTime() != null || request.getEndTime() != null) {
+            LocalTime newStartTime = request.getStartTime() != null
+                    ? LocalTime.parse(request.getStartTime())
+                    : timeSlot.getStartTime();
+            LocalTime newEndTime = request.getEndTime() != null
+                    ? LocalTime.parse(request.getEndTime())
+                    : timeSlot.getEndTime();
+
+            if (!newEndTime.isAfter(newStartTime)) {
+                throw new BusinessRuleException("Giờ kết thúc phải lớn hơn giờ bắt đầu");
+            }
+
+            boolean isTimeChanged = !newStartTime.equals(timeSlot.getStartTime())
+                    || !newEndTime.equals(timeSlot.getEndTime());
+            if (isTimeChanged) {
+                if (sessionRepository.existsByTimeSlotTemplateId(id)) {
+                    throw new BusinessRuleException("Không thể thay đổi thời gian vì đang được sử dụng");
+                }
+                if (timeSlotTemplateRepository.existsByBranchIdAndStartTimeAndEndTime(branchId, newStartTime,
+                        newEndTime, id)) {
+                    throw new BusinessRuleException("Khung giờ này đã tồn tại");
+                }
+                timeSlot.setStartTime(newStartTime);
+                timeSlot.setEndTime(newEndTime);
+            }
+        }
+
+        timeSlot.setUpdatedAt(OffsetDateTime.now());
+        TimeSlotTemplate saved = timeSlotTemplateRepository.save(timeSlot);
+        return convertToDTO(saved);
     }
 
+    // Xóa khung giờ
+    @Transactional
+    public void deleteTimeSlot(Long id) {
+        log.info("Deleting time slot {}", id);
+
+        TimeSlotTemplate timeSlot = timeSlotTemplateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found with id: " + id));
+
+        // Phải ngưng hoạt động trước khi xóa
+        if (timeSlot.getStatus() != ResourceStatus.INACTIVE) {
+            throw new BusinessRuleException("Vui lòng ngưng hoạt động trước khi xóa");
+        }
+
+        // Không thể xóa nếu có session đang dùng
+        if (sessionRepository.existsByTimeSlotTemplateId(id)) {
+            throw new BusinessRuleException("Không thể xóa vì đang được sử dụng");
+        }
+
+        // Không thể xóa nếu giáo viên đăng ký rảnh
+        if (teacherAvailabilityRepository.existsById_TimeSlotTemplateId(id)) {
+            throw new BusinessRuleException("Không thể xóa vì đang trong lịch rảnh giáo viên");
+        }
+
+        timeSlotTemplateRepository.deleteById(id);
+    }
+
+    // Đổi trạng thái hoạt động/ngưng hoạt động
+    @Transactional
+    public TimeSlotResponseDTO updateTimeSlotStatus(Long id, ResourceStatus status) {
+        log.info("Updating status for time slot {}: {}", id, status);
+
+        TimeSlotTemplate timeSlot = timeSlotTemplateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found with id: " + id));
+
+        // Nếu ngưng hoạt động → check không có session tương lai
+        if (status == ResourceStatus.INACTIVE) {
+            Long futureSessions = sessionRepository.countFutureSessionsByTimeSlotId(id, LocalDate.now(), LocalTime.now());
+            if (futureSessions > 0) {
+                throw new BusinessRuleException("Không thể ngưng hoạt động vì có " + futureSessions + " lớp học sắp diễn ra");
+            }
+        }
+
+        timeSlot.setStatus(status);
+        timeSlot.setUpdatedAt(OffsetDateTime.now());
+        TimeSlotTemplate saved = timeSlotTemplateRepository.save(timeSlot);
+        return convertToDTO(saved);
+    }
+
+    // Lấy danh sách sessions đang dùng khung giờ
+    @Transactional(readOnly = true)
+    public List<SessionInfoDTO> getSessionsByTimeSlotId(Long id) {
+        if (!timeSlotTemplateRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Time slot not found with id: " + id);
+        }
+        List<Session> sessions = sessionRepository.findByTimeSlotTemplateId(id);
+        return sessions.stream().map(this::convertSessionToDTO).collect(Collectors.toList());
+    }
+
+    // Helper: chuyển Session → DTO
+    private SessionInfoDTO convertSessionToDTO(Session session) {
+        return SessionInfoDTO.builder()
+                .id(session.getId())
+                .classId(session.getClassEntity().getId())
+                .classCode(session.getClassEntity().getCode())
+                .className(session.getClassEntity().getName())
+                .date(session.getDate().toString())
+                .startTime(session.getTimeSlotTemplate().getStartTime().toString())
+                .endTime(session.getTimeSlotTemplate().getEndTime().toString())
+                .status(session.getStatus().toString())
+                .type(session.getType().toString())
+                .build();
+    }
+
+    // Lấy danh sách branchId của user
     private List<Long> getBranchIdsForUser(Long userId) {
-        if (userId == null) return List.of();
+        if (userId == null)
+            return List.of();
         UserAccount user = userAccountRepository.findById(userId).orElse(null);
         if (user != null && !user.getUserBranches().isEmpty()) {
             return user.getUserBranches().stream()
@@ -167,7 +286,8 @@ public class TimeSlotTemplateService {
         try {
             Long activeClasses = sessionRepository.countDistinctClassesByTimeSlotId(ts.getId());
             Long totalSessions = sessionRepository.countSessionsByTimeSlotId(ts.getId());
-            Long futureSessions = sessionRepository.countFutureSessionsByTimeSlotId(ts.getId(), LocalDate.now(), LocalTime.now());
+            Long futureSessions = sessionRepository.countFutureSessionsByTimeSlotId(ts.getId(), LocalDate.now(),
+                    LocalTime.now());
             boolean hasTeacherAvailability = teacherAvailabilityRepository.existsById_TimeSlotTemplateId(ts.getId());
 
             builder.activeClassesCount(activeClasses)

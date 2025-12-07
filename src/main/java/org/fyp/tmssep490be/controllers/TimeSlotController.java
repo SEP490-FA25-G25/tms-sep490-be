@@ -13,6 +13,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import org.fyp.tmssep490be.entities.enums.ResourceStatus;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -24,6 +26,7 @@ public class TimeSlotController {
 
     private final TimeSlotTemplateService timeSlotTemplateService;
 
+    // Lấy danh sách khung giờ
     @GetMapping("/time-slots")
     @PreAuthorize("hasAnyRole('CENTER_HEAD', 'ACADEMIC_AFFAIR', 'TEACHER', 'MANAGER')")
     @Operation(summary = "Get all time slots")
@@ -32,13 +35,8 @@ public class TimeSlotController {
             @RequestParam(required = false) String search,
             @AuthenticationPrincipal UserPrincipal currentUser) {
 
-        boolean isCenterHead = currentUser.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_CENTER_HEAD"));
-        boolean isTeacher = currentUser.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_TEACHER"));
-
         List<TimeSlotResponseDTO> timeSlots = timeSlotTemplateService.getAllTimeSlots(
-                branchId, search, currentUser.getId(), isCenterHead, isTeacher);
+                branchId, search, currentUser.getId());
         return ResponseEntity.ok(timeSlots);
     }
 
@@ -60,10 +58,59 @@ public class TimeSlotController {
     public ResponseEntity<TimeSlotResponseDTO> createTimeSlot(
             @RequestBody TimeSlotRequestDTO request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
-        Long forcedBranchId = null; // TODO: lấy từ branch của user
-        TimeSlotResponseDTO saved = timeSlotTemplateService.createTimeSlot(request, currentUser.getId(), forcedBranchId);
+
+        TimeSlotResponseDTO saved = timeSlotTemplateService.createTimeSlot(request, currentUser.getId(), null);
         return ResponseEntity.ok(saved);
     }
 
+    // Cập nhật khung giờ
+    @PutMapping("/time-slots/{id}")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Update time slot")
+    public ResponseEntity<TimeSlotResponseDTO> updateTimeSlot(
+            @PathVariable Long id,
+            @RequestBody TimeSlotRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        TimeSlotResponseDTO saved = timeSlotTemplateService.updateTimeSlot(id, request, currentUser.getId());
+        return ResponseEntity.ok(saved);
+    }
+
+    // Xóa khung giờ
+    @DeleteMapping("/time-slots/{id}")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Delete time slot")
+    public ResponseEntity<Void> deleteTimeSlot(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        timeSlotTemplateService.deleteTimeSlot(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // Đổi trạng thái
+    @PatchMapping("/time-slots/{id}/status")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Update time slot status")
+    public ResponseEntity<TimeSlotResponseDTO> updateTimeSlotStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (!request.containsKey("status")) {
+            throw new RuntimeException("Field 'status' is required");
+        }
+        ResourceStatus status = ResourceStatus.valueOf(request.get("status"));
+        TimeSlotResponseDTO saved = timeSlotTemplateService.updateTimeSlotStatus(id, status);
+        return ResponseEntity.ok(saved);
+    }
+
+    // Lấy sessions đang dùng khung giờ
+    @GetMapping("/time-slots/{id}/sessions")
+    @PreAuthorize("hasAnyRole('CENTER_HEAD', 'ACADEMIC_AFFAIR', 'MANAGER')")
+    @Operation(summary = "Get sessions using a time slot")
+    public ResponseEntity<List<SessionInfoDTO>> getSessionsByTimeSlotId(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        List<SessionInfoDTO> sessions = timeSlotTemplateService.getSessionsByTimeSlotId(id);
+        return ResponseEntity.ok(sessions);
+    }
 
 }
