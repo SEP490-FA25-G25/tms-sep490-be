@@ -30,4 +30,9 @@ build/
 !**/src/test/**/build/
 
 ### VS Code ###
-.vscode/
+.vscode/s
+
+MIGRATION_COPY_PASTE.md
+MIGRATION_GUIDE.md
+MIGRATION_STEP_BY_STEP.md
+
