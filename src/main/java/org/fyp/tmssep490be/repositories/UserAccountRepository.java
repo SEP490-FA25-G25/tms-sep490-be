@@ -24,6 +24,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     org.springframework.data.domain.Page<UserAccount> findAll(org.springframework.data.domain.Pageable pageable);
 
     boolean existsByPhone(String phone);
+    boolean existsByEmail(String email);
 
     @Query("SELECT DISTINCT u FROM UserAccount u " +
             "JOIN u.userRoles ur " +
