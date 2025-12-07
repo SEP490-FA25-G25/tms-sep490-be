@@ -72,6 +72,64 @@ public class TimeSlotTemplateService {
         return convertToDTO(timeSlot);
     }
 
+    // Tạo khung giờ mới
+    @Transactional
+    public TimeSlotResponseDTO createTimeSlot(TimeSlotRequestDTO request, Long userId, Long forcedBranchId) {
+        log.info("Creating time slot: {}", request);
+
+        // 1. Xác định branchId
+        Long branchId = forcedBranchId != null ? forcedBranchId : request.getBranchId();
+        if (branchId == null) {
+            throw new BusinessRuleException("Vui lòng chọn chi nhánh");
+        }
+
+        // 2. Lấy branch entity
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found with id: " + branchId));
+
+        // 3. Validate tên
+        String name = request.getName() != null ? request.getName().trim() : null;
+        if (name == null || name.isEmpty()) {
+            throw new BusinessRuleException("Vui lòng nhập tên khung giờ");
+        }
+
+        // 4. Validate thời gian
+        if (request.getStartTime() == null || request.getEndTime() == null) {
+            throw new BusinessRuleException("Vui lòng nhập giờ bắt đầu và giờ kết thúc");
+        }
+        LocalTime startTime = LocalTime.parse(request.getStartTime());
+        LocalTime endTime = LocalTime.parse(request.getEndTime());
+
+        // 5. Check endTime > startTime
+        if (!endTime.isAfter(startTime)) {
+            throw new BusinessRuleException("Giờ kết thúc phải lớn hơn giờ bắt đầu");
+        }
+
+        // 6. Check tên không trùng
+        if (timeSlotTemplateRepository.existsByBranchIdAndNameIgnoreCase(branchId, name, null)) {
+            throw new BusinessRuleException("Tên khung giờ đã tồn tại trong chi nhánh này");
+        }
+
+        // 7. Check thời gian không trùng
+        if (timeSlotTemplateRepository.existsByBranchIdAndStartTimeAndEndTime(branchId, startTime, endTime, null)) {
+            throw new BusinessRuleException("Khung giờ này đã tồn tại trong chi nhánh");
+        }
+
+        // 8. Tạo entity và lưu
+        TimeSlotTemplate timeSlot = new TimeSlotTemplate();
+        timeSlot.setBranch(branch);
+        timeSlot.setName(name);
+        timeSlot.setStartTime(startTime);
+        timeSlot.setEndTime(endTime);
+        timeSlot.setStatus(ResourceStatus.ACTIVE);
+        timeSlot.setCreatedAt(OffsetDateTime.now());
+        timeSlot.setUpdatedAt(OffsetDateTime.now());
+
+        TimeSlotTemplate saved = timeSlotTemplateRepository.save(timeSlot);
+        log.info("Created time slot with ID: {}", saved.getId());
+        return convertToDTO(saved);
+    }
+
     // ==================== HELPER METHODS ====================
 
     private Long getBranchIdForUser(Long userId) {

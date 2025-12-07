@@ -53,6 +53,17 @@ public class TimeSlotController {
         return ResponseEntity.ok(timeSlot);
     }
 
+    // Tạo khung giờ mới
+    @PostMapping("/time-slots")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Create new time slot")
+    public ResponseEntity<TimeSlotResponseDTO> createTimeSlot(
+            @RequestBody TimeSlotRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        Long forcedBranchId = null; // TODO: lấy từ branch của user
+        TimeSlotResponseDTO saved = timeSlotTemplateService.createTimeSlot(request, currentUser.getId(), forcedBranchId);
+        return ResponseEntity.ok(saved);
+    }
 
 
 }
