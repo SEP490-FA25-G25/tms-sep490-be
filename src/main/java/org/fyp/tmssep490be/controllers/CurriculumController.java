@@ -87,4 +87,30 @@ public class CurriculumController {
                 .data(curriculum)
                 .build());
     }
+
+    // Deactivate curriculum
+    @PatchMapping("/curriculums/{id}/deactivate")
+    @Operation(summary = "Deactivate curriculum")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<Void>> deactivateCurriculum(@PathVariable Long id) {
+        log.info("Deactivating curriculum with ID: {}", id);
+        curriculumService.deactivateCurriculum(id);
+        return ResponseEntity.ok(ResponseObject.<Void>builder()
+                .success(true)
+                .message("Curriculum deactivated successfully")
+                .build());
+    }
+
+    // Reactivate curriculum
+    @PatchMapping("/curriculums/{id}/reactivate")
+    @Operation(summary = "Reactivate curriculum")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<Void>> reactivateCurriculum(@PathVariable Long id) {
+        log.info("Reactivating curriculum with ID: {}", id);
+        curriculumService.reactivateCurriculum(id);
+        return ResponseEntity.ok(ResponseObject.<Void>builder()
+                .success(true)
+                .message("Curriculum reactivated successfully")
+                .build());
+    }
 }

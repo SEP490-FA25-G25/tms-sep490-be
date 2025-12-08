@@ -191,6 +191,34 @@ public class CurriculumService {
                 return getCurriculum(curriculum.getId());
         }
 
+        @Transactional
+        public void deactivateCurriculum(Long id) {
+                log.info("Deactivating curriculum with ID: {}", id);
+                Curriculum curriculum = curriculumRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chương trình với ID: " + id));
+
+                curriculum.setStatus(CurriculumStatus.INACTIVE);
+                curriculumRepository.save(curriculum);
+        }
+
+        @Transactional
+        public void reactivateCurriculum(Long id) {
+                log.info("Reactivating curriculum with ID: {}", id);
+                Curriculum curriculum = curriculumRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chương trình với ID: " + id));
+
+                // Kiểm tra có Subject nào đang ACTIVE không (thông qua Levels)
+                boolean hasActiveSubject = curriculum.getLevels().stream()
+                        .anyMatch(level -> subjectRepository.existsByLevelIdAndStatus(level.getId(), SubjectStatus.ACTIVE));
+
+                if (hasActiveSubject) {
+                        curriculum.setStatus(CurriculumStatus.ACTIVE);
+                } else {
+                        curriculum.setStatus(CurriculumStatus.DRAFT);
+                }
+                curriculumRepository.save(curriculum);
+        }
+
         // ==================== HELPER METHODS ====================
 
         private CurriculumWithLevelsDTO convertToCurriculumWithLevelsDTO(Curriculum curriculum) {
