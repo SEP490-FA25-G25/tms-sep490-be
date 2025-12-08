@@ -753,6 +753,7 @@ public class ClassService {
                 .email(userAccount.getEmail())
                 .phone(userAccount.getPhone())
                 .avatarUrl(userAccount.getAvatarUrl())
+                .address(userAccount.getAddress())
                 .branchName(branchName)
                 .enrolledAt(enrollment.getEnrolledAt())
                 .enrolledBy(enrollment.getEnrolledByUser() != null ? enrollment.getEnrolledByUser().getFullName()

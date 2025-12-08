@@ -55,23 +55,39 @@ public class StudentRequestService {
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND, 
                     "Student not found for user ID: " + userId));
 
+        StudentRequestType requestType = null;
+        if (filter.getRequestType() != null) {
+            try {
+                requestType = StudentRequestType.valueOf(filter.getRequestType());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid request type: {}", filter.getRequestType());
+            }
+        }
+
+        RequestStatus status = null;
+        if (filter.getStatus() != null) {
+            try {
+                status = RequestStatus.valueOf(filter.getStatus());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid status: {}", filter.getStatus());
+            }
+        }
+
         String searchTerm = (filter.getSearch() != null && !filter.getSearch().trim().isEmpty()) 
             ? filter.getSearch().trim() : null;
-        
-        List<StudentRequestType> requestTypes = prepareRequestTypeFilter(filter);
-        List<RequestStatus> statuses = prepareStatusFilter(filter);
 
-        Sort sort = buildSortOrder(filter, statuses);
+        // Simple sort
+        Sort sort = Sort.by(Sort.Direction.DESC, "submittedAt");
         Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
+
+        // Convert to List for repository query
+        List<StudentRequestType> requestTypes = requestType != null ? List.of(requestType) : null;
+        List<RequestStatus> statuses = status != null ? List.of(status) : null;
 
         Page<StudentRequest> requests = studentRequestRepository.findStudentRequestsWithFilters(
             student.getId(), searchTerm, requestTypes, statuses, pageable);
 
-        List<StudentRequestResponseDTO> dtoList = requests.getContent().stream()
-                .map(this::mapToStudentRequestResponseDTO)
-                .collect(Collectors.toList());
-
-        return new PageImpl<>(dtoList, pageable, requests.getTotalElements());
+        return requests.map(this::mapToStudentRequestResponseDTO);
     }
 
     public StudentRequestDetailDTO getRequestById(Long requestId, Long userId) {
@@ -110,64 +126,6 @@ public class StudentRequestService {
         return detailDTO;
     }
 
-    private List<StudentRequestType> prepareRequestTypeFilter(RequestFilterDTO filter) {
-        if (filter.getRequestTypeFilters() != null && !filter.getRequestTypeFilters().isEmpty()) {
-            return filter.getRequestTypeFilters();
-        }
-        
-        if (filter.getRequestType() != null) {
-            try {
-                return List.of(StudentRequestType.valueOf(filter.getRequestType()));
-            } catch (IllegalArgumentException e) {
-                log.warn("Invalid request type: {}", filter.getRequestType());
-            }
-        }
-        
-        return null;
-    }
-
-    private List<RequestStatus> prepareStatusFilter(RequestFilterDTO filter) {
-        if (filter.getStatusFilters() != null && !filter.getStatusFilters().isEmpty()) {
-            return filter.getStatusFilters();
-        }
-        
-        if (filter.getStatus() != null) {
-            try {
-                return List.of(RequestStatus.valueOf(filter.getStatus()));
-            } catch (IllegalArgumentException e) {
-                log.warn("Invalid status: {}", filter.getStatus());
-            }
-        }
-        
-        return null;
-    }
-
-    private Sort buildSortOrder(RequestFilterDTO filter, List<RequestStatus> statusFilter) {
-        boolean hasStatusFilter = (statusFilter != null && !statusFilter.isEmpty());
-        
-        try {
-            String[] sortParts = filter.getSort().split(",");
-            String field = sortParts[0];
-            String direction = sortParts.length > 1 ? sortParts[1] : "desc";
-            Sort.Direction sortDirection = Sort.Direction.fromString(direction);
-            
-            if (!hasStatusFilter) {
-                return Sort.by(
-                    Sort.Order.asc("status"),  
-                    new Sort.Order(sortDirection, field)
-                );
-            }
-            
-            return Sort.by(sortDirection, field);
-            
-        } catch (Exception e) {
-            log.warn("Invalid sort format: {}, using default", filter.getSort());
-            return !hasStatusFilter 
-                ? Sort.by(Sort.Order.asc("status"), Sort.Order.desc("submittedAt"))
-                : Sort.by(Sort.Direction.DESC, "submittedAt");
-        }
-    }
-
     public Page<AARequestResponseDTO> getPendingRequests(Long currentUserId, AARequestFilterDTO filter) {
         List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(currentUserId);
         if (userBranchIds.isEmpty()) {
@@ -179,25 +137,22 @@ public class StudentRequestService {
         List<Long> targetBranchIds = filter.getBranchId() != null ?
             List.of(filter.getBranchId()) : userBranchIds;
 
-        Sort sort = Sort.by(Sort.Direction.fromString(filter.getSort().split(",")[1]),
-                filter.getSort().split(",")[0]);
+        // Simple sort
+        Sort sort = Sort.by(Sort.Direction.DESC, "submittedAt");
         Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
 
         Page<StudentRequest> requests = studentRequestRepository.findPendingRequestsByBranches(
                 RequestStatus.PENDING, targetBranchIds, pageable);
         
+        // Apply additional filters in memory (Note: this may cause pagination count mismatch)
         List<StudentRequest> filteredRequests = requests.getContent().stream()
                 .filter(request -> applyAdditionalFilters(request, filter))
                 .toList();
 
-        List<AARequestResponseDTO> dtoList = filteredRequests.stream()
-                .map(this::mapToAAResponseDTO)
-                .collect(Collectors.toList());
-
         return new PageImpl<>(
-                dtoList,
+                filteredRequests.stream().map(this::mapToAAResponseDTO).toList(),
                 pageable,
-                requests.getTotalElements() // Keep original total for pagination
+                requests.getTotalElements()
         );
     }
 
@@ -214,8 +169,8 @@ public class StudentRequestService {
         List<Long> targetBranchIds = filter.getBranchId() != null ?
             List.of(filter.getBranchId()) : userBranchIds;
 
-        Sort sort = Sort.by(Sort.Direction.fromString(filter.getSort().split(",")[1]),
-                filter.getSort().split(",")[0]);
+        // Simple sort
+        Sort sort = Sort.by(Sort.Direction.DESC, "submittedAt");
         Pageable pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
 
         Page<StudentRequest> requests;
@@ -227,16 +182,13 @@ public class StudentRequestService {
                     targetBranchIds, pageable);
         }
 
+        // Apply additional filters in memory (Note: this may cause pagination count mismatch)
         List<StudentRequest> filteredRequests = requests.getContent().stream()
                 .filter(request -> applyAdditionalFilters(request, filter))
                 .toList();
 
-        List<AARequestResponseDTO> dtoList = filteredRequests.stream()
-                .map(this::mapToAAResponseDTO)
-                .collect(Collectors.toList());
-
         return new PageImpl<>(
-                dtoList,
+                filteredRequests.stream().map(this::mapToAAResponseDTO).toList(),
                 pageable,
                 requests.getTotalElements()
         );

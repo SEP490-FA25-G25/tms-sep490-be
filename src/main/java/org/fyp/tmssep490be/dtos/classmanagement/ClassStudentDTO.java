@@ -22,6 +22,7 @@ public class ClassStudentDTO {
     private String email;
     private String phone;
     private String avatarUrl;
+    private String address;
     private String branchName;
 
     // Enrollment information
