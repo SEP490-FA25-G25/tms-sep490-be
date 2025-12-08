@@ -376,6 +376,21 @@ public class ResourceService {
         return convertToDTO(saved);
     }
 
+    // Lấy danh sách sessions đang dùng resource
+    @Transactional(readOnly = true)
+    public List<SessionInfoDTO> getSessionsByResourceId(Long id) {
+        log.info("Getting sessions for resource {}", id);
+
+        if (!resourceRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Resource not found with id: " + id);
+        }
+
+        List<Session> sessions = sessionResourceRepository.findSessionsByResourceId(id);
+        return sessions.stream().map(this::convertSessionToDTO).collect(Collectors.toList());
+    }
+
+
+
     // ==================== HELPER METHODS ======================
 
     private List<Long> getBranchIdsForUser(Long userId) {

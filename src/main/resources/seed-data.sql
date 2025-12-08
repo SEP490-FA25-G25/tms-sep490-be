@@ -1650,6 +1650,30 @@ INSERT INTO teacher_request (id, teacher_id, session_id, request_type, new_resou
 INSERT INTO teacher_request (id, teacher_id, session_id, request_type, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
 (4, 5, 15, 'REPLACEMENT', 'REJECTED', 'Personal reason - insufficient notice', 24, '2025-09-10 08:00:00+07', 6, '2025-09-10 10:00:00+07');
 
+-- SCENARIO 14: Pending Replacement Request (Emma Wilson - teacher 2)
+INSERT INTO teacher_request (id, teacher_id, session_id, request_type, status, request_reason, submitted_by, submitted_at) VALUES
+(5, 2, 20, 'REPLACEMENT', 'PENDING', 'Medical appointment scheduled - need substitute teacher for this session', 21, '2025-12-01 14:30:00+07');
+
+-- SCENARIO 15: Pending Reschedule Request (David Lee - teacher 3)
+INSERT INTO teacher_request (id, teacher_id, session_id, request_type, new_date, new_time_slot_id, new_resource_id, status, request_reason, submitted_by, submitted_at) VALUES
+(6, 3, 105, 'RESCHEDULE', '2025-12-20', 3, 1, 'PENDING', 'Personal commitment conflicts with original schedule - request to move to Friday evening', 22, '2025-12-02 09:15:00+07');
+
+-- SCENARIO 16: Pending Modality Change Request (Sarah Johnson - teacher 4)
+INSERT INTO teacher_request (id, teacher_id, session_id, request_type, new_resource_id, status, request_reason, submitted_by, submitted_at) VALUES
+(7, 4, 210, 'MODALITY_CHANGE', 5, 'PENDING', 'Classroom equipment malfunction - request to switch to online format for this session', 23, '2025-12-03 11:00:00+07');
+
+-- SCENARIO 17: Waiting Confirm Replacement Request (James Taylor - teacher 7)
+INSERT INTO teacher_request (id, teacher_id, session_id, request_type, replacement_teacher_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
+(8, 7, 115, 'REPLACEMENT', 8, 'WAITING_CONFIRM', 'Family event - cannot attend session, replacement teacher assigned', 26, '2025-11-28 10:00:00+07', 6, '2025-11-28 14:00:00+07');
+
+-- SCENARIO 18: Pending Replacement Request (Anna Martinez - teacher 8)
+INSERT INTO teacher_request (id, teacher_id, session_id, request_type, status, request_reason, submitted_by, submitted_at) VALUES
+(9, 8, 120, 'REPLACEMENT', 'PENDING', 'Unexpected travel required - need someone to cover this session', 27, '2025-12-04 08:45:00+07');
+
+-- SCENARIO 19: Approved Reschedule Request (John Smith - teacher 1)
+INSERT INTO teacher_request (id, teacher_id, session_id, request_type, new_date, new_time_slot_id, new_resource_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
+(10, 1, 5, 'RESCHEDULE', '2025-09-08', 2, 1, 'APPROVED', 'Conference attendance - reschedule approved', 20, '2025-09-02 09:00:00+07', 6, '2025-09-02 11:00:00+07');
+
 -- ========== TIER 7: ASSESSMENTS & SCORES ==========
 
 -- Assessments for Class 2 (scheduled and completed)
