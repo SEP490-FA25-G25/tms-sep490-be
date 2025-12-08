@@ -76,4 +76,15 @@ public class ResourceController {
         ResourceDTO saved = resourceService.updateResource(id, request, currentUser.getId());
         return ResponseEntity.ok(saved);
     }
+
+    // DELETE /resources/{id} - Xóa
+    @DeleteMapping("/resources/{id}")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Delete resource")
+    public ResponseEntity<Void> deleteResource(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        resourceService.deleteResource(id);
+        return ResponseEntity.noContent().build();
+    }
 }

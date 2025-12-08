@@ -330,6 +330,28 @@ public class ResourceService {
         validateExpiryDate(request.getExpiryDate());
     }
 
+    // Xóa resource
+    @Transactional
+    public void deleteResource(Long id) {
+        log.info("Deleting resource {}", id);
+
+        Resource resource = resourceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found with id: " + id));
+
+        // Phải ngưng hoạt động trước khi xóa
+        if (resource.getStatus() != ResourceStatus.INACTIVE) {
+            throw new BusinessRuleException("Vui lòng ngưng hoạt động tài nguyên trước khi xóa");
+        }
+
+        // Không thể xóa nếu có session đang dùng
+        if (sessionResourceRepository.existsByResourceId(id)) {
+            throw new BusinessRuleException("Không thể xóa vì tài nguyên này đang được sử dụng trong buổi học");
+        }
+
+        resourceRepository.deleteById(id);
+        log.info("Deleted resource with ID: {}", id);
+    }
+
     // ==================== HELPER METHODS ====================
 
     private List<Long> getBranchIdsForUser(Long userId) {
