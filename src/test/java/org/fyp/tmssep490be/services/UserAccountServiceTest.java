@@ -1,8 +1,7 @@
-package org.fyp.tmssep490be.service;
+package org.fyp.tmssep490be.services;
 
 import org.fyp.tmssep490be.dtos.user.UpdateUserRequest;
 import org.fyp.tmssep490be.entities.Role;
-import org.fyp.tmssep490be.services.UserAccountService;
 import org.fyp.tmssep490be.dtos.user.CreateUserRequest;
 import org.fyp.tmssep490be.dtos.user.UserResponse;
 import org.fyp.tmssep490be.entities.UserAccount;
