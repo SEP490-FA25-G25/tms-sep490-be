@@ -57,6 +57,54 @@ public class CurriculumService {
         return result;
     }
 
+    // CREATE CURRICULUM
+    @Transactional
+    public CurriculumResponseDTO createCurriculum(CreateCurriculumDTO request) {
+        log.info("Creating new curriculum: {}", request.getCode());
+
+        // 1. Kiểm tra code không trùng
+        if (curriculumRepository.existsByCode(request.getCode())) {
+            throw new IllegalArgumentException("Mã chương trình đã tồn tại: " + request.getCode());
+        }
+
+        // 2. Tạo entity
+        Curriculum curriculum = new Curriculum();
+        curriculum.setCode(request.getCode());
+        curriculum.setName(request.getName());
+        curriculum.setDescription(request.getDescription());
+        curriculum.setLanguage(request.getLanguage() != null ? request.getLanguage() : "English");
+        curriculum.setStatus(CurriculumStatus.DRAFT);
+
+        curriculum = curriculumRepository.save(curriculum);
+        log.info("Curriculum created with ID: {}", curriculum.getId());
+
+        // 3. Lưu PLOs nếu có
+        if (request.getPlos() != null && !request.getPlos().isEmpty()) {
+            Curriculum finalCurriculum = curriculum;
+            List<PLO> plos = request.getPlos().stream()
+                    .map(ploDTO -> PLO.builder()
+                            .curriculum(finalCurriculum)
+                            .code(ploDTO.getCode())
+                            .description(ploDTO.getDescription())
+                            .build())
+                    .collect(Collectors.toList());
+            ploRepository.saveAll(plos);
+        }
+
+        // 4. Trả về DTO
+        return CurriculumResponseDTO.builder()
+                .id(curriculum.getId().toString())
+                .code(curriculum.getCode())
+                .name(curriculum.getName())
+                .description(curriculum.getDescription())
+                .language(curriculum.getLanguage())
+                .status(curriculum.getStatus().name())
+                .createdAt(curriculum.getCreatedAt() != null ? curriculum.getCreatedAt().toString() : null)
+                .levelCount(0)
+                .plos(request.getPlos() != null ? request.getPlos() : java.util.Collections.emptyList())
+                .build();
+    }
+
     // ==================== HELPER METHODS ====================
 
     private CurriculumWithLevelsDTO convertToCurriculumWithLevelsDTO(Curriculum curriculum) {

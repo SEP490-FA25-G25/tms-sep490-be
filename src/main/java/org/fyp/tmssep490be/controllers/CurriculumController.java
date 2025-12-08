@@ -42,4 +42,19 @@ public class CurriculumController {
                 .data(curriculums)
                 .build());
     }
+
+    // Tạo curriculum mới
+    @PostMapping("/curriculums")
+    @Operation(summary = "Create a new curriculum")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<CurriculumResponseDTO>> createCurriculum(
+            @RequestBody CreateCurriculumDTO request) {
+        log.info("Creating new curriculum: {}", request.getCode());
+        CurriculumResponseDTO curriculum = curriculumService.createCurriculum(request);
+        return ResponseEntity.ok(ResponseObject.<CurriculumResponseDTO>builder()
+                .success(true)
+                .message("Curriculum created successfully")
+                .data(curriculum)
+                .build());
+    }
 }
