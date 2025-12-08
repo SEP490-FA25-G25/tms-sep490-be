@@ -1,0 +1,64 @@
+# Test profile configuration for Integration Tests
+spring:
+  application:
+    name: tms-sep490-be-test
+
+  security:
+    jwt:
+      secret: TestSecretKeyForJWTTokenGenerationInTestEnvironment123456789012345
+      access-token-expiration: 900000
+      refresh-token-expiration: 604800000
+
+  # Datasource will be overridden by Testcontainers
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:test-seed-data.sql
+
+  jpa:
+    defer-datasource-initialization: true
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+    show-sql: false
+
+  mail:
+    host: localhost
+    port: 1025
+    username: test
+    password: test
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+# Disable Swagger for tests
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# Application Configuration
+app:
+  frontend:
+    url: http://localhost:3000
+  email:
+    enabled: false
+
+server:
+  port: 0  # Random port for tests
+
+logging:
+  level:
+    org.fyp.tmssep490be: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
