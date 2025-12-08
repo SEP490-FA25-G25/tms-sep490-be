@@ -1,19 +1,24 @@
 package org.fyp.tmssep490be.controllers;
 
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestApproveDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestConfigDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestListDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestRejectDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.PolicyService;
 import org.fyp.tmssep490be.services.TeacherRequestService;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -117,6 +122,45 @@ public class TeacherRequestController {
         return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
                 .success(true)
                 .message("Request loaded successfully")
+                .data(response)
+                .build());
+    }
+
+    //Endpoint để duyệt yêu cầu giáo viên (Academic Staff)
+    //Tất cả thông tin bắt buộc phải được điền khi approve
+    @PatchMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> approveRequest(
+            @PathVariable Long id,
+            @RequestBody @Valid TeacherRequestApproveDTO approveDTO,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        log.info("Approve request {} by academic staff {}", id, userPrincipal.getId());
+
+        TeacherRequestResponseDTO response = teacherRequestService.approveRequest(id, approveDTO, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
+                .success(true)
+                .message("Request approved successfully")
+                .data(response)
+                .build());
+    }
+
+    //Endpoint để từ chối yêu cầu giáo viên (Academic Staff)
+    @PatchMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> rejectRequest(
+            @PathVariable Long id,
+            @RequestBody @Valid TeacherRequestRejectDTO rejectDTO,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        log.info("Reject request {} by academic staff {}", id, userPrincipal.getId());
+
+        TeacherRequestResponseDTO response = teacherRequestService.rejectRequest(id, rejectDTO.getReason(), userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
+                .success(true)
+                .message("Request rejected")
                 .data(response)
                 .build());
     }

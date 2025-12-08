@@ -72,6 +72,9 @@ public enum ErrorCode {
 
     // Teacher Request errors (5000-5099)
     TEACHER_REQUEST_NOT_FOUND(5000, "Không tìm thấy yêu cầu giáo viên"),
+    TEACHER_REQUEST_NOT_PENDING(5001, "Yêu cầu không ở trạng thái chờ duyệt"),
+    RESOURCE_NOT_FOUND(5002, "Không tìm thấy tài nguyên"),
+    TIMESLOT_NOT_FOUND(5003, "Không tìm thấy khung giờ"),
 
     // Student Request errors (4100-4199)
 
