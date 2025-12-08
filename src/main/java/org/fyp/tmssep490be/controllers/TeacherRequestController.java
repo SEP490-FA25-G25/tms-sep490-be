@@ -3,8 +3,10 @@ package org.fyp.tmssep490be.controllers;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestApproveDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestConfigDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestCreateDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestListDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.MySessionDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.ModalityResourceSuggestionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestRejectDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
@@ -17,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -54,6 +57,50 @@ public class TeacherRequestController {
                         .message("Requests retrieved successfully")
                         .data(requests)
                         .build());
+    }
+
+    //Endpoint để giáo viên tạo yêu cầu (bắt đầu với MODALITY_CHANGE)
+    @PostMapping
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> createRequest(
+            @RequestBody @Valid TeacherRequestCreateDTO createDTO,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        log.info("Teacher {} creating request {}", userPrincipal.getId(), createDTO.getRequestType());
+
+        TeacherRequestResponseDTO response = teacherRequestService.createRequest(createDTO, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
+                .success(true)
+                .message("Request created successfully")
+                .data(response)
+                .build());
+    }
+
+    //Gợi ý resource khả dụng cho MODALITY_CHANGE
+    @GetMapping("/sessions/{sessionId}/modality-resources")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<List<ModalityResourceSuggestionDTO>>> suggestModalityResources(
+            @PathVariable Long sessionId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<ModalityResourceSuggestionDTO> suggestions = teacherRequestService.suggestModalityResources(
+                sessionId, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<List<ModalityResourceSuggestionDTO>>builder()
+                .success(true)
+                .message("Resources loaded successfully")
+                .data(suggestions)
+                .build());
+    }
+
+    // Alias path to match frontend call /api/v1/teacher-requests/{sessionId}/modality/resources
+    @GetMapping("/{sessionId}/modality/resources")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<List<ModalityResourceSuggestionDTO>>> suggestModalityResourcesAlias(
+            @PathVariable Long sessionId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return suggestModalityResources(sessionId, userPrincipal);
     }
 
     //Endpoint để lấy cấu hình request cho giáo viên (từ policies)

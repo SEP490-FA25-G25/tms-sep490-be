@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.teacherrequest.MySessionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestApproveDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestCreateDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestListDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.ModalityResourceSuggestionDTO;
 import org.fyp.tmssep490be.entities.Resource;
 import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.Teacher;
@@ -15,6 +17,7 @@ import org.fyp.tmssep490be.entities.UserAccount;
 import org.fyp.tmssep490be.entities.enums.Modality;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.entities.enums.TeacherRequestType;
+import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.ResourceRepository;
@@ -24,6 +27,8 @@ import org.fyp.tmssep490be.repositories.TeacherRequestRepository;
 import org.fyp.tmssep490be.repositories.TimeSlotTemplateRepository;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.repositories.UserBranchesRepository;
+import org.fyp.tmssep490be.repositories.SessionResourceRepository;
+import org.fyp.tmssep490be.services.PolicyService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +49,146 @@ public class TeacherRequestService {
     private final UserAccountRepository userAccountRepository;
     private final ResourceRepository resourceRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
+    private final PolicyService policyService;
+    private final SessionResourceRepository sessionResourceRepository;
+
+    // Giáo viên tạo yêu cầu (hiện mới hỗ trợ MODALITY_CHANGE)
+    @Transactional
+    public TeacherRequestResponseDTO createRequest(TeacherRequestCreateDTO createDTO, Long userId) {
+        log.info("Creating teacher request type {} for user {}", createDTO.getRequestType(), userId);
+
+        Teacher teacher = teacherRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher profile not found for current user"));
+
+        // Validate lý do tối thiểu theo policy
+        int minReasonLength = policyService.getGlobalInt("teacher.request.reason_min_length", 15);
+        String reason = createDTO.getReason() != null ? createDTO.getReason().trim() : "";
+        if (reason.length() < minReasonLength) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Reason must be at least " + minReasonLength + " characters");
+        }
+
+        // Lấy session và kiểm tra quyền sở hữu
+        Session session = sessionRepository.findById(createDTO.getSessionId())
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
+
+        boolean isOwner = session.getTeachingSlots().stream()
+                .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
+        if (!isOwner) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You are not assigned to this session");
+        }
+
+        // Chỉ cho phép tạo yêu cầu cho buổi PLANNED và còn đủ thời gian theo policy
+        if (session.getStatus() != SessionStatus.PLANNED) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session is not in PLANNED status");
+        }
+        int minDaysBeforeSession = policyService.getGlobalInt("teacher.request.min_days_before_session", 1);
+        LocalDate minAllowedDate = LocalDate.now().plusDays(minDaysBeforeSession);
+        if (session.getDate().isBefore(minAllowedDate)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session is too close to request (" + minDaysBeforeSession + " day(s) required)");
+        }
+
+        TeacherRequestType requestType = createDTO.getRequestType();
+        if (requestType != TeacherRequestType.MODALITY_CHANGE) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Only MODALITY_CHANGE is supported at the moment");
+        }
+
+        TeacherRequest request = new TeacherRequest();
+        request.setTeacher(teacher);
+        request.setSession(session);
+        request.setRequestType(requestType);
+        request.setStatus(RequestStatus.PENDING);
+        request.setSubmittedAt(OffsetDateTime.now());
+        request.setSubmittedBy(teacher.getUserAccount());
+        request.setRequestReason(reason);
+
+        // MODALITY_CHANGE: yêu cầu resource (phòng) theo policy
+        boolean requireResource = policyService.getGlobalBoolean("teacher.modality_change.require_resource", true);
+        Long newResourceId = createDTO.getNewResourceId();
+        if (requireResource && newResourceId == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Resource is required for MODALITY_CHANGE requests");
+        }
+        if (newResourceId != null) {
+            Resource resource = resourceRepository.findById(newResourceId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Resource not found"));
+            request.setNewResource(resource);
+        }
+
+        request = teacherRequestRepository.save(request);
+        log.info("Created teacher request {} for user {}", request.getId(), userId);
+
+        return mapToResponseDTO(request);
+    }
+
+    // Gợi ý resource khả dụng cho yêu cầu đổi phương thức
+    @Transactional(readOnly = true)
+    public List<ModalityResourceSuggestionDTO> suggestModalityResources(Long sessionId, Long userId) {
+        log.info("Suggest modality resources for session {} by user {}", sessionId, userId);
+
+        Teacher teacher = teacherRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher profile not found for current user"));
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
+
+        // Quyền: giáo viên phải là người dạy buổi này
+        boolean isOwner = session.getTeachingSlots().stream()
+                .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
+        if (!isOwner) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You are not assigned to this session");
+        }
+
+        // Chỉ gợi ý cho session PLANNED
+        if (session.getStatus() != SessionStatus.PLANNED) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session is not in PLANNED status");
+        }
+
+        if (session.getClassEntity() == null || session.getClassEntity().getBranch() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session branch is missing");
+        }
+        if (session.getTimeSlotTemplate() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session time slot is missing");
+        }
+
+        Long branchId = session.getClassEntity().getBranch().getId();
+        Long timeSlotId = session.getTimeSlotTemplate().getId();
+        LocalDate sessionDate = session.getDate();
+
+        // Resource hiện tại (nếu có)
+        Long currentResourceId = session.getSessionResources().stream()
+                .findFirst()
+                .map(sr -> sr.getResource() != null ? sr.getResource().getId() : null)
+                .orElse(null);
+
+        List<Resource> resources = resourceRepository.findAvailableResourcesForSession(
+                branchId, sessionDate, timeSlotId, sessionId);
+
+        // Nếu buổi đang gán resource hiện tại, đảm bảo vẫn xuất hiện trong list
+        if (currentResourceId != null) {
+            boolean containsCurrent = resources.stream().anyMatch(r -> r.getId().equals(currentResourceId));
+            if (!containsCurrent) {
+                resourceRepository.findById(currentResourceId).ifPresent(resources::add);
+            }
+        }
+
+        return resources.stream()
+                .map(r -> ModalityResourceSuggestionDTO.builder()
+                        .resourceId(r.getId())
+                        .name(r.getName())
+                        .resourceType(r.getResourceType() != null ? r.getResourceType().name() : null)
+                        .capacity(r.getCapacity())
+                        .branchId(r.getBranch() != null ? r.getBranch().getId() : null)
+                        .currentResource(currentResourceId != null && currentResourceId.equals(r.getId()))
+                        .build())
+                .sorted((a, b) -> {
+                    // current resource lên đầu, sau đó tên
+                    if (a.isCurrentResource() && !b.isCurrentResource()) return -1;
+                    if (!a.isCurrentResource() && b.isCurrentResource()) return 1;
+                    if (a.getName() == null) return 1;
+                    if (b.getName() == null) return -1;
+                    return a.getName().compareToIgnoreCase(b.getName());
+                })
+                .collect(Collectors.toList());
+    }
 
     //Lấy tất cả yêu cầu của giáo viên theo userId
     public List<TeacherRequestListDTO> getMyRequests(Long userId) {
