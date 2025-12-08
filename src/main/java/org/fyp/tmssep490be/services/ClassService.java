@@ -543,7 +543,6 @@ public class ClassService {
         Integer matchPriority = 3; // Default: No match
         String matchingSkill = null;
         AvailableStudentDTO.LevelInfoDTO matchingLevel = null;
-        String matchReason = "No skill assessment found for this course's curriculum";
 
         if (matchingAssessment != null && matchingAssessment.getLevel() != null) {
             Long assessmentCurriculumId = matchingAssessment.getLevel().getCurriculum() != null ?
@@ -556,10 +555,8 @@ public class ClassService {
 
                 if (classLevelId != null && assessmentLevelId.equals(classLevelId)) {
                     matchPriority = 1;
-                    matchReason = "Perfect match - Assessment matches both Curriculum AND Level";
                 } else {
                     matchPriority = 2;
-                    matchReason = "Partial match - Assessment matches Curriculum only";
                 }
             }
         }
@@ -568,7 +565,6 @@ public class ClassService {
                 .matchPriority(matchPriority)
                 .matchingSkill(matchingSkill)
                 .matchingLevel(matchingLevel)
-                .matchReason(matchReason)
                 .build();
     }
 
