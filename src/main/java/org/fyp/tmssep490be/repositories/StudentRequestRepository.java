@@ -24,8 +24,10 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
             Long studentId, Long sessionId, StudentRequestType requestType, List<RequestStatus> statuses);
 
     @Query("SELECT sr FROM StudentRequest sr " +
+           "JOIN sr.currentClass c " +
+           "JOIN c.branch b " +
            "WHERE sr.status = :status " +
-           "AND sr.currentClass.branch.id IN :branchIds")
+           "AND b.id IN :branchIds")
     Page<StudentRequest> findPendingRequestsByBranches(
             @Param("status") RequestStatus status,
             @Param("branchIds") List<Long> branchIds,
@@ -33,14 +35,18 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
 
 
     @Query("SELECT sr FROM StudentRequest sr " +
-           "WHERE sr.currentClass.branch.id IN :branchIds")
+           "JOIN sr.currentClass c " +
+           "JOIN c.branch b " +
+           "WHERE b.id IN :branchIds")
     Page<StudentRequest> findAllRequestsByBranches(
             @Param("branchIds") List<Long> branchIds,
             Pageable pageable);
 
 
     @Query("SELECT sr FROM StudentRequest sr " +
-           "WHERE sr.currentClass.branch.id IN :branchIds " +
+           "JOIN sr.currentClass c " +
+           "JOIN c.branch b " +
+           "WHERE b.id IN :branchIds " +
            "AND sr.decidedBy.id = :decidedBy")
     Page<StudentRequest> findAllRequestsByBranchesAndDecidedBy(
             @Param("branchIds") List<Long> branchIds,
@@ -48,16 +54,20 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
             Pageable pageable);
 
     @Query("SELECT COUNT(sr) FROM StudentRequest sr " +
+           "JOIN sr.currentClass c " +
+           "JOIN c.branch b " +
            "WHERE sr.status = :status " +
-           "AND sr.currentClass.branch.id IN :branchIds")
+           "AND b.id IN :branchIds")
     long countByStatusAndBranches(
             @Param("status") RequestStatus status,
             @Param("branchIds") List<Long> branchIds);
 
     @Query("SELECT COUNT(sr) FROM StudentRequest sr " +
+           "JOIN sr.currentClass c " +
+           "JOIN c.branch b " +
            "WHERE sr.requestType = :requestType " +
            "AND sr.status = :status " +
-           "AND sr.currentClass.branch.id IN :branchIds")
+           "AND b.id IN :branchIds")
     long countByRequestTypeAndStatusAndBranches(
             @Param("requestType") StudentRequestType requestType,
             @Param("status") RequestStatus status,

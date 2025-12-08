@@ -247,11 +247,6 @@ public class StudentScheduleService {
         }
     }
 
-    /**
-     * Hiển thị trạng thái cho học viên trong lịch/chi tiết:
-     * - Nếu ngày session < hôm nay và status là null hoặc PLANNED → ABSENT (vắng không phép)
-     * - Ngược lại dùng status thực tế (PRESENT / ABSENT / EXCUSED / PLANNED / LATE)
-     */
     private org.fyp.tmssep490be.entities.enums.AttendanceStatus resolveDisplayStatus(StudentSession studentSession) {
         Session session = studentSession.getSession();
         if (session == null) {

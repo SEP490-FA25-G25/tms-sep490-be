@@ -55,4 +55,14 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             @Param("endDate") LocalDate endDate
     );
 
+    // Find all student sessions by student and class for absence rate calculation
+    @Query("SELECT ss FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE ss.student.id = :studentId " +
+           "AND s.classEntity.id = :classId")
+    List<StudentSession> findByStudentIdAndClassEntityId(
+            @Param("studentId") Long studentId,
+            @Param("classId") Long classId
+    );
+
 }

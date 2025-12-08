@@ -4,13 +4,18 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.studentrequest.AARequestFilterDTO;
 import org.fyp.tmssep490be.dtos.studentrequest.AARequestResponseDTO;
+import org.fyp.tmssep490be.dtos.studentrequest.ApprovalDTO;
 import org.fyp.tmssep490be.dtos.studentrequest.PagedAARequestResponseDTO;
+import org.fyp.tmssep490be.dtos.studentrequest.RejectionDTO;
 import org.fyp.tmssep490be.dtos.studentrequest.RequestSummaryDTO;
+import org.fyp.tmssep490be.dtos.studentrequest.StudentRequestDetailDTO;
+import org.fyp.tmssep490be.dtos.studentrequest.StudentRequestResponseDTO;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentRequestService;
 import org.springframework.data.domain.Page;
@@ -23,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/academic-requests")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Academic Affairs Request Management", description = "APIs for Academic Affairs staff to manage student requests")
 @SecurityRequirement(name = "Bearer Authentication")
 public class AcademicAffairsRequestController {
 
@@ -103,5 +109,45 @@ public class AcademicAffairsRequestController {
         Page<AARequestResponseDTO> requests = studentRequestService.getAllRequests(currentUser.getId(), filter);
 
         return ResponseEntity.ok(ResponseObject.success("Retrieved all requests successfully", requests));
+    }
+
+    @GetMapping("/{requestId}")
+    @Operation(summary = "Get request details for review", description = "Retrieve detailed information about a specific request for Academic Affairs review")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<StudentRequestDetailDTO>> getRequestDetails(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "Request ID") @PathVariable Long requestId) {
+
+        StudentRequestDetailDTO request = studentRequestService.getRequestDetailsForAA(requestId);
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved request details successfully", request));
+    }
+
+    @PutMapping("/{requestId}/approve")
+    @Operation(summary = "Approve request", description = "Approve a pending student request")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> approveRequest(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "Request ID") @PathVariable Long requestId,
+            @Valid @RequestBody ApprovalDTO approvalDTO) {
+
+        Long decidedById = currentUser.getId();
+        StudentRequestResponseDTO request = studentRequestService.approveRequest(requestId, decidedById, approvalDTO);
+
+        return ResponseEntity.ok(ResponseObject.success("Request approved successfully", request));
+    }
+
+    @PutMapping("/{requestId}/reject")
+    @Operation(summary = "Reject request", description = "Reject a pending student request")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> rejectRequest(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "Request ID") @PathVariable Long requestId,
+            @Valid @RequestBody RejectionDTO rejectionDTO) {
+
+        Long decidedById = currentUser.getId();
+        StudentRequestResponseDTO request = studentRequestService.rejectRequest(requestId, decidedById, rejectionDTO);
+
+        return ResponseEntity.ok(ResponseObject.success("Request rejected successfully", request));
     }
 }

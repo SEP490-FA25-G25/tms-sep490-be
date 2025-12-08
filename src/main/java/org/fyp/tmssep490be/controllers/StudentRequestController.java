@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.studentrequest.RequestFilterDTO;
+import org.fyp.tmssep490be.dtos.studentrequest.StudentRequestDetailDTO;
 import org.fyp.tmssep490be.dtos.studentrequest.StudentRequestResponseDTO;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.entities.enums.StudentRequestType;
@@ -26,7 +27,6 @@ import java.util.List;
 @RequestMapping("/api/v1/students-request")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Student Request Management", description = "APIs for students to manage their absence/makeup/transfer requests")
 @SecurityRequirement(name = "Bearer Authentication")
 public class StudentRequestController {
 
@@ -104,5 +104,17 @@ public class StudentRequestController {
         Page<StudentRequestResponseDTO> requests = studentRequestService.getMyRequests(studentId, filter);
 
         return ResponseEntity.ok(ResponseObject.success("Retrieved student requests successfully", requests));
+    }
+
+    @GetMapping("/requests/{requestId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ResponseObject<StudentRequestDetailDTO>> getRequestById(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "Request ID") @PathVariable Long requestId) {
+
+        Long studentId = currentUser.getId();
+        StudentRequestDetailDTO request = studentRequestService.getRequestById(requestId, studentId);
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved request details successfully", request));
     }
 }
