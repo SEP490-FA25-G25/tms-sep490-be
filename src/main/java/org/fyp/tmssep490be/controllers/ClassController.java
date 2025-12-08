@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.classmanagement.AvailableStudentDTO;
 import org.fyp.tmssep490be.dtos.classmanagement.ClassDetailDTO;
 import org.fyp.tmssep490be.dtos.classmanagement.ClassListItemDTO;
+import org.fyp.tmssep490be.dtos.classmanagement.ClassStudentDTO;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
@@ -101,6 +102,33 @@ public class ClassController {
                 .success(true)
                 .message("Available students retrieved successfully")
                 .data(availableStudents)
+                .build());
+    }
+
+    @GetMapping("/{classId}/students")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER') or hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<Page<ClassStudentDTO>>> getClassStudents(
+            @PathVariable Long classId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "enrolledAt") String sort,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        log.info("User {} requesting students for class {} with search: {}", currentUser.getId(), classId, search);
+
+        // Create pageable with sort
+        Sort.Direction direction = sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sort));
+
+        Page<ClassStudentDTO> students = classService.getClassStudents(
+                classId, search, pageable, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<Page<ClassStudentDTO>>builder()
+                .success(true)
+                .message("Class students retrieved successfully")
+                .data(students)
                 .build());
     }
 
