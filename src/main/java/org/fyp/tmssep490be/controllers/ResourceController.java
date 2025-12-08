@@ -87,4 +87,22 @@ public class ResourceController {
         resourceService.deleteResource(id);
         return ResponseEntity.noContent().build();
     }
+
+    // PATCH /resources/{id}/status - Đổi trạng thái
+    @PatchMapping("/resources/{id}/status")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Update resource status")
+    public ResponseEntity<ResourceDTO> updateResourceStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (!request.containsKey("status")) {
+            throw new RuntimeException("Field 'status' is required");
+        }
+        ResourceStatus status = ResourceStatus.valueOf(request.get("status"));
+        ResourceDTO saved = resourceService.updateResourceStatus(id, status);
+        return ResponseEntity.ok(saved);
+    }
+
+
 }

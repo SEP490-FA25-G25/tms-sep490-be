@@ -352,7 +352,31 @@ public class ResourceService {
         log.info("Deleted resource with ID: {}", id);
     }
 
-    // ==================== HELPER METHODS ====================
+    // Đổi trạng thái hoạt động/ngưng hoạt động
+    @Transactional
+    public ResourceDTO updateResourceStatus(Long id, ResourceStatus status) {
+        log.info("Updating status for resource {}: {}", id, status);
+
+        Resource resource = resourceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found with id: " + id));
+
+        // Nếu ngưng hoạt động → kiểm tra không có session tương lai
+        if (status == ResourceStatus.INACTIVE) {
+            Session nextSession = sessionResourceRepository.findNextSessionByResourceId(
+                    id, LocalDate.now(), LocalTime.now());
+            if (nextSession != null) {
+                throw new BusinessRuleException(
+                        "Không thể ngưng hoạt động vì tài nguyên này đang được sử dụng cho các buổi học trong tương lai");
+            }
+        }
+
+        resource.setStatus(status);
+        resource.setUpdatedAt(OffsetDateTime.now());
+        Resource saved = resourceRepository.save(resource);
+        return convertToDTO(saved);
+    }
+
+    // ==================== HELPER METHODS ======================
 
     private List<Long> getBranchIdsForUser(Long userId) {
         if (userId == null) return List.of();
