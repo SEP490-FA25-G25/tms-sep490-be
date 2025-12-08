@@ -71,4 +71,20 @@ public class CurriculumController {
                 .data(curriculum)
                 .build());
     }
+
+    // Cập nhật curriculum
+    @PutMapping("/curriculums/{id}")
+    @Operation(summary = "Update curriculum")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<CurriculumResponseDTO>> updateCurriculum(
+            @PathVariable Long id,
+            @RequestBody CreateCurriculumDTO request) {
+        log.info("Updating curriculum with ID: {}", id);
+        CurriculumResponseDTO curriculum = curriculumService.updateCurriculum(id, request);
+        return ResponseEntity.ok(ResponseObject.<CurriculumResponseDTO>builder()
+                .success(true)
+                .message("Curriculum updated successfully")
+                .data(curriculum)
+                .build());
+    }
 }
