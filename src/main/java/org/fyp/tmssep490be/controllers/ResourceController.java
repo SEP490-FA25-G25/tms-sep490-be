@@ -104,5 +104,14 @@ public class ResourceController {
         return ResponseEntity.ok(saved);
     }
 
-
+    // GET /resources/{id}/sessions - Lấy sessions đang dùng
+    @GetMapping("/resources/{id}/sessions")
+    @PreAuthorize("hasAnyRole('CENTER_HEAD', 'ACADEMIC_AFFAIR', 'MANAGER')")
+    @Operation(summary = "Get sessions using a resource")
+    public ResponseEntity<List<SessionInfoDTO>> getSessionsByResourceId(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        List<SessionInfoDTO> sessions = resourceService.getSessionsByResourceId(id);
+        return ResponseEntity.ok(sessions);
+    }
 }
