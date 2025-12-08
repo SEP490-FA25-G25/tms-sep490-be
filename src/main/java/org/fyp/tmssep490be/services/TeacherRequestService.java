@@ -2,6 +2,7 @@ package org.fyp.tmssep490be.services;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestApproveDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestListDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
 import org.fyp.tmssep490be.entities.Resource;
@@ -15,12 +16,18 @@ import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.entities.enums.TeacherRequestType;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
+import org.fyp.tmssep490be.repositories.ResourceRepository;
+import org.fyp.tmssep490be.repositories.SessionRepository;
 import org.fyp.tmssep490be.repositories.TeacherRepository;
 import org.fyp.tmssep490be.repositories.TeacherRequestRepository;
+import org.fyp.tmssep490be.repositories.TimeSlotTemplateRepository;
+import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,6 +39,9 @@ public class TeacherRequestService {
     private final TeacherRequestRepository teacherRequestRepository;
     private final TeacherRepository teacherRepository;
     private final UserBranchesRepository userBranchesRepository;
+    private final UserAccountRepository userAccountRepository;
+    private final ResourceRepository resourceRepository;
+    private final TimeSlotTemplateRepository timeSlotTemplateRepository;
 
     //Lấy tất cả yêu cầu của giáo viên theo userId
     public List<TeacherRequestListDTO> getMyRequests(Long userId) {
@@ -288,6 +298,196 @@ public class TeacherRequestService {
         }
 
         return builder.build();
+    }
+
+    //Duyệt yêu cầu giáo viên (Academic Staff)
+    //Tất cả thông tin bắt buộc phải được điền khi approve
+    @Transactional
+    public TeacherRequestResponseDTO approveRequest(Long requestId, TeacherRequestApproveDTO approveDTO, Long academicStaffUserId) {
+        log.info("Approving request {} by academic staff {}", requestId, academicStaffUserId);
+
+        // Lấy request với đầy đủ relationships
+        TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+
+        // Kiểm tra status phải là PENDING
+        if (request.getStatus() != RequestStatus.PENDING) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not in PENDING status");
+        }
+
+        // Kiểm tra quyền: academic staff phải có branch trùng với teacher
+        List<Long> academicBranchIds = getBranchIdsForUser(academicStaffUserId);
+        if (academicBranchIds.isEmpty()) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "Academic staff has no branches assigned");
+        }
+        Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
+        List<Long> teacherBranchIds = getBranchIdsForUser(teacherUserAccountId);
+        boolean hasAccess = teacherBranchIds.stream().anyMatch(academicBranchIds::contains);
+        if (!hasAccess) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You don't have permission to approve this request");
+        }
+
+        // Lấy user account của academic staff
+        UserAccount academicStaffAccount = userAccountRepository.findById(academicStaffUserId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND, "Academic staff not found"));
+
+        // Validate và xử lý theo request type
+        switch (request.getRequestType()) {
+            case REPLACEMENT:
+                validateAndApproveReplacement(request, approveDTO);
+                request.setStatus(RequestStatus.WAITING_CONFIRM); // Chờ replacement teacher confirm
+                break;
+            case MODALITY_CHANGE:
+                validateAndApproveModalityChange(request, approveDTO);
+                request.setStatus(RequestStatus.APPROVED);
+                break;
+            case RESCHEDULE:
+                validateAndApproveReschedule(request, approveDTO);
+                request.setStatus(RequestStatus.APPROVED);
+                break;
+            default:
+                throw new CustomException(ErrorCode.INVALID_INPUT, "Invalid request type");
+        }
+
+        // Cập nhật thông tin quyết định
+        request.setDecidedBy(academicStaffAccount);
+        request.setDecidedAt(OffsetDateTime.now());
+        if (approveDTO.getNote() != null && !approveDTO.getNote().trim().isEmpty()) {
+            request.setNote(approveDTO.getNote().trim());
+        }
+
+        request = teacherRequestRepository.save(request);
+        log.info("Request {} approved successfully by academic staff {}", requestId, academicStaffUserId);
+
+        return mapToResponseDTO(request);
+    }
+
+    //Validate và approve REPLACEMENT request
+    private void validateAndApproveReplacement(TeacherRequest request, TeacherRequestApproveDTO approveDTO) {
+        // REPLACEMENT: replacementTeacherId bắt buộc
+        if (approveDTO.getReplacementTeacherId() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Replacement teacher ID is required for REPLACEMENT requests");
+        }
+
+        // Kiểm tra replacement teacher tồn tại
+        Teacher replacementTeacher = teacherRepository.findById(approveDTO.getReplacementTeacherId())
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Replacement teacher not found"));
+
+        // Không được chọn chính giáo viên tạo request
+        if (replacementTeacher.getId().equals(request.getTeacher().getId())) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Replacement teacher cannot be the same as the requesting teacher");
+        }
+
+        // Cập nhật replacement teacher
+        request.setReplacementTeacher(replacementTeacher);
+
+    }
+
+    //Validate và approve MODALITY_CHANGE request
+    private void validateAndApproveModalityChange(TeacherRequest request, TeacherRequestApproveDTO approveDTO) {
+        // MODALITY_CHANGE: newResourceId bắt buộc
+        if (approveDTO.getNewResourceId() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Resource ID is required for MODALITY_CHANGE requests");
+        }
+
+        // Kiểm tra resource tồn tại
+        Resource newResource = resourceRepository.findById(approveDTO.getNewResourceId())
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Resource not found"));
+
+        // Cập nhật resource
+        request.setNewResource(newResource);
+
+    }
+
+    //Validate và approve RESCHEDULE request
+    private void validateAndApproveReschedule(TeacherRequest request, TeacherRequestApproveDTO approveDTO) {
+        // RESCHEDULE: newResourceId bắt buộc
+        if (approveDTO.getNewResourceId() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Resource ID is required for RESCHEDULE requests");
+        }
+
+        // Xác định newDate và newTimeSlotId
+        // Priority: approveDTO > request (nếu teacher đã điền)
+        LocalDate newDate = approveDTO.getNewDate() != null ? approveDTO.getNewDate() : request.getNewDate();
+        Long newTimeSlotId = approveDTO.getNewTimeSlotId() != null ? approveDTO.getNewTimeSlotId() :
+                (request.getNewTimeSlot() != null ? request.getNewTimeSlot().getId() : null);
+
+        // Validate: nếu teacher chưa điền newDate hoặc newTimeSlotId, staff phải điền
+        if (newDate == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "New date is required for RESCHEDULE requests");
+        }
+        if (newTimeSlotId == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "New time slot ID is required for RESCHEDULE requests");
+        }
+
+        // Validate newDate không được trong quá khứ
+        if (newDate.isBefore(LocalDate.now())) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "New date cannot be in the past");
+        }
+
+        // Kiểm tra resource tồn tại
+        Resource newResource = resourceRepository.findById(approveDTO.getNewResourceId())
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Resource not found"));
+
+        // Kiểm tra time slot tồn tại
+        TimeSlotTemplate newTimeSlot = timeSlotTemplateRepository.findById(newTimeSlotId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Time slot not found"));
+
+        // Cập nhật thông tin
+        request.setNewDate(newDate);
+        request.setNewTimeSlot(newTimeSlot);
+        request.setNewResource(newResource);
+
+    }
+
+    //Từ chối yêu cầu giáo viên
+    @Transactional
+    public TeacherRequestResponseDTO rejectRequest(Long requestId, String reason, Long academicStaffUserId) {
+        log.info("Rejecting request {} by academic staff {}", requestId, academicStaffUserId);
+
+        // Lấy request
+        TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+
+        // Kiểm tra status phải là PENDING
+        if (request.getStatus() != RequestStatus.PENDING) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not in PENDING status");
+        }
+
+        // Kiểm tra quyền: academic staff phải có branch trùng với teacher
+        List<Long> academicBranchIds = getBranchIdsForUser(academicStaffUserId);
+        if (academicBranchIds.isEmpty()) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "Academic staff has no branches assigned");
+        }
+        Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
+        List<Long> teacherBranchIds = getBranchIdsForUser(teacherUserAccountId);
+        boolean hasAccess = teacherBranchIds.stream().anyMatch(academicBranchIds::contains);
+        if (!hasAccess) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You don't have permission to reject this request");
+        }
+
+        // Validate lý do từ chối
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Rejection reason is required");
+        }
+        if (reason.trim().length() < 10) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Rejection reason must be at least 10 characters");
+        }
+
+        // Lấy user account của giáo vụ
+        UserAccount academicStaffAccount = userAccountRepository.findById(academicStaffUserId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND, "Academic staff not found"));
+
+        // Cập nhật status và thông tin quyết định
+        request.setStatus(RequestStatus.REJECTED);
+        request.setDecidedBy(academicStaffAccount);
+        request.setDecidedAt(OffsetDateTime.now());
+        request.setNote(reason.trim());
+
+        request = teacherRequestRepository.save(request);
+        log.info("Request {} rejected successfully by academic staff {}", requestId, academicStaffUserId);
+
+        return mapToResponseDTO(request);
     }
 }
 
