@@ -92,4 +92,56 @@ class UserAccountServiceTest {
         verify(userAccountRepository).save(any(UserAccount.class));
     }
 
+    @Test
+    void updateUser_WhenUserNotFound_ShouldThrowException() {
+        when(userAccountRepository.findById(99L)).thenReturn(Optional.empty());
+        UpdateUserRequest request = new UpdateUserRequest();
+        request.setFullName("Hoang Thi Huyen Trang");
+        assertThrows(IllegalArgumentException.class,
+                () -> userAccountService.updateUser(99L, request));
+    }
+
+    @Test
+    void updateUser_WhenValidRequest_ShouldUpdateUser() {
+
+        UserAccount existingUser = new UserAccount();
+        existingUser.setId(1L);
+        existingUser.setEmail("huyentrang@gmail.com");
+        existingUser.setFullName("Huyen Trang");
+        when(userAccountRepository.findById(1L)).thenReturn(Optional.of(existingUser));
+        when(userAccountRepository.save(any(UserAccount.class))).thenReturn(existingUser);
+        UpdateUserRequest request = new UpdateUserRequest();
+        request.setFullName("New Name");
+
+        UserResponse response = userAccountService.updateUser(1L, request);
+
+        verify(userAccountRepository).save(any(UserAccount.class));
+        assertEquals("New Name", existingUser.getFullName());
+    }
+
+    @Test
+    void deleteUser_WhenUserNotFound_ShouldThrowException() {
+        when(userAccountRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> userAccountService.deleteUser(99L));
+    }
+
+    @Test
+    void deleteUser_WhenUserExists_ShouldSetStatusInactive() {
+
+        UserAccount existingUser = new UserAccount();
+        existingUser.setId(1L);
+        existingUser.setStatus(UserStatus.ACTIVE);
+
+        when(userAccountRepository.findById(1L)).thenReturn(Optional.of(existingUser));
+        when(userAccountRepository.save(any(UserAccount.class))).thenReturn(existingUser);
+
+
+        userAccountService.deleteUser(1L);
+
+
+        assertEquals(UserStatus.INACTIVE, existingUser.getStatus());
+        verify(userAccountRepository).save(existingUser);
+    }
 }
