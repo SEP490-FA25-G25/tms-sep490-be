@@ -598,6 +598,7 @@ public class StudentRequestService {
         request.setNote(dto.getNote());
         request = studentRequestRepository.save(request);
 
+        // Handle ABSENCE requests
         if (request.getRequestType().equals(StudentRequestType.ABSENCE) && request.getTargetSession() != null) {
             markSessionAsExcused(
                     request.getStudent(),
@@ -605,6 +606,11 @@ public class StudentRequestService {
                     String.format("Vắng có phép được duyệt lúc %s. Request ID: %d",
                             OffsetDateTime.now(), requestId)
             );
+        }
+
+        // Handle MAKEUP requests - validate capacity and create student session
+        if (request.getRequestType().equals(StudentRequestType.MAKEUP)) {
+            executeMakeupApproval(request);
         }
 
         log.info("Request {} approved by user {}", requestId, decidedById);
@@ -633,6 +639,192 @@ public class StudentRequestService {
         log.info("Request {} rejected by user {}", requestId, decidedById);
 
         return mapToStudentRequestResponseDTO(request);
+    }
+
+    @Transactional
+    public StudentRequestResponseDTO submitMakeupRequest(Long userId, MakeupRequestDTO dto) {
+        log.info("Submitting makeup request for user {} - target: {}, makeup: {}",
+                userId, dto.getTargetSessionId(), dto.getMakeupSessionId());
+
+        Student student = studentRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
+
+        UserAccount submittedBy = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        return submitMakeupRequestInternal(student.getId(), dto, submittedBy, false);
+    }
+
+    @Transactional
+    public StudentRequestResponseDTO submitMakeupRequestOnBehalf(Long decidedById, MakeupRequestDTO dto) {
+        log.info("AA user {} submitting makeup request on-behalf for student {} - target: {}, makeup: {}",
+                decidedById, dto.getStudentId(), dto.getTargetSessionId(), dto.getMakeupSessionId());
+
+        if (dto.getStudentId() == null) {
+            throw new BusinessRuleException("MISSING_STUDENT_ID", "Student ID is required for on-behalf requests");
+        }
+
+        UserAccount submittedBy = userAccountRepository.findById(decidedById)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        return submitMakeupRequestInternal(dto.getStudentId(), dto, submittedBy, true);
+    }
+
+    private StudentRequestResponseDTO submitMakeupRequestInternal(Long studentId, MakeupRequestDTO dto,
+                                                                   UserAccount submittedBy, boolean autoApprove) {
+        // 1. Validate target session exists and has ABSENT or EXCUSED attendance
+        StudentSession.StudentSessionId targetSsId = new StudentSession.StudentSessionId(studentId, dto.getTargetSessionId());
+        StudentSession targetStudentSession = studentSessionRepository.findById(targetSsId)
+                .orElseThrow(() -> new ResourceNotFoundException("Target session not found for this student"));
+
+        AttendanceStatus attendanceStatus = targetStudentSession.getAttendanceStatus();
+        if (attendanceStatus != AttendanceStatus.ABSENT && attendanceStatus != AttendanceStatus.EXCUSED) {
+            throw new BusinessRuleException("NOT_ABSENT", "Can only makeup absent or excused sessions");
+        }
+
+        Session targetSession = targetStudentSession.getSession();
+
+        // 2. Check eligible timeframe (4 weeks limit)
+        int makeupWeeksLimit = 4;
+        long weeksAgo = ChronoUnit.WEEKS.between(targetSession.getDate(), LocalDate.now());
+        if (weeksAgo > makeupWeeksLimit) {
+            throw new BusinessRuleException("SESSION_TOO_OLD",
+                    String.format("Session too old for makeup (limit: %d weeks)", makeupWeeksLimit));
+        }
+
+        // 3. Validate makeup session
+        Session makeupSession = sessionRepository.findById(dto.getMakeupSessionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Makeup session not found"));
+
+        if (makeupSession.getStatus() != SessionStatus.PLANNED) {
+            throw new BusinessRuleException("INVALID_MAKEUP_STATUS", "Makeup session must be PLANNED");
+        }
+
+        if (makeupSession.getDate().isBefore(LocalDate.now())) {
+            throw new BusinessRuleException("PAST_SESSION", "Makeup session must be in the future");
+        }
+
+        // 4. CRITICAL: Validate subject session match (same content)
+        if (targetSession.getSubjectSession() == null || makeupSession.getSubjectSession() == null) {
+            throw new BusinessRuleException("MISSING_SUBJECT_SESSION", "Both sessions must have subject session defined");
+        }
+
+        if (!targetSession.getSubjectSession().getId().equals(makeupSession.getSubjectSession().getId())) {
+            throw new BusinessRuleException("SUBJECT_SESSION_MISMATCH",
+                    "Makeup session must have same content (subjectSessionId)");
+        }
+
+        // 5. Check capacity (for informational purposes only)
+        // Note: We allow requests even if session is full - AA will decide whether to approve
+        ClassEntity makeupClass = makeupSession.getClassEntity();
+        long enrolledCount = studentSessionRepository.countBySessionId(makeupSession.getId());
+        boolean isOverCapacity = enrolledCount >= makeupClass.getMaxCapacity();
+        
+        if (isOverCapacity) {
+            if (autoApprove) {
+                // AA on-behalf: Log but allow (AA consciously overriding capacity)
+                log.warn("AA override: Creating makeup request for session {} at/over capacity ({}/{})",
+                        makeupSession.getId(), enrolledCount, makeupClass.getMaxCapacity());
+            } else {
+                // Student self-service: Log but allow (AA will review and decide)
+                log.info("Student requesting makeup for session {} at/over capacity ({}/{}) - AA will review",
+                        makeupSession.getId(), enrolledCount, makeupClass.getMaxCapacity());
+            }
+        }
+
+        // 6. Check schedule conflict
+        List<Session> studentSessions = sessionRepository.findSessionsForStudentByDate(studentId, makeupSession.getDate());
+        for (Session existing : studentSessions) {
+            if (hasTimeOverlap(existing.getTimeSlotTemplate(), makeupSession.getTimeSlotTemplate())) {
+                throw new BusinessRuleException("SCHEDULE_CONFLICT", "Schedule conflict with other classes");
+            }
+        }
+
+        // 7. Check duplicate request
+        boolean hasDuplicate = studentRequestRepository.existsByStudentIdAndTargetSessionIdAndRequestTypeAndStatusIn(
+                studentId, dto.getTargetSessionId(), StudentRequestType.MAKEUP,
+                List.of(RequestStatus.PENDING, RequestStatus.APPROVED));
+
+        if (hasDuplicate) {
+            throw new BusinessRuleException("DUPLICATE_REQUEST", "Duplicate makeup request for this session");
+        }
+
+        // 8. Create request
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
+
+        ClassEntity currentClass = classRepository.findById(dto.getCurrentClassId())
+                .orElseThrow(() -> new ResourceNotFoundException("Class not found"));
+
+        StudentRequest request = StudentRequest.builder()
+                .student(student)
+                .requestType(StudentRequestType.MAKEUP)
+                .currentClass(currentClass)
+                .targetSession(targetSession)
+                .makeupSession(makeupSession)
+                .requestReason(dto.getRequestReason())
+                .note(dto.getNote())
+                .status(autoApprove ? RequestStatus.APPROVED : RequestStatus.PENDING)
+                .submittedBy(submittedBy)
+                .submittedAt(OffsetDateTime.now())
+                .build();
+
+        // 9. If auto-approve (AA on-behalf)
+        if (autoApprove) {
+            request.setDecidedBy(submittedBy);
+            request.setDecidedAt(OffsetDateTime.now());
+        }
+
+        request = studentRequestRepository.save(request);
+
+        // 10. If auto-approved, create makeup student session immediately
+        if (autoApprove) {
+            executeMakeupApproval(request);
+        }
+
+        log.info("Makeup request created with ID: {} - Status: {}", request.getId(), request.getStatus());
+        return mapToStudentRequestResponseDTO(request);
+    }
+
+    private void executeMakeupApproval(StudentRequest request) {
+        log.info("Executing makeup approval for request {}", request.getId());
+
+        // 1. Check capacity (informational only - AA has already seen the warning and decided to approve)
+        long currentEnrolled = studentSessionRepository.countBySessionId(request.getMakeupSession().getId());
+        int maxCapacity = request.getMakeupSession().getClassEntity().getMaxCapacity();
+        
+        if (currentEnrolled >= maxCapacity) {
+            log.warn("CAPACITY OVERRIDE: AA approved makeup request {} for session {} which is at/over capacity ({}/{}). " +
+                    "Student {} will be added despite full capacity.",
+                    request.getId(), 
+                    request.getMakeupSession().getId(), 
+                    currentEnrolled, 
+                    maxCapacity,
+                    request.getStudent().getStudentCode());
+        }
+
+        // 2. Create StudentSession for the makeup session
+        StudentSession.StudentSessionId makeupSsId = new StudentSession.StudentSessionId(
+                request.getStudent().getId(),
+                request.getMakeupSession().getId()
+        );
+
+        StudentSession makeupStudentSession = studentSessionRepository.findById(makeupSsId)
+                .orElseGet(() -> StudentSession.builder()
+                        .id(makeupSsId)
+                        .student(request.getStudent())
+                        .session(request.getMakeupSession())
+                        .build());
+
+        // 3. Mark as makeup session linking to original
+        makeupStudentSession.setIsMakeup(true);
+        makeupStudentSession.setOriginalSession(request.getTargetSession());
+        makeupStudentSession.setAttendanceStatus(AttendanceStatus.PLANNED);
+        makeupStudentSession.setNote("Makeup for session " + request.getTargetSession().getId());
+
+        studentSessionRepository.save(makeupStudentSession);
+        log.info("Created makeup StudentSession for student {} session {}", 
+                request.getStudent().getId(), request.getMakeupSession().getId());
     }
 
     private StudentRequestDetailDTO mapToDetailDTO(StudentRequest request) {
@@ -702,6 +894,21 @@ public class StudentRequestService {
             teacher = session.getTeachingSlots().iterator().next().getTeacher();
         }
         
+        // Get capacity information
+        long enrolledCount = studentSessionRepository.countBySessionId(session.getId());
+        Integer maxCapacity = session.getClassEntity() != null ? session.getClassEntity().getMaxCapacity() : null;
+        
+        // Get class information
+        ClassEntity classEntity = session.getClassEntity();
+        StudentRequestDetailDTO.ClassInfoDTO classInfo = null;
+        if (classEntity != null) {
+            classInfo = StudentRequestDetailDTO.ClassInfoDTO.builder()
+                    .classId(classEntity.getId())
+                    .classCode(classEntity.getCode())
+                    .branchName(classEntity.getBranch() != null ? classEntity.getBranch().getName() : null)
+                    .build();
+        }
+        
         return StudentRequestDetailDTO.SessionDetailDTO.builder()
                 .id(session.getId())
                 .date(session.getDate() != null ? session.getDate().toString() : null)
@@ -722,6 +929,9 @@ public class StudentRequestService {
                         .email(teacher.getUserAccount() != null ? teacher.getUserAccount().getEmail() : null)
                         .build()
                     : null)
+                .enrolledCount(enrolledCount)
+                .maxCapacity(maxCapacity)
+                .classInfo(classInfo)
                 .build();
     }
 
@@ -732,6 +942,245 @@ public class StudentRequestService {
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .build();
+    }
+
+    public StudentRequestConfigDTO getStudentRequestConfig() {
+        return StudentRequestConfigDTO.builder()
+                .makeupLookbackWeeks(4)
+                .makeupWeeksLimit(4)
+                .maxTransfersPerCourse(2)
+                .absenceLeadTimeDays(LEAD_TIME_DAYS)
+                .reasonMinLength(10)
+                .build();
+    }
+
+     public MissedSessionsResponseDTO getMissedSessions(Long userId, Integer weeksBack, Boolean excludeRequested) {
+        Student student = studentRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
+        return getMissedSessionsForStudent(student.getId(), weeksBack, excludeRequested);
+    }
+
+    public MissedSessionsResponseDTO getMissedSessionsForStudent(Long studentId, Integer weeksBack, Boolean excludeRequested) {
+        int lookbackWeeks = weeksBack != null ? weeksBack : 4;
+        boolean excludeRequestedSessions = excludeRequested != null ? excludeRequested : true;
+
+        LocalDate cutoffDate = LocalDate.now().minusWeeks(lookbackWeeks);
+        LocalDate today = LocalDate.now();
+
+        List<StudentSession> allSessions = studentSessionRepository.findAllByStudentId(studentId);
+        
+        List<MissedSessionDTO> missedSessions = allSessions.stream()
+                .filter(ss -> ss.getSession() != null)
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT 
+                           || ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
+                .filter(ss -> {
+                    LocalDate sessionDate = ss.getSession().getDate();
+                    return !sessionDate.isBefore(cutoffDate) && !sessionDate.isAfter(today);
+                })
+                .filter(ss -> ss.getSession().getStatus() != SessionStatus.CANCELLED)
+                .map(ss -> mapToMissedSessionDTO(ss, excludeRequestedSessions))
+                .filter(dto -> !excludeRequestedSessions || !dto.getHasExistingMakeupRequest())
+                .sorted((a, b) -> b.getDate().compareTo(a.getDate())) // 
+                .collect(Collectors.toList());
+
+        return MissedSessionsResponseDTO.builder()
+                .studentId(studentId)
+                .totalCount(missedSessions.size())
+                .missedSessions(missedSessions)
+                .build();
+    }
+
+    public MakeupOptionsResponseDTO getMakeupOptions(Long userId, Long targetSessionId) {
+        Student student = studentRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
+
+        return getMakeupOptionsForStudent(student.getId(), targetSessionId);
+    }
+
+    public MakeupOptionsResponseDTO getMakeupOptionsForStudent(Long studentId, Long targetSessionId) {
+        Session targetSession = sessionRepository.findById(targetSessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Target session not found"));
+
+        if (targetSession.getSubjectSession() == null) {
+            throw new BusinessRuleException("INVALID_SESSION", "Target session must have subject session defined");
+        }
+
+        // Find makeup options with same subject session (same content)
+        // Business Rule: Same branch → allow all modalities; Different branch → ONLINE only
+        List<Session> makeupOptions = sessionRepository.findMakeupSessionOptions(
+                targetSession.getSubjectSession().getId(),
+                targetSessionId,
+                targetSession.getClassEntity().getBranch().getId()
+        );
+
+        // Apply smart ranking and filtering
+        List<MakeupOptionDTO> rankedOptions = makeupOptions.stream()
+                .map(session -> mapToMakeupOptionDTO(session, targetSession, studentId))
+                .filter(option -> option != null) // Filter out sessions with conflicts
+                .sorted((a, b) -> {
+                    // Primary: Sort by total score (higher is better)
+                    int scoreCompare = b.getMatchScore().getTotalScore().compareTo(a.getMatchScore().getTotalScore());
+                    if (scoreCompare != 0) return scoreCompare;
+                    // Secondary: If scores are equal, prefer earlier date (closer to today)
+                    return a.getDate().compareTo(b.getDate());
+                })
+                .collect(Collectors.toList());
+
+        // Build target session info
+        MakeupOptionsResponseDTO.TargetSessionInfo targetInfo = MakeupOptionsResponseDTO.TargetSessionInfo.builder()
+                .sessionId(targetSession.getId())
+                .subjectSessionId(targetSession.getSubjectSession().getId())
+                .classId(targetSession.getClassEntity().getId())
+                .classCode(targetSession.getClassEntity().getCode())
+                .branchId(targetSession.getClassEntity().getBranch().getId())
+                .branchName(targetSession.getClassEntity().getBranch().getName())
+                .modality(targetSession.getClassEntity().getModality().name())
+                .build();
+
+        return MakeupOptionsResponseDTO.builder()
+                .targetSessionId(targetSessionId)
+                .targetSession(targetInfo)
+                .makeupOptions(rankedOptions)
+                .totalOptions(rankedOptions.size())
+                .build();
+    }
+
+    private MissedSessionDTO mapToMissedSessionDTO(StudentSession studentSession, boolean checkExistingRequest) {
+        Session session = studentSession.getSession();
+        SubjectSession subjectSession = session.getSubjectSession();
+        ClassEntity classEntity = session.getClassEntity();
+        TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
+
+        // Check if there's an existing absence request
+        List<StudentRequest> absenceRequests = studentRequestRepository
+                .findByStudentIdAndTargetSessionIdAndRequestType(
+                        studentSession.getStudent().getId(),
+                        session.getId(),
+                        StudentRequestType.ABSENCE
+                );
+
+        StudentRequest absenceRequest = absenceRequests.stream()
+                .filter(r -> r.getStatus() != RequestStatus.CANCELLED && r.getStatus() != RequestStatus.REJECTED)
+                .findFirst()
+                .orElse(null);
+
+        // Check if there's an existing makeup request
+        boolean hasExistingMakeupRequest = checkExistingRequest && studentRequestRepository
+                .existsByStudentIdAndTargetSessionIdAndRequestTypeAndStatusIn(
+                        studentSession.getStudent().getId(),
+                        session.getId(),
+                        StudentRequestType.MAKEUP,
+                        List.of(RequestStatus.PENDING, RequestStatus.APPROVED)
+                );
+
+        int daysAgo = (int) ChronoUnit.DAYS.between(session.getDate(), LocalDate.now());
+
+        return MissedSessionDTO.builder()
+                .sessionId(session.getId())
+                .date(session.getDate())
+                .daysAgo(daysAgo)
+                .subjectSessionNumber(subjectSession != null ? subjectSession.getSequenceNo() : null)
+                .subjectSessionTitle(subjectSession != null ? subjectSession.getTopic() : null)
+                .subjectSessionId(subjectSession != null ? subjectSession.getId() : null)
+                .classInfo(MissedSessionDTO.ClassInfo.builder()
+                        .classId(classEntity.getId())
+                        .classCode(classEntity.getCode())
+                        .className(classEntity.getName())
+                        .branchId(classEntity.getBranch().getId())
+                        .branchName(classEntity.getBranch().getName())
+                        .modality(classEntity.getModality().name())
+                        .build())
+                .timeSlotInfo(MissedSessionDTO.TimeSlotInfo.builder()
+                        .startTime(timeSlot != null ? timeSlot.getStartTime().toString() : null)
+                        .endTime(timeSlot != null ? timeSlot.getEndTime().toString() : null)
+                        .build())
+                .attendanceStatus(studentSession.getAttendanceStatus().name())
+                .hasExistingMakeupRequest(hasExistingMakeupRequest)
+                .isExcusedAbsence(studentSession.getAttendanceStatus() == AttendanceStatus.EXCUSED)
+                .absenceRequestId(absenceRequest != null ? absenceRequest.getId() : null)
+                .absenceRequestStatus(absenceRequest != null ? absenceRequest.getStatus().name() : null)
+                .build();
+    }
+
+    private MakeupOptionDTO mapToMakeupOptionDTO(Session session, Session targetSession, Long studentId) {
+        // Check schedule conflict
+        List<Session> conflicts = sessionRepository.findSessionsForStudentByDate(studentId, session.getDate());
+        for (Session conflict : conflicts) {
+            if (hasTimeOverlap(conflict.getTimeSlotTemplate(), session.getTimeSlotTemplate())) {
+                return null; // Filter out conflicting sessions
+            }
+        }
+
+        // Calculate match score
+        boolean branchMatch = session.getClassEntity().getBranch().getId()
+                .equals(targetSession.getClassEntity().getBranch().getId());
+        boolean modalityMatch = session.getClassEntity().getModality()
+                .equals(targetSession.getClassEntity().getModality());
+
+        int score = 0;
+        //Cùng chi nhánh thì + 10, khác thì không +
+        if (branchMatch) score += 10;
+        //Cùng hình thức học thì + 5, khác thì không cộng
+        if (modalityMatch) score += 5;
+
+        // Date proximity bonus
+        long weeksUntil = ChronoUnit.WEEKS.between(LocalDate.now(), session.getDate());
+        int dateProximityScore = (int) Math.max(0, 3 - weeksUntil); // +3 this week, +2 next, +1 in 2 weeks
+        //weeksUntil = 0 -> 3-0 =3 -> điểm cao
+        // tương tự như vậy weeksUntil = 3 -> 3-3 = 0 điểm vì quá xa
+        score += dateProximityScore;
+
+        // Capacity bonus
+        long enrolled = studentSessionRepository.countBySessionId(session.getId());
+        int availableSlots = session.getClassEntity().getMaxCapacity() - (int) enrolled;
+        boolean capacityOk = availableSlots > 0;
+        score += Math.min(1, availableSlots / 5); // +1 per 5 slots
+
+        String priority = score >= 15 ? "HIGH" : (score >= 8 ? "MEDIUM" : "LOW");
+
+        SubjectSession subjectSession = session.getSubjectSession();
+        TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
+
+        return MakeupOptionDTO.builder()
+                .sessionId(session.getId())
+                .date(session.getDate())
+                .dayOfWeek(session.getDate().getDayOfWeek().name())
+                .subjectSessionNumber(subjectSession != null ? subjectSession.getSequenceNo() : null)
+                .subjectSessionTitle(subjectSession != null ? subjectSession.getTopic() : null)
+                .subjectSessionId(subjectSession != null ? subjectSession.getId() : null)
+                .classInfo(MakeupOptionDTO.ClassInfo.builder()
+                        .classId(session.getClassEntity().getId())
+                        .classCode(session.getClassEntity().getCode())
+                        .className(session.getClassEntity().getName())
+                        .branchId(session.getClassEntity().getBranch().getId())
+                        .branchName(session.getClassEntity().getBranch().getName())
+                        .modality(session.getClassEntity().getModality().name())
+                        .availableSlots(availableSlots)
+                        .maxCapacity(session.getClassEntity().getMaxCapacity())
+                        .build())
+                .timeSlotInfo(MakeupOptionDTO.TimeSlotInfo.builder()
+                        .startTime(timeSlot != null ? timeSlot.getStartTime().toString() : null)
+                        .endTime(timeSlot != null ? timeSlot.getEndTime().toString() : null)
+                        .slotId(timeSlot != null ? timeSlot.getId() : null)
+                        .slotName(timeSlot != null ? timeSlot.getName() : null)
+                        .build())
+                .availableSlots(availableSlots)
+                .maxCapacity(session.getClassEntity().getMaxCapacity())
+                .matchScore(MakeupOptionDTO.MatchScore.builder()
+                        .branchMatch(branchMatch)
+                        .modalityMatch(modalityMatch)
+                        .capacityOk(capacityOk)
+                        .dateProximityScore(dateProximityScore)
+                        .totalScore(score)
+                        .priority(priority)
+                        .build())
+                .build();
+    }
+
+    private boolean hasTimeOverlap(TimeSlotTemplate slot1, TimeSlotTemplate slot2) {
+        if (slot1 == null || slot2 == null) return false;
+        return !(slot1.getEndTime().isBefore(slot2.getStartTime()) || 
+                 slot2.getEndTime().isBefore(slot1.getStartTime()));
     }
 
     private StudentRequestDetailDTO.StudentAbsenceStatsDTO calculateAbsenceStats(Long studentId, Long classId) {

@@ -151,10 +151,6 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
             @Param("requestType") StudentRequestType requestType,
             @Param("status") RequestStatus status);
 
-    /**
-     * Dynamic query for student's own requests with flexible filtering
-     * Supports: search, multiple request types, multiple statuses
-     */
     @Query("""
         SELECT sr FROM StudentRequest sr
         WHERE sr.student.id = :studentId
@@ -186,4 +182,13 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
         @Param("status") RequestStatus status,
         @Param("effectiveDate") LocalDate effectiveDate
     );
+
+    @Query("SELECT sr FROM StudentRequest sr " +
+           "WHERE sr.student.id = :studentId " +
+           "AND sr.targetSession.id = :targetSessionId " +
+           "AND sr.requestType = :requestType")
+    List<StudentRequest> findByStudentIdAndTargetSessionIdAndRequestType(
+            @Param("studentId") Long studentId,
+            @Param("targetSessionId") Long targetSessionId,
+            @Param("requestType") StudentRequestType requestType);
 }

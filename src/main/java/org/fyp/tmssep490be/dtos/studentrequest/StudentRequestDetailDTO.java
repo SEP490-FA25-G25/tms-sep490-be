@@ -7,9 +7,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.OffsetDateTime;
 
-/**
- * DTO for detailed request view (both student and AA views)
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -106,6 +103,19 @@ public class StudentRequestDetailDTO {
         private TimeSlotDTO timeSlot;
         private String status; // PLANNED, COMPLETED, CANCELLED
         private TeacherSummaryDTO teacher;
+        private Long enrolledCount; // Current enrolled students
+        private Integer maxCapacity; // Maximum capacity of the class
+        private ClassInfoDTO classInfo; // Class information for this session
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ClassInfoDTO {
+        private Long classId;
+        private String classCode;
+        private String branchName;
     }
 
     @Data

@@ -20,18 +20,15 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             Long classId,
             LocalDate date,
             SessionStatus status);
-    // Kiểm tra khung giờ có được dùng trong session không
+            
     boolean existsByTimeSlotTemplateId(Long timeSlotTemplateId);
 
-    // Đếm số lớp đang dùng khung giờ này
     @Query("SELECT COUNT(DISTINCT s.classEntity.id) FROM Session s WHERE s.timeSlotTemplate.id = :timeSlotId AND s.status != 'CANCELLED'")
     Long countDistinctClassesByTimeSlotId(@Param("timeSlotId") Long timeSlotId);
 
-    // Đếm tổng số session dùng khung giờ này
     @Query("SELECT COUNT(s) FROM Session s WHERE s.timeSlotTemplate.id = :timeSlotId AND s.status != 'CANCELLED'")
     Long countSessionsByTimeSlotId(@Param("timeSlotId") Long timeSlotId);
 
-    // Đếm session tương lai (kiểm tra trước khi ngưng hoạt động)
     @Query(value = """
         SELECT COUNT(s.id) FROM session s
         JOIN time_slot_template tst ON s.time_slot_template_id = tst.id
@@ -44,7 +41,6 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("currentDate") LocalDate currentDate,
             @Param("currentTime") LocalTime currentTime);
 
-    // Tìm sessions theo khung giờ
     @Query(value = """
         SELECT s.* FROM session s
         JOIN time_slot_template tst ON s.time_slot_template_id = tst.id
@@ -82,4 +78,39 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
                                                  @Param("fromDate") LocalDate fromDate,
                                                  @Param("toDate") LocalDate toDate,
                                                  @Param("classId") Long classId);
+
+    // Học viên chọn buổi học bù -> join với class để kiểm tra chi nhánh và hình thức điều kiện cùng  môn
+    // Kiểm tra date trong 2 tuần từ ngày hiện tại, trạng thái PLANNED, không phải buổi học bị bỏ
+    // Loại trừ buổi học bị mà học viên đã bỏ qua (excludeSessionId)
+    // Cùng chi nhánh được học onl hoạc offline, khác chi nhánh thì chỉ được học online
+    @Query(value = """
+        SELECT s.* FROM session s
+        JOIN class c ON s.class_id = c.id
+        WHERE s.subject_session_id = :subjectSessionId
+          AND s.date >= CURRENT_DATE
+          AND s.date <= CURRENT_DATE + INTERVAL '2 weeks'
+          AND s.status = 'PLANNED'
+          AND s.id != :excludeSessionId
+          AND (
+            c.branch_id = :targetBranchId
+            OR c.modality = 'ONLINE'
+          )
+        ORDER BY s.date ASC
+        """, nativeQuery = true)
+    List<Session> findMakeupSessionOptions(
+            @Param("subjectSessionId") Long subjectSessionId,
+            @Param("excludeSessionId") Long excludeSessionId,
+            @Param("targetBranchId") Long targetBranchId);
+
+    @Query("""
+        SELECT s FROM Session s
+        JOIN s.studentSessions ss
+        WHERE ss.student.id = :studentId
+          AND s.date = :date
+          AND s.status IN ('PLANNED', 'ONGOING')
+          AND ss.attendanceStatus != 'CANCELLED'
+        """)
+    List<Session> findSessionsForStudentByDate(
+            @Param("studentId") Long studentId,
+            @Param("date") LocalDate date);
 }

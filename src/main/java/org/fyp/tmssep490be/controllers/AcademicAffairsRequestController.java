@@ -8,14 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
-import org.fyp.tmssep490be.dtos.studentrequest.AARequestFilterDTO;
-import org.fyp.tmssep490be.dtos.studentrequest.AARequestResponseDTO;
-import org.fyp.tmssep490be.dtos.studentrequest.ApprovalDTO;
-import org.fyp.tmssep490be.dtos.studentrequest.PagedAARequestResponseDTO;
-import org.fyp.tmssep490be.dtos.studentrequest.RejectionDTO;
-import org.fyp.tmssep490be.dtos.studentrequest.RequestSummaryDTO;
-import org.fyp.tmssep490be.dtos.studentrequest.StudentRequestDetailDTO;
-import org.fyp.tmssep490be.dtos.studentrequest.StudentRequestResponseDTO;
+import org.fyp.tmssep490be.dtos.studentrequest.*;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentRequestService;
 import org.springframework.data.domain.Page;
@@ -149,5 +142,50 @@ public class AcademicAffairsRequestController {
         StudentRequestResponseDTO request = studentRequestService.rejectRequest(requestId, decidedById, rejectionDTO);
 
         return ResponseEntity.ok(ResponseObject.success("Request rejected successfully", request));
+    }
+
+    @GetMapping("/students/{studentId}/missed-sessions")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(summary = "Get student missed sessions (AA)", description = "Get missed sessions for a specific student for on-behalf makeup request creation")
+    public ResponseEntity<ResponseObject<MissedSessionsResponseDTO>> getStudentMissedSessions(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "Student ID", required = true) @PathVariable Long studentId,
+            @Parameter(description = "Number of weeks to look back (default: 4)")
+            @RequestParam(required = false) Integer weeksBack,
+            @Parameter(description = "Exclude sessions with existing makeup requests (default: true)")
+            @RequestParam(required = false) Boolean excludeRequested) {
+
+        MissedSessionsResponseDTO response = studentRequestService.getMissedSessionsForStudent(
+                studentId, weeksBack, excludeRequested);
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved missed sessions successfully", response));
+    }
+
+    @GetMapping("/makeup-options")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(summary = "Get makeup options for student (AA)", description = "Get available makeup sessions for a specific missed session (for AA to create makeup requests on behalf)")
+    public ResponseEntity<ResponseObject<MakeupOptionsResponseDTO>> getMakeupOptionsForStudent(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "Student ID", required = true) @RequestParam Long studentId,
+            @Parameter(description = "Target session ID (the missed session to makeup)", required = true)
+            @RequestParam Long targetSessionId) {
+
+        MakeupOptionsResponseDTO response = studentRequestService.getMakeupOptionsForStudent(
+                studentId, targetSessionId);
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved makeup options successfully", response));
+    }
+
+    @PostMapping("/makeup-requests/on-behalf")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    @Operation(summary = "Submit makeup request on-behalf", description = "Create makeup request for student (auto-approved)")
+    public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> submitMakeupOnBehalf(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody MakeupRequestDTO dto) {
+
+        StudentRequestResponseDTO response = studentRequestService.submitMakeupRequestOnBehalf(
+                currentUser.getId(), dto);
+
+        return ResponseEntity.ok(ResponseObject.success("Makeup request created and auto-approved", response));
     }
 }

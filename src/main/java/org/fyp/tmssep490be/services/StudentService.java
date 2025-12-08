@@ -4,10 +4,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.studentmanagement.*;
 import org.fyp.tmssep490be.entities.*;
+import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
+import org.fyp.tmssep490be.entities.enums.Gender;
 import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +42,7 @@ public class StudentService {
     private final PasswordEncoder passwordEncoder;
     private final PolicyService policyService;
     private final ExcelParserService excelParserService;
+    private final EnrollmentRepository enrollmentRepository;
 
     @Transactional
     public CreateStudentResponse createStudent(CreateStudentRequest request, Long currentUserId) {
@@ -194,6 +201,112 @@ public class StudentService {
         log.info("Sent welcome email with credentials to: {}", savedUser.getEmail());
 
         return response;
+    }
+
+    /**
+     * Get students list with filters for AA operations (search, on-behalf requests)
+     */
+    public Page<StudentListItemDTO> getStudents(
+            List<Long> branchIds,
+            String search,
+            UserStatus status,
+            Gender gender,
+            Pageable pageable,
+            Long userId
+    ) {
+        log.debug("Getting students for user {} with filters: branchIds={}, search={}, status={}, gender={}",
+                userId, branchIds, search, status, gender);
+
+        // SECURITY: Validate and get branch IDs
+        List<Long> userBranches = userBranchesRepository.findBranchIdsByUserId(userId);
+        
+        if (branchIds == null || branchIds.isEmpty()) {
+            branchIds = userBranches;
+        } else {
+            // Validate provided branches are accessible
+            if (!userBranches.containsAll(branchIds)) {
+                throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
+            }
+        }
+
+        // Map sort field
+        pageable = mapStudentSortField(pageable);
+
+        Page<Student> students = studentRepository.findStudentsWithFilters(branchIds, search, status, gender, pageable);
+
+        return students.map(this::convertToStudentListItemDTO);
+    }
+
+    /**
+     * Map sort fields from DTO field names to entity paths
+     */
+    private Pageable mapStudentSortField(Pageable pageable) {
+        if (pageable.getSort().isUnsorted()) {
+            return pageable;
+        }
+
+        // Check if sorting by unsupported nested fields
+        boolean hasNestedSort = pageable.getSort().stream()
+                .anyMatch(order -> {
+                    String prop = order.getProperty();
+                    return prop.equals("fullName") || prop.equals("name") || 
+                           prop.equals("email") || prop.equals("phone") || 
+                           prop.equals("status");
+                });
+
+        // If trying to sort by nested fields, use default (studentCode)
+        if (hasNestedSort) {
+            log.warn("Sorting by UserAccount fields not supported. Using default sort by studentCode.");
+            return PageRequest.of(
+                pageable.getPageNumber(), 
+                pageable.getPageSize(), 
+                Sort.by(Sort.Direction.ASC, "studentCode")
+            );
+        }
+
+        // Only map Student's own fields
+        List<Sort.Order> mappedOrders = pageable.getSort().stream()
+                .map(order -> {
+                    String property = order.getProperty();
+                    String mappedProperty = switch (property) {
+                        case "studentCode", "code" -> "studentCode";
+                        case "createdAt", "created" -> "createdAt";
+                        default -> "studentCode";
+                    };
+                    return new Sort.Order(order.getDirection(), mappedProperty);
+                })
+                .toList();
+
+        Sort mappedSort = Sort.by(mappedOrders);
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), mappedSort);
+    }
+
+    private StudentListItemDTO convertToStudentListItemDTO(Student student) {
+        UserAccount user = student.getUserAccount();
+        Branch branch = user.getUserBranches().isEmpty() ? null : user.getUserBranches().stream().findFirst().get().getBranch();
+
+        // Get enrollment counts
+        int activeEnrollments = enrollmentRepository.countByStudentIdAndStatus(
+                student.getId(), EnrollmentStatus.ENROLLED);
+
+        Enrollment latestEnrollment = enrollmentRepository.findLatestEnrollmentByStudent(student.getId());
+
+        return StudentListItemDTO.builder()
+                .id(student.getId())
+                .studentCode(student.getStudentCode())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .gender(user.getGender() != null ? user.getGender().name() : null)
+                .status(user.getStatus() != null ? user.getStatus().name() : null)
+                .branchName(branch != null ? branch.getName() : null)
+                .branchId(branch != null ? branch.getId() : null)
+                .activeEnrollments((long) activeEnrollments)
+                .lastEnrollmentDate(latestEnrollment != null && latestEnrollment.getEnrolledAt() != null
+                        ? latestEnrollment.getEnrolledAt().toLocalDate()
+                        : null)
+                .canEnroll(activeEnrollments < policyService.getGlobalInt("student.max_concurrent_enrollments", 3))
+                .build();
     }
 
     private List<Long> getUserAccessibleBranches(Long userId) {

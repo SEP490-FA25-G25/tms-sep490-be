@@ -4,12 +4,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
-import org.fyp.tmssep490be.dtos.studentrequest.RequestFilterDTO;
-import org.fyp.tmssep490be.dtos.studentrequest.StudentRequestDetailDTO;
-import org.fyp.tmssep490be.dtos.studentrequest.StudentRequestResponseDTO;
+import org.fyp.tmssep490be.dtos.studentrequest.*;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.entities.enums.StudentRequestType;
 import org.fyp.tmssep490be.security.UserPrincipal;
@@ -116,5 +115,55 @@ public class StudentRequestController {
         StudentRequestDetailDTO request = studentRequestService.getRequestById(requestId, studentId);
 
         return ResponseEntity.ok(ResponseObject.success("Retrieved request details successfully", request));
+    }
+
+    //Step đầu tiên trong luồng tạo makeup request là student phải gọi config từ bảng policy lên
+    @GetMapping("/config")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ResponseObject<StudentRequestConfigDTO>> getConfig() {
+        StudentRequestConfigDTO config = studentRequestService.getStudentRequestConfig();
+        return ResponseEntity.ok(ResponseObject.success("Retrieved configuration successfully", config));
+    }
+
+    // Lấy ra những buổi bị missed trong quá khứ cả xin phep lẫn chưa xin phép
+    @GetMapping("/missed-sessions")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ResponseObject<MissedSessionsResponseDTO>> getMissedSessions(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam(required = false) Integer weeksBack,
+            @RequestParam(required = false) Boolean excludeRequested) {
+
+        MissedSessionsResponseDTO response = studentRequestService.getMissedSessions(
+                currentUser.getId(), weeksBack, excludeRequested);
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved missed sessions successfully", response));
+    }
+
+    // Lấy ra buổi phù hợp
+    @GetMapping("/makeup-options")
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "Get makeup session options", description = "Get available makeup sessions for a specific missed session with smart ranking by branch, modality, date, and capacity")
+    public ResponseEntity<ResponseObject<MakeupOptionsResponseDTO>> getMakeupOptions(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "Target session ID (the missed session to makeup)", required = true)
+            @RequestParam Long targetSessionId) {
+
+        MakeupOptionsResponseDTO response = studentRequestService.getMakeupOptions(
+                currentUser.getId(), targetSessionId);
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved makeup options successfully", response));
+    }
+
+    @PostMapping("/makeup-requests")
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "Submit makeup request", description = "Submit a makeup request for a missed session")
+    public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> submitMakeupRequest(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody MakeupRequestDTO dto) {
+
+        StudentRequestResponseDTO response = studentRequestService.submitMakeupRequest(
+                currentUser.getId(), dto);
+
+        return ResponseEntity.ok(ResponseObject.success("Makeup request submitted successfully", response));
     }
 }

@@ -65,4 +65,25 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             @Param("classId") Long classId
     );
 
+    /**
+     * Count enrolled students in a session (for capacity calculation)
+     * Excludes students who have been marked as CANCELLED
+     */
+    @Query("SELECT COUNT(ss) FROM StudentSession ss " +
+           "WHERE ss.session.id = :sessionId " +
+           "AND ss.attendanceStatus != 'CANCELLED'")
+    Long countBySessionId(@Param("sessionId") Long sessionId);
+
+    /**
+     * Find all student sessions for a student (across all classes)
+     */
+    @Query("SELECT ss FROM StudentSession ss " +
+           "JOIN FETCH ss.session s " +
+           "JOIN FETCH s.classEntity c " +
+           "LEFT JOIN FETCH s.subjectSession " +
+           "LEFT JOIN FETCH s.timeSlotTemplate " +
+           "WHERE ss.student.id = :studentId " +
+           "AND s.status != 'CANCELLED'")
+    List<StudentSession> findAllByStudentId(@Param("studentId") Long studentId);
+
 }

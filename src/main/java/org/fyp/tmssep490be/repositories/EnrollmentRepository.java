@@ -55,4 +55,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
             @Param("classId") Long classId,
             @Param("status") EnrollmentStatus status
     );
+
+    // Find latest enrollment for a student (for lastEnrollmentDate)
+    @Query("SELECT e FROM Enrollment e WHERE e.student.id = :studentId ORDER BY e.enrolledAt DESC LIMIT 1")
+    Enrollment findLatestEnrollmentByStudent(@Param("studentId") Long studentId);
 }
