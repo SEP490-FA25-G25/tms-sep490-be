@@ -68,8 +68,10 @@ public enum ErrorCode {
     // Class Code Generation errors (4032-4039)
 
     // Teacher errors (3000-3099)
+    TEACHER_NOT_FOUND(3000, "Không tìm thấy giáo viên"),
 
     // Teacher Request errors (5000-5099)
+    TEACHER_REQUEST_NOT_FOUND(5000, "Không tìm thấy yêu cầu giáo viên"),
 
     // Student Request errors (4100-4199)
 
@@ -80,6 +82,7 @@ public enum ErrorCode {
     // Common errors (9000-9999)
     INVALID_INPUT(9000, "Dữ liệu đầu vào không hợp lệ"),
     UNAUTHORIZED(9401, "Truy cập trái phép"),
+    FORBIDDEN(9403, "Không có quyền truy cập"),
     ;
 
     private final int code;
