@@ -45,4 +45,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     boolean existsByClassIdAndStudentIdAndStatus(Long classId, Long studentId, EnrollmentStatus status);
     //Tìm kiếm tất cả đăng ký lớp học theo ID lớp học và trạng thái
     List<Enrollment> findByClassIdAndStatus(Long classId, EnrollmentStatus status);
+
+    List<Enrollment> findByStudentIdAndStatus(Long studentId, EnrollmentStatus status);
+
 }

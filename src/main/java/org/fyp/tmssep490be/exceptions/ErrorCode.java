@@ -38,6 +38,7 @@ public enum ErrorCode {
     // Student errors (1100-1199)
     EMAIL_ALREADY_EXISTS(1103, "Email đã tồn tại"),
     STUDENT_ROLE_NOT_FOUND(1105, "Vai trò HỌC VIÊN chưa được cấu hình trong hệ thống"),
+    STUDENT_NOT_FOUND(1100, "Không tìm thấy học viên"),
 
     // Enrollment errors (1200-1299)
     EXCEL_GENERATION_FAILED(1216, "Tạo tệp Excel thất bại"),
@@ -78,6 +79,7 @@ public enum ErrorCode {
 
     // Common errors (9000-9999)
     INVALID_INPUT(9000, "Dữ liệu đầu vào không hợp lệ"),
+    UNAUTHORIZED(9401, "Truy cập trái phép"),
     ;
 
     private final int code;
