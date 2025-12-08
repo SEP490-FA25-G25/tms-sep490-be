@@ -2,6 +2,7 @@ package org.fyp.tmssep490be.services;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.fyp.tmssep490be.dtos.teacherrequest.MySessionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestApproveDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestListDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
@@ -38,6 +39,7 @@ public class TeacherRequestService {
 
     private final TeacherRequestRepository teacherRequestRepository;
     private final TeacherRepository teacherRepository;
+    private final SessionRepository sessionRepository;
     private final UserBranchesRepository userBranchesRepository;
     private final UserAccountRepository userAccountRepository;
     private final ResourceRepository resourceRepository;
@@ -298,6 +300,43 @@ public class TeacherRequestService {
         }
 
         return builder.build();
+    }
+
+    //Lấy buổi học sắp tới của giáo viên theo teacher ID
+    @Transactional(readOnly = true)
+    public List<MySessionDTO> getFutureSessionsForTeacher(Long userId, Integer days, Long classId) {
+        Teacher teacher = teacherRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher not found"));
+
+        int windowDays = (days != null && days > 0) ? days : 14;
+        LocalDate fromDate = LocalDate.now();
+        LocalDate toDate = fromDate.plusDays(windowDays);
+
+        List<Session> sessions = sessionRepository.findUpcomingSessionsForTeacher(
+                teacher.getId(), fromDate, toDate, classId);
+
+        return sessions.stream()
+                .map(this::mapToMySessionDTO)
+                .collect(Collectors.toList());
+    }
+
+    private MySessionDTO mapToMySessionDTO(Session session) {
+        if (session == null) return null;
+        TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
+        org.fyp.tmssep490be.entities.ClassEntity classEntity = session.getClassEntity();
+        org.fyp.tmssep490be.entities.Subject subject = classEntity != null ? classEntity.getSubject() : null;
+        org.fyp.tmssep490be.entities.SubjectSession subjectSession = session.getSubjectSession();
+
+        return MySessionDTO.builder()
+                .sessionId(session.getId())
+                .date(session.getDate())
+                .startTime(timeSlot != null ? timeSlot.getStartTime() : null)
+                .endTime(timeSlot != null ? timeSlot.getEndTime() : null)
+                .className(classEntity != null ? classEntity.getName() : null)
+                .courseName(subject != null ? subject.getName() : null)
+                .topic(subjectSession != null ? subjectSession.getTopic() : null)
+                .hasPendingRequest(false)
+                .build();
     }
 
     //Duyệt yêu cầu giáo viên (Academic Staff)

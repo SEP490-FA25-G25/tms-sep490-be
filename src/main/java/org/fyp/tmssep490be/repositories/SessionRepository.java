@@ -53,6 +53,7 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
         """, nativeQuery = true)
     List<Session> findByTimeSlotTemplateId(@Param("timeSlotId") Long timeSlotId);
 
+    // Đếm số buổi học đã hoàn thành theo class ID
     @Query("""
       SELECT s.classEntity.id, 
              SUM(CASE WHEN s.status = 'DONE' THEN 1 ELSE 0 END),
@@ -63,4 +64,22 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
       GROUP BY s.classEntity.id
       """)
     List<Object[]> countSessionsByClassIds(@Param("classIds") List<Long> classIds);
+
+    // Tìm buổi học sắp tới của giáo viên theo teacher ID
+    @Query("""
+        SELECT DISTINCT s FROM Session s
+        JOIN s.teachingSlots ts
+        JOIN ts.teacher t
+        LEFT JOIN FETCH s.timeSlotTemplate tst
+        LEFT JOIN FETCH s.classEntity c
+        WHERE t.id = :teacherId
+          AND s.status = org.fyp.tmssep490be.entities.enums.SessionStatus.PLANNED
+          AND s.date BETWEEN :fromDate AND :toDate
+          AND (:classId IS NULL OR c.id = :classId)
+        ORDER BY s.date ASC, tst.startTime ASC
+        """)
+    List<Session> findUpcomingSessionsForTeacher(@Param("teacherId") Long teacherId,
+                                                 @Param("fromDate") LocalDate fromDate,
+                                                 @Param("toDate") LocalDate toDate,
+                                                 @Param("classId") Long classId);
 }

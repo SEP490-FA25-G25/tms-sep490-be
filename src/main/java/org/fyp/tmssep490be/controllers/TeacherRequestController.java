@@ -4,6 +4,7 @@ import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestApproveDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestConfigDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestListDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.MySessionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestRejectDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
@@ -162,6 +163,24 @@ public class TeacherRequestController {
                 .success(true)
                 .message("Request rejected")
                 .data(response)
+                .build());
+    }
+
+    //Endpoint lấy buổi sắp tới của giáo viên
+    @GetMapping("/my-sessions")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<List<MySessionDTO>>> getMyFutureSessions(
+            @RequestParam(value = "days", required = false) Integer days,
+            @RequestParam(value = "classId", required = false) Long classId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<MySessionDTO> sessions = teacherRequestService.getFutureSessionsForTeacher(
+                userPrincipal.getId(), days, classId);
+
+        return ResponseEntity.ok(ResponseObject.<List<MySessionDTO>>builder()
+                .success(true)
+                .message("Future sessions loaded successfully")
+                .data(sessions)
                 .build());
     }
 }
