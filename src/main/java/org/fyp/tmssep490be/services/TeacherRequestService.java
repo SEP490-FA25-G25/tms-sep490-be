@@ -190,6 +190,77 @@ public class TeacherRequestService {
                 .collect(Collectors.toList());
     }
 
+    // Gợi ý resource cho giáo vụ dựa trên request ID (đổi phương thức)
+    @Transactional(readOnly = true)
+    public List<ModalityResourceSuggestionDTO> suggestModalityResourcesForStaff(Long requestId, Long academicStaffUserId) {
+        log.info("Suggest modality resources for staff {} on request {}", academicStaffUserId, requestId);
+
+        TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+
+        // Kiểm tra quyền branch
+        Long teacherUserAccountId = request.getTeacher() != null ? request.getTeacher().getUserAccount().getId() : null;
+        List<Long> academicBranches = getBranchIdsForUser(academicStaffUserId);
+        List<Long> teacherBranches = getBranchIdsForUser(teacherUserAccountId);
+        boolean allowed = teacherBranches.isEmpty()
+                || academicBranches.isEmpty()
+                || academicBranches.stream().anyMatch(teacherBranches::contains);
+        if (!allowed) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You don't have permission to view resources for this request");
+        }
+
+        Session session = request.getSession();
+        if (session == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no session");
+        }
+        if (session.getStatus() != SessionStatus.PLANNED) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session is not in PLANNED status");
+        }
+        if (session.getClassEntity() == null || session.getClassEntity().getBranch() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session branch is missing");
+        }
+        if (session.getTimeSlotTemplate() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session time slot is missing");
+        }
+
+        Long branchId = session.getClassEntity().getBranch().getId();
+        Long timeSlotId = session.getTimeSlotTemplate().getId();
+        LocalDate sessionDate = session.getDate();
+
+        Long currentResourceId = session.getSessionResources().stream()
+                .findFirst()
+                .map(sr -> sr.getResource() != null ? sr.getResource().getId() : null)
+                .orElse(null);
+
+        List<Resource> resources = resourceRepository.findAvailableResourcesForSession(
+                branchId, sessionDate, timeSlotId, session.getId());
+
+        if (currentResourceId != null) {
+            boolean containsCurrent = resources.stream().anyMatch(r -> r.getId().equals(currentResourceId));
+            if (!containsCurrent) {
+                resourceRepository.findById(currentResourceId).ifPresent(resources::add);
+            }
+        }
+
+        return resources.stream()
+                .map(r -> ModalityResourceSuggestionDTO.builder()
+                        .resourceId(r.getId())
+                        .name(r.getName())
+                        .resourceType(r.getResourceType() != null ? r.getResourceType().name() : null)
+                        .capacity(r.getCapacity())
+                        .branchId(r.getBranch() != null ? r.getBranch().getId() : null)
+                        .currentResource(currentResourceId != null && currentResourceId.equals(r.getId()))
+                        .build())
+                .sorted((a, b) -> {
+                    if (a.isCurrentResource() && !b.isCurrentResource()) return -1;
+                    if (!a.isCurrentResource() && b.isCurrentResource()) return 1;
+                    if (a.getName() == null) return 1;
+                    if (b.getName() == null) return -1;
+                    return a.getName().compareToIgnoreCase(b.getName());
+                })
+                .collect(Collectors.toList());
+    }
+
     //Lấy tất cả yêu cầu của giáo viên theo userId
     public List<TeacherRequestListDTO> getMyRequests(Long userId) {
         log.debug("Getting requests for user {}", userId);
@@ -465,6 +536,7 @@ public class TeacherRequestService {
                 .collect(Collectors.toList());
     }
 
+    //Map Session entity sang MySessionDTO
     private MySessionDTO mapToMySessionDTO(Session session) {
         if (session == null) return null;
         TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
@@ -569,16 +641,18 @@ public class TeacherRequestService {
 
     //Validate và approve MODALITY_CHANGE request
     private void validateAndApproveModalityChange(TeacherRequest request, TeacherRequestApproveDTO approveDTO) {
-        // MODALITY_CHANGE: newResourceId bắt buộc
-        if (approveDTO.getNewResourceId() == null) {
+        // Ưu tiên resource do staff chọn; nếu staff không chọn, dùng resource teacher đã chọn
+        Long chosenResourceId = approveDTO.getNewResourceId() != null
+                ? approveDTO.getNewResourceId()
+                : (request.getNewResource() != null ? request.getNewResource().getId() : null);
+
+        if (chosenResourceId == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Resource ID is required for MODALITY_CHANGE requests");
         }
 
-        // Kiểm tra resource tồn tại
-        Resource newResource = resourceRepository.findById(approveDTO.getNewResourceId())
+        Resource newResource = resourceRepository.findById(chosenResourceId)
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Resource not found"));
 
-        // Cập nhật resource
         request.setNewResource(newResource);
 
     }
