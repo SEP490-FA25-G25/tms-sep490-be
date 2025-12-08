@@ -257,6 +257,79 @@ public class ResourceService {
         }
     }
 
+    // Cập nhật resource
+    @Transactional
+    public ResourceDTO updateResource(Long id, ResourceRequestDTO request, Long userId) {
+        log.info("Updating resource {}: {}", id, request);
+
+        Resource resource = resourceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found with id: " + id));
+
+        Long branchId = resource.getBranch().getId();
+
+        // Validate code nếu thay đổi
+        if (request.getCode() != null && !request.getCode().trim().isEmpty()) {
+            String code = request.getCode().trim();
+            String branchCode = resource.getBranch().getCode();
+            String fullCode = code.startsWith(branchCode + "-") ? code : branchCode + "-" + code;
+
+            if (resourceRepository.existsByBranchIdAndCodeIgnoreCaseAndIdNot(branchId, fullCode, id)) {
+                throw new BusinessRuleException("Mã tài nguyên '" + fullCode + "' đã tồn tại trong chi nhánh này");
+            }
+            resource.setCode(fullCode);
+        }
+
+        // Validate tên nếu thay đổi
+        if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            if (resourceRepository.existsByBranchIdAndNameIgnoreCaseAndIdNot(branchId, request.getName().trim(), id)) {
+                throw new BusinessRuleException("Tên tài nguyên '" + request.getName() + "' đã tồn tại trong chi nhánh này");
+            }
+        }
+
+        // Validate mô tả
+        if (request.getDescription() != null && !request.getDescription().trim().isEmpty()
+                && request.getDescription().trim().length() < 10) {
+            throw new BusinessRuleException("Mô tả phải có ít nhất 10 ký tự hoặc để trống");
+        }
+
+        // Validate capacity
+        validateCapacity(request, resource.getResourceType() == ResourceType.VIRTUAL);
+
+        // Validate VIRTUAL resource fields
+        if (resource.getResourceType() == ResourceType.VIRTUAL) {
+            validateVirtualResourceFieldsForUpdate(request);
+        }
+
+        // Kiểm tra giảm capacity
+        if (request.getCapacity() != null) {
+            Integer maxRequired = sessionResourceRepository.findMaxClassCapacityByResourceId(id);
+            if (maxRequired != null && request.getCapacity() < maxRequired) {
+                throw new BusinessRuleException("Không thể giảm sức chứa xuống " + request.getCapacity() +
+                        " vì tài nguyên này đang được sử dụng cho lớp học có sĩ số tối đa là " + maxRequired);
+            }
+        }
+
+        updateResourceFromRequest(resource, request, userId);
+        resource.setUpdatedAt(OffsetDateTime.now());
+
+        Resource saved = resourceRepository.save(resource);
+        return convertToDTO(saved);
+    }
+
+    private void validateVirtualResourceFieldsForUpdate(ResourceRequestDTO request) {
+        if (request.getMeetingUrl() != null && !request.getMeetingUrl().trim().isEmpty()
+                && !request.getMeetingUrl().matches("^https?://.*")) {
+            throw new BusinessRuleException("Meeting URL phải bắt đầu bằng http:// hoặc https://");
+        }
+
+        if (request.getAccountEmail() != null && !request.getAccountEmail().trim().isEmpty()
+                && !request.getAccountEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+            throw new BusinessRuleException("Account Email không đúng định dạng email");
+        }
+
+        validateExpiryDate(request.getExpiryDate());
+    }
+
     // ==================== HELPER METHODS ====================
 
     private List<Long> getBranchIdsForUser(Long userId) {

@@ -64,4 +64,16 @@ public class ResourceController {
         ResourceDTO saved = resourceService.createResource(request, currentUser.getId());
         return ResponseEntity.ok(saved);
     }
+
+    // PUT /resources/{id} - Cập nhật
+    @PutMapping("/resources/{id}")
+    @PreAuthorize("hasRole('CENTER_HEAD')")
+    @Operation(summary = "Update resource")
+    public ResponseEntity<ResourceDTO> updateResource(
+            @PathVariable Long id,
+            @RequestBody ResourceRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        ResourceDTO saved = resourceService.updateResource(id, request, currentUser.getId());
+        return ResponseEntity.ok(saved);
+    }
 }
