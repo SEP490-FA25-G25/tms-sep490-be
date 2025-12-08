@@ -3,20 +3,26 @@ package org.fyp.tmssep490be.controllers;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestConfigDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestListDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
+import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.PolicyService;
 import org.fyp.tmssep490be.services.TeacherRequestService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/teacher-requests")
+@Slf4j
 public class TeacherRequestController {
 
     private final TeacherRequestService teacherRequestService;
@@ -71,6 +77,47 @@ public class TeacherRequestController {
                 .success(true)
                 .message("Teacher request configuration loaded successfully")
                 .data(config)
+                .build());
+    }
+
+    //Endpoint để lấy danh sách yêu cầu giáo viên cho Academic Staff với optional status filter
+    @GetMapping("/staff")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<TeacherRequestListDTO>>> getRequestsForStaff(
+            @RequestParam(value = "status", required = false) RequestStatus status,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        List<TeacherRequestListDTO> requests = teacherRequestService.getRequestsForStaff(status, userPrincipal.getId());
+        
+        return ResponseEntity.ok(
+                ResponseObject.<List<TeacherRequestListDTO>>builder()
+                        .success(true)
+                        .message("Teacher requests loaded successfully")
+                        .data(requests)
+                        .build());
+    }
+
+    //Endpoint để lấy chi tiết request theo ID (cho cả TEACHER và ACADEMIC_AFFAIR)
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('TEACHER') or hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> getRequestById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        log.info("Get request {} for user {}", id, userPrincipal.getId());
+
+        // Kiểm tra quyền truy cập
+        boolean isAcademicStaff = userPrincipal.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ACADEMIC_AFFAIR".equals(authority.getAuthority()));
+
+        TeacherRequestResponseDTO response = isAcademicStaff
+                ? teacherRequestService.getRequestForStaff(id)
+                : teacherRequestService.getRequestById(id, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
+                .success(true)
+                .message("Request loaded successfully")
+                .data(response)
                 .build());
     }
 }

@@ -55,5 +55,22 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
            "WHERE tr.status = :status " +
            "ORDER BY tr.submittedAt DESC")
     List<TeacherRequest> findByStatusOrderBySubmittedAtDesc(@Param("status") RequestStatus status);
+
+    //Lấy đầy đủ thông tin yêu cầu theo ID
+    @Query("SELECT tr FROM TeacherRequest tr " +
+           "LEFT JOIN FETCH tr.teacher t " +
+           "LEFT JOIN FETCH t.userAccount ua " +
+           "LEFT JOIN FETCH tr.replacementTeacher rt " +
+           "LEFT JOIN FETCH rt.userAccount rua " +
+           "LEFT JOIN FETCH tr.session s " +
+           "LEFT JOIN FETCH s.classEntity c " +
+           "LEFT JOIN FETCH s.subjectSession ss " +
+           "LEFT JOIN FETCH s.timeSlotTemplate tst " +
+           "LEFT JOIN FETCH tr.newResource nr " +
+           "LEFT JOIN FETCH tr.newTimeSlot nts " +
+           "LEFT JOIN FETCH tr.newSession ns " +
+           "LEFT JOIN FETCH tr.decidedBy db " +
+           "WHERE tr.id = :id")
+    java.util.Optional<TeacherRequest> findByIdWithTeacherAndSession(@Param("id") Long id);
 }
 
