@@ -8,6 +8,9 @@ import org.fyp.tmssep490be.dtos.user.UpdateUserRequest;
 import org.fyp.tmssep490be.dtos.user.UserResponse;
 import org.fyp.tmssep490be.services.UserAccountService;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -40,5 +43,22 @@ public class UserAccountController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/{userId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<UserResponse> getUserById(@PathVariable Long userId) {
+        UserResponse userResponse = userAccountService.getUserById(userId);
+        return ResponseEntity.ok(userResponse);
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<Page<UserResponse>> getAllUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<UserResponse> users = userAccountService.getAllUsers(pageable);
+        return ResponseEntity.ok(users);
+    }
 
 }

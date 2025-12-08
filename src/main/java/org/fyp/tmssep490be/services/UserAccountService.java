@@ -7,6 +7,8 @@ import org.fyp.tmssep490be.dtos.user.UpdateUserRequest;
 import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.dtos.user.UserResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,8 @@ import org.fyp.tmssep490be.entities.Role;
 import org.fyp.tmssep490be.entities.UserRole;
 import org.fyp.tmssep490be.entities.Branch;
 import org.fyp.tmssep490be.entities.UserBranches;
+
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
@@ -175,6 +179,21 @@ public class UserAccountService {
         userAccountRepository.save(user);
 
         log.info("User set to inactive successfully with ID: {}", user.getId());
+    }
+
+    public UserResponse getUserById(Long userId) {
+        log.info("Getting user with ID: {}", userId);
+
+        UserAccount user = userAccountRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
+        return mapToResponse(user);
+    }
+
+    public Page<UserResponse> getAllUsers(Pageable pageable) {
+        log.info("Getting all users");
+
+        Page<UserAccount> users = userAccountRepository.findAll(pageable);
+
+        return users.map(this::mapToResponse);
     }
 
     private UserResponse mapToResponse(UserAccount user) {
