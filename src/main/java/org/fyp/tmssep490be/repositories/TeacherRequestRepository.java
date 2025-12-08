@@ -1,6 +1,7 @@
 package org.fyp.tmssep490be.repositories;
 
 import org.fyp.tmssep490be.entities.TeacherRequest;
+import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,5 +24,36 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
            "WHERE tr.teacher.id = :teacherId OR tr.replacementTeacher.id = :teacherId " +
            "ORDER BY tr.submittedAt DESC")
     List<TeacherRequest> findByTeacherIdOrReplacementTeacherIdOrderBySubmittedAtDesc(@Param("teacherId") Long teacherId);
+
+    //Lất tất cả yêu cầu của giáo viên
+    //Sắp xếp theo thời gian submit giảm dần
+    List<TeacherRequest> findByTeacherIdOrderBySubmittedAtDesc(Long teacherId);
+    
+    //Lất tất cả yêu cầu của giáo viên mà giáo viên là người dạy thay
+    //Sắp xếp theo thời gian submit giảm dần
+    List<TeacherRequest> findByReplacementTeacherIdOrderBySubmittedAtDesc(Long replacementTeacherId);
+
+    //Lất tất cả yêu cầu
+    //Sắp xếp theo thời gian submit giảm dần
+    @Query("SELECT tr FROM TeacherRequest tr " +
+           "LEFT JOIN FETCH tr.teacher t " +
+           "LEFT JOIN FETCH t.userAccount ua " +
+           "LEFT JOIN FETCH tr.session s " +
+           "LEFT JOIN FETCH s.classEntity c " +
+           "LEFT JOIN FETCH tr.decidedBy db " +
+           "ORDER BY tr.submittedAt DESC")
+    List<TeacherRequest> findAllByOrderBySubmittedAtDesc();
+
+    //Lất tất cả yêu cầu theo trạng thái
+    //Sắp xếp theo thời gian submit giảm dần
+    @Query("SELECT tr FROM TeacherRequest tr " +
+           "LEFT JOIN FETCH tr.teacher t " +
+           "LEFT JOIN FETCH t.userAccount ua " +
+           "LEFT JOIN FETCH tr.session s " +
+           "LEFT JOIN FETCH s.classEntity c " +
+           "LEFT JOIN FETCH tr.decidedBy db " +
+           "WHERE tr.status = :status " +
+           "ORDER BY tr.submittedAt DESC")
+    List<TeacherRequest> findByStatusOrderBySubmittedAtDesc(@Param("status") RequestStatus status);
 }
 
