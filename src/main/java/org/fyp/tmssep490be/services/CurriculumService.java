@@ -105,6 +105,32 @@ public class CurriculumService {
                 .build();
     }
 
+    public CurriculumResponseDTO getCurriculum(Long id) {
+        log.debug("Fetching curriculum with ID: {}", id);
+        Curriculum curriculum = curriculumRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chương trình với ID: " + id));
+
+        return CurriculumResponseDTO.builder()
+                .id(curriculum.getId().toString())
+                .code(curriculum.getCode())
+                .name(curriculum.getName())
+                .description(curriculum.getDescription())
+                .language(curriculum.getLanguage())
+                .status(curriculum.getStatus().name())
+                .createdAt(curriculum.getCreatedAt() != null ? curriculum.getCreatedAt().toString() : null)
+                .levelCount(curriculum.getLevels().size())
+                .plos(curriculum.getPlos().stream()
+                        .map(plo -> CreatePLODTO.builder()
+                                .code(plo.getCode())
+                                .description(plo.getDescription())
+                                .build())
+                        .collect(Collectors.toList()))
+                .levels(levelRepository.findByCurriculumIdOrderBySortOrderAsc(id).stream()
+                        .map(this::toLevelResponseDTO)
+                        .collect(Collectors.toList()))
+                .build();
+    }
+
     // ==================== HELPER METHODS ====================
 
     private CurriculumWithLevelsDTO convertToCurriculumWithLevelsDTO(Curriculum curriculum) {

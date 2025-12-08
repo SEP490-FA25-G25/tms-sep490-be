@@ -57,4 +57,18 @@ public class CurriculumController {
                 .data(curriculum)
                 .build());
     }
+
+    // Lấy chi tiết curriculum
+    @GetMapping("/curriculums/{id}")
+    @Operation(summary = "Get curriculum details")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<CurriculumResponseDTO>> getCurriculum(@PathVariable Long id) {
+        log.info("Fetching curriculum details for ID: {}", id);
+        CurriculumResponseDTO curriculum = curriculumService.getCurriculum(id);
+        return ResponseEntity.ok(ResponseObject.<CurriculumResponseDTO>builder()
+                .success(true)
+                .message("Curriculum details retrieved successfully")
+                .data(curriculum)
+                .build());
+    }
 }
