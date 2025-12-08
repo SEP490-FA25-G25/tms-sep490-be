@@ -21,7 +21,7 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
            "LEFT JOIN FETCH rt.userAccount rua " +
            "LEFT JOIN FETCH tr.session s " +
            "LEFT JOIN FETCH s.classEntity c " +
-           "WHERE tr.teacher.id = :teacherId OR tr.replacementTeacher.id = :teacherId " +
+           "WHERE tr.teacher.id = :teacherId OR (tr.replacementTeacher IS NOT NULL AND tr.replacementTeacher.id = :teacherId) " +
            "ORDER BY tr.submittedAt DESC")
     List<TeacherRequest> findByTeacherIdOrReplacementTeacherIdOrderBySubmittedAtDesc(@Param("teacherId") Long teacherId);
 

@@ -8,6 +8,8 @@ import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestCreateDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestListDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ModalityResourceSuggestionDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateSkillDTO;
 import org.fyp.tmssep490be.entities.Resource;
 import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.Teacher;
@@ -27,14 +29,16 @@ import org.fyp.tmssep490be.repositories.TeacherRequestRepository;
 import org.fyp.tmssep490be.repositories.TimeSlotTemplateRepository;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.repositories.UserBranchesRepository;
-import org.fyp.tmssep490be.repositories.SessionResourceRepository;
-import org.fyp.tmssep490be.services.PolicyService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,11 +50,11 @@ public class TeacherRequestService {
     private final TeacherRepository teacherRepository;
     private final SessionRepository sessionRepository;
     private final UserBranchesRepository userBranchesRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final UserAccountRepository userAccountRepository;
     private final ResourceRepository resourceRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
     private final PolicyService policyService;
-    private final SessionResourceRepository sessionResourceRepository;
 
     // Giáo viên tạo yêu cầu (hiện mới hỗ trợ MODALITY_CHANGE)
     @Transactional
@@ -88,10 +92,6 @@ public class TeacherRequestService {
         }
 
         TeacherRequestType requestType = createDTO.getRequestType();
-        if (requestType != TeacherRequestType.MODALITY_CHANGE) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Only MODALITY_CHANGE is supported at the moment");
-        }
-
         TeacherRequest request = new TeacherRequest();
         request.setTeacher(teacher);
         request.setSession(session);
@@ -101,6 +101,29 @@ public class TeacherRequestService {
         request.setSubmittedBy(teacher.getUserAccount());
         request.setRequestReason(reason);
 
+        // Xử lý theo từng loại yêu cầu
+        switch (requestType) {
+            case MODALITY_CHANGE:
+                handleModalityChangeRequest(request, createDTO);
+                break;
+            case RESCHEDULE:
+                handleRescheduleRequest(request, createDTO);
+                break;
+            case REPLACEMENT:
+                handleReplacementRequest(request, createDTO, teacher);
+                break;
+            default:
+                throw new CustomException(ErrorCode.INVALID_INPUT, "Unsupported request type: " + requestType);
+        }
+
+        request = teacherRequestRepository.save(request);
+        log.info("Created teacher request {} type {} for user {}", request.getId(), requestType, userId);
+
+        return mapToResponseDTO(request);
+    }
+
+    // Xử lý MODALITY_CHANGE request khi teacher tạo
+    private void handleModalityChangeRequest(TeacherRequest request, TeacherRequestCreateDTO createDTO) {
         // MODALITY_CHANGE: yêu cầu resource (phòng) theo policy
         boolean requireResource = policyService.getGlobalBoolean("teacher.modality_change.require_resource", true);
         Long newResourceId = createDTO.getNewResourceId();
@@ -112,11 +135,62 @@ public class TeacherRequestService {
                     .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Resource not found"));
             request.setNewResource(resource);
         }
+    }
 
-        request = teacherRequestRepository.save(request);
-        log.info("Created teacher request {} for user {}", request.getId(), userId);
+    // Xử lý RESCHEDULE request khi teacher tạo
+    private void handleRescheduleRequest(TeacherRequest request, TeacherRequestCreateDTO createDTO) {
+        // RESCHEDULE: newDate, newTimeSlotId và newResourceId là bắt buộc
+        LocalDate newDate = createDTO.getNewDate();
+        Long newTimeSlotId = createDTO.getNewTimeSlotId();
+        Long newResourceId = createDTO.getNewResourceId();
 
-        return mapToResponseDTO(request);
+        // Validate newDate bắt buộc
+        if (newDate == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "New date is required for RESCHEDULE requests");
+        }
+        // Validate newDate không được trong quá khứ
+        if (newDate.isBefore(LocalDate.now())) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "New date cannot be in the past");
+        }
+        request.setNewDate(newDate);
+
+        // Validate newTimeSlotId bắt buộc
+        if (newTimeSlotId == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "New time slot ID is required for RESCHEDULE requests");
+        }
+        TimeSlotTemplate timeSlot = timeSlotTemplateRepository.findById(newTimeSlotId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Time slot not found"));
+        request.setNewTimeSlot(timeSlot);
+
+        // Validate newResourceId bắt buộc
+        if (newResourceId == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "New resource ID is required for RESCHEDULE requests");
+        }
+        Resource resource = resourceRepository.findById(newResourceId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Resource not found"));
+        request.setNewResource(resource);
+    }
+
+    // Xử lý REPLACEMENT request khi teacher tạo
+    private void handleReplacementRequest(TeacherRequest request, TeacherRequestCreateDTO createDTO, Teacher requestingTeacher) {
+        // REPLACEMENT: replacementTeacherId là bắt buộc khi teacher tạo
+        Long replacementTeacherId = createDTO.getReplacementTeacherId();
+        
+        if (replacementTeacherId == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Replacement teacher ID is required for REPLACEMENT requests");
+        }
+
+        // Kiểm tra replacement teacher tồn tại
+        Teacher replacementTeacher = teacherRepository.findById(replacementTeacherId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Replacement teacher not found"));
+
+        // Không được chọn chính giáo viên tạo request
+        if (replacementTeacher.getId().equals(requestingTeacher.getId())) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Replacement teacher cannot be the same as the requesting teacher");
+        }
+
+        // Set replacement teacher
+        request.setReplacementTeacher(replacementTeacher);
     }
 
     // Gợi ý resource khả dụng cho yêu cầu đổi phương thức
@@ -556,6 +630,180 @@ public class TeacherRequestService {
                 .build();
     }
 
+    //Gợi ý giáo viên dạy thay cho REPLACEMENT request (cho teacher)
+    @Transactional(readOnly = true)
+    public List<ReplacementCandidateDTO> suggestReplacementCandidates(Long sessionId, Long userId) {
+        log.info("Suggesting replacement candidates for session {} by teacher {}", sessionId, userId);
+
+        // Lấy teacher hiện tại
+        Teacher requestingTeacher = teacherRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher not found"));
+
+        // Lấy session và kiểm tra quyền
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
+
+        boolean isOwner = session.getTeachingSlots().stream()
+                .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(requestingTeacher.getId()));
+        if (!isOwner) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You are not assigned to this session");
+        }
+
+        // Lấy subject từ session
+        org.fyp.tmssep490be.entities.ClassEntity classEntity = session.getClassEntity();
+        if (classEntity == null || classEntity.getSubject() == null) {
+            log.warn("Session {} has no subject information", sessionId);
+            return List.of();
+        }
+
+        org.fyp.tmssep490be.entities.Subject subject = classEntity.getSubject();
+
+        // Lấy tất cả teachers (trừ teacher hiện tại)
+        List<Teacher> allTeachers = teacherRepository.findAll();
+        List<Teacher> candidateTeachers = allTeachers.stream()
+                .filter(teacher -> !teacher.getId().equals(requestingTeacher.getId()))
+                .collect(Collectors.toList());
+
+        // Loại trừ các teacher đã từ chối request này (nếu có requestId)
+
+        // Lấy skills yêu cầu của session từ SubjectSession
+        Set<org.fyp.tmssep490be.entities.enums.Skill> sessionRequiredSkills = getSessionRequiredSkills(session);
+
+        // Map sang DTO và sắp xếp theo skill phù hợp, sau đó theo tên
+        final Set<org.fyp.tmssep490be.entities.enums.Skill> finalSessionRequiredSkills = sessionRequiredSkills;
+        return candidateTeachers.stream()
+                .map(teacher -> mapToReplacementCandidateDTO(teacher, subject, session))
+                .filter(dto -> dto != null)
+                .sorted((a, b) -> {
+                    // 1. Ưu tiên teacher có skills phù hợp với skills yêu cầu của session
+                    boolean aHasMatchingSkills = hasMatchingSkills(a, finalSessionRequiredSkills);
+                    boolean bHasMatchingSkills = hasMatchingSkills(b, finalSessionRequiredSkills);
+                    
+                    if (aHasMatchingSkills && !bHasMatchingSkills) {
+                        return -1; // a được ưu tiên
+                    }
+                    if (!aHasMatchingSkills && bHasMatchingSkills) {
+                        return 1; // b được ưu tiên
+                    }
+                    
+                    // 2. Nếu cả hai đều có hoặc không có matching skills, sắp xếp theo số lượng skills (nhiều hơn = phù hợp hơn)
+                    int aSkillCount = a.getSkills() != null ? a.getSkills().size() : 0;
+                    int bSkillCount = b.getSkills() != null ? b.getSkills().size() : 0;
+                    if (aSkillCount != bSkillCount) {
+                        return Integer.compare(bSkillCount, aSkillCount); // Giảm dần
+                    }
+                    
+                    // 3. Cuối cùng sắp xếp theo tên tăng dần
+                    String nameA = a.getFullName() != null ? a.getFullName() : "";
+                    String nameB = b.getFullName() != null ? b.getFullName() : "";
+                    return nameA.compareToIgnoreCase(nameB);
+                })
+                .collect(Collectors.toList());
+    }
+
+    //Map Teacher entity sang ReplacementCandidateDTO
+    private ReplacementCandidateDTO mapToReplacementCandidateDTO(
+            Teacher teacher, org.fyp.tmssep490be.entities.Subject subject, Session session) {
+        UserAccount userAccount = teacher.getUserAccount();
+        if (userAccount == null) {
+            return null;
+        }
+
+        // Lấy skills
+        List<ReplacementCandidateSkillDTO> skills = teacher.getTeacherSkills().stream()
+                .map(ts -> ReplacementCandidateSkillDTO.builder()
+                        .id(ts.getId() != null ? ts.getId().getSkill() != null ? (long) ts.getId().getSkill().ordinal() : null : null)
+                        .name(ts.getId() != null && ts.getId().getSkill() != null ? ts.getId().getSkill().name() : null)
+                        .skillName(ts.getId() != null && ts.getId().getSkill() != null ? ts.getId().getSkill().name() : null)
+                        .level(ts.getLevel() != null ? ts.getLevel().toString() : null)
+                        .skillLevel(ts.getLevel() != null ? ts.getLevel().toString() : null)
+                        .description(ts.getSpecialization())
+                        .build())
+                .collect(Collectors.toList());
+
+        // Tạo skill summary
+        String skillSummary = teacher.getTeacherSkills().stream()
+                .map(ts -> ts.getId() != null && ts.getId().getSkill() != null ? ts.getId().getSkill().name() : "")
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.joining(", "));
+
+        return ReplacementCandidateDTO.builder()
+                .teacherId(teacher.getId())
+                .fullName(userAccount.getFullName())
+                .displayName(userAccount.getFullName())
+                .email(userAccount.getEmail())
+                .phone(userAccount.getPhone())
+                .skills(skills)
+                .skillSummary(skillSummary)
+                .specialization(teacher.getTeacherSkills().stream()
+                        .map(org.fyp.tmssep490be.entities.TeacherSkill::getSpecialization)
+                        .filter(s -> s != null && !s.isEmpty())
+                        .findFirst()
+                        .orElse(null))
+                .note(teacher.getNote())
+                .build();
+    }
+
+    //Kiểm tra xem teacher có skills phù hợp với skills yêu cầu của session không
+    private boolean hasMatchingSkills(ReplacementCandidateDTO candidate, Set<org.fyp.tmssep490be.entities.enums.Skill> sessionRequiredSkills) {
+        if (sessionRequiredSkills.isEmpty() || candidate.getSkills() == null || candidate.getSkills().isEmpty()) {
+            return false;
+        }
+
+        // Lấy danh sách skills của candidate
+        Set<org.fyp.tmssep490be.entities.enums.Skill> candidateSkills = candidate.getSkills().stream()
+                .filter(skill -> skill.getName() != null)
+                .map(skill -> {
+                    try {
+                        return org.fyp.tmssep490be.entities.enums.Skill.valueOf(skill.getName());
+                    } catch (IllegalArgumentException e) {
+                        return null;
+                    }
+                })
+                .filter(skill -> skill != null)
+                .collect(Collectors.toSet());
+
+        // Kiểm tra xem có skill nào trùng với skills yêu cầu của session không
+        return candidateSkills.stream().anyMatch(sessionRequiredSkills::contains);
+    }
+
+    //Lấy danh sách skills yêu cầu của session từ SubjectSession
+    private Set<org.fyp.tmssep490be.entities.enums.Skill> getSessionRequiredSkills(Session session) {
+        Set<org.fyp.tmssep490be.entities.enums.Skill> requiredSkills = new HashSet<>();
+        
+        if (session == null || session.getSubjectSession() == null) {
+            log.warn("Session {} has no SubjectSession", session != null ? session.getId() : "null");
+            return requiredSkills;
+        }
+        
+        org.fyp.tmssep490be.entities.SubjectSession subjectSession = session.getSubjectSession();
+        String skillsJson = subjectSession.getSkills();
+        
+        if (skillsJson == null || skillsJson.trim().isEmpty()) {
+            log.warn("SubjectSession {} has no skills requirement", subjectSession.getId());
+            return requiredSkills;
+        }
+        
+        try {
+            // Parse JSON string thành List<String>
+            List<String> skillNames = objectMapper.readValue(skillsJson, new TypeReference<List<String>>() {});
+            
+            // Convert sang Set<Skill>
+            for (String skillName : skillNames) {
+                try {
+                    org.fyp.tmssep490be.entities.enums.Skill skill = org.fyp.tmssep490be.entities.enums.Skill.valueOf(skillName.trim());
+                    requiredSkills.add(skill);
+                } catch (IllegalArgumentException e) {
+                    log.warn("Invalid skill name in SubjectSession {}: {}", subjectSession.getId(), skillName);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse skills JSON from SubjectSession {}: {}", subjectSession.getId(), skillsJson, e);
+        }
+        
+        return requiredSkills;
+    }
+
     //Duyệt yêu cầu giáo viên (Academic Staff)
     //Tất cả thông tin bắt buộc phải được điền khi approve
     @Transactional
@@ -620,13 +868,19 @@ public class TeacherRequestService {
 
     //Validate và approve REPLACEMENT request
     private void validateAndApproveReplacement(TeacherRequest request, TeacherRequestApproveDTO approveDTO) {
-        // REPLACEMENT: replacementTeacherId bắt buộc
-        if (approveDTO.getReplacementTeacherId() == null) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Replacement teacher ID is required for REPLACEMENT requests");
+        // REPLACEMENT: Ưu tiên replacement teacher do academic staff chọn trong approveDTO
+        // Nếu academic staff không chọn, dùng replacement teacher mà teacher đã đề xuất khi tạo request
+        Long chosenReplacementTeacherId = approveDTO.getReplacementTeacherId() != null
+                ? approveDTO.getReplacementTeacherId()
+                : (request.getReplacementTeacher() != null ? request.getReplacementTeacher().getId() : null);
+
+        // Nếu cả academic staff và teacher đều không chọn, bắt buộc academic staff phải chọn
+        if (chosenReplacementTeacherId == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Replacement teacher ID is required. Please select a replacement teacher.");
         }
 
         // Kiểm tra replacement teacher tồn tại
-        Teacher replacementTeacher = teacherRepository.findById(approveDTO.getReplacementTeacherId())
+        Teacher replacementTeacher = teacherRepository.findById(chosenReplacementTeacherId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Replacement teacher not found"));
 
         // Không được chọn chính giáo viên tạo request
@@ -634,9 +888,8 @@ public class TeacherRequestService {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Replacement teacher cannot be the same as the requesting teacher");
         }
 
-        // Cập nhật replacement teacher
+        // Cập nhật replacement teacher (ưu tiên lựa chọn của academic staff)
         request.setReplacementTeacher(replacementTeacher);
-
     }
 
     //Validate và approve MODALITY_CHANGE request
@@ -746,6 +999,228 @@ public class TeacherRequestService {
         log.info("Request {} rejected successfully by academic staff {}", requestId, academicStaffUserId);
 
         return mapToResponseDTO(request);
+    }
+
+    //Giáo viên dạy thay xác nhận đồng ý dạy thay
+    @Transactional
+    public TeacherRequestResponseDTO confirmReplacementRequest(Long requestId, Long userId, String note) {
+        log.info("Confirm replacement request {} by teacher {}", requestId, userId);
+
+        // Lấy request với đầy đủ relationships
+        TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+
+        // Kiểm tra request phải là REPLACEMENT và status là WAITING_CONFIRM
+        if (request.getRequestType() != TeacherRequestType.REPLACEMENT) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not a REPLACEMENT request");
+        }
+        if (request.getStatus() != RequestStatus.WAITING_CONFIRM) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not in WAITING_CONFIRM status");
+        }
+
+        // Kiểm tra quyền: teacher phải là replacement teacher
+        Teacher teacher = teacherRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher not found"));
+
+        if (request.getReplacementTeacher() == null || !request.getReplacementTeacher().getId().equals(teacher.getId())) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You are not the replacement teacher for this request");
+        }
+
+        // Cập nhật status thành APPROVED
+        request.setStatus(RequestStatus.APPROVED);
+        if (note != null && !note.trim().isEmpty()) {
+            request.setNote(note.trim());
+        }
+
+        request = teacherRequestRepository.save(request);
+        log.info("Replacement request {} confirmed successfully by teacher {}", requestId, userId);
+
+        return mapToResponseDTO(request);
+    }
+
+    //Giáo viên dạy thay từ chối dạy thay
+    @Transactional
+    public TeacherRequestResponseDTO declineReplacementRequest(Long requestId, String reason, Long userId) {
+        log.info("Decline replacement request {} by teacher {}", requestId, userId);
+
+        // Lấy request với đầy đủ relationships
+        TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+
+        // Kiểm tra request phải là REPLACEMENT và status là WAITING_CONFIRM
+        if (request.getRequestType() != TeacherRequestType.REPLACEMENT) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not a REPLACEMENT request");
+        }
+        if (request.getStatus() != RequestStatus.WAITING_CONFIRM) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not in WAITING_CONFIRM status");
+        }
+
+        // Kiểm tra quyền: teacher phải là replacement teacher
+        Teacher teacher = teacherRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher not found"));
+
+        if (request.getReplacementTeacher() == null || !request.getReplacementTeacher().getId().equals(teacher.getId())) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You are not the replacement teacher for this request");
+        }
+
+        // Validate lý do từ chối
+        int minReasonLength = policyService.getGlobalInt("teacher.request.reason_min_length", 15);
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Rejection reason is required");
+        }
+        if (reason.trim().length() < minReasonLength) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Rejection reason must be at least " + minReasonLength + " characters");
+        }
+
+        // Khi replacement teacher từ chối, request trở lại PENDING để giáo vụ có thể xử lý lại
+        // Lưu teacher ID và tên đã từ chối vào note để track
+        Long declinedTeacherId = teacher.getId();
+        UserAccount teacherAccount = teacher.getUserAccount();
+        String declinedTeacherName = teacherAccount != null ? teacherAccount.getFullName() : "Giáo viên ID " + declinedTeacherId;
+        String declinedNote = String.format("DECLINED_BY_TEACHER:%d:%s:%s", declinedTeacherId, declinedTeacherName, reason.trim());
+        
+        // Nếu đã có note về teacher từ chối trước đó, append thêm
+        String existingNote = request.getNote();
+        if (existingNote != null && existingNote.contains("DECLINED_BY_TEACHER")) {
+            request.setNote(existingNote + "\n" + declinedNote);
+        } else {
+            request.setNote(declinedNote);
+        }
+        
+        // Clear replacement teacher và set status về PENDING
+        request.setStatus(RequestStatus.PENDING);
+        request.setReplacementTeacher(null); // Xóa replacement teacher để giáo vụ có thể chọn lại
+
+        request = teacherRequestRepository.save(request);
+        log.info("Replacement request {} declined by teacher {}, returning to PENDING status", requestId, userId);
+
+        return mapToResponseDTO(request);
+    }
+
+    //Gợi ý giáo viên dạy thay cho REPLACEMENT request (cho academic staff)
+    //Loại trừ các teacher đã từ chối request này
+    @Transactional(readOnly = true)
+    public List<ReplacementCandidateDTO> suggestReplacementCandidatesForStaff(Long requestId, Long academicStaffUserId) {
+        log.info("Suggesting replacement candidates for request {} by academic staff {}", requestId, academicStaffUserId);
+
+        // Lấy request
+        TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+
+        // Kiểm tra request phải là REPLACEMENT
+        if (request.getRequestType() != TeacherRequestType.REPLACEMENT) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not a REPLACEMENT request");
+        }
+
+        // Kiểm tra quyền branch
+        Long teacherUserAccountId = request.getTeacher() != null ? request.getTeacher().getUserAccount().getId() : null;
+        List<Long> academicBranches = getBranchIdsForUser(academicStaffUserId);
+        List<Long> teacherBranches = getBranchIdsForUser(teacherUserAccountId);
+        boolean allowed = teacherBranches.isEmpty()
+                || academicBranches.isEmpty()
+                || academicBranches.stream().anyMatch(teacherBranches::contains);
+        if (!allowed) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You don't have permission to view candidates for this request");
+        }
+
+        Session session = request.getSession();
+        if (session == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no session");
+        }
+
+        // Lấy subject từ session
+        org.fyp.tmssep490be.entities.ClassEntity classEntity = session.getClassEntity();
+        if (classEntity == null || classEntity.getSubject() == null) {
+            log.warn("Session {} has no subject information", session.getId());
+            return List.of();
+        }
+
+        org.fyp.tmssep490be.entities.Subject subject = classEntity.getSubject();
+
+        // Lấy skills yêu cầu của session từ SubjectSession
+        Set<org.fyp.tmssep490be.entities.enums.Skill> sessionRequiredSkills = getSessionRequiredSkills(session);
+
+        // Lấy tất cả teachers (trừ teacher hiện tại)
+        List<Teacher> allTeachers = teacherRepository.findAll();
+        
+        // Lấy danh sách teacher IDs đã từ chối request này
+        // Parse note để lấy các teacher ID đã từ chối
+        Set<Long> declinedTeacherIds = new java.util.HashSet<>();
+        String note = request.getNote();
+        if (note != null && (note.contains("DECLINED_BY_TEACHER") || note.contains("DECLINED_BY_TEACHER_ID"))) {
+            // Parse note để lấy các teacher ID đã từ chối
+            String[] lines = note.split("\n");
+            for (String line : lines) {
+                if (line.startsWith("DECLINED_BY_TEACHER:")) {
+                    try {
+                        // Format mới: DECLINED_BY_TEACHER:{teacherId}:{teacherName}:{reason}
+                        String[] parts = line.split(":", 4);
+                        if (parts.length >= 2) {
+                            Long teacherId = Long.parseLong(parts[1]);
+                            declinedTeacherIds.add(teacherId);
+                        }
+                    } catch (NumberFormatException e) {
+                        log.warn("Failed to parse declined teacher ID from note: {}", line);
+                    }
+                } else if (line.startsWith("DECLINED_BY_TEACHER_ID:")) {
+                    try {
+                        // Format cũ: DECLINED_BY_TEACHER_ID:{teacherId}:{reason}
+                        String[] parts = line.split(":", 3);
+                        if (parts.length >= 2) {
+                            Long teacherId = Long.parseLong(parts[1]);
+                            declinedTeacherIds.add(teacherId);
+                        }
+                    } catch (NumberFormatException e) {
+                        log.warn("Failed to parse declined teacher ID from note: {}", line);
+                    }
+                }
+            }
+        }
+
+        // Loại trừ các teacher đã từ chối và teacher hiện tại
+        Set<Long> excludedTeacherIds = new java.util.HashSet<>(declinedTeacherIds);
+        if (request.getTeacher() != null) {
+            excludedTeacherIds.add(request.getTeacher().getId());
+        }
+        if (request.getReplacementTeacher() != null) {
+            excludedTeacherIds.add(request.getReplacementTeacher().getId());
+        }
+
+        // Lọc candidates
+        List<Teacher> candidateTeachers = allTeachers.stream()
+                .filter(teacher -> !excludedTeacherIds.contains(teacher.getId()))
+                .collect(Collectors.toList());
+
+        // Map sang DTO và sắp xếp
+        final Set<org.fyp.tmssep490be.entities.enums.Skill> finalSessionRequiredSkills = sessionRequiredSkills;
+        return candidateTeachers.stream()
+                .map(teacher -> mapToReplacementCandidateDTO(teacher, subject, session))
+                .filter(dto -> dto != null)
+                .sorted((a, b) -> {
+                    // 1. Ưu tiên teacher có skills phù hợp với skills yêu cầu của session
+                    boolean aHasMatchingSkills = hasMatchingSkills(a, finalSessionRequiredSkills);
+                    boolean bHasMatchingSkills = hasMatchingSkills(b, finalSessionRequiredSkills);
+                    
+                    if (aHasMatchingSkills && !bHasMatchingSkills) {
+                        return -1;
+                    }
+                    if (!aHasMatchingSkills && bHasMatchingSkills) {
+                        return 1;
+                    }
+                    
+                    // 2. Sắp xếp theo số lượng skills
+                    int aSkillCount = a.getSkills() != null ? a.getSkills().size() : 0;
+                    int bSkillCount = b.getSkills() != null ? b.getSkills().size() : 0;
+                    if (aSkillCount != bSkillCount) {
+                        return Integer.compare(bSkillCount, aSkillCount);
+                    }
+                    
+                    // 3. Cuối cùng sắp xếp theo tên
+                    String nameA = a.getFullName() != null ? a.getFullName() : "";
+                    String nameB = b.getFullName() != null ? b.getFullName() : "";
+                    return nameA.compareToIgnoreCase(nameB);
+                })
+                .collect(Collectors.toList());
     }
 }
 

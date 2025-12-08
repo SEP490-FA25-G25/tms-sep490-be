@@ -9,6 +9,7 @@ import org.fyp.tmssep490be.dtos.teacherrequest.MySessionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ModalityResourceSuggestionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestRejectDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateDTO;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.PolicyService;
@@ -245,6 +246,80 @@ public class TeacherRequestController {
                 .success(true)
                 .message("Future sessions loaded successfully")
                 .data(sessions)
+                .build());
+    }
+
+    //Endpoint để gợi ý giáo viên dạy thay cho REPLACEMENT request (cho teacher)
+    @GetMapping("/{sessionId}/replacement/candidates")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<List<ReplacementCandidateDTO>>> suggestReplacementCandidates(
+            @PathVariable Long sessionId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<ReplacementCandidateDTO> candidates = teacherRequestService.suggestReplacementCandidates(
+                sessionId, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<List<ReplacementCandidateDTO>>builder()
+                .success(true)
+                .message("Replacement candidates loaded successfully")
+                .data(candidates)
+                .build());
+    }
+
+    //Endpoint để gợi ý giáo viên dạy thay cho REPLACEMENT request (cho academic staff)
+    //Loại trừ các teacher đã từ chối request này
+    @GetMapping("/staff/{requestId}/replacement/candidates")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<ReplacementCandidateDTO>>> suggestReplacementCandidatesForStaff(
+            @PathVariable Long requestId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<ReplacementCandidateDTO> candidates = teacherRequestService.suggestReplacementCandidatesForStaff(
+                requestId, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<List<ReplacementCandidateDTO>>builder()
+                .success(true)
+                .message("Replacement candidates loaded successfully")
+                .data(candidates)
+                .build());
+    }
+
+    //Endpoint để giáo viên dạy thay xác nhận đồng ý dạy thay
+    @PatchMapping("/{id}/confirm")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> confirmReplacementRequest(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> body,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        log.info("Confirm replacement request {} by teacher {}", id, userPrincipal.getId());
+
+        String note = body != null ? body.get("note") : null;
+        TeacherRequestResponseDTO response = teacherRequestService.confirmReplacementRequest(id, userPrincipal.getId(), note);
+
+        return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
+                .success(true)
+                .message("Replacement request confirmed successfully")
+                .data(response)
+                .build());
+    }
+
+    //Endpoint để giáo viên dạy thay từ chối dạy thay
+    @PatchMapping("/{id}/decline")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> declineReplacementRequest(
+            @PathVariable Long id,
+            @RequestBody @Valid TeacherRequestRejectDTO rejectDTO,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        log.info("Decline replacement request {} by teacher {}", id, userPrincipal.getId());
+
+        TeacherRequestResponseDTO response = teacherRequestService.declineReplacementRequest(id, rejectDTO.getReason(), userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
+                .success(true)
+                .message("Replacement request declined")
+                .data(response)
                 .build());
     }
 }
