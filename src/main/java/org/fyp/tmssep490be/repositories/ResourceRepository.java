@@ -1,7 +1,6 @@
 package org.fyp.tmssep490be.repositories;
 
 import org.fyp.tmssep490be.entities.Resource;
-import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.entities.enums.ResourceStatus;
 import org.fyp.tmssep490be.entities.enums.ResourceType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -52,7 +51,7 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
     // Đếm resources theo branch và status
     long countByBranchIdAndStatus(Long branchId, ResourceStatus status);
 
-    // Lấy resources VIRTUAL có ngày hết hạn (cho scheduler job)
+    // Lấy resources VIRTUAL có ngày hết hạn
     @Query("SELECT r FROM Resource r " +
             "WHERE r.resourceType = :resourceType " +
             "AND r.expiryDate IS NOT NULL " +

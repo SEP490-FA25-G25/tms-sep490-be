@@ -5,9 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO gợi ý resource khả dụng cho yêu cầu đổi phương thức
- */
 @Data
 @Builder
 @NoArgsConstructor

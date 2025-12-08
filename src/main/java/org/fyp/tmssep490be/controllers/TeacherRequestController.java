@@ -59,7 +59,7 @@ public class TeacherRequestController {
                         .build());
     }
 
-    //Endpoint để giáo viên tạo yêu cầu (bắt đầu với MODALITY_CHANGE)
+    //Endpoint để giáo viên tạo yêu cầu
     @PostMapping
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> createRequest(
@@ -94,7 +94,24 @@ public class TeacherRequestController {
                 .build());
     }
 
-    // Alias path to match frontend call /api/v1/teacher-requests/{sessionId}/modality/resources
+    // Gợi ý resource cho giáo vụ dựa trên request ID (MODALITY_CHANGE)
+    @GetMapping("/{requestId}/modality/resources/staff")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<ModalityResourceSuggestionDTO>>> suggestModalityResourcesForStaff(
+            @PathVariable Long requestId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<ModalityResourceSuggestionDTO> suggestions = teacherRequestService.suggestModalityResourcesForStaff(
+                requestId, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<List<ModalityResourceSuggestionDTO>>builder()
+                .success(true)
+                .message("Resources loaded successfully")
+                .data(suggestions)
+                .build());
+    }
+
+    //Endpoint để gợi ý resource khả dụng cho MODALITY_CHANGE
     @GetMapping("/{sessionId}/modality/resources")
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ResponseObject<List<ModalityResourceSuggestionDTO>>> suggestModalityResourcesAlias(
@@ -103,7 +120,7 @@ public class TeacherRequestController {
         return suggestModalityResources(sessionId, userPrincipal);
     }
 
-    //Endpoint để lấy cấu hình request cho giáo viên (từ policies)
+    //Endpoint để lấy cấu hình request cho giáo viên
     @GetMapping("/config")
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ResponseObject<TeacherRequestConfigDTO>> getTeacherRequestConfig() {
