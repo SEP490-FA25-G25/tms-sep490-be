@@ -18,7 +18,7 @@ public class MySessionDTO {
     private LocalTime startTime;
     private LocalTime endTime;
     private String className;
-    private String courseName;
+    private String subjectName;
     private String topic;
     private String requestStatus;
     @Builder.Default

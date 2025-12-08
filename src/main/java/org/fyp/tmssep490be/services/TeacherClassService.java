@@ -48,8 +48,8 @@ public class TeacherClassService {
                 .code(classEntity.getCode())
                 .name(classEntity.getName())
                 // Chuyển đổi thông tin môn học
-                .courseName(classEntity.getSubject() != null ? classEntity.getSubject().getName() : null)
-                .courseCode(classEntity.getSubject() != null ? classEntity.getSubject().getCode() : null)
+                .subjectName(classEntity.getSubject() != null ? classEntity.getSubject().getName() : null)
+                .subjectCode(classEntity.getSubject() != null ? classEntity.getSubject().getCode() : null)
                 // Chuyển đổi thông tin chi nhánh
                 .branchName(classEntity.getBranch() != null ? classEntity.getBranch().getName() : null)
                 .branchCode(classEntity.getBranch() != null ? classEntity.getBranch().getCode() : null)

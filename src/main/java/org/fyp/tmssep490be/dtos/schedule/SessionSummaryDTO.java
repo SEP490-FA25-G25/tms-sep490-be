@@ -52,10 +52,10 @@ public class SessionSummaryDTO {
     private String className;
 
     @Schema(description = "Course ID", example = "1")
-    private Long courseId;
+    private Long subjectId;
 
     @Schema(description = "Course name", example = "IELTS Foundation")
-    private String courseName;
+    private String subjectName;
 
     @Schema(description = "Session topic", example = "Introduction to IELTS")
     private String topic;

@@ -333,7 +333,7 @@ public class TeacherRequestService {
                 .startTime(timeSlot != null ? timeSlot.getStartTime() : null)
                 .endTime(timeSlot != null ? timeSlot.getEndTime() : null)
                 .className(classEntity != null ? classEntity.getName() : null)
-                .courseName(subject != null ? subject.getName() : null)
+                .subjectName(subject != null ? subject.getName() : null)
                 .topic(subjectSession != null ? subjectSession.getTopic() : null)
                 .hasPendingRequest(false)
                 .build();
