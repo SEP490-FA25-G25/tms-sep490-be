@@ -219,6 +219,22 @@ public class CurriculumService {
                 curriculumRepository.save(curriculum);
         }
 
+        @Transactional
+        public void deleteCurriculum(Long id) {
+                log.info("Deleting curriculum with ID: {}", id);
+                Curriculum curriculum = curriculumRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chương trình với ID: " + id));
+
+                // Kiểm tra có level nào phụ thuộc không
+                long levelCount = levelRepository.countByCurriculumId(id);
+                if (levelCount > 0) {
+                        throw new IllegalStateException("Không thể xóa chương trình vì đã có cấp độ phụ thuộc.");
+                }
+
+                curriculumRepository.delete(curriculum);
+                log.info("Curriculum deleted successfully: {}", id);
+        }
+
         // ==================== HELPER METHODS ====================
 
         private CurriculumWithLevelsDTO convertToCurriculumWithLevelsDTO(Curriculum curriculum) {

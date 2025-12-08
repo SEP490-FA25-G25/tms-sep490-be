@@ -113,4 +113,17 @@ public class CurriculumController {
                 .message("Curriculum reactivated successfully")
                 .build());
     }
+
+    // Delete curriculum
+    @DeleteMapping("/curriculums/{id}")
+    @Operation(summary = "Delete curriculum")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<Void>> deleteCurriculum(@PathVariable Long id) {
+        log.info("Deleting curriculum with ID: {}", id);
+        curriculumService.deleteCurriculum(id);
+        return ResponseEntity.ok(ResponseObject.<Void>builder()
+                .success(true)
+                .message("Curriculum deleted successfully")
+                .build());
+    }
 }
