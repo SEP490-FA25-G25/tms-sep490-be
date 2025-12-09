@@ -105,4 +105,16 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
            "AND s.status != 'CANCELLED'")
     List<StudentSession> findAllByStudentId(@Param("studentId") Long studentId);
 
+    // Check if student attended a specific session
+    @Query("SELECT CASE WHEN COUNT(ss) > 0 THEN true ELSE false END " +
+           "FROM StudentSession ss " +
+           "WHERE ss.student.id = :studentId " +
+           "AND ss.session.id = :sessionId " +
+           "AND ss.attendanceStatus = :status")
+    boolean existsByStudentIdAndSessionIdAndStatus(
+            @Param("studentId") Long studentId,
+            @Param("sessionId") Long sessionId,
+            @Param("status") AttendanceStatus status
+    );
+
 }

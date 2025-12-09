@@ -1,8 +1,5 @@
 package org.fyp.tmssep490be.controllers;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/students-request")
 @RequiredArgsConstructor
 @Slf4j
-@SecurityRequirement(name = "Bearer Authentication")
 public class StudentRequestController {
 
     private final StudentRequestService studentRequestService;
@@ -32,10 +28,8 @@ public class StudentRequestController {
             @RequestParam(required = false) String requestType,
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") Integer page,
-            @Parameter(description = "Page size")
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(defaultValue = "submittedAt,desc") String sort,
-            @Parameter(description = "Search by request reason, class code, or session title")
             @RequestParam(required = false) String search) {
 
         Long studentId = currentUser.getId();
@@ -58,7 +52,7 @@ public class StudentRequestController {
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ResponseObject<StudentRequestDetailDTO>> getRequestById(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @Parameter(description = "Request ID") @PathVariable Long requestId) {
+            @PathVariable Long requestId) {
 
         Long studentId = currentUser.getId();
         StudentRequestDetailDTO request = studentRequestService.getRequestById(requestId, studentId);
@@ -91,10 +85,8 @@ public class StudentRequestController {
     // Lấy ra buổi phù hợp
     @GetMapping("/makeup-options")
     @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Get makeup session options", description = "Get available makeup sessions for a specific missed session with smart ranking by branch, modality, date, and capacity")
     public ResponseEntity<ResponseObject<MakeupOptionsResponseDTO>> getMakeupOptions(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @Parameter(description = "Target session ID (the missed session to makeup)", required = true)
             @RequestParam Long targetSessionId) {
 
         MakeupOptionsResponseDTO response = studentRequestService.getMakeupOptions(
@@ -105,7 +97,6 @@ public class StudentRequestController {
 
     @PostMapping("/makeup-requests")
     @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Submit makeup request", description = "Submit a makeup request for a missed session")
     public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> submitMakeupRequest(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @Valid @RequestBody MakeupRequestDTO dto) {
@@ -118,10 +109,9 @@ public class StudentRequestController {
 
     @PostMapping("/requests/{requestId}/cancel")
     @PreAuthorize("hasRole('STUDENT')")
-    @Operation(summary = "Cancel request", description = "Cancel a pending request submitted by the student")
     public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> cancelRequest(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @Parameter(description = "Request ID") @PathVariable Long requestId) {
+            @PathVariable Long requestId) {
 
         StudentRequestResponseDTO response = studentRequestService.cancelRequest(requestId, currentUser.getId());
 
