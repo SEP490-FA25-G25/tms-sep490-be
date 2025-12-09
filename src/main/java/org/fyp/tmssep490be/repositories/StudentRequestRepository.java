@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Repository
@@ -191,4 +192,16 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
             @Param("studentId") Long studentId,
             @Param("targetSessionId") Long targetSessionId,
             @Param("requestType") StudentRequestType requestType);
+
+    /**
+     * Find requests by status and submitted before cutoff date
+     * Used by RequestExpiryJob to expire old PENDING requests
+     */
+    @Query("SELECT sr FROM StudentRequest sr " +
+           "WHERE sr.status = :status " +
+           "AND sr.submittedAt < :cutoffDate " +
+           "ORDER BY sr.submittedAt ASC")
+    List<StudentRequest> findByStatusAndSubmittedAtBefore(
+            @Param("status") RequestStatus status,
+            @Param("cutoffDate") OffsetDateTime cutoffDate);
 }

@@ -3,6 +3,7 @@ package org.fyp.tmssep490be.repositories;
 import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -83,12 +84,13 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     // Kiểm tra date trong 2 tuần từ ngày hiện tại, trạng thái PLANNED, không phải buổi học bị bỏ
     // Loại trừ buổi học bị mà học viên đã bỏ qua (excludeSessionId)
     // Cùng chi nhánh được học onl hoạc offline, khác chi nhánh thì chỉ được học online
+    // weeksLimit: số tuần tối đa để tìm buổi học bù (lấy từ policy)
     @Query(value = """
         SELECT s.* FROM session s
         JOIN class c ON s.class_id = c.id
         WHERE s.subject_session_id = :subjectSessionId
           AND s.date >= CURRENT_DATE
-          AND s.date <= CURRENT_DATE + INTERVAL '2 weeks'
+          AND s.date <= CURRENT_DATE + CAST((:weeksLimit || ' weeks') AS INTERVAL)
           AND s.status = 'PLANNED'
           AND s.id != :excludeSessionId
           AND (
@@ -100,7 +102,8 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     List<Session> findMakeupSessionOptions(
             @Param("subjectSessionId") Long subjectSessionId,
             @Param("excludeSessionId") Long excludeSessionId,
-            @Param("targetBranchId") Long targetBranchId);
+            @Param("targetBranchId") Long targetBranchId,
+            @Param("weeksLimit") Integer weeksLimit);
 
     @Query("""
         SELECT s FROM Session s
@@ -113,4 +116,16 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     List<Session> findSessionsForStudentByDate(
             @Param("studentId") Long studentId,
             @Param("date") LocalDate date);
+
+    @Query("SELECT s FROM Session s WHERE s.date < :today AND s.status = :status")
+    List<Session> findPastSessionsByStatus(
+            @Param("today") LocalDate today,
+            @Param("status") SessionStatus status);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Session s SET s.status = :newStatus WHERE s.date < :today AND s.status = :oldStatus")
+    int updatePastSessionsStatus(
+            @Param("today") LocalDate today,
+            @Param("oldStatus") SessionStatus oldStatus,
+            @Param("newStatus") SessionStatus newStatus);
 }

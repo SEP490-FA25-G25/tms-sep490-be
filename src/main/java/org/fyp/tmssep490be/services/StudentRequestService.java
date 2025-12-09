@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class StudentRequestService {
 
-    private static final int LEAD_TIME_DAYS = 2;
     private static final double ABSENCE_THRESHOLD_PERCENT = 20.0;
 
     private final StudentRequestRepository studentRequestRepository;
@@ -47,6 +46,7 @@ public class StudentRequestService {
     private final EnrollmentRepository enrollmentRepository;
     private final ClassRepository classRepository;
     private final UserAccountRepository userAccountRepository;
+    private final SystemPolicyRepository systemPolicyRepository;
 
     public Page<StudentRequestResponseDTO> getMyRequests(Long userId, RequestFilterDTO filter) {
         log.debug("Getting requests for student user {}", userId);
@@ -499,9 +499,10 @@ public class StudentRequestService {
             throw new BusinessRuleException("DUPLICATE_REQUEST", "Duplicate absence request for this session");
         }
 
+        int leadTimeDays = getPolicyIntValue("request.absence.lead_time_days", 1);
         long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), session.getDate());
-        if (daysUntil < LEAD_TIME_DAYS) {
-            log.warn("Absence request submitted with insufficient lead time: {} days", daysUntil);
+        if (daysUntil < leadTimeDays) {
+            log.warn("Absence request submitted with insufficient lead time: {} days (required: {})", daysUntil, leadTimeDays);
         }
 
         double absenceRate = calculateAbsenceRate(student.getId(), dto.getCurrentClassId());
@@ -898,12 +899,53 @@ public class StudentRequestService {
 
     public StudentRequestConfigDTO getStudentRequestConfig() {
         return StudentRequestConfigDTO.builder()
-                .makeupLookbackWeeks(4)
-                .makeupWeeksLimit(4)
-                .maxTransfersPerCourse(2)
-                .absenceLeadTimeDays(LEAD_TIME_DAYS)
-                .reasonMinLength(10)
+                .makeupLookbackWeeks(getPolicyIntValue("student.makeup.lookback_weeks", 2))
+                .makeupWeeksLimit(getPolicyIntValue("student.makeup.weeks_limit", 4))
+                .maxTransfersPerCourse(getPolicyIntValue("request.transfer.max_per_course", 1))
+                .absenceLeadTimeDays(getPolicyIntValue("request.absence.lead_time_days", 1))
+                .reasonMinLength(getPolicyIntValue("request.absence.reason_min_length", 10))
                 .build();
+    }
+
+    // Helper methods để lấy policy values từ DB
+    private Integer getPolicyIntValue(String policyKey, Integer defaultValue) {
+        return systemPolicyRepository.findFirstByPolicyKeyOrderByIdAsc(policyKey)
+                .map(policy -> {
+                    try {
+                        return Integer.parseInt(policy.getCurrentValue());
+                    } catch (NumberFormatException e) {
+                        log.warn("Invalid integer value for policy {}: {}", policyKey, policy.getCurrentValue());
+                        return defaultValue;
+                    }
+                })
+                .orElseGet(() -> {
+                    log.warn("Policy not found: {}, using default value: {}", policyKey, defaultValue);
+                    return defaultValue;
+                });
+    }
+
+    @Transactional
+    public StudentRequestResponseDTO cancelRequest(Long requestId, Long userId) {
+        Student student = studentRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND,
+                        "Student not found for user ID: " + userId));
+
+        StudentRequest request = studentRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Request not found with id: " + requestId));
+
+        if (!request.getStudent().getId().equals(student.getId())) {
+            throw new BusinessRuleException("ACCESS_DENIED", "You can only cancel your own requests");
+        }
+
+        if (!request.getStatus().equals(RequestStatus.PENDING)) {
+            throw new BusinessRuleException("INVALID_STATUS", "Only pending requests can be cancelled");
+        }
+
+        request.setStatus(RequestStatus.CANCELLED);
+        request = studentRequestRepository.save(request);
+
+        log.info("Request {} cancelled by student {} (user {})", requestId, student.getId(), userId);
+        return mapToStudentRequestResponseDTO(request);
     }
 
      public MissedSessionsResponseDTO getMissedSessions(Long userId, Integer weeksBack, Boolean excludeRequested) {
@@ -913,9 +955,13 @@ public class StudentRequestService {
     }
 
     public MissedSessionsResponseDTO getMissedSessionsForStudent(Long studentId, Integer weeksBack, Boolean excludeRequested) {
-        int lookbackWeeks = weeksBack != null ? weeksBack : 4;
+        // Nếu client không truyền weeksBack, lấy từ policy
+        int lookbackWeeks = weeksBack != null ? weeksBack : getPolicyIntValue("student.makeup.lookback_weeks", 2);
+
+        //
         boolean excludeRequestedSessions = excludeRequested != null ? excludeRequested : true;
 
+        //Là hôm nay - số tuần -> ra cái ngày cũ nhất
         LocalDate cutoffDate = LocalDate.now().minusWeeks(lookbackWeeks);
         LocalDate today = LocalDate.now();
 
@@ -957,12 +1003,16 @@ public class StudentRequestService {
             throw new BusinessRuleException("INVALID_SESSION", "Target session must have subject session defined");
         }
 
+        // Lấy policy: số tuần giới hạn tìm buổi học bù
+        int weeksLimit = getPolicyIntValue("student.makeup.weeks_limit", 4);
+
         // Find makeup options with same subject session (same content)
         // Business Rule: Same branch → allow all modalities; Different branch → ONLINE only
         List<Session> makeupOptions = sessionRepository.findMakeupSessionOptions(
                 targetSession.getSubjectSession().getId(),
                 targetSessionId,
-                targetSession.getClassEntity().getBranch().getId()
+                targetSession.getClassEntity().getBranch().getId(),
+                weeksLimit
         );
 
         // Apply smart ranking and filtering
@@ -1075,7 +1125,6 @@ public class StudentRequestService {
         //Cùng hình thức học thì + 5, khác thì không cộng
         if (modalityMatch) score += 5;
 
-        // Date proximity bonus
         long weeksUntil = ChronoUnit.WEEKS.between(LocalDate.now(), session.getDate());
         int dateProximityScore = (int) Math.max(0, 3 - weeksUntil); // +3 this week, +2 next, +1 in 2 weeks
         //weeksUntil = 0 -> 3-0 =3 -> điểm cao

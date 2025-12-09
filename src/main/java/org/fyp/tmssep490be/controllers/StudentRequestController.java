@@ -115,4 +115,16 @@ public class StudentRequestController {
 
         return ResponseEntity.ok(ResponseObject.success("Makeup request submitted successfully", response));
     }
+
+    @PostMapping("/requests/{requestId}/cancel")
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "Cancel request", description = "Cancel a pending request submitted by the student")
+    public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> cancelRequest(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Parameter(description = "Request ID") @PathVariable Long requestId) {
+
+        StudentRequestResponseDTO response = studentRequestService.cancelRequest(requestId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.success("Request cancelled successfully", response));
+    }
 }
