@@ -54,11 +54,35 @@ public class UserAccountController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<Page<UserResponse>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String status) {
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<UserResponse> users = userAccountService.getAllUsers(pageable);
+        Page<UserResponse> users = userAccountService.getAllUsers(pageable, search, role, status);
         return ResponseEntity.ok(users);
     }
 
+    @GetMapping("/email/{email}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<UserResponse> getUserByEmail(@PathVariable String email) {
+        UserResponse userResponse = userAccountService.getUserByEmail(email);
+        return ResponseEntity.ok(userResponse);
+    }
+
+    @PatchMapping("/{userId}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserResponse> updateUserStatus(
+            @PathVariable Long userId,
+            @RequestParam String status) {
+        UserResponse userResponse = userAccountService.updateUserStatus(userId, status);
+        return ResponseEntity.ok(userResponse);
+    }
+
+    @GetMapping("/check/email/{email}")
+    public ResponseEntity<Boolean> checkEmailExists(@PathVariable String email) {
+        boolean exists = userAccountService.checkEmailExists(email);
+        return ResponseEntity.ok(exists);
+    }
 }

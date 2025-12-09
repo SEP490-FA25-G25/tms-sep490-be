@@ -6,31 +6,31 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.schedule.*;
+import org.fyp.tmssep490be.dtos.schedule.AttendanceSummaryDTO;
+import org.fyp.tmssep490be.dtos.schedule.TeacherSessionDetailDTO;
 import org.fyp.tmssep490be.entities.*;
-import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
-import org.fyp.tmssep490be.entities.enums.Skill;
+import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
+import org.fyp.tmssep490be.entities.enums.ResourceType;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
-import org.fyp.tmssep490be.repositories.EnrollmentRepository;
-import org.fyp.tmssep490be.repositories.StudentRepository;
-import org.fyp.tmssep490be.repositories.StudentSessionRepository;
-import org.fyp.tmssep490be.repositories.TimeSlotTemplateRepository;
+import org.fyp.tmssep490be.repositories.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class StudentScheduleService {
+public class TeacherScheduleService {
 
-    private final StudentRepository studentRepository;
-    private final StudentSessionRepository studentSessionRepository;
+    private final TeacherRepository teacherRepository;
+    private final SessionRepository sessionRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
-    private final EnrollmentRepository enrollmentRepository;
     private final ObjectMapper objectMapper;
 
     public LocalDate getCurrentWeekStart() {
@@ -38,34 +38,35 @@ public class StudentScheduleService {
         return today.minusDays(today.getDayOfWeek().getValue() - 1);
     }
 
-    public WeeklyScheduleResponseDTO getWeeklySchedule(Long studentId, LocalDate weekStart) {
-        log.info("Getting weekly schedule for student: {}, week: {}", studentId, weekStart);
+    @Transactional(readOnly = true)
+    public WeeklyScheduleResponseDTO getWeeklySchedule(Long teacherId, LocalDate weekStart, Long classId) {
+        log.info("Getting weekly schedule for teacher: {}, week: {}, class: {}", teacherId, weekStart, classId);
 
         // 1. Validate weekStart is Monday
         if (weekStart.getDayOfWeek() != DayOfWeek.MONDAY) {
-            throw new CustomException(ErrorCode.INVALID_INPUT);
+            throw new CustomException(ErrorCode.INVALID_INPUT, "weekStart must be a Monday");
         }
 
         // 2. Calculate week range
         LocalDate weekEnd = weekStart.plusDays(6);
 
-        // 3. Fetch student
-        Student student = studentRepository.findById(studentId)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+        // 3. Fetch teacher
+        Teacher teacher = teacherRepository.findById(teacherId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND));
 
-        // 4. Fetch all sessions for this week (with JOIN FETCH)
-        List<StudentSession> studentSessions = studentSessionRepository
-                .findWeeklyScheduleByStudentId(studentId, weekStart, weekEnd);
+        // 4. Fetch all sessions for this week (all statuses)
+        List<Session> sessions = sessionRepository.findWeeklySessionsForTeacher(
+                teacherId, weekStart, weekEnd, classId);
 
-        log.debug("Found {} sessions for week {} to {}", studentSessions.size(), weekStart, weekEnd);
+        log.debug("Found {} sessions for week {} to {}", sessions.size(), weekStart, weekEnd);
 
-        // 5. Get all time slots from all branches with active enrollments (Union + Merge)
-        List<TimeSlotDTO> timeSlots = getAllTimeSlotsForStudent(studentId);
+        // 5. Get all time slots from branches where teacher has classes
+        List<TimeSlotDTO> timeSlots = getAllTimeSlotsForTeacher(teacherId);
 
         // 6. Group by day of week
-        Map<DayOfWeek, List<SessionSummaryDTO>> scheduleMap = studentSessions.stream()
+        Map<DayOfWeek, List<SessionSummaryDTO>> scheduleMap = sessions.stream()
                 .collect(Collectors.groupingBy(
-                        ss -> ss.getSession().getDate().getDayOfWeek(),
+                        s -> s.getDate().getDayOfWeek(),
                         Collectors.mapping(this::mapToSessionSummaryDTO, Collectors.toList())
                 ));
 
@@ -74,8 +75,8 @@ public class StudentScheduleService {
             scheduleMap.putIfAbsent(day, new ArrayList<>());
         }
 
-        log.info("Schedule map for student {}: {} total sessions across {} days with data", 
-                studentId, 
+        log.info("Schedule map for teacher {}: {} total sessions across {} days with data",
+                teacherId,
                 scheduleMap.values().stream().mapToInt(List::size).sum(),
                 scheduleMap.values().stream().filter(list -> !list.isEmpty()).count());
 
@@ -83,26 +84,33 @@ public class StudentScheduleService {
         return WeeklyScheduleResponseDTO.builder()
                 .weekStart(weekStart)
                 .weekEnd(weekEnd)
-                .studentId(student.getId())
-                .studentName(student.getUserAccount().getFullName())
+                .studentId(teacher.getId()) // Reuse field for teacherId
+                .studentName(teacher.getUserAccount().getFullName()) // Reuse field for teacherName
                 .timeSlots(timeSlots)
                 .schedule(scheduleMap)
                 .build();
     }
 
-    public SessionDetailDTO getSessionDetail(Long studentId, Long sessionId) {
-        log.info("Getting session detail for student: {}, session: {}", studentId, sessionId);
+    @Transactional(readOnly = true)
+    public TeacherSessionDetailDTO getSessionDetail(Long teacherId, Long sessionId) {
+        log.info("Getting session detail for teacher: {}, session: {}", teacherId, sessionId);
 
-        // 1. Fetch with authorization check
-        StudentSession studentSession = studentSessionRepository
-                .findByStudentIdAndSessionId(studentId, sessionId)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_SESSION_NOT_FOUND));
+        // 1. Fetch session with authorization check
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
 
-        return mapToSessionDetailDTO(studentSession);
+        // 2. Verify teacher is assigned to this session
+        boolean isAssigned = session.getTeachingSlots().stream()
+                .anyMatch(ts -> ts.getTeacher() != null && ts.getTeacher().getId().equals(teacherId));
+
+        if (!isAssigned) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "Teacher is not assigned to this session");
+        }
+
+        return mapToTeacherSessionDetailDTO(session);
     }
 
-    private SessionDetailDTO mapToSessionDetailDTO(StudentSession studentSession) {
-        Session session = studentSession.getSession();
+    private TeacherSessionDetailDTO mapToTeacherSessionDetailDTO(Session session) {
         TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
         ClassEntity classEntity = session.getClassEntity();
         SubjectSession subjectSession = session.getSubjectSession();
@@ -145,11 +153,7 @@ public class StudentScheduleService {
                 .sequenceNo(subjectSession != null ? subjectSession.getSequenceNo() : null)
                 .build();
 
-        StudentStatusDTO studentStatus = StudentStatusDTO.builder()
-                .attendanceStatus(resolveDisplayStatus(studentSession))
-                .homeworkStatus(studentSession.getHomeworkStatus())
-                .note(studentSession.getNote())
-                .build();
+        // Note: TeacherSessionDetailDTO doesn't need StudentStatusDTO
 
         List<MaterialDTO> materials = new ArrayList<>();
         if (subjectSession != null && !subjectSession.getSubjectMaterials().isEmpty()) {
@@ -166,15 +170,43 @@ public class StudentScheduleService {
                     .orElse(null);
         }
 
-        // Build MakeupInfoDTO if applicable
+        // Build MakeupInfoDTO if applicable (check if session has makeup info)
         MakeupInfoDTO makeupInfo = null;
-        if (studentSession.getIsMakeup() != null && studentSession.getIsMakeup()) {
-            makeupInfo = buildMakeupInfo(studentSession);
-        }
+        // Note: Makeup info for teacher sessions might be stored differently
+        // For now, we'll leave it null unless we find makeup-related data
 
-        return SessionDetailDTO.builder()
+        // Get attendance summary
+        long totalStudents = session.getStudentSessions().size();
+        long presentCount = session.getStudentSessions().stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                .count();
+        long absentCount = session.getStudentSessions().stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                .count();
+        // Note: AttendanceStatus enum doesn't have LATE status
+        // Set to 0 for now
+        long lateCount = 0;
+        long excusedCount = session.getStudentSessions().stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
+                .count();
+        
+        // Check if attendance has been submitted (any student has non-PLANNED status)
+        boolean attendanceSubmitted = session.getStudentSessions().stream()
+                .anyMatch(ss -> ss.getAttendanceStatus() != null && 
+                               ss.getAttendanceStatus() != AttendanceStatus.PLANNED);
+
+        // Build attendance summary
+        AttendanceSummaryDTO attendanceSummary = AttendanceSummaryDTO.builder()
+                .totalStudents(totalStudents)
+                .presentCount(presentCount)
+                .absentCount(absentCount)
+                .lateCount(lateCount)
+                .excusedCount(excusedCount)
+                .attendanceSubmitted(attendanceSubmitted)
+                .build();
+
+        return TeacherSessionDetailDTO.builder()
                 .sessionId(session.getId())
-                .studentSessionId(studentSession.getId().getSessionId())
                 .date(session.getDate())
                 .dayOfWeek(session.getDate().getDayOfWeek())
                 .startTime(timeSlot != null ? timeSlot.getStartTime() : null)
@@ -182,10 +214,10 @@ public class StudentScheduleService {
                 .timeSlotName(timeSlot != null ? timeSlot.getName() : null)
                 .classInfo(classInfo)
                 .sessionInfo(sessionInfo)
-                .studentStatus(studentStatus)
                 .materials(materials)
                 .classroomResource(classroomResource)
                 .makeupInfo(makeupInfo)
+                .attendanceSummary(attendanceSummary)
                 .build();
     }
 
@@ -193,16 +225,54 @@ public class StudentScheduleService {
         if (subjectSession == null || subjectSession.getSkills() == null) {
             return new ArrayList<>();
         }
-        
-        // SubjectSession.skills đã là List<Skill>, chỉ cần map sang tên
-        return subjectSession.getSkills().stream()
-                .map(Skill::name)
-                .toList();
+
+        Object skillsRaw = subjectSession.getSkills();
+
+        // Case 1: String (JSON array hoặc text đơn)
+        if (skillsRaw instanceof String) {
+            String skillsText = ((String) skillsRaw).trim();
+
+            if (skillsText.isEmpty()) {
+                return new ArrayList<>();
+            }
+
+            if (skillsText.startsWith("[")) {
+                try {
+                    return objectMapper.readValue(skillsText, new TypeReference<List<String>>() {});
+                } catch (JsonProcessingException e) {
+                    log.warn("Failed to parse skills JSON array: {}", skillsText, e);
+                    return new ArrayList<>();
+                }
+            }
+
+            return List.of(skillsText);
+        }
+
+        // Case 2: List<?> (enum Skill hoặc String)
+        if (skillsRaw instanceof List<?>) {
+            List<?> skillList = (List<?>) skillsRaw;
+            return skillList.stream()
+                    .map(item -> {
+                        if (item == null) return null;
+                        if (item instanceof String) {
+                            String txt = ((String) item).trim();
+                            return txt.isEmpty() ? null : txt;
+                        }
+                        // enum Skill
+                        String txt = item.toString();
+                        return txt != null && !txt.trim().isEmpty() ? txt.trim() : null;
+                    })
+                    .filter(s -> s != null && !s.isEmpty())
+                    .collect(Collectors.toList());
+        }
+
+        // Fallback
+        return new ArrayList<>();
     }
 
     private String determineOnlineLink(Session session) {
         return session.getSessionResources().stream()
-                .filter(sr -> sr.getResource().getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL)
+                .filter(sr -> sr.getResource().getResourceType() == ResourceType.VIRTUAL)
                 .map(sr -> sr.getResource().getName())
                 .findFirst()
                 .orElse(null);
@@ -234,38 +304,40 @@ public class StudentScheduleService {
                 .build();
     }
 
-    private List<TimeSlotDTO> getAllTimeSlotsForStudent(Long studentId) {
-        log.debug("Getting all time slots for student: {}", studentId);
+    private List<TimeSlotDTO> getAllTimeSlotsForTeacher(Long teacherId) {
+        log.debug("Getting all time slots for teacher: {}", teacherId);
 
-        // 1. Get all active enrollments for student
-        List<Enrollment> activeEnrollments = enrollmentRepository
-                .findByStudentIdAndStatus(studentId, EnrollmentStatus.ENROLLED);
+        // 1. Get all branches where teacher has classes
+        // Query sessions in a wide date range to get all branches
+        LocalDate fromDate = LocalDate.now().minusYears(1);
+        LocalDate toDate = LocalDate.now().plusYears(1);
+        List<Session> allSessions = sessionRepository.findWeeklySessionsForTeacher(
+                teacherId, fromDate, toDate, null);
+        
+        Set<Long> branchIds = allSessions.stream()
+                .map(s -> s.getClassEntity().getBranch().getId())
+                .collect(Collectors.toSet());
 
-        if (activeEnrollments.isEmpty()) {
-            log.warn("Student {} has no active enrollments. Returning empty time slot list.", studentId);
+        if (branchIds.isEmpty()) {
+            log.warn("Teacher {} has no sessions. Returning empty time slot list.", teacherId);
             return Collections.emptyList();
         }
 
-        // 2. Extract unique branch IDs from enrollments
-        Set<Long> branchIds = activeEnrollments.stream()
-                .map(e -> e.getClassEntity().getBranch().getId())
-                .collect(Collectors.toSet());
+        log.debug("Teacher {} has sessions in {} branches", teacherId, branchIds.size());
 
-        log.debug("Student {} has active enrollments in {} branches", studentId, branchIds.size());
-
-        // 3. Union time slots from all branches
+        // 2. Union time slots from all branches
         List<TimeSlotTemplate> allTimeSlots = branchIds.stream()
                 .flatMap(branchId -> timeSlotTemplateRepository
                         .findByBranchIdOrderByStartTimeAsc(branchId).stream())
                 .toList();
 
-        // 4. Group by TimeRange (startTime, endTime) to merge duplicates
+        // 3. Group by TimeRange (startTime, endTime) to merge duplicates
         Map<TimeRange, List<TimeSlotTemplate>> groupedByTimeRange = allTimeSlots.stream()
                 .collect(Collectors.groupingBy(
                         ts -> new TimeRange(ts.getStartTime(), ts.getEndTime())
                 ));
 
-        // 5. Merge duplicates and build DTOs
+        // 4. Merge duplicates and build DTOs
         List<TimeSlotDTO> mergedTimeSlots = groupedByTimeRange.entrySet().stream()
                 .map(entry -> {
                     TimeRange timeRange = entry.getKey();
@@ -279,7 +351,7 @@ public class StudentScheduleService {
                         mergedName = slot.getName();
                         timeSlotTemplateId = slot.getId();
                     } else {
-                        // Merge names from different branches (e.g., "HN Morning 1 / SG Morning 1")
+                        // Merge names from different branches
                         mergedName = slots.stream()
                                 .map(TimeSlotTemplate::getName)
                                 .distinct()
@@ -297,24 +369,18 @@ public class StudentScheduleService {
                 .sorted(Comparator.comparing(TimeSlotDTO::getStartTime))
                 .collect(Collectors.toList());
 
-        log.debug("Merged {} unique time slots for student {}", mergedTimeSlots.size(), studentId);
+        log.debug("Merged {} unique time slots for teacher {}", mergedTimeSlots.size(), teacherId);
         return mergedTimeSlots;
     }
 
-    private SessionSummaryDTO mapToSessionSummaryDTO(StudentSession studentSession) {
-        Session session = studentSession.getSession();
+    private SessionSummaryDTO mapToSessionSummaryDTO(Session session) {
         ClassEntity classEntity = session.getClassEntity();
         SubjectSession subjectSession = session.getSubjectSession();
         TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
 
-        MakeupInfoDTO makeupInfo = null;
-        if (studentSession.getIsMakeup() != null && studentSession.getIsMakeup()) {
-            makeupInfo = buildMakeupInfo(studentSession);
-        }
-
         // Extract resource information
         String resourceName = null;
-        org.fyp.tmssep490be.entities.enums.ResourceType resourceType = null;
+        ResourceType resourceType = null;
         String onlineLink = null;
 
         if (!session.getSessionResources().isEmpty()) {
@@ -322,16 +388,19 @@ public class StudentScheduleService {
             Resource resource = sessionResource.getResource();
             resourceName = resource.getName();
             resourceType = resource.getResourceType();
-            
+
             // If virtual resource, the name is typically the zoom link or label
-            if (resourceType == org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL) {
+            if (resourceType == ResourceType.VIRTUAL) {
                 onlineLink = resource.getName(); // Store zoom link
             }
         }
 
+        // Note: Attendance summary is not included in SessionSummaryDTO
+        // It's only available in TeacherSessionDetailDTO
+
         return SessionSummaryDTO.builder()
                 .sessionId(session.getId())
-                .studentSessionId(studentSession.getId().getSessionId())
+                .studentSessionId(null) // Not applicable for teacher
                 .classId(classEntity.getId())
                 .date(session.getDate())
                 .dayOfWeek(session.getDate().getDayOfWeek())
@@ -348,9 +417,9 @@ public class StudentScheduleService {
                 .modality(classEntity.getModality())
                 .location(determineLocationForSummary(classEntity, session))
                 .branchName(classEntity.getBranch().getName())
-                .attendanceStatus(resolveDisplayStatus(studentSession))
-                .isMakeup(studentSession.getIsMakeup() != null ? studentSession.getIsMakeup() : false)
-                .makeupInfo(makeupInfo)
+                .attendanceStatus(null) // Not applicable for teacher
+                .isMakeup(false) // TODO: Check if session is makeup
+                .makeupInfo(null) // TODO: Build makeup info if applicable
                 .resourceName(resourceName)
                 .resourceType(resourceType)
                 .onlineLink(onlineLink)
@@ -360,36 +429,17 @@ public class StudentScheduleService {
     private String determineLocationForSummary(ClassEntity classEntity, Session session) {
         if (!session.getSessionResources().isEmpty()) {
             Resource resource = session.getSessionResources().iterator().next().getResource();
-            if (resource.getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.ROOM) {
+            if (resource.getResourceType() == ResourceType.ROOM) {
                 return resource.getName();
-            } else if (resource.getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL) {
+            } else if (resource.getResourceType() == ResourceType.VIRTUAL) {
                 return "Online";
             }
         }
         return determineLocation(classEntity, session);
     }
 
-    private MakeupInfoDTO buildMakeupInfo(StudentSession studentSession) {
-        Session originalSession = studentSession.getOriginalSession();
-        if (originalSession == null) {
-            return null;
-        }
-
-        TimeSlotTemplate originalTimeSlot = originalSession.getTimeSlotTemplate();
-        return MakeupInfoDTO.builder()
-                .isMakeup(true)
-                .originalSessionId(originalSession.getId())
-                .originalDate(originalSession.getDate())
-                .originalStartTime(originalTimeSlot != null ? originalTimeSlot.getStartTime().toString() : null)
-                .originalEndTime(originalTimeSlot != null ? originalTimeSlot.getEndTime().toString() : null)
-                .originalStatus(originalSession.getStatus())
-                .reason("Session rescheduled")
-                .makeupDate(studentSession.getSession().getDate())
-                .build();
-    }
-
     private String determineResourceLocation(Resource resource) {
-        if (resource.getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.ROOM) {
+        if (resource.getResourceType() == ResourceType.ROOM) {
             return resource.getName() + ", " + resource.getBranch().getName();
         } else {
             return "Online";
@@ -397,7 +447,7 @@ public class StudentScheduleService {
     }
 
     private String determineResourceOnlineLink(Resource resource) {
-        if (resource.getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL) {
+        if (resource.getResourceType() == ResourceType.VIRTUAL) {
             return resource.getName();
         }
         return null;
@@ -413,27 +463,10 @@ public class StudentScheduleService {
         }
     }
 
-    private org.fyp.tmssep490be.entities.enums.AttendanceStatus resolveDisplayStatus(StudentSession studentSession) {
-        Session session = studentSession.getSession();
-        if (session == null) {
-            return studentSession.getAttendanceStatus();
-        }
-        org.fyp.tmssep490be.entities.enums.AttendanceStatus status = studentSession.getAttendanceStatus();
-        LocalDate today = LocalDate.now();
-
-        if (session.getDate() != null
-                && session.getDate().isBefore(today)
-                && (status == null || status == org.fyp.tmssep490be.entities.enums.AttendanceStatus.PLANNED)) {
-            return org.fyp.tmssep490be.entities.enums.AttendanceStatus.ABSENT;
-        }
-        return status;
-    }
-
     @lombok.Value
     private static class TimeRange {
-        java.time.LocalTime startTime;
-        java.time.LocalTime endTime;
+        LocalTime startTime;
+        LocalTime endTime;
     }
-
 }
 
