@@ -1041,6 +1041,17 @@ public class TeacherRequestService {
                 throw new CustomException(ErrorCode.INVALID_INPUT, "Unsupported request type: " + requestType);
         }
 
+        // Với REPLACEMENT request, không tự động approve mà chờ replacement teacher confirm
+        if (requestType == TeacherRequestType.REPLACEMENT) {
+            // Set status = WAITING_CONFIRM để chờ replacement teacher confirm
+            request.setStatus(RequestStatus.WAITING_CONFIRM);
+            request = teacherRequestRepository.save(request);
+            log.info("Created REPLACEMENT request {} for teacher {} by academic staff {}. Status: WAITING_CONFIRM (waiting for replacement teacher confirmation)",
+                    request.getId(), teacher.getId(), academicStaffUserId);
+            return mapToResponseDTO(request);
+        }
+
+        // Với MODALITY_CHANGE và RESCHEDULE, tự động approve và update session
         request = teacherRequestRepository.save(request);
         log.info("Created teacher request {} type {} for teacher {} by academic staff {}", 
                 request.getId(), requestType, teacher.getId(), academicStaffUserId);
@@ -1933,6 +1944,193 @@ public class TeacherRequestService {
                     return nameA.compareToIgnoreCase(nameB);
                 })
                 .collect(Collectors.toList());
+    }
+
+    //Gợi ý giáo viên dạy thay cho REPLACEMENT request (cho academic staff - từ sessionId khi tạo request mới)
+    @Transactional(readOnly = true)
+    public List<ReplacementCandidateDTO> suggestReplacementCandidatesForStaffBySession(
+            Long sessionId, Long teacherId, Long academicStaffUserId) {
+        log.info("Suggesting replacement candidates for session {} and teacher {} by academic staff {}",
+                sessionId, teacherId, academicStaffUserId);
+
+        // Kiểm tra quyền: academic staff phải có branch trùng với session branch
+        List<Long> academicBranchIds = getBranchIdsForUser(academicStaffUserId);
+        if (academicBranchIds.isEmpty()) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "Academic staff has no branches assigned");
+        }
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
+
+        // Kiểm tra session có branch không
+        if (session.getClassEntity() == null || session.getClassEntity().getBranch() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session branch is missing");
+        }
+
+        Long sessionBranchId = session.getClassEntity().getBranch().getId();
+        boolean hasAccess = academicBranchIds.contains(sessionBranchId);
+        if (!hasAccess) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You don't have permission to view candidates for this session");
+        }
+
+        // Kiểm tra teacher có được assign vào session không
+        Teacher teacher = teacherRepository.findById(teacherId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher not found"));
+
+        boolean isOwner = session.getTeachingSlots().stream()
+                .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
+        if (!isOwner) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "Teacher is not assigned to this session");
+        }
+
+        // Lấy subject từ session
+        org.fyp.tmssep490be.entities.ClassEntity classEntity = session.getClassEntity();
+        if (classEntity == null || classEntity.getSubject() == null) {
+            log.warn("Session {} has no subject information", sessionId);
+            return List.of();
+        }
+
+        org.fyp.tmssep490be.entities.Subject subject = classEntity.getSubject();
+
+        // Lấy skills yêu cầu của session từ SubjectSession
+        Set<org.fyp.tmssep490be.entities.enums.Skill> sessionRequiredSkills = getSessionRequiredSkills(session);
+
+        // Lấy tất cả teachers (trừ teacher hiện tại)
+        List<Teacher> allTeachers = teacherRepository.findAll();
+
+        // Loại trừ teacher hiện tại
+        Set<Long> excludedTeacherIds = new java.util.HashSet<>();
+        excludedTeacherIds.add(teacher.getId());
+
+        // Filter teachers có conflict về thời gian
+        LocalDate sessionDate = session.getDate();
+        TimeSlotTemplate sessionTimeSlot = session.getTimeSlotTemplate();
+
+        // Lọc candidates
+        List<Teacher> candidateTeachers = allTeachers.stream()
+                .filter(t -> !excludedTeacherIds.contains(t.getId()))
+                .filter(t -> !hasTeacherTimeConflict(t.getId(), sessionDate, sessionTimeSlot, session.getId()))
+                .collect(Collectors.toList());
+
+        // Map sang DTO và sắp xếp
+        final Set<org.fyp.tmssep490be.entities.enums.Skill> finalSessionRequiredSkills = sessionRequiredSkills;
+        return candidateTeachers.stream()
+                .map(t -> mapToReplacementCandidateDTO(t, subject, session))
+                .filter(dto -> dto != null)
+                .sorted((a, b) -> {
+                    // 1. Ưu tiên teacher có skills phù hợp với skills yêu cầu của session
+                    boolean aHasMatchingSkills = hasMatchingSkills(a, finalSessionRequiredSkills);
+                    boolean bHasMatchingSkills = hasMatchingSkills(b, finalSessionRequiredSkills);
+
+                    if (aHasMatchingSkills && !bHasMatchingSkills) {
+                        return -1;
+                    }
+                    if (!aHasMatchingSkills && bHasMatchingSkills) {
+                        return 1;
+                    }
+
+                    // 2. Sắp xếp theo số lượng skills
+                    int aSkillCount = a.getSkills() != null ? a.getSkills().size() : 0;
+                    int bSkillCount = b.getSkills() != null ? b.getSkills().size() : 0;
+                    if (aSkillCount != bSkillCount) {
+                        return Integer.compare(bSkillCount, aSkillCount);
+                    }
+
+                    // 3. Cuối cùng sắp xếp theo tên
+                    String nameA = a.getFullName() != null ? a.getFullName() : "";
+                    String nameB = b.getFullName() != null ? b.getFullName() : "";
+                    return nameA.compareToIgnoreCase(nameB);
+                })
+                .collect(Collectors.toList());
+    }
+
+    //Academic staff chọn lại replacement teacher khi request ở PENDING (sau khi bị từ chối)
+    @Transactional
+    public TeacherRequestResponseDTO updateReplacementTeacher(Long requestId, Long replacementTeacherId, Long academicStaffUserId) {
+        log.info("Updating replacement teacher for request {} to teacher {} by academic staff {}",
+                requestId, replacementTeacherId, academicStaffUserId);
+
+        // Lấy request với đầy đủ relationships
+        TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+
+        // Kiểm tra request phải là REPLACEMENT
+        if (request.getRequestType() != TeacherRequestType.REPLACEMENT) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not a REPLACEMENT request");
+        }
+
+        // Kiểm tra status phải là PENDING (sau khi replacement teacher từ chối)
+        if (request.getStatus() != RequestStatus.PENDING) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request must be in PENDING status to update replacement teacher");
+        }
+
+        // Kiểm tra quyền: academic staff phải có branch trùng với teacher
+        List<Long> academicBranchIds = getBranchIdsForUser(academicStaffUserId);
+        if (academicBranchIds.isEmpty()) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "Academic staff has no branches assigned");
+        }
+
+        Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
+        List<Long> teacherBranchIds = getBranchIdsForUser(teacherUserAccountId);
+        boolean hasAccess = teacherBranchIds.stream().anyMatch(academicBranchIds::contains);
+        if (!hasAccess) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You don't have permission to update this request");
+        }
+
+        // Kiểm tra replacement teacher tồn tại
+        Teacher replacementTeacher = teacherRepository.findById(replacementTeacherId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Replacement teacher not found"));
+
+        // Không được chọn chính giáo viên tạo request
+        if (replacementTeacher.getId().equals(request.getTeacher().getId())) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Replacement teacher cannot be the same as the requesting teacher");
+        }
+
+        // Kiểm tra replacement teacher đã từ chối request này chưa
+        String existingNote = request.getNote();
+        if (existingNote != null && existingNote.contains("DECLINED_BY_TEACHER")) {
+            String[] declinedParts = existingNote.split("\n");
+            for (String part : declinedParts) {
+                if (part.startsWith("DECLINED_BY_TEACHER:")) {
+                    String[] tokens = part.split(":");
+                    if (tokens.length >= 2) {
+                        try {
+                            Long declinedTeacherId = Long.parseLong(tokens[1]);
+                            if (declinedTeacherId.equals(replacementTeacherId)) {
+                                throw new CustomException(ErrorCode.INVALID_INPUT,
+                                        "This teacher has already declined this request. Please select a different teacher.");
+                            }
+                        } catch (NumberFormatException e) {
+                            log.warn("Failed to parse declined teacher ID from note: {}", part);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Kiểm tra conflict thời gian cho replacement teacher
+        Session session = request.getSession();
+        if (session == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no associated session");
+        }
+
+        // Kiểm tra replacement teacher có conflict không
+        boolean hasConflict = hasTeacherTimeConflict(replacementTeacher.getId(), session.getDate(),
+                session.getTimeSlotTemplate(), session.getId());
+        if (hasConflict) {
+            throw new CustomException(ErrorCode.INVALID_INPUT,
+                    "Replacement teacher has a time conflict on this date and time slot");
+        }
+
+        // Cập nhật replacement teacher và chuyển status sang WAITING_CONFIRM
+        request.setReplacementTeacher(replacementTeacher);
+        request.setStatus(RequestStatus.WAITING_CONFIRM);
+
+        request = teacherRequestRepository.save(request);
+        log.info("Replacement teacher updated for request {} to teacher {} by academic staff {}. Status changed to WAITING_CONFIRM",
+                requestId, replacementTeacherId, academicStaffUserId);
+
+        return mapToResponseDTO(request);
     }
 }
 

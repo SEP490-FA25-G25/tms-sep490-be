@@ -80,6 +80,28 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
                                                  @Param("toDate") LocalDate toDate,
                                                  @Param("classId") Long classId);
 
+    // Tìm tất cả buổi học của giáo viên trong tuần (tất cả status) cho schedule
+    @Query("""
+        SELECT DISTINCT s FROM Session s
+        JOIN s.teachingSlots ts
+        JOIN ts.teacher t
+        LEFT JOIN FETCH s.timeSlotTemplate tst
+        LEFT JOIN FETCH s.classEntity c
+        LEFT JOIN FETCH c.subject sub
+        LEFT JOIN FETCH c.branch b
+        LEFT JOIN FETCH s.subjectSession ss
+        LEFT JOIN FETCH s.sessionResources sr
+        LEFT JOIN FETCH sr.resource r
+        WHERE t.id = :teacherId
+          AND s.date BETWEEN :fromDate AND :toDate
+          AND (:classId IS NULL OR c.id = :classId)
+        ORDER BY s.date ASC, tst.startTime ASC
+        """)
+    List<Session> findWeeklySessionsForTeacher(@Param("teacherId") Long teacherId,
+                                               @Param("fromDate") LocalDate fromDate,
+                                               @Param("toDate") LocalDate toDate,
+                                               @Param("classId") Long classId);
+
     // Học viên chọn buổi học bù -> join với class để kiểm tra chi nhánh và hình thức điều kiện cùng  môn
     // Kiểm tra date trong 2 tuần từ ngày hiện tại, trạng thái PLANNED, không phải buổi học bị bỏ
     // Loại trừ buổi học bị mà học viên đã bỏ qua (excludeSessionId) tức là học viên đang chọn buổi bị missed thì phỉa bỏ ra

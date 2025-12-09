@@ -24,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -222,7 +223,9 @@ public class TeacherRequestController {
                 .build());
     }
 
-    //Endpoint để tạo request cho teacher bởi academic staff (tự động approve)
+    //Endpoint để tạo request cho teacher bởi academic staff
+    //MODALITY_CHANGE và RESCHEDULE: tự động approve
+    //REPLACEMENT: chờ replacement teacher confirm (status = WAITING_CONFIRM)
     @PostMapping("/staff/create")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> createRequestForTeacher(
@@ -232,9 +235,13 @@ public class TeacherRequestController {
         TeacherRequestResponseDTO request = teacherRequestService.createRequestForTeacherByStaff(
                 createDTO, userPrincipal.getId());
 
+        String message = request.getStatus() == RequestStatus.WAITING_CONFIRM
+                ? "REPLACEMENT request created successfully. Waiting for replacement teacher confirmation."
+                : "Request created and approved successfully";
+
         return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
                 .success(true)
-                .message("Request created and approved successfully")
+                .message(message)
                 .data(request)
                 .build());
     }
@@ -424,13 +431,47 @@ public class TeacherRequestController {
                 .build());
     }
 
-    //Endpoint để gợi ý giáo viên dạy thay cho REPLACEMENT request (cho teacher)
-    @GetMapping("/{sessionId}/replacement/candidates")
-    @PreAuthorize("hasRole('TEACHER')")
-    public ResponseEntity<ResponseObject<List<ReplacementCandidateDTO>>> suggestReplacementCandidates(
+    //Endpoint để gợi ý giáo viên dạy thay cho REPLACEMENT request
+    //  (cho academic staff - từ sessionId khi tạo request mới)
+    @GetMapping("/sessions/{sessionId}/replacement/candidates/staff")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<ReplacementCandidateDTO>>> suggestReplacementCandidatesForStaffBySession(
             @PathVariable Long sessionId,
+            @RequestParam Long teacherId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
+        List<ReplacementCandidateDTO> candidates = teacherRequestService.suggestReplacementCandidatesForStaffBySession(
+                sessionId, teacherId, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<List<ReplacementCandidateDTO>>builder()
+                .success(true)
+                .message("Replacement candidates loaded successfully")
+                .data(candidates)
+                .build());
+    }
+
+    //Endpoint để gợi ý giáo viên dạy thay cho REPLACEMENT request (cho cả teacher và academic staff)
+    //Nếu có teacherId trong query param → academic staff đang tạo request cho teacher
+    //Nếu không có teacherId → teacher đang tạo request cho chính mình
+    @GetMapping("/{sessionId}/replacement/candidates")
+    @PreAuthorize("hasRole('TEACHER') or hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<ReplacementCandidateDTO>>> suggestReplacementCandidates(
+            @PathVariable Long sessionId,
+            @RequestParam(required = false) Long teacherId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        // Nếu có teacherId trong query param, đây là request từ academic staff
+        if (teacherId != null) {
+            List<ReplacementCandidateDTO> candidates = teacherRequestService.suggestReplacementCandidatesForStaffBySession(
+                    sessionId, teacherId, userPrincipal.getId());
+            return ResponseEntity.ok(ResponseObject.<List<ReplacementCandidateDTO>>builder()
+                    .success(true)
+                    .message("Replacement candidates loaded successfully")
+                    .data(candidates)
+                    .build());
+        }
+
+        // Nếu không có teacherId, đây là request từ teacher
         List<ReplacementCandidateDTO> candidates = teacherRequestService.suggestReplacementCandidates(
                 sessionId, userPrincipal.getId());
 
@@ -441,7 +482,7 @@ public class TeacherRequestController {
                 .build());
     }
 
-    //Endpoint để gợi ý giáo viên dạy thay cho REPLACEMENT request (cho academic staff)
+    //Endpoint để gợi ý giáo viên dạy thay cho REPLACEMENT request (cho academic staff - từ requestId)
     //Loại trừ các teacher đã từ chối request này
     @GetMapping("/staff/{requestId}/replacement/candidates")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
@@ -494,6 +535,36 @@ public class TeacherRequestController {
         return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
                 .success(true)
                 .message("Replacement request declined")
+                .data(response)
+                .build());
+    }
+
+    //Endpoint để academic staff chọn lại replacement teacher khi request ở PENDING (sau khi bị từ chối)
+    @PutMapping("/{id}/staff/replacement-teacher")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> updateReplacementTeacher(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, Long> body,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        log.info("Update replacement teacher for request {} by academic staff {}", id, userPrincipal.getId());
+        
+        Long replacementTeacherId = body.get("replacementTeacherId");
+        if (replacementTeacherId == null) {
+            return ResponseEntity.badRequest().body(
+                    ResponseObject.<TeacherRequestResponseDTO>builder()
+                            .success(false)
+                            .message("replacementTeacherId is required")
+                            .build()
+            );
+        }
+
+        TeacherRequestResponseDTO response = teacherRequestService.updateReplacementTeacher(
+                id, replacementTeacherId, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
+                .success(true)
+                .message("Replacement teacher updated successfully. Request status changed to WAITING_CONFIRM")
                 .data(response)
                 .build());
     }
