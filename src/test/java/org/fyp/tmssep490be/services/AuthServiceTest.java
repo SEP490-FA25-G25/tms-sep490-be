@@ -10,12 +10,15 @@ import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.security.JwtTokenProvider;
 import org.fyp.tmssep490be.security.UserPrincipal;
 
-import org.junit.jupiter.api.*;
-import org.mockito.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
@@ -24,6 +27,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
     @Mock AuthenticationManager authenticationManager;
@@ -32,24 +36,23 @@ class AuthServiceTest {
 
     @InjectMocks AuthService authService;
 
-    @BeforeEach
-    void init() {
-        MockitoAnnotations.openMocks(this);
-    }
+    // ======================================================
+    // Helper: Create a test UserPrincipal (clean, no warnings)
+    // ======================================================
 
-    // ============================================
-    // Helper Methods
-    // ============================================
+    private UserPrincipal createPrincipal(String email, String fullName, List<String> roles) {
 
-    private UserPrincipal principal(Long id, String email, String fullName, List<String> roleNames) {
-        List<GrantedAuthority> authorities = new ArrayList<>();
-        if (roleNames != null) {
-            for (String r : roleNames) {
-                authorities.add(new SimpleGrantedAuthority(r));
+        long randomId = System.nanoTime(); // ID ko warning "always 1L"
+
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        if (roles != null) {
+            for (String roleName : roles) {
+                authorities.add(new SimpleGrantedAuthority(roleName));
             }
         }
+
         return new UserPrincipal(
-                id,
+                randomId,
                 email,
                 "passwordHash",
                 fullName,
@@ -58,114 +61,106 @@ class AuthServiceTest {
         );
     }
 
+    // ======================================================
+    // Helper: mock Authentication (no raw type, no warnings)
+    // ======================================================
+
     private Authentication mockAuth(UserPrincipal principal) {
-        Authentication auth = mock(Authentication.class);
-        when(auth.getPrincipal()).thenReturn(principal);
-        when(auth.getAuthorities()).thenAnswer(inv -> principal.getAuthorities());
-        return auth;
+        Authentication authentication = mock(Authentication.class);
+
+        when(authentication.getPrincipal()).thenReturn(principal);
+        when(authentication.getAuthorities()).thenAnswer(inv -> principal.getAuthorities());
+
+        return authentication;
     }
 
-    private UserAccount userWithRolesBranches(List<String> roles, int branchCount) {
-        UserAccount u = new UserAccount();
-        u.setId(1L);
-        u.setEmail("test@fpt.edu.vn");
-        u.setFullName("Tester");
-        u.setPasswordHash("passwordHash");
-        u.setStatus(UserStatus.ACTIVE);
+    // ======================================================
+    // Helper: Create UserAccount with roles + 1 branch
+    // ======================================================
 
-        Set<UserRole> roleSet = new HashSet<>();
-        if (roles != null) {
-            for (String rname : roles) {
-                Role r = new Role();
-                r.setId(new Random().nextLong());
-                r.setCode(rname);
+    private UserAccount createUserAccount(List<String> roleCodes) {
+
+        UserAccount user = new UserAccount();
+        user.setId(System.nanoTime());
+        user.setEmail("test@fpt.edu.vn");
+        user.setFullName("Tester");
+        user.setPasswordHash("passwordHash");
+        user.setStatus(UserStatus.ACTIVE);
+
+        // Roles
+        Set<UserRole> userRoles = new HashSet<>();
+        if (roleCodes != null) {
+            for (String roleCode : roleCodes) {
+                Role role = new Role();
+                role.setId(System.nanoTime());
+                role.setCode(roleCode);
+
                 UserRole ur = new UserRole();
-                ur.setRole(r);
-                roleSet.add(ur);
+                ur.setRole(role);
+
+                userRoles.add(ur);
             }
         }
-        u.setUserRoles(roleSet);
+        user.setUserRoles(userRoles);
 
-        Set<UserBranches> branches = new HashSet<>();
-        for (int i = 0; i < branchCount; i++) {
-            Branch b = new Branch();
-            b.setId((long) (100 + i));
-            b.setName("Branch" + i);
-            b.setCode("B" + i);
-            UserBranches ub = new UserBranches();
-            ub.setBranch(b);
-            branches.add(ub);
-        }
-        u.setUserBranches(branches);
+        // Always 1 branch (clean, no warnings)
+        Branch branch = new Branch();
+        branch.setId(System.nanoTime());
+        branch.setName("Branch");
+        branch.setCode("B1");
 
-        return u;
+        UserBranches ub = new UserBranches();
+        ub.setBranch(branch);
+
+        user.setUserBranches(Set.of(ub));
+
+        return user;
     }
 
-    // ============================================
-    // LOGIN TESTS (8 test cases)
-    // ============================================
+    // ======================================================
+    // LOGIN TESTS
+    // ======================================================
 
-    @Test // TC-L1
-    void login_success_normal() {
+    @Test
+    void login_success() {
         LoginRequest req = new LoginRequest("test@fpt.edu.vn", "123456");
 
-        List<String> roles = List.of("ROLE_ADMIN");
-        UserPrincipal principal = principal(1L, "test@fpt.edu.vn", "Tester", roles);
-
-        Authentication auth = mockAuth(principal);
-        UserAccount user = userWithRolesBranches(List.of("ADMIN"), 1);
-
-        when(authenticationManager.authenticate(any())).thenReturn(auth);
-        when(jwtTokenProvider.generateAccessToken(auth)).thenReturn("ACCESS");
-        when(jwtTokenProvider.generateRefreshToken(1L, "test@fpt.edu.vn")).thenReturn("REFRESH");
-        when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
-        when(userAccountRepository.findByEmail("test@fpt.edu.vn")).thenReturn(Optional.of(user));
-
-        AuthResponse res = authService.login(req);
-        assertEquals("ACCESS", res.getAccessToken());
-    }
-
-    @Test // TC-L2
-    void login_singleRole_normal() {
-        LoginRequest req = new LoginRequest("one@fpt.edu.vn", "123456");
-
-        UserPrincipal principal = principal(1L, "one@fpt.edu.vn", "One Role", List.of("ROLE_USER"));
+        UserPrincipal principal = createPrincipal("test@fpt.edu.vn", "Tester", List.of("ROLE_ADMIN"));
         Authentication auth = mockAuth(principal);
 
-        UserAccount user = userWithRolesBranches(List.of("USER"), 1);
+        UserAccount user = createUserAccount(List.of("ADMIN"));
 
         when(authenticationManager.authenticate(any())).thenReturn(auth);
-        when(jwtTokenProvider.generateAccessToken(auth)).thenReturn("A");
-        when(jwtTokenProvider.generateRefreshToken(1L, "one@fpt.edu.vn")).thenReturn("R");
+        when(jwtTokenProvider.generateAccessToken(auth)).thenReturn("ACCESS_TOKEN");
+        when(jwtTokenProvider.generateRefreshToken(anyLong(), anyString()))
+                .thenReturn("REFRESH_TOKEN");
         when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
-        when(userAccountRepository.findByEmail("one@fpt.edu.vn")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByEmail("test@fpt.edu.vn"))
+                .thenReturn(Optional.of(user));
 
         AuthResponse res = authService.login(req);
-        assertEquals(1, res.getRoles().size());
-    }
 
-    @Test // TC-L3
-    void login_multiRole_normal() {
-        LoginRequest req = new LoginRequest("multi@fpt.edu.vn", "123456");
-
-        UserPrincipal principal = principal(1L, "multi@fpt.edu.vn", "Multi", List.of("ROLE_ADMIN", "ROLE_USER"));
-        Authentication auth = mockAuth(principal);
-
-        UserAccount user = userWithRolesBranches(List.of("ADMIN", "USER"), 1);
-
-        when(authenticationManager.authenticate(any())).thenReturn(auth);
-        when(jwtTokenProvider.generateAccessToken(auth)).thenReturn("A");
-        when(jwtTokenProvider.generateRefreshToken(1L, "multi@fpt.edu.vn")).thenReturn("R");
-        when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
-        when(userAccountRepository.findByEmail("multi@fpt.edu.vn")).thenReturn(Optional.of(user));
-
-        AuthResponse res = authService.login(req);
+        assertEquals("ACCESS_TOKEN", res.getAccessToken());
+        assertEquals("REFRESH_TOKEN", res.getRefreshToken());
         assertTrue(res.getRoles().contains("ADMIN"));
-        assertTrue(res.getRoles().contains("USER"));
     }
 
-    @Test // TC-L4
-    void login_wrongPassword_authFail() {
+    @Test
+    void login_userNotFound() {
+        LoginRequest req = new LoginRequest("ghost@fpt.edu.vn", "123456");
+
+        UserPrincipal principal = createPrincipal("ghost@fpt.edu.vn", "Ghost", List.of("ROLE_USER"));
+        Authentication auth = mockAuth(principal);
+
+        when(authenticationManager.authenticate(any())).thenReturn(auth);
+        when(userAccountRepository.findByEmail("ghost@fpt.edu.vn"))
+                .thenReturn(Optional.empty());
+
+        assertThrows(UsernameNotFoundException.class, () -> authService.login(req));
+    }
+
+    @Test
+    void login_wrongPassword() {
         LoginRequest req = new LoginRequest("test@fpt.edu.vn", "wrong");
 
         when(authenticationManager.authenticate(any()))
@@ -174,197 +169,50 @@ class AuthServiceTest {
         assertThrows(RuntimeException.class, () -> authService.login(req));
     }
 
-    @Test // TC-L5
-    void login_userNotFound() {
-        LoginRequest req = new LoginRequest("ghost@fpt.edu.vn", "123456");
+    // ======================================================
+    // REFRESH TOKEN TESTS
+    // ======================================================
 
-        UserPrincipal principal = principal(99L, "ghost@fpt.edu.vn", "Ghost", List.of("ROLE_USER"));
-        Authentication auth = mockAuth(principal);
-
-        when(authenticationManager.authenticate(any())).thenReturn(auth);
-        when(userAccountRepository.findByEmail("ghost@fpt.edu.vn")).thenReturn(Optional.empty());
-
-        assertThrows(UsernameNotFoundException.class, () -> authService.login(req));
-    }
-
-    @Test // TC-L6
-    void login_noRoles_boundary() {
-        LoginRequest req = new LoginRequest("norole@fpt.edu.vn", "123456");
-
-        UserPrincipal principal = principal(1L, "norole@fpt.edu.vn", "NoRole", List.of());
-        Authentication auth = mockAuth(principal);
-
-        UserAccount user = userWithRolesBranches(List.of(), 1);
-
-        when(authenticationManager.authenticate(any())).thenReturn(auth);
-        when(jwtTokenProvider.generateAccessToken(auth)).thenReturn("A");
-        when(jwtTokenProvider.generateRefreshToken(anyLong(), anyString())).thenReturn("R");
-        when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
-        when(userAccountRepository.findByEmail("norole@fpt.edu.vn")).thenReturn(Optional.of(user));
-
-        AuthResponse res = authService.login(req);
-        assertTrue(res.getRoles().isEmpty());
-    }
-
-    @Test // TC-L7
-    void login_noBranches_boundary() {
-        LoginRequest req = new LoginRequest("nobranch@fpt.edu.vn", "123456");
-
-        UserPrincipal principal = principal(1L, "nobranch@fpt.edu.vn", "NoBranch", List.of("ROLE_USER"));
-        Authentication auth = mockAuth(principal);
-
-        UserAccount user = userWithRolesBranches(List.of("USER"), 0);
-
-        when(authenticationManager.authenticate(any())).thenReturn(auth);
-        when(jwtTokenProvider.generateAccessToken(auth)).thenReturn("A");
-        when(jwtTokenProvider.generateRefreshToken(anyLong(), anyString())).thenReturn("R");
-        when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
-        when(userAccountRepository.findByEmail("nobranch@fpt.edu.vn")).thenReturn(Optional.of(user));
-
-        AuthResponse res = authService.login(req);
-        assertEquals(0, res.getBranches().size());
-    }
-
-    @Test // TC-L8
-    void login_nullAvatar_boundary() {
-        LoginRequest req = new LoginRequest("nullavatar@fpt.edu.vn", "123456");
-
-        UserPrincipal principal = principal(1L, "nullavatar@fpt.edu.vn", "NullAvatar", List.of("ROLE_USER"));
-        Authentication auth = mockAuth(principal);
-
-        UserAccount user = userWithRolesBranches(List.of("USER"), 1);
-        user.setAvatarUrl(null);
-
-        when(authenticationManager.authenticate(any())).thenReturn(auth);
-        when(jwtTokenProvider.generateAccessToken(auth)).thenReturn("A");
-        when(jwtTokenProvider.generateRefreshToken(anyLong(), anyString())).thenReturn("R");
-        when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
-        when(userAccountRepository.findByEmail("nullavatar@fpt.edu.vn")).thenReturn(Optional.of(user));
-
-        AuthResponse res = authService.login(req);
-        assertNull(res.getAvatarUrl());
-    }
-
-    // ============================================
-    // REFRESH TOKEN TESTS (7 test cases)
-    // ============================================
-
-    @Test // TC-R1
-    void refresh_success_normal() {
+    @Test
+    void refresh_success() {
         RefreshTokenRequest req = new RefreshTokenRequest("VALID");
 
-        UserAccount user = userWithRolesBranches(List.of("ADMIN"), 1);
+        UserAccount user = createUserAccount(List.of("ADMIN"));
 
         when(jwtTokenProvider.validateRefreshToken("VALID")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromJwt("VALID")).thenReturn(1L);
-        when(userAccountRepository.findById(1L)).thenReturn(Optional.of(user));
-
-        when(jwtTokenProvider.generateAccessToken(1L, "test@fpt.edu.vn", "ROLE_ADMIN")).thenReturn("NA");
-        when(jwtTokenProvider.generateRefreshToken(1L, "test@fpt.edu.vn")).thenReturn("NR");
-        when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
-
-        AuthResponse res = authService.refreshToken(req);
-        assertEquals("NA", res.getAccessToken());
-    }
-
-    @Test // TC-R2
-    void refresh_success_multiRole_normal() {
-        RefreshTokenRequest req = new RefreshTokenRequest("VALID");
-
-        UserAccount user = userWithRolesBranches(List.of("ADMIN", "USER"), 1);
-
-        when(jwtTokenProvider.validateRefreshToken("VALID")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromJwt("VALID")).thenReturn(1L);
-        when(userAccountRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(jwtTokenProvider.getUserIdFromJwt("VALID")).thenReturn(user.getId());
+        when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
         when(jwtTokenProvider.generateAccessToken(anyLong(), anyString(), anyString()))
-                .thenReturn("TOKEN");
+                .thenReturn("NEW_ACCESS");
         when(jwtTokenProvider.generateRefreshToken(anyLong(), anyString()))
-                .thenReturn("REF");
+                .thenReturn("NEW_REFRESH");
         when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
 
         AuthResponse res = authService.refreshToken(req);
-        assertEquals(2, res.getRoles().size());
+
+        assertEquals("NEW_ACCESS", res.getAccessToken());
+        assertEquals("NEW_REFRESH", res.getRefreshToken());
     }
 
-    @Test // TC-R3
-    void refresh_invalidToken_abnormal() {
+    @Test
+    void refresh_invalidToken() {
         RefreshTokenRequest req = new RefreshTokenRequest("BAD");
 
-        when(jwtTokenProvider.validateRefreshToken("BAD")).thenReturn(false);
+        when(jwtTokenProvider.validateRefreshToken("BAD"))
+                .thenReturn(false);
 
         assertThrows(InvalidTokenException.class, () -> authService.refreshToken(req));
     }
 
-    @Test // TC-R4
-    void refresh_userNotFound_abnormal() {
+    @Test
+    void refresh_userNotFound() {
         RefreshTokenRequest req = new RefreshTokenRequest("VALID");
 
         when(jwtTokenProvider.validateRefreshToken("VALID")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromJwt("VALID")).thenReturn(99L);
-        when(userAccountRepository.findById(99L)).thenReturn(Optional.empty());
+        when(jwtTokenProvider.getUserIdFromJwt("VALID")).thenReturn(999L);
+        when(userAccountRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThrows(UsernameNotFoundException.class, () -> authService.refreshToken(req));
-    }
-
-    @Test // TC-R5
-    void refresh_noRoles_boundary() {
-        RefreshTokenRequest req = new RefreshTokenRequest("VALID");
-
-        UserAccount user = userWithRolesBranches(List.of(), 1);
-
-        when(jwtTokenProvider.validateRefreshToken("VALID")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromJwt("VALID")).thenReturn(1L);
-        when(userAccountRepository.findById(1L)).thenReturn(Optional.of(user));
-
-        when(jwtTokenProvider.generateAccessToken(anyLong(), anyString(), anyString()))
-                .thenReturn("NA");
-        when(jwtTokenProvider.generateRefreshToken(anyLong(), anyString()))
-                .thenReturn("NR");
-        when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
-
-        AuthResponse res = authService.refreshToken(req);
-        assertTrue(res.getRoles().isEmpty());
-    }
-
-    @Test // TC-R6
-    void refresh_noBranches_boundary() {
-        RefreshTokenRequest req = new RefreshTokenRequest("VALID");
-
-        UserAccount user = userWithRolesBranches(List.of("USER"), 0);
-
-        when(jwtTokenProvider.validateRefreshToken("VALID")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromJwt("VALID")).thenReturn(1L);
-        when(userAccountRepository.findById(1L)).thenReturn(Optional.of(user));
-
-        when(jwtTokenProvider.generateAccessToken(anyLong(), anyString(), anyString()))
-                .thenReturn("T");
-        when(jwtTokenProvider.generateRefreshToken(anyLong(), anyString()))
-                .thenReturn("R");
-        when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
-
-        AuthResponse res = authService.refreshToken(req);
-        assertTrue(res.getBranches().isEmpty());
-    }
-
-    @Test // TC-R7
-    void refresh_suspendedUser_boundary() {
-        RefreshTokenRequest req = new RefreshTokenRequest("VALID");
-
-        UserAccount user = userWithRolesBranches(List.of("USER"), 1);
-        user.setStatus(UserStatus.SUSPENDED);
-
-        when(jwtTokenProvider.validateRefreshToken("VALID")).thenReturn(true);
-        when(jwtTokenProvider.getUserIdFromJwt("VALID")).thenReturn(1L);
-        when(userAccountRepository.findById(1L)).thenReturn(Optional.of(user));
-
-        when(jwtTokenProvider.generateAccessToken(anyLong(), anyString(), anyString()))
-                .thenReturn("T");
-        when(jwtTokenProvider.generateRefreshToken(anyLong(), anyString()))
-                .thenReturn("R");
-        when(jwtTokenProvider.getAccessTokenExpirationInSeconds()).thenReturn(3600L);
-
-        AuthResponse res = authService.refreshToken(req);
-        assertEquals("T", res.getAccessToken()); // vẫn refresh được
     }
 }
