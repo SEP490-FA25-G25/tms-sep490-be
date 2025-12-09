@@ -20,7 +20,7 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
         JOIN FETCH c.subject
         JOIN FETCH c.branch
         WHERE ts.teacher.id = :teacherId
-          AND ts.status = 'SCHEDULED'
+          AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
         ORDER BY c.code ASC
         """)
     List<org.fyp.tmssep490be.entities.ClassEntity> findDistinctClassesByTeacherId(
@@ -29,4 +29,51 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
     @Query("SELECT ts FROM TeachingSlot ts WHERE ts.session.classEntity.id = :classId AND ts.status = :status")
     List<TeachingSlot> findByClassEntityIdAndStatus(@Param("classId") Long classId,
                                                     @Param("status") TeachingSlotStatus status);
+
+    // Kiểm tra giáo viên có sở hữu buổi học không (slot đang hoạt động)
+    boolean existsByIdSessionIdAndIdTeacherIdAndStatusIn(
+        Long sessionId,
+        Long teacherId,
+        List<TeachingSlotStatus> statuses);
+
+    // Tìm teaching slots theo giáo viên và ngày (loại trừ các buổi học đã hủy)
+    @Query("""
+        SELECT ts FROM TeachingSlot ts
+        JOIN FETCH ts.session s
+        JOIN FETCH s.timeSlotTemplate tst
+        JOIN FETCH s.classEntity c
+        JOIN FETCH c.subject subj
+        JOIN FETCH c.branch branch
+        LEFT JOIN FETCH s.subjectSession ss
+        WHERE ts.teacher.id = :teacherId
+          AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
+          AND s.date = :date
+          AND s.status <> 'CANCELLED'
+        ORDER BY tst.startTime ASC
+        """)
+    List<TeachingSlot> findByTeacherIdAndDate(
+        @Param("teacherId") Long teacherId,
+        @Param("date") java.time.LocalDate date);
+
+    // Lấy teaching slots của một buổi học với thông tin giáo viên/user đã load
+    @Query("""
+        SELECT ts FROM TeachingSlot ts
+        JOIN FETCH ts.teacher t
+        JOIN FETCH t.userAccount ua
+        WHERE ts.session.id = :sessionId
+          AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
+        """)
+    List<TeachingSlot> findBySessionIdWithTeacher(@Param("sessionId") Long sessionId);
+
+    // Kiểm tra giáo viên có được phân công vào lớp học không
+    @Query("""
+        SELECT COUNT(ts) > 0 FROM TeachingSlot ts
+        JOIN ts.session s
+        WHERE ts.teacher.id = :teacherId
+          AND s.classEntity.id = :classId
+          AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
+        """)
+    boolean existsByTeacherIdAndClassEntityId(
+        @Param("teacherId") Long teacherId,
+        @Param("classId") Long classId);
 }

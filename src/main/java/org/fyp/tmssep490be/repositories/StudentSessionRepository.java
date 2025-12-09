@@ -117,4 +117,13 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             @Param("status") AttendanceStatus status
     );
 
+    @Query("""
+            SELECT ss FROM StudentSession ss
+            JOIN FETCH ss.student st
+            JOIN FETCH st.userAccount ua
+            JOIN FETCH ss.session sess
+            WHERE ss.session.id IN :sessionIds
+            """)
+    List<StudentSession> findBySessionIds(@Param("sessionIds") List<Long> sessionIds);
+
 }
