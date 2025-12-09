@@ -188,12 +188,49 @@ public class UserAccountService {
         return mapToResponse(user);
     }
 
-    public Page<UserResponse> getAllUsers(Pageable pageable) {
-        log.info("Getting all users");
+    public Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status) {
+        log.info("Getting all users with search: {}, role: {}, status: {}", search, role, status);
 
-        Page<UserAccount> users = userAccountRepository.findAll(pageable);
+        // Convert status string sang enum
+        UserStatus userStatus = null;
+        if (status != null && !status.isEmpty()) {
+            userStatus = UserStatus.valueOf(status);
+        }
+
+        Page<UserAccount> users = userAccountRepository.findAllWithFilters(
+                search,
+                role,
+                userStatus,
+                pageable
+        );
 
         return users.map(this::mapToResponse);
+    }
+
+    public UserResponse getUserByEmail(String email) {
+        log.info("Getting user by email: {}", email);
+
+        UserAccount user = userAccountRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User không tồn tại với email: " + email));
+
+        return mapToResponse(user);
+    }
+
+    @Transactional
+    public UserResponse updateUserStatus(Long userId, String status) {
+        log.info("Updating status for user {}: {}", userId, status);
+
+        UserAccount user = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
+
+        user.setStatus(UserStatus.valueOf(status));
+        userAccountRepository.save(user);
+
+        return mapToResponse(user);
+    }
+
+    public boolean checkEmailExists(String email) {
+        return userAccountRepository.existsByEmail(email);
     }
 
     private UserResponse mapToResponse(UserAccount user) {

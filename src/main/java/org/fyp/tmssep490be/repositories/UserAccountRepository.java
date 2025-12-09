@@ -1,6 +1,9 @@
 package org.fyp.tmssep490be.repositories;
 
 import org.fyp.tmssep490be.entities.UserAccount;
+import org.fyp.tmssep490be.entities.enums.UserStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -34,5 +37,18 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     List<UserAccount> findByRoleCodeAndBranches(
             @Param("roleCode") String roleCode,
             @Param("branchIds") List<Long> branchIds);
+
+    @Query("SELECT u FROM UserAccount u " +
+            "LEFT JOIN u.userRoles ur " +
+            "LEFT JOIN ur.role r " +
+            "WHERE (:search IS NULL OR u.fullName LIKE %:search% OR u.email LIKE %:search%) " +
+            "AND (:role IS NULL OR r.code = :role) " +
+            "AND (:status IS NULL OR u.status = :status)")
+    Page<UserAccount> findAllWithFilters(
+            @Param("search") String search,
+            @Param("role") String role,
+            @Param("status") UserStatus status,
+            Pageable pageable);
+
 
 }
