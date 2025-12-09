@@ -105,4 +105,13 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
            "AND s.status != 'CANCELLED'")
     List<StudentSession> findAllByStudentId(@Param("studentId") Long studentId);
 
+    @Query("""
+            SELECT ss FROM StudentSession ss
+            JOIN FETCH ss.student st
+            JOIN FETCH st.userAccount ua
+            JOIN FETCH ss.session sess
+            WHERE ss.session.id IN :sessionIds
+            """)
+    List<StudentSession> findBySessionIds(@Param("sessionIds") List<Long> sessionIds);
+
 }

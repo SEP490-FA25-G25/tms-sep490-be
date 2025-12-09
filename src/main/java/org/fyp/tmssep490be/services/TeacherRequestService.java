@@ -40,7 +40,6 @@ import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -60,13 +59,12 @@ public class TeacherRequestService {
     private final SessionResourceRepository sessionResourceRepository;
     private final TeachingSlotRepository teachingSlotRepository;
     private final UserBranchesRepository userBranchesRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
     private final UserAccountRepository userAccountRepository;
     private final ResourceRepository resourceRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
     private final PolicyService policyService;
 
-    // Giáo viên tạo yêu cầu (hiện mới hỗ trợ MODALITY_CHANGE)
+    // Giáo viên tạo yêu cầu
     @Transactional
     public TeacherRequestResponseDTO createRequest(TeacherRequestCreateDTO createDTO, Long userId) {
         log.info("Creating teacher request type {} for user {}", createDTO.getRequestType(), userId);
