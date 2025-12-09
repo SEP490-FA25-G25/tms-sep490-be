@@ -958,7 +958,6 @@ public class StudentRequestService {
         // Nếu client không truyền weeksBack, lấy từ policy
         int lookbackWeeks = weeksBack != null ? weeksBack : getPolicyIntValue("student.makeup.lookback_weeks", 2);
 
-        //
         boolean excludeRequestedSessions = excludeRequested != null ? excludeRequested : true;
 
         //Là hôm nay - số tuần -> ra cái ngày cũ nhất

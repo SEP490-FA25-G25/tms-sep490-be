@@ -1,11 +1,11 @@
 package org.fyp.tmssep490be.services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.fyp.tmssep490be.dtos.schedule.MakeupInfoDTO;
-import org.fyp.tmssep490be.dtos.schedule.SessionSummaryDTO;
-import org.fyp.tmssep490be.dtos.schedule.TimeSlotDTO;
-import org.fyp.tmssep490be.dtos.schedule.WeeklyScheduleResponseDTO;
+import org.fyp.tmssep490be.dtos.schedule.*;
 import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
@@ -30,6 +30,7 @@ public class StudentScheduleService {
     private final StudentSessionRepository studentSessionRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final ObjectMapper objectMapper;
 
     public LocalDate getCurrentWeekStart() {
         LocalDate today = LocalDate.now();
@@ -85,6 +86,163 @@ public class StudentScheduleService {
                 .studentName(student.getUserAccount().getFullName())
                 .timeSlots(timeSlots)
                 .schedule(scheduleMap)
+                .build();
+    }
+
+    public SessionDetailDTO getSessionDetail(Long studentId, Long sessionId) {
+        log.info("Getting session detail for student: {}, session: {}", studentId, sessionId);
+
+        // 1. Fetch with authorization check
+        StudentSession studentSession = studentSessionRepository
+                .findByStudentIdAndSessionId(studentId, sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_SESSION_NOT_FOUND));
+
+        return mapToSessionDetailDTO(studentSession);
+    }
+
+    private SessionDetailDTO mapToSessionDetailDTO(StudentSession studentSession) {
+        Session session = studentSession.getSession();
+        TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
+        ClassEntity classEntity = session.getClassEntity();
+        SubjectSession subjectSession = session.getSubjectSession();
+
+        // Get teacher from teaching slots
+        String teacherName = session.getTeachingSlots().stream()
+                .filter(ts -> ts.getTeacher() != null)
+                .map(ts -> ts.getTeacher().getUserAccount().getFullName())
+                .findFirst()
+                .orElse(null);
+
+        Long teacherId = session.getTeachingSlots().stream()
+                .filter(ts -> ts.getTeacher() != null)
+                .map(ts -> ts.getTeacher().getId())
+                .findFirst()
+                .orElse(null);
+
+        ClassInfoDTO classInfo = ClassInfoDTO.builder()
+                .classId(classEntity.getId())
+                .classCode(classEntity.getCode())
+                .className(classEntity.getName())
+                .subjectId(classEntity.getSubject().getId())
+                .subjectName(classEntity.getSubject().getName())
+                .teacherId(teacherId)
+                .teacherName(teacherName)
+                .branchId(classEntity.getBranch().getId())
+                .branchName(classEntity.getBranch().getName())
+                .branchAddress(classEntity.getBranch().getAddress())
+                .modality(classEntity.getModality())
+                .build();
+
+        SessionInfoDTO sessionInfo = SessionInfoDTO.builder()
+                .topic(subjectSession != null ? subjectSession.getTopic() : null)
+                .description(subjectSession != null ? subjectSession.getStudentTask() : null)
+                .sessionType(session.getType())
+                .sessionStatus(session.getStatus())
+                .location(determineLocation(classEntity, session))
+                .onlineLink(determineOnlineLink(session))
+                .skills(parseSkills(subjectSession))
+                .sequenceNo(subjectSession != null ? subjectSession.getSequenceNo() : null)
+                .build();
+
+        StudentStatusDTO studentStatus = StudentStatusDTO.builder()
+                .attendanceStatus(resolveDisplayStatus(studentSession))
+                .homeworkStatus(studentSession.getHomeworkStatus())
+                .homeworkDueDate(null) // Not available in current schema
+                .homeworkDescription(studentSession.getNote())
+                .build();
+
+        List<MaterialDTO> materials = new ArrayList<>();
+        if (subjectSession != null && !subjectSession.getSubjectMaterials().isEmpty()) {
+            materials = subjectSession.getSubjectMaterials().stream()
+                    .map(this::mapToMaterialDTO)
+                    .collect(Collectors.toList());
+        }
+
+        ResourceDTO classroomResource = null;
+        if (!session.getSessionResources().isEmpty()) {
+            classroomResource = session.getSessionResources().stream()
+                    .findFirst()
+                    .map(this::mapToResourceDTO)
+                    .orElse(null);
+        }
+
+        // Build MakeupInfoDTO if applicable
+        MakeupInfoDTO makeupInfo = null;
+        if (studentSession.getIsMakeup() != null && studentSession.getIsMakeup()) {
+            makeupInfo = buildMakeupInfo(studentSession);
+        }
+
+        return SessionDetailDTO.builder()
+                .sessionId(session.getId())
+                .studentSessionId(studentSession.getId().getSessionId())
+                .date(session.getDate())
+                .dayOfWeek(session.getDate().getDayOfWeek())
+                .startTime(timeSlot != null ? timeSlot.getStartTime() : null)
+                .endTime(timeSlot != null ? timeSlot.getEndTime() : null)
+                .timeSlotName(timeSlot != null ? timeSlot.getName() : null)
+                .classInfo(classInfo)
+                .sessionInfo(sessionInfo)
+                .studentStatus(studentStatus)
+                .materials(materials)
+                .classroomResource(classroomResource)
+                .makeupInfo(makeupInfo)
+                .build();
+    }
+
+    private List<String> parseSkills(SubjectSession subjectSession) {
+        if (subjectSession == null || subjectSession.getSkills() == null) {
+            return new ArrayList<>();
+        }
+        
+        String skillsText = subjectSession.getSkills().trim();
+        
+        if (skillsText.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        if (skillsText.startsWith("[")) {
+            try {
+                return objectMapper.readValue(skillsText, new TypeReference<List<String>>() {});
+            } catch (JsonProcessingException e) {
+                log.warn("Failed to parse skills JSON array: {}", skillsText, e);
+                return new ArrayList<>();
+            }
+        }
+        
+        return List.of(skillsText);
+    }
+
+    private String determineOnlineLink(Session session) {
+        return session.getSessionResources().stream()
+                .filter(sr -> sr.getResource().getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL)
+                .map(sr -> sr.getResource().getName())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private MaterialDTO mapToMaterialDTO(SubjectMaterial subjectMaterial) {
+        return MaterialDTO.builder()
+                .materialId(subjectMaterial.getId())
+                .title(subjectMaterial.getTitle())
+                .description(subjectMaterial.getDescription())
+                .fileName(subjectMaterial.getTitle())
+                .materialType(subjectMaterial.getMaterialType() != null ? subjectMaterial.getMaterialType().name() : null)
+                .fileUrl(subjectMaterial.getUrl())
+                .uploadedAt(subjectMaterial.getCreatedAt() != null ?
+                        subjectMaterial.getCreatedAt().toLocalDateTime() : null)
+                .build();
+    }
+
+    private ResourceDTO mapToResourceDTO(SessionResource sessionResource) {
+        Resource resource = sessionResource.getResource();
+        return ResourceDTO.builder()
+                .resourceId(resource.getId())
+                .resourceCode(resource.getCode())
+                .resourceName(resource.getName())
+                .resourceType(resource.getResourceType())
+                .capacity(resource.getCapacity())
+                .location(determineResourceLocation(resource))
+                .onlineLink(determineResourceOnlineLink(resource))
                 .build();
     }
 
@@ -166,6 +324,23 @@ public class StudentScheduleService {
             makeupInfo = buildMakeupInfo(studentSession);
         }
 
+        // Extract resource information
+        String resourceName = null;
+        org.fyp.tmssep490be.entities.enums.ResourceType resourceType = null;
+        String onlineLink = null;
+
+        if (!session.getSessionResources().isEmpty()) {
+            SessionResource sessionResource = session.getSessionResources().iterator().next();
+            Resource resource = sessionResource.getResource();
+            resourceName = resource.getName();
+            resourceType = resource.getResourceType();
+            
+            // If virtual resource, the name is typically the zoom link or label
+            if (resourceType == org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL) {
+                onlineLink = resource.getName(); // Store zoom link
+            }
+        }
+
         return SessionSummaryDTO.builder()
                 .sessionId(session.getId())
                 .studentSessionId(studentSession.getId().getSessionId())
@@ -188,6 +363,9 @@ public class StudentScheduleService {
                 .attendanceStatus(resolveDisplayStatus(studentSession))
                 .isMakeup(studentSession.getIsMakeup() != null ? studentSession.getIsMakeup() : false)
                 .makeupInfo(makeupInfo)
+                .resourceName(resourceName)
+                .resourceType(resourceType)
+                .onlineLink(onlineLink)
                 .build();
     }
 

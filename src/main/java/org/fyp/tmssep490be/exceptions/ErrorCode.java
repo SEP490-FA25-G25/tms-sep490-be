@@ -39,6 +39,7 @@ public enum ErrorCode {
     EMAIL_ALREADY_EXISTS(1103, "Email đã tồn tại"),
     STUDENT_ROLE_NOT_FOUND(1105, "Vai trò HỌC VIÊN chưa được cấu hình trong hệ thống"),
     STUDENT_NOT_FOUND(1100, "Không tìm thấy học viên"),
+    STUDENT_SESSION_NOT_FOUND(1106, "Không tìm thấy buổi học của học viên hoặc học viên chưa đăng ký buổi học này"),
 
     // Enrollment errors (1200-1299)
     EXCEL_GENERATION_FAILED(1216, "Tạo tệp Excel thất bại"),

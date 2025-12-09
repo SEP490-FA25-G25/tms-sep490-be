@@ -82,7 +82,7 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
 
     // Học viên chọn buổi học bù -> join với class để kiểm tra chi nhánh và hình thức điều kiện cùng  môn
     // Kiểm tra date trong 2 tuần từ ngày hiện tại, trạng thái PLANNED, không phải buổi học bị bỏ
-    // Loại trừ buổi học bị mà học viên đã bỏ qua (excludeSessionId)
+    // Loại trừ buổi học bị mà học viên đã bỏ qua (excludeSessionId) tức là học viên đang chọn buổi bị missed thì phỉa bỏ ra
     // Cùng chi nhánh được học onl hoạc offline, khác chi nhánh thì chỉ được học online
     // weeksLimit: số tuần tối đa để tìm buổi học bù (lấy từ policy)
     @Query(value = """

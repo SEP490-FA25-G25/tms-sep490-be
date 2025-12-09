@@ -1,8 +1,16 @@
 package org.fyp.tmssep490be.controllers;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.dtos.schedule.SessionDetailDTO;
 import org.fyp.tmssep490be.dtos.schedule.WeeklyScheduleResponseDTO;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentScheduleService;
@@ -11,10 +19,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 
@@ -22,6 +27,7 @@ import java.time.LocalDate;
 @RequestMapping("/api/v1/students")
 @Slf4j
 @RequiredArgsConstructor
+@Tag(name = "Student Schedule", description = "APIs for student to view their weekly schedule and session details")
 public class StudentScheduleController {
 
     private final StudentScheduleService studentScheduleService;
@@ -77,6 +83,27 @@ public class StudentScheduleController {
                         .success(true)
                         .message("Weekly schedule retrieved successfully")
                         .data(schedule)
+                        .build()
+        );
+    }
+
+    @GetMapping("/me/sessions/{sessionId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ResponseObject<SessionDetailDTO>> getMySessionDetail(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Long sessionId
+    ) {
+        log.info("Student {} requesting details for session: {}", userPrincipal.getId(), sessionId);
+
+        Long studentId = studentContextHelper.getStudentId(userPrincipal);
+
+        SessionDetailDTO sessionDetail = studentScheduleService.getSessionDetail(studentId, sessionId);
+
+        return ResponseEntity.ok(
+                ResponseObject.<SessionDetailDTO>builder()
+                        .success(true)
+                        .message("Session detail retrieved successfully")
+                        .data(sessionDetail)
                         .build()
         );
     }
