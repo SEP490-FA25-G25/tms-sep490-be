@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.fyp.tmssep490be.entities.enums.AssessmentKind;
 import org.fyp.tmssep490be.entities.enums.Skill;
+import org.fyp.tmssep490be.utils.SkillListConverter;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -43,6 +44,7 @@ public class SubjectAssessment {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Convert(converter = SkillListConverter.class)
     @Column(name = "skill", nullable = false, columnDefinition = "TEXT")
     @Builder.Default
     private List<Skill> skills = new ArrayList<>();
