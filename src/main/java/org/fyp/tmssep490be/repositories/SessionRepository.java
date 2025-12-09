@@ -117,6 +117,20 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("studentId") Long studentId,
             @Param("date") LocalDate date);
 
+    @Query("""
+        SELECT DISTINCT s FROM Session s
+        JOIN s.teachingSlots ts
+        JOIN ts.teacher t
+        WHERE t.id = :teacherId
+          AND s.date = :date
+          AND s.status IN ('PLANNED', 'ONGOING')
+          AND s.id != :excludeSessionId
+        """)
+    List<Session> findSessionsForTeacherByDate(
+            @Param("teacherId") Long teacherId,
+            @Param("date") LocalDate date,
+            @Param("excludeSessionId") Long excludeSessionId);
+
     @Query("SELECT s FROM Session s WHERE s.date < :today AND s.status = :status")
     List<Session> findPastSessionsByStatus(
             @Param("today") LocalDate today,

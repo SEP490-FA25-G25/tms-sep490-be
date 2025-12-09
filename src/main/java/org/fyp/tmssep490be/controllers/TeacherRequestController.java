@@ -10,6 +10,7 @@ import org.fyp.tmssep490be.dtos.teacherrequest.ModalityResourceSuggestionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestRejectDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateDTO;
+import org.fyp.tmssep490be.dtos.schedule.TimeSlotDTO;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.PolicyService;
@@ -246,6 +247,110 @@ public class TeacherRequestController {
                 .success(true)
                 .message("Future sessions loaded successfully")
                 .data(sessions)
+                .build());
+    }
+
+    //Endpoint để lấy slots khả dụng cho RESCHEDULE (cho teacher)
+    @GetMapping("/sessions/{sessionId}/reschedule/slots")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<List<TimeSlotDTO>>> getRescheduleSlots(
+            @PathVariable Long sessionId,
+            @RequestParam String date,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<TimeSlotDTO> slots = teacherRequestService.getRescheduleSlots(
+                sessionId, date, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<List<TimeSlotDTO>>builder()
+                .success(true)
+                .message("Reschedule slots loaded successfully")
+                .data(slots)
+                .build());
+    }
+
+    //Endpoint để lấy slots khả dụng cho RESCHEDULE (cho academic staff - từ sessionId)
+    @GetMapping("/sessions/{sessionId}/reschedule/slots/staff")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<TimeSlotDTO>>> getRescheduleSlotsForStaff(
+            @PathVariable Long sessionId,
+            @RequestParam String date,
+            @RequestParam Long teacherId) {
+
+        List<TimeSlotDTO> slots = teacherRequestService.getRescheduleSlotsForStaff(
+                sessionId, date, teacherId);
+
+        return ResponseEntity.ok(ResponseObject.<List<TimeSlotDTO>>builder()
+                .success(true)
+                .message("Reschedule slots loaded successfully")
+                .data(slots)
+                .build());
+    }
+
+    //Endpoint để lấy slots khả dụng cho RESCHEDULE (cho academic staff - từ requestId)
+    @GetMapping("/{requestId}/reschedule/slots/staff")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<TimeSlotDTO>>> getRescheduleSlotsForStaffFromRequest(
+            @PathVariable Long requestId) {
+
+        List<TimeSlotDTO> slots = teacherRequestService.getRescheduleSlotsForStaffFromRequest(requestId);
+
+        return ResponseEntity.ok(ResponseObject.<List<TimeSlotDTO>>builder()
+                .success(true)
+                .message("Reschedule slots loaded successfully")
+                .data(slots)
+                .build());
+    }
+
+    //Endpoint để lấy resources khả dụng cho RESCHEDULE (cho teacher)
+    @GetMapping("/sessions/{sessionId}/reschedule/suggestions")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<List<ModalityResourceSuggestionDTO>>> getRescheduleResources(
+            @PathVariable Long sessionId,
+            @RequestParam String date,
+            @RequestParam Long timeSlotId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<ModalityResourceSuggestionDTO> resources = teacherRequestService.getRescheduleResources(
+                sessionId, date, timeSlotId, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<List<ModalityResourceSuggestionDTO>>builder()
+                .success(true)
+                .message("Reschedule resources loaded successfully")
+                .data(resources)
+                .build());
+    }
+
+    //Endpoint để lấy resources khả dụng cho RESCHEDULE (cho academic staff - từ sessionId)
+    @GetMapping("/sessions/{sessionId}/reschedule/suggestions/staff")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<ModalityResourceSuggestionDTO>>> getRescheduleResourcesForStaff(
+            @PathVariable Long sessionId,
+            @RequestParam String date,
+            @RequestParam Long timeSlotId,
+            @RequestParam Long teacherId) {
+
+        List<ModalityResourceSuggestionDTO> resources = teacherRequestService.getRescheduleResourcesForStaff(
+                sessionId, date, timeSlotId, teacherId);
+
+        return ResponseEntity.ok(ResponseObject.<List<ModalityResourceSuggestionDTO>>builder()
+                .success(true)
+                .message("Reschedule resources loaded successfully")
+                .data(resources)
+                .build());
+    }
+
+    //Endpoint để lấy resources khả dụng cho RESCHEDULE (cho academic staff - từ requestId)
+    @GetMapping("/{requestId}/reschedule/suggestions/staff")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<ModalityResourceSuggestionDTO>>> getRescheduleResourcesForStaffFromRequest(
+            @PathVariable Long requestId) {
+
+        List<ModalityResourceSuggestionDTO> resources = teacherRequestService.getRescheduleResourcesForStaffFromRequest(requestId);
+
+        return ResponseEntity.ok(ResponseObject.<List<ModalityResourceSuggestionDTO>>builder()
+                .success(true)
+                .message("Reschedule resources loaded successfully")
+                .data(resources)
                 .build());
     }
 

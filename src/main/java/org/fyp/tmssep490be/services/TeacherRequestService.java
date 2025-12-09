@@ -10,11 +10,14 @@ import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ModalityResourceSuggestionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateSkillDTO;
+import org.fyp.tmssep490be.dtos.schedule.TimeSlotDTO;
 import org.fyp.tmssep490be.entities.Resource;
 import org.fyp.tmssep490be.entities.Session;
+import org.fyp.tmssep490be.entities.SessionResource;
 import org.fyp.tmssep490be.entities.Teacher;
 import org.fyp.tmssep490be.entities.TeacherRequest;
 import org.fyp.tmssep490be.entities.TimeSlotTemplate;
+import org.fyp.tmssep490be.entities.enums.ResourceType;
 import org.fyp.tmssep490be.entities.UserAccount;
 import org.fyp.tmssep490be.entities.enums.Modality;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
@@ -24,6 +27,7 @@ import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.ResourceRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
+import org.fyp.tmssep490be.repositories.SessionResourceRepository;
 import org.fyp.tmssep490be.repositories.TeacherRepository;
 import org.fyp.tmssep490be.repositories.TeacherRequestRepository;
 import org.fyp.tmssep490be.repositories.TimeSlotTemplateRepository;
@@ -49,6 +53,7 @@ public class TeacherRequestService {
     private final TeacherRequestRepository teacherRequestRepository;
     private final TeacherRepository teacherRepository;
     private final SessionRepository sessionRepository;
+    private final SessionResourceRepository sessionResourceRepository;
     private final UserBranchesRepository userBranchesRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final UserAccountRepository userAccountRepository;
@@ -328,6 +333,372 @@ public class TeacherRequestService {
                 .sorted((a, b) -> {
                     if (a.isCurrentResource() && !b.isCurrentResource()) return -1;
                     if (!a.isCurrentResource() && b.isCurrentResource()) return 1;
+                    if (a.getName() == null) return 1;
+                    if (b.getName() == null) return -1;
+                    return a.getName().compareToIgnoreCase(b.getName());
+                })
+                .collect(Collectors.toList());
+    }
+
+    // Lấy các time slots khả dụng cho RESCHEDULE (cho teacher)
+    @Transactional(readOnly = true)
+    public List<TimeSlotDTO> getRescheduleSlots(Long sessionId, String dateStr, Long userId) {
+        log.info("Get reschedule slots for session {} on date {} by user {}", sessionId, dateStr, userId);
+
+        Teacher teacher = teacherRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher profile not found for current user"));
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
+
+        // Quyền: giáo viên phải là người dạy buổi này
+        boolean isOwner = session.getTeachingSlots().stream()
+                .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
+        if (!isOwner) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You are not assigned to this session");
+        }
+
+        return getRescheduleSlotsInternal(session, dateStr, teacher.getId());
+    }
+
+    // Lấy các time slots khả dụng cho RESCHEDULE (cho academic staff - từ sessionId)
+    @Transactional(readOnly = true)
+    public List<TimeSlotDTO> getRescheduleSlotsForStaff(Long sessionId, String dateStr, Long teacherId) {
+        log.info("Get reschedule slots for session {} on date {} for teacher {} by staff", sessionId, dateStr, teacherId);
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
+
+        // Kiểm tra teacher tồn tại
+        Teacher teacher = teacherRepository.findById(teacherId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher not found"));
+
+        // Kiểm tra teacher có phải là người dạy buổi này không
+        boolean isOwner = session.getTeachingSlots().stream()
+                .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
+        if (!isOwner) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Teacher is not assigned to this session");
+        }
+
+        return getRescheduleSlotsInternal(session, dateStr, teacherId);
+    }
+
+    // Lấy các time slots khả dụng cho RESCHEDULE (cho academic staff - từ requestId)
+    @Transactional(readOnly = true)
+    public List<TimeSlotDTO> getRescheduleSlotsForStaffFromRequest(Long requestId) {
+        log.info("Get reschedule slots from request {} by staff", requestId);
+
+        TeacherRequest request = teacherRequestRepository.findById(requestId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+
+        if (request.getRequestType() != TeacherRequestType.RESCHEDULE) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not a RESCHEDULE request");
+        }
+
+        if (request.getSession() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no associated session");
+        }
+
+        if (request.getNewDate() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no newDate set");
+        }
+
+        Session session = request.getSession();
+        String dateStr = request.getNewDate().toString();
+        Long teacherId = request.getTeacher().getId();
+
+        return getRescheduleSlotsInternal(session, dateStr, teacherId);
+    }
+
+    // Internal method để lấy slots (shared logic)
+    private List<TimeSlotDTO> getRescheduleSlotsInternal(Session session, String dateStr, Long teacherId) {
+        Long sessionId = session.getId();
+
+        // Chỉ gợi ý cho session PLANNED
+        if (session.getStatus() != SessionStatus.PLANNED) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session is not in PLANNED status");
+        }
+
+        LocalDate targetDate;
+        try {
+            targetDate = LocalDate.parse(dateStr);
+        } catch (Exception e) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Invalid date format");
+        }
+
+        // Lấy tất cả time slots từ branch của session
+        if (session.getClassEntity() == null || session.getClassEntity().getBranch() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session branch is missing");
+        }
+
+        Long branchId = session.getClassEntity().getBranch().getId();
+        List<TimeSlotTemplate> availableSlots = timeSlotTemplateRepository.findByBranchIdOrderByStartTimeAsc(branchId);
+
+        // Tính thời lượng của time slot hiện tại (duration)
+        TimeSlotTemplate currentTimeSlot = session.getTimeSlotTemplate();
+        if (currentTimeSlot == null || currentTimeSlot.getStartTime() == null || currentTimeSlot.getEndTime() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session time slot is missing or invalid");
+        }
+        
+        // Tính duration hiện tại (minutes)
+        long currentDurationMinutes = java.time.Duration.between(
+                currentTimeSlot.getStartTime(),
+                currentTimeSlot.getEndTime()
+        ).toMinutes();
+
+        // Lấy sessions của teacher trong ngày target (trừ session hiện tại)
+        List<Session> teacherSessions = sessionRepository.findSessionsForTeacherByDate(
+                teacherId, targetDate, sessionId);
+
+        // Lấy students của session hiện tại (chỉ lấy các students đã đăng ký)
+        List<Long> studentIds = session.getStudentSessions().stream()
+                .filter(ss -> ss.getStudent() != null)
+                .map(ss -> ss.getStudent().getId())
+                .distinct()
+                .collect(Collectors.toList());
+
+        // Kiểm tra conflict cho từng time slot
+        return availableSlots.stream()
+                .filter(slot -> {
+                    // Chỉ gợi ý time slots có cùng thời lượng
+                    if (slot.getStartTime() == null || slot.getEndTime() == null) {
+                        return false;
+                    }
+                    long slotDurationMinutes = java.time.Duration.between(
+                            slot.getStartTime(),
+                            slot.getEndTime()
+                    ).toMinutes();
+                    if (slotDurationMinutes != currentDurationMinutes) {
+                        return false; // Filter out slots with different duration
+                    }
+
+                    // Kiểm tra conflict với teacher
+                    boolean hasTeacherConflict = teacherSessions.stream()
+                            .anyMatch(ts -> hasTimeOverlap(ts.getTimeSlotTemplate(), slot));
+
+                    if (hasTeacherConflict) {
+                        return false; // Filter out slots with teacher conflict
+                    }
+
+                    // Kiểm tra conflict với students
+                    for (Long studentId : studentIds) {
+                        List<Session> studentSessions = sessionRepository.findSessionsForStudentByDate(
+                                studentId, targetDate);
+                        boolean hasStudentConflict = studentSessions.stream()
+                                .anyMatch(ss -> ss.getId().equals(sessionId) || // Exclude current session
+                                        hasTimeOverlap(ss.getTimeSlotTemplate(), slot));
+                        if (hasStudentConflict) {
+                            return false; // Filter out slots with student conflict
+                        }
+                    }
+
+                    return true; // Slot is available
+                })
+                .map(slot -> TimeSlotDTO.builder()
+                        .timeSlotTemplateId(slot.getId())
+                        .name(slot.getName())
+                        .startTime(slot.getStartTime())
+                        .endTime(slot.getEndTime())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    // Helper method to check time overlap between two time slots
+    private boolean hasTimeOverlap(TimeSlotTemplate slot1, TimeSlotTemplate slot2) {
+        if (slot1 == null || slot2 == null) return false;
+        if (slot1.getStartTime() == null || slot1.getEndTime() == null ||
+            slot2.getStartTime() == null || slot2.getEndTime() == null) {
+            return false;
+        }
+        return !(slot1.getEndTime().isBefore(slot2.getStartTime()) ||
+                 slot2.getEndTime().isBefore(slot1.getStartTime()));
+    }
+
+    // Lấy các resources khả dụng cho RESCHEDULE (cho teacher)
+    @Transactional(readOnly = true)
+    public List<ModalityResourceSuggestionDTO> getRescheduleResources(Long sessionId, String dateStr, Long timeSlotId, Long userId) {
+        log.info("Get reschedule resources for session {} on date {} with timeSlot {} by user {}", sessionId, dateStr, timeSlotId, userId);
+
+        Teacher teacher = teacherRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher profile not found for current user"));
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
+
+        // Quyền: giáo viên phải là người dạy buổi này
+        boolean isOwner = session.getTeachingSlots().stream()
+                .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
+        if (!isOwner) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You are not assigned to this session");
+        }
+
+        return getRescheduleResourcesInternal(session, dateStr, timeSlotId);
+    }
+
+    // Lấy các resources khả dụng cho RESCHEDULE (cho academic staff - từ sessionId)
+    @Transactional(readOnly = true)
+    public List<ModalityResourceSuggestionDTO> getRescheduleResourcesForStaff(Long sessionId, String dateStr, Long timeSlotId, Long teacherId) {
+        log.info("Get reschedule resources for session {} on date {} with timeSlot {} for teacher {} by staff", sessionId, dateStr, timeSlotId, teacherId);
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
+
+        // Kiểm tra teacher tồn tại
+        Teacher teacher = teacherRepository.findById(teacherId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher not found"));
+
+        // Kiểm tra teacher có phải là người dạy buổi này không
+        boolean isOwner = session.getTeachingSlots().stream()
+                .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
+        if (!isOwner) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Teacher is not assigned to this session");
+        }
+
+        return getRescheduleResourcesInternal(session, dateStr, timeSlotId);
+    }
+
+    // Lấy các resources khả dụng cho RESCHEDULE (cho academic staff - từ requestId)
+    @Transactional(readOnly = true)
+    public List<ModalityResourceSuggestionDTO> getRescheduleResourcesForStaffFromRequest(Long requestId) {
+        log.info("Get reschedule resources from request {} by staff", requestId);
+
+        TeacherRequest request = teacherRequestRepository.findById(requestId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+
+        if (request.getRequestType() != TeacherRequestType.RESCHEDULE) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not a RESCHEDULE request");
+        }
+
+        if (request.getSession() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no associated session");
+        }
+
+        if (request.getNewDate() == null || request.getNewTimeSlot() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no newDate or newTimeSlot set");
+        }
+
+        Session session = request.getSession();
+        String dateStr = request.getNewDate().toString();
+        Long timeSlotId = request.getNewTimeSlot().getId();
+
+        return getRescheduleResourcesInternal(session, dateStr, timeSlotId);
+    }
+
+    // Internal method để lấy resources (shared logic)
+    private List<ModalityResourceSuggestionDTO> getRescheduleResourcesInternal(Session session, String dateStr, Long timeSlotId) {
+        Long sessionId = session.getId();
+
+        // Chỉ gợi ý cho session PLANNED
+        if (session.getStatus() != SessionStatus.PLANNED) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session is not in PLANNED status");
+        }
+
+        LocalDate targetDate;
+        try {
+            targetDate = LocalDate.parse(dateStr);
+        } catch (Exception e) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Invalid date format");
+        }
+
+        if (session.getClassEntity() == null || session.getClassEntity().getBranch() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session branch is missing");
+        }
+
+        Long branchId = session.getClassEntity().getBranch().getId();
+        Modality classModality = session.getClassEntity().getModality();
+
+        // Resource hiện tại (nếu có)
+        Long currentResourceId = session.getSessionResources().stream()
+                .findFirst()
+                .map(sr -> sr.getResource() != null ? sr.getResource().getId() : null)
+                .orElse(null);
+
+        List<Resource> allResources = resourceRepository.findAvailableResourcesForSession(
+                branchId, targetDate, timeSlotId, sessionId);
+
+        // Filter resources theo modality của lớp
+        // OFFLINE -> chỉ ROOM, ONLINE -> chỉ VIRTUAL
+        ResourceType requiredResourceType = null;
+        if (classModality != null) {
+            requiredResourceType = (classModality == Modality.OFFLINE) 
+                    ? ResourceType.ROOM 
+                    : ResourceType.VIRTUAL;
+        }
+        
+        final ResourceType finalRequiredResourceType = requiredResourceType;
+        List<Resource> resources = allResources.stream()
+                .filter(r -> finalRequiredResourceType == null || r.getResourceType() == finalRequiredResourceType)
+                .collect(Collectors.toList());
+
+        // Lấy số lượng học viên của lớp
+        Integer studentCount = session.getClassEntity() != null 
+                ? session.getClassEntity().getMaxCapacity() 
+                : null;
+        
+        // Nếu không có maxCapacity, đếm số học viên đã đăng ký
+        if (studentCount == null) {
+            studentCount = (int) session.getStudentSessions().stream()
+                    .filter(ss -> ss.getStudent() != null)
+                    .count();
+        }
+
+        // Filter resources theo sức chứa: chỉ lấy các phòng có capacity >= số học viên
+        final Integer finalStudentCount = studentCount;
+        List<Resource> filteredResources = resources.stream()
+                .filter(r -> {
+                    // Nếu không có thông tin capacity hoặc studentCount, vẫn hiển thị
+                    if (r.getCapacity() == null || finalStudentCount == null) {
+                        return true;
+                    }
+                    // Chỉ lấy phòng có sức chứa đủ
+                    return r.getCapacity() >= finalStudentCount;
+                })
+                .collect(Collectors.toList());
+
+        // Nếu buổi đang gán resource hiện tại, đảm bảo vẫn xuất hiện trong list
+        // (nhưng chỉ nếu resource đó phù hợp với modality và capacity)
+        if (currentResourceId != null) {
+            boolean containsCurrent = filteredResources.stream().anyMatch(r -> r.getId().equals(currentResourceId));
+            if (!containsCurrent) {
+                resourceRepository.findById(currentResourceId).ifPresent(resource -> {
+                    // Chỉ thêm nếu resource phù hợp với modality và capacity
+                    boolean modalityMatch = finalRequiredResourceType == null || 
+                            resource.getResourceType() == finalRequiredResourceType;
+                    boolean capacityMatch = resource.getCapacity() == null || finalStudentCount == null ||
+                            resource.getCapacity() >= finalStudentCount;
+                    if (modalityMatch && capacityMatch) {
+                        filteredResources.add(resource);
+                    }
+                });
+            }
+        }
+
+        // Sắp xếp theo: current resource trước, sau đó theo độ chênh lệch capacity (gần nhất trước)
+        final Integer finalStudentCountForSort = studentCount;
+        return filteredResources.stream()
+                .map(r -> ModalityResourceSuggestionDTO.builder()
+                        .resourceId(r.getId())
+                        .name(r.getName())
+                        .resourceType(r.getResourceType() != null ? r.getResourceType().name() : null)
+                        .capacity(r.getCapacity())
+                        .branchId(r.getBranch() != null ? r.getBranch().getId() : null)
+                        .currentResource(currentResourceId != null && currentResourceId.equals(r.getId()))
+                        .build())
+                .sorted((a, b) -> {
+                    // Current resource lên đầu
+                    if (a.isCurrentResource() && !b.isCurrentResource()) return -1;
+                    if (!a.isCurrentResource() && b.isCurrentResource()) return 1;
+                    
+                    // Sắp xếp theo độ chênh lệch capacity với số học viên (gần nhất trước)
+                    if (finalStudentCountForSort != null && a.getCapacity() != null && b.getCapacity() != null) {
+                        int diffA = Math.abs(a.getCapacity() - finalStudentCountForSort);
+                        int diffB = Math.abs(b.getCapacity() - finalStudentCountForSort);
+                        if (diffA != diffB) {
+                            return Integer.compare(diffA, diffB); // Nhỏ hơn = gần hơn
+                        }
+                    }
+                    
+                    // Nếu cùng độ chênh lệch hoặc không có thông tin, sắp xếp theo tên
                     if (a.getName() == null) return 1;
                     if (b.getName() == null) return -1;
                     return a.getName().compareToIgnoreCase(b.getName());
@@ -912,8 +1283,14 @@ public class TeacherRequestService {
 
     //Validate và approve RESCHEDULE request
     private void validateAndApproveReschedule(TeacherRequest request, TeacherRequestApproveDTO approveDTO) {
-        // RESCHEDULE: newResourceId bắt buộc
-        if (approveDTO.getNewResourceId() == null) {
+        // RESCHEDULE: Ưu tiên newResourceId do academic staff chọn trong approveDTO
+        // Nếu academic staff không chọn, dùng newResource mà teacher đã đề xuất khi tạo request
+        Long chosenResourceId = approveDTO.getNewResourceId() != null
+                ? approveDTO.getNewResourceId()
+                : (request.getNewResource() != null ? request.getNewResource().getId() : null);
+
+        // Nếu cả academic staff và teacher đều không chọn, bắt buộc academic staff phải chọn
+        if (chosenResourceId == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Resource ID is required for RESCHEDULE requests");
         }
 
@@ -937,18 +1314,54 @@ public class TeacherRequestService {
         }
 
         // Kiểm tra resource tồn tại
-        Resource newResource = resourceRepository.findById(approveDTO.getNewResourceId())
+        Resource newResource = resourceRepository.findById(chosenResourceId)
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Resource not found"));
 
         // Kiểm tra time slot tồn tại
         TimeSlotTemplate newTimeSlot = timeSlotTemplateRepository.findById(newTimeSlotId)
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Time slot not found"));
 
-        // Cập nhật thông tin
+        // Cập nhật thông tin vào request
         request.setNewDate(newDate);
         request.setNewTimeSlot(newTimeSlot);
         request.setNewResource(newResource);
 
+        // Cập nhật session với thông tin mới
+        Session session = request.getSession();
+        if (session == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no associated session");
+        }
+
+        // Update session date
+        session.setDate(newDate);
+
+        // Update session time slot
+        session.setTimeSlotTemplate(newTimeSlot);
+
+        // Update session resources: xóa resources cũ và thêm resource mới
+        // Xóa tất cả session resources hiện tại
+        if (!session.getSessionResources().isEmpty()) {
+            sessionResourceRepository.deleteAll(session.getSessionResources());
+            session.getSessionResources().clear();
+        }
+
+        // Tạo session resource mới
+        SessionResource newSessionResource = new SessionResource();
+        SessionResource.SessionResourceId sessionResourceId = new SessionResource.SessionResourceId();
+        sessionResourceId.setSessionId(session.getId());
+        sessionResourceId.setResourceId(newResource.getId());
+        newSessionResource.setId(sessionResourceId);
+        newSessionResource.setSession(session);
+        newSessionResource.setResource(newResource);
+
+        // Thêm vào session
+        session.getSessionResources().add(newSessionResource);
+
+        // Lưu session (cascade sẽ lưu SessionResource)
+        sessionRepository.save(session);
+
+        log.info("Session {} updated: date={}, timeSlot={}, resource={}", 
+                session.getId(), newDate, newTimeSlotId, newResource.getId());
     }
 
     //Từ chối yêu cầu giáo viên
