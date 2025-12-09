@@ -783,7 +783,11 @@ public class TeacherRequestService {
 
         TimeSlotTemplate newTimeSlot = request.getNewTimeSlot();
 
+        // Nếu chưa có decidedBy, fallback sang submittedBy để hiển thị người tạo (đặc biệt với WAITING_CONFIRM)
         UserAccount decidedBy = request.getDecidedBy();
+        UserAccount submittedBy = request.getSubmittedBy();
+        UserAccount handler = decidedBy != null ? decidedBy : submittedBy;
+        OffsetDateTime decidedAt = request.getDecidedAt() != null ? request.getDecidedAt() : request.getSubmittedAt();
 
         // Xử lý modality cho MODALITY_CHANGE
         Modality currentModality = null;
@@ -814,10 +818,10 @@ public class TeacherRequestService {
                 .newSessionEndTime(newTimeSlot != null ? newTimeSlot.getEndTime() : null)
                 .requestReason(request.getRequestReason())
                 .submittedAt(request.getSubmittedAt())
-                .decidedAt(request.getDecidedAt())
-                .decidedById(decidedBy != null ? decidedBy.getId() : null)
-                .decidedByName(decidedBy != null ? decidedBy.getFullName() : null)
-                .decidedByEmail(decidedBy != null ? decidedBy.getEmail() : null)
+                .decidedAt(decidedAt)
+                .decidedById(handler != null ? handler.getId() : null)
+                .decidedByName(handler != null ? handler.getFullName() : null)
+                .decidedByEmail(handler != null ? handler.getEmail() : null)
                 .currentModality(currentModality)
                 .newModality(newModality)
                 .build();
@@ -1128,6 +1132,9 @@ public class TeacherRequestService {
         Teacher replacementTeacher = request.getReplacementTeacher();
         UserAccount replacementTeacherAccount = replacementTeacher != null ? replacementTeacher.getUserAccount() : null;
         UserAccount decidedBy = request.getDecidedBy();
+        UserAccount submittedBy = request.getSubmittedBy();
+        UserAccount handler = decidedBy != null ? decidedBy : submittedBy;
+        OffsetDateTime decidedAt = request.getDecidedAt() != null ? request.getDecidedAt() : request.getSubmittedAt();
         Resource newResource = request.getNewResource();
         TimeSlotTemplate newTimeSlot = request.getNewTimeSlot();
 
@@ -1147,10 +1154,21 @@ public class TeacherRequestService {
                 .requestReason(request.getRequestReason())
                 .note(request.getNote())
                 .submittedAt(request.getSubmittedAt())
-                .decidedAt(request.getDecidedAt())
-                .decidedById(decidedBy != null ? decidedBy.getId() : null)
-                .decidedByName(decidedBy != null ? decidedBy.getFullName() : null)
-                .decidedByEmail(decidedBy != null ? decidedBy.getEmail() : null);
+                .decidedAt(decidedAt)
+                .decidedById(handler != null ? handler.getId() : null)
+                .decidedByName(handler != null ? handler.getFullName() : null)
+                .decidedByEmail(handler != null ? handler.getEmail() : null);
+
+        // Debug log to trace who is shown as handler in responses
+        log.debug(
+                "mapToResponseDTO id={} type={} status={} decidedBy={} submittedBy={} handler={}",
+                request.getId(),
+                request.getRequestType(),
+                request.getStatus(),
+                decidedBy != null ? decidedBy.getFullName() : null,
+                submittedBy != null ? submittedBy.getFullName() : null,
+                handler != null ? handler.getFullName() : null
+        );
 
         // Hiển thị thông tin dựa trên yêu cầu
         switch (request.getRequestType()) {
