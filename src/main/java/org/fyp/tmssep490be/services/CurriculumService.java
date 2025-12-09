@@ -235,6 +235,172 @@ public class CurriculumService {
                 log.info("Curriculum deleted successfully: {}", id);
         }
 
+        // ==================== CURRICULUM METHODS ====================
+
+        @Transactional
+        public LevelResponseDTO createLevel(CreateLevelDTO request) {
+                log.info("Creating new level for curriculum ID: {}", request.getCurriculumId());
+
+                Curriculum curriculum = curriculumRepository.findById(request.getCurriculumId())
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Không tìm thấy chương trình với ID: " + request.getCurriculumId()));
+
+                Level level = new Level();
+                level.setCurriculum(curriculum);
+                level.setCode(request.getCode());
+                level.setName(request.getName());
+                level.setDescription(request.getDescription());
+
+                // Tính sortOrder (thêm vào cuối)
+                Integer maxSortOrder = levelRepository.findMaxSortOrderByCurriculumId(curriculum.getId());
+                level.setSortOrder(maxSortOrder != null ? maxSortOrder + 1 : 1);
+
+                level = levelRepository.save(level);
+                log.info("Level created with ID: {}", level.getId());
+
+                return LevelResponseDTO.builder()
+                        .id(level.getId().toString())
+                        .code(level.getCode())
+                        .name(level.getName())
+                        .description(level.getDescription())
+                        .curriculumName(curriculum.getName())
+                        .curriculumCode(curriculum.getCode())
+                        .build();
+        }
+
+        public List<LevelResponseDTO> getLevels(Long curriculumId) {
+                log.debug("Fetching levels with curriculumId: {}", curriculumId);
+
+                List<Level> levels;
+                if (curriculumId != null) {
+                        levels = levelRepository.findByCurriculumIdOrderByUpdatedAtDesc(curriculumId);
+                } else {
+                        levels = levelRepository.findAll(Sort.by(Sort.Direction.DESC, "updatedAt"));
+                }
+
+                return levels.stream()
+                        .map(this::toLevelResponseDTO)
+                        .collect(Collectors.toList());
+        }
+
+        public LevelResponseDTO getLevel(Long id) {
+                log.debug("Fetching level with ID: {}", id);
+                Level level = levelRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ với ID: " + id));
+                return toLevelResponseDTO(level);
+        }
+
+        @Transactional
+        public LevelResponseDTO updateLevel(Long id, CreateLevelDTO request) {
+                log.info("Updating level with ID: {}", id);
+                Level level = levelRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ với ID: " + id));
+
+                level.setCode(request.getCode());
+                level.setName(request.getName());
+                level.setDescription(request.getDescription());
+                level.setUpdatedAt(OffsetDateTime.now());
+
+                level = levelRepository.save(level);
+                log.info("Level updated with ID: {}", level.getId());
+
+                return toLevelResponseDTO(level);
+        }
+
+        @Transactional
+        public void deactivateLevel(Long id) {
+                log.info("Deactivating level with ID: {}", id);
+                Level level = levelRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ với ID: " + id));
+
+                level.setStatus(LevelStatus.INACTIVE);
+                levelRepository.save(level);
+        }
+
+        @Transactional
+        public void reactivateLevel(Long id) {
+                log.info("Reactivating level with ID: {}", id);
+                Level level = levelRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ với ID: " + id));
+
+                // Kiểm tra có Subject nào đang ACTIVE không
+                boolean hasActiveSubject = subjectRepository.existsByLevelIdAndStatus(id, SubjectStatus.ACTIVE);
+
+                if (hasActiveSubject) {
+                        level.setStatus(LevelStatus.ACTIVE);
+                } else {
+                        level.setStatus(LevelStatus.DRAFT);
+                }
+                levelRepository.save(level);
+        }
+
+        @Transactional
+        public void updateLevelSortOrder(Long curriculumId, List<Long> levelIds) {
+                log.info("Updating level sort order for curriculum ID: {}", curriculumId);
+
+                List<Level> levels = levelRepository.findByCurriculumIdOrderBySortOrderAsc(curriculumId);
+
+                Map<Long, Level> levelMap = levels.stream()
+                        .collect(Collectors.toMap(Level::getId, level -> level));
+
+                for (int i = 0; i < levelIds.size(); i++) {
+                        Long levelId = levelIds.get(i);
+                        Level level = levelMap.get(levelId);
+
+                        if (level != null) {
+                                level.setSortOrder(i + 1);
+                        } else {
+                                log.warn("Level ID {} not found for curriculum ID {}", levelId, curriculumId);
+                        }
+                }
+
+                levelRepository.saveAll(levels);
+        }
+
+        @Transactional
+        public void deleteLevel(Long id) {
+                log.info("Deleting level with ID: {}", id);
+                Level level = levelRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ với ID: " + id));
+
+                long subjectCount = subjectRepository.countByLevelId(id);
+                if (subjectCount > 0) {
+                        throw new IllegalStateException("Không thể xóa cấp độ vì đã có khóa học phụ thuộc.");
+                }
+
+                levelRepository.delete(level);
+                log.info("Level deleted successfully: {}", id);
+        }
+
+        public BigDecimal getStandardTimeslotDuration() {
+                log.debug("Calculating standard timeslot duration");
+                var templates = timeSlotTemplateRepository.findAll();
+                if (templates.isEmpty()) {
+                        return BigDecimal.valueOf(2.0); // Default 2 hours
+                }
+
+                var template = templates.get(0);
+                long minutes = Duration.between(template.getStartTime(), template.getEndTime()).toMinutes();
+                return BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        }
+
+        public List<BigDecimal> getAllTimeslotDurations() {
+                log.debug("Fetching all unique timeslot durations");
+                var templates = timeSlotTemplateRepository.findAll();
+                if (templates.isEmpty()) {
+                        return List.of(BigDecimal.valueOf(2.0));
+                }
+
+                return templates.stream()
+                        .map(template -> {
+                                long minutes = Duration.between(template.getStartTime(), template.getEndTime()).toMinutes();
+                                return BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 1, RoundingMode.HALF_UP);
+                        })
+                        .distinct()
+                        .sorted()
+                        .collect(Collectors.toList());
+        }
+
         // ==================== HELPER METHODS ====================
 
         private CurriculumWithLevelsDTO convertToCurriculumWithLevelsDTO(Curriculum curriculum) {
