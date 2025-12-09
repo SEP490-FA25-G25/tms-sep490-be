@@ -10,25 +10,13 @@ import java.util.List;
 
 @Repository
 public interface SubjectRepository extends JpaRepository<Subject, Long> {
-    
-    /**
-     * Find all subjects sorted by specified order
-     */
+
     List<Subject> findAll(Sort sort);
-    
-    /**
-     * Find subjects by curriculum ID ordered by updatedAt
-     */
+
     List<Subject> findByCurriculumIdOrderByUpdatedAtDesc(Long curriculumId);
-    
-    /**
-     * Find subjects by level ID ordered by updatedAt
-     */
+
     List<Subject> findByLevelIdOrderByUpdatedAtDesc(Long levelId);
-    
-    /**
-     * Find subjects by both curriculum and level ordered by updatedAt
-     */
+
     List<Subject> findByCurriculumIdAndLevelIdOrderByUpdatedAtDesc(Long curriculumId, Long levelId);
 
     // Kiểm tra có Subject nào đang ACTIVE thuộc Level không
@@ -36,5 +24,11 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
 
     // Đếm số Subject thuộc Level
     long countByLevelId(Long levelId);
+
+    // Kiểm tra code đã tồn tại
+    boolean existsByCode(String code);
+
+    // Tìm theo curriculum ID và status
+    boolean existsByCurriculumIdAndStatus(Long curriculumId, SubjectStatus status);
 }
 
