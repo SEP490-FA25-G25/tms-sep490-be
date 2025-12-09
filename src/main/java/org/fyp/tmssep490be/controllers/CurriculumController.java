@@ -126,4 +126,146 @@ public class CurriculumController {
                 .message("Curriculum deleted successfully")
                 .build());
     }
+
+
+    // Tạo level mới
+    @PostMapping("/levels")
+    @Operation(summary = "Create a new level")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<LevelResponseDTO>> createLevel(@RequestBody CreateLevelDTO request) {
+        log.info("Creating new level for curriculum ID: {}", request.getCurriculumId());
+        LevelResponseDTO level = curriculumService.createLevel(request);
+        return ResponseEntity.ok(ResponseObject.<LevelResponseDTO>builder()
+                .success(true)
+                .message("Level created successfully")
+                .data(level)
+                .build());
+    }
+
+    // Lấy danh sách levels
+    @GetMapping("/levels")
+    @Operation(summary = "Get all levels", description = "Retrieve all levels, optionally filtered by curriculum.")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<List<LevelResponseDTO>>> getLevels(
+            @RequestParam(required = false) Long curriculumId) {
+        log.info("Fetching levels with curriculumId: {}", curriculumId);
+        List<LevelResponseDTO> levels = curriculumService.getLevels(curriculumId);
+        return ResponseEntity.ok(ResponseObject.<List<LevelResponseDTO>>builder()
+                .success(true)
+                .message("Levels retrieved successfully")
+                .data(levels)
+                .build());
+    }
+
+    // Lấy chi tiết level
+    @GetMapping("/levels/{id}")
+    @Operation(summary = "Get level details")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<LevelResponseDTO>> getLevel(@PathVariable Long id) {
+        log.info("Fetching level details for ID: {}", id);
+        LevelResponseDTO level = curriculumService.getLevel(id);
+        return ResponseEntity.ok(ResponseObject.<LevelResponseDTO>builder()
+                .success(true)
+                .message("Level details retrieved successfully")
+                .data(level)
+                .build());
+    }
+
+    // Cập nhật level
+    @PutMapping("/levels/{id}")
+    @Operation(summary = "Update level")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<LevelResponseDTO>> updateLevel(
+            @PathVariable Long id,
+            @RequestBody CreateLevelDTO request) {
+        log.info("Updating level with ID: {}", id);
+        LevelResponseDTO level = curriculumService.updateLevel(id, request);
+        return ResponseEntity.ok(ResponseObject.<LevelResponseDTO>builder()
+                .success(true)
+                .message("Level updated successfully")
+                .data(level)
+                .build());
+    }
+
+    // Deactivate level
+    @PatchMapping("/levels/{id}/deactivate")
+    @Operation(summary = "Deactivate level")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<Void>> deactivateLevel(@PathVariable Long id) {
+        log.info("Deactivating level with ID: {}", id);
+        curriculumService.deactivateLevel(id);
+        return ResponseEntity.ok(ResponseObject.<Void>builder()
+                .success(true)
+                .message("Level deactivated successfully")
+                .build());
+    }
+
+    // Reactivate level
+    @PatchMapping("/levels/{id}/reactivate")
+    @Operation(summary = "Reactivate level")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<Void>> reactivateLevel(@PathVariable Long id) {
+        log.info("Reactivating level with ID: {}", id);
+        curriculumService.reactivateLevel(id);
+        return ResponseEntity.ok(ResponseObject.<Void>builder()
+                .success(true)
+                .message("Level reactivated successfully")
+                .build());
+    }
+
+    // Update level sort order
+    @PutMapping("/curriculums/{id}/levels/sort-order")
+    @Operation(summary = "Update level sort order for a curriculum")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<Void>> updateLevelSortOrder(
+            @PathVariable Long id,
+            @RequestBody List<Long> levelIds) {
+        log.info("Updating level sort order for curriculum ID: {}", id);
+        curriculumService.updateLevelSortOrder(id, levelIds);
+        return ResponseEntity.ok(ResponseObject.<Void>builder()
+                .success(true)
+                .message("Level sort order updated successfully")
+                .build());
+    }
+
+    // Delete level
+    @DeleteMapping("/levels/{id}")
+    @Operation(summary = "Delete level")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<Void>> deleteLevel(@PathVariable Long id) {
+        log.info("Deleting level with ID: {}", id);
+        curriculumService.deleteLevel(id);
+        return ResponseEntity.ok(ResponseObject.<Void>builder()
+                .success(true)
+                .message("Level deleted successfully")
+                .build());
+    }
+
+    // Get standard timeslot duration
+    @GetMapping("/timeslot-duration")
+    @Operation(summary = "Get standard timeslot duration", description = "Retrieve standard timeslot duration in hours.")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<BigDecimal>> getStandardTimeslotDuration() {
+        log.info("Fetching standard timeslot duration");
+        BigDecimal duration = curriculumService.getStandardTimeslotDuration();
+        return ResponseEntity.ok(ResponseObject.<BigDecimal>builder()
+                .success(true)
+                .message("Standard timeslot duration retrieved successfully")
+                .data(duration)
+                .build());
+    }
+
+    // Get all timeslot durations
+    @GetMapping("/timeslot-durations")
+    @Operation(summary = "Get all unique timeslot durations")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
+    public ResponseEntity<ResponseObject<List<BigDecimal>>> getAllTimeslotDurations() {
+        log.info("Fetching all unique timeslot durations");
+        List<BigDecimal> durations = curriculumService.getAllTimeslotDurations();
+        return ResponseEntity.ok(ResponseObject.<List<BigDecimal>>builder()
+                .success(true)
+                .message("Timeslot durations retrieved successfully")
+                .data(durations)
+                .build());
+    }
 }
