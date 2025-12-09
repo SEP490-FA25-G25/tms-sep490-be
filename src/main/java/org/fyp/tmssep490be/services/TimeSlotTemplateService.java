@@ -81,45 +81,45 @@ public class TimeSlotTemplateService {
         // 1. Xác định branchId
         Long branchId = forcedBranchId != null ? forcedBranchId : request.getBranchId();
 
-        // 2. ⚠️ VALIDATE QUYỀN TRUY CẬP (CẦN THÊM!)
+        // 2. Validate quyền truy cập
         List<Long> userBranches = getBranchIdsForUser(userId);
         if (!userBranches.contains(branchId)) {
             throw new BusinessRuleException("ACCESS_DENIED", "Bạn không có quyền truy cập chi nhánh này");
         }
 
-        // 2. Lấy branch entity
+        // 3. Lấy branch entity
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Branch not found with id: " + branchId));
 
-        // 3. Validate tên
+        // 4. Validate tên
         String name = request.getName() != null ? request.getName().trim() : null;
         if (name == null || name.isEmpty()) {
             throw new BusinessRuleException("Vui lòng nhập tên khung giờ");
         }
 
-        // 4. Validate thời gian
+        // 5. Validate thời gian
         if (request.getStartTime() == null || request.getEndTime() == null) {
             throw new BusinessRuleException("Vui lòng nhập giờ bắt đầu và giờ kết thúc");
         }
         LocalTime startTime = LocalTime.parse(request.getStartTime());
         LocalTime endTime = LocalTime.parse(request.getEndTime());
 
-        // 5. Check endTime > startTime
+        // 6. Check endTime > startTime
         if (!endTime.isAfter(startTime)) {
             throw new BusinessRuleException("Giờ kết thúc phải lớn hơn giờ bắt đầu");
         }
 
-        // 6. Check tên không trùng
+        // 7. Check tên không trùng
         if (timeSlotTemplateRepository.existsByBranchIdAndNameIgnoreCase(branchId, name, null)) {
             throw new BusinessRuleException("Tên khung giờ đã tồn tại trong chi nhánh này");
         }
 
-        // 7. Check thời gian không trùng
+        // 8. Check thời gian không trùng
         if (timeSlotTemplateRepository.existsByBranchIdAndStartTimeAndEndTime(branchId, startTime, endTime, null)) {
             throw new BusinessRuleException("Khung giờ này đã tồn tại trong chi nhánh");
         }
 
-        // 8. Tạo entity và lưu
+        // 9. Tạo entity và lưu
         TimeSlotTemplate timeSlot = new TimeSlotTemplate();
         timeSlot.setBranch(branch);
         timeSlot.setName(name);

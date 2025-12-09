@@ -3,6 +3,7 @@ package org.fyp.tmssep490be.repositories;
 import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -20,18 +21,15 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             Long classId,
             LocalDate date,
             SessionStatus status);
-    // Kiểm tra khung giờ có được dùng trong session không
+            
     boolean existsByTimeSlotTemplateId(Long timeSlotTemplateId);
 
-    // Đếm số lớp đang dùng khung giờ này
     @Query("SELECT COUNT(DISTINCT s.classEntity.id) FROM Session s WHERE s.timeSlotTemplate.id = :timeSlotId AND s.status != 'CANCELLED'")
     Long countDistinctClassesByTimeSlotId(@Param("timeSlotId") Long timeSlotId);
 
-    // Đếm tổng số session dùng khung giờ này
     @Query("SELECT COUNT(s) FROM Session s WHERE s.timeSlotTemplate.id = :timeSlotId AND s.status != 'CANCELLED'")
     Long countSessionsByTimeSlotId(@Param("timeSlotId") Long timeSlotId);
 
-    // Đếm session tương lai (kiểm tra trước khi ngưng hoạt động)
     @Query(value = """
         SELECT COUNT(s.id) FROM session s
         JOIN time_slot_template tst ON s.time_slot_template_id = tst.id
@@ -44,7 +42,6 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("currentDate") LocalDate currentDate,
             @Param("currentTime") LocalTime currentTime);
 
-    // Tìm sessions theo khung giờ
     @Query(value = """
         SELECT s.* FROM session s
         JOIN time_slot_template tst ON s.time_slot_template_id = tst.id
@@ -53,6 +50,7 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
         """, nativeQuery = true)
     List<Session> findByTimeSlotTemplateId(@Param("timeSlotId") Long timeSlotId);
 
+    // Đếm số buổi học đã hoàn thành theo class ID
     @Query("""
       SELECT s.classEntity.id, 
              SUM(CASE WHEN s.status = 'DONE' THEN 1 ELSE 0 END),
@@ -63,4 +61,119 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
       GROUP BY s.classEntity.id
       """)
     List<Object[]> countSessionsByClassIds(@Param("classIds") List<Long> classIds);
+
+    // Tìm buổi học sắp tới của giáo viên theo teacher ID
+    @Query("""
+        SELECT DISTINCT s FROM Session s
+        JOIN s.teachingSlots ts
+        JOIN ts.teacher t
+        LEFT JOIN FETCH s.timeSlotTemplate tst
+        LEFT JOIN FETCH s.classEntity c
+        WHERE t.id = :teacherId
+          AND s.status = org.fyp.tmssep490be.entities.enums.SessionStatus.PLANNED
+          AND s.date BETWEEN :fromDate AND :toDate
+          AND (:classId IS NULL OR c.id = :classId)
+        ORDER BY s.date ASC, tst.startTime ASC
+        """)
+    List<Session> findUpcomingSessionsForTeacher(@Param("teacherId") Long teacherId,
+                                                 @Param("fromDate") LocalDate fromDate,
+                                                 @Param("toDate") LocalDate toDate,
+                                                 @Param("classId") Long classId);
+
+    // Tìm tất cả buổi học của giáo viên trong tuần (tất cả status) cho schedule
+    @Query("""
+        SELECT DISTINCT s FROM Session s
+        JOIN s.teachingSlots ts
+        JOIN ts.teacher t
+        LEFT JOIN FETCH s.timeSlotTemplate tst
+        LEFT JOIN FETCH s.classEntity c
+        LEFT JOIN FETCH c.subject sub
+        LEFT JOIN FETCH c.branch b
+        LEFT JOIN FETCH s.subjectSession ss
+        LEFT JOIN FETCH s.sessionResources sr
+        LEFT JOIN FETCH sr.resource r
+        WHERE t.id = :teacherId
+          AND s.date BETWEEN :fromDate AND :toDate
+          AND (:classId IS NULL OR c.id = :classId)
+        ORDER BY s.date ASC, tst.startTime ASC
+        """)
+    List<Session> findWeeklySessionsForTeacher(@Param("teacherId") Long teacherId,
+                                               @Param("fromDate") LocalDate fromDate,
+                                               @Param("toDate") LocalDate toDate,
+                                               @Param("classId") Long classId);
+
+    // Học viên chọn buổi học bù -> join với class để kiểm tra chi nhánh và hình thức điều kiện cùng  môn
+    // Kiểm tra date trong 2 tuần từ ngày hiện tại, trạng thái PLANNED, không phải buổi học bị bỏ
+    // Loại trừ buổi học bị mà học viên đã bỏ qua (excludeSessionId) tức là học viên đang chọn buổi bị missed thì phỉa bỏ ra
+    // Cùng chi nhánh được học onl hoạc offline, khác chi nhánh thì chỉ được học online
+    // weeksLimit: số tuần tối đa để tìm buổi học bù (lấy từ policy)
+    @Query(value = """
+        SELECT s.* FROM session s
+        JOIN class c ON s.class_id = c.id
+        WHERE s.subject_session_id = :subjectSessionId
+          AND s.date >= CURRENT_DATE
+          AND s.date <= CURRENT_DATE + CAST((:weeksLimit || ' weeks') AS INTERVAL)
+          AND s.status = 'PLANNED'
+          AND s.id != :excludeSessionId
+          AND (
+            c.branch_id = :targetBranchId
+            OR c.modality = 'ONLINE'
+          )
+        ORDER BY s.date ASC
+        """, nativeQuery = true)
+    List<Session> findMakeupSessionOptions(
+            @Param("subjectSessionId") Long subjectSessionId,
+            @Param("excludeSessionId") Long excludeSessionId,
+            @Param("targetBranchId") Long targetBranchId,
+            @Param("weeksLimit") Integer weeksLimit);
+
+    @Query("""
+        SELECT s FROM Session s
+        JOIN s.studentSessions ss
+        WHERE ss.student.id = :studentId
+          AND s.date = :date
+          AND s.status IN ('PLANNED', 'ONGOING')
+          AND ss.attendanceStatus != 'CANCELLED'
+        """)
+    List<Session> findSessionsForStudentByDate(
+            @Param("studentId") Long studentId,
+            @Param("date") LocalDate date);
+
+    @Query("""
+        SELECT DISTINCT s FROM Session s
+        JOIN s.teachingSlots ts
+        JOIN ts.teacher t
+        WHERE t.id = :teacherId
+          AND s.date = :date
+          AND s.status IN ('PLANNED', 'ONGOING')
+          AND s.id != :excludeSessionId
+        """)
+    List<Session> findSessionsForTeacherByDate(
+            @Param("teacherId") Long teacherId,
+            @Param("date") LocalDate date,
+            @Param("excludeSessionId") Long excludeSessionId);
+
+    @Query("SELECT s FROM Session s WHERE s.date < :today AND s.status = :status")
+    List<Session> findPastSessionsByStatus(
+            @Param("today") LocalDate today,
+            @Param("status") SessionStatus status);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Session s SET s.status = :newStatus WHERE s.date < :today AND s.status = :oldStatus")
+    int updatePastSessionsStatus(
+            @Param("today") LocalDate today,
+            @Param("oldStatus") SessionStatus oldStatus,
+            @Param("newStatus") SessionStatus newStatus);
+
+    @Query("SELECT s FROM Session s " +
+           "LEFT JOIN FETCH s.timeSlotTemplate tst " +
+           "LEFT JOIN FETCH s.teachingSlots ts " +
+           "LEFT JOIN FETCH ts.teacher t " +
+           "LEFT JOIN FETCH t.userAccount " +
+           "LEFT JOIN FETCH s.sessionResources sr " +
+           "LEFT JOIN FETCH sr.resource " +
+           "WHERE s.classEntity.id = :classId " +
+           "ORDER BY s.date ASC, tst.startTime ASC")
+    List<Session> findAllByClassIdOrderByDateAndTime(@Param("classId") Long classId);
 }
+

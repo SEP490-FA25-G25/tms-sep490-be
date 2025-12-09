@@ -20,8 +20,8 @@ public class ClassListItemDTO {
     private Long id;
     private String code;
     private String name;
-    private String courseName;
-    private String courseCode;
+    private String subjectName;
+    private String subjectCode;
     private String branchName;
     private String branchCode;
 
@@ -31,23 +31,18 @@ public class ClassListItemDTO {
     private ClassStatus status;
     private ApprovalStatus approvalStatus;
 
-    // Capacity information
     private Integer maxCapacity;
     private Integer currentEnrolled;
     private Integer availableSlots;
     private Double utilizationRate;
 
-    // Teacher information - all teachers teaching this class
     private List<TeacherSummaryDTO> teachers;
 
-    // Schedule summary
     private String scheduleSummary;
 
-    // Session progress
     private Integer completedSessions;
     private Integer totalSessions;
 
-    // Quick checks for UI
     private Boolean canEnrollStudents;
     private String enrollmentRestrictionReason;
 }

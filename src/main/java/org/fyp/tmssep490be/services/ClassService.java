@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.classmanagement.AvailableStudentDTO;
 import org.fyp.tmssep490be.dtos.classmanagement.ClassDetailDTO;
 import org.fyp.tmssep490be.dtos.classmanagement.ClassListItemDTO;
+import org.fyp.tmssep490be.dtos.classmanagement.ClassStudentDTO;
 import org.fyp.tmssep490be.dtos.classmanagement.TeacherSummaryDTO;
 import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
 import org.fyp.tmssep490be.entities.*;
@@ -118,8 +119,8 @@ public class ClassService {
                 .id(classEntity.getId())
                 .code(classEntity.getCode())
                 .name(classEntity.getName())
-                .courseName(classEntity.getSubject().getName())
-                .courseCode(classEntity.getSubject().getCode())
+                .subjectName(classEntity.getSubject().getName())
+                .subjectCode(classEntity.getSubject().getCode())
                 .branchName(classEntity.getBranch().getName())
                 .branchCode(classEntity.getBranch().getCode())
                 .modality(classEntity.getModality())
@@ -370,6 +371,31 @@ public class ClassService {
     private static final Set<Skill> ALLOWED_SKILLS = Set.of(
             Skill.GENERAL, Skill.READING, Skill.WRITING, Skill.SPEAKING, Skill.LISTENING
     );
+
+    public Page<ClassStudentDTO> getClassStudents(
+            Long classId,
+            String search,
+            Pageable pageable,
+            Long userId) {
+        log.debug("Getting students for class {} by user {} with search: {}", classId, userId, search);
+
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        // Validate user has access to this class
+        validateClassBranchAccess(classEntity, userId);
+
+        // Prepare search parameter with wildcards for LIKE query
+        String searchPattern = (search != null && !search.isBlank())
+                ? "%" + search + "%"
+                : null;
+
+        // Get enrolled students
+        Page<Enrollment> enrollments = enrollmentRepository.findEnrolledStudentsByClass(
+                classId, EnrollmentStatus.ENROLLED, searchPattern, pageable);
+
+        return enrollments.map(this::convertToClassStudentDTO);
+    }
 
     public Page<AvailableStudentDTO> getAvailableStudentsForClass(
             Long classId,
@@ -706,6 +732,39 @@ public class ClassService {
                 .classCode(classEntity.getCode() != null ? classEntity.getCode() : "N/A")
                 .totalSessions(sessions.size())
                 .sessions(sessionItems)
+                .build();
+    }
+
+    private ClassStudentDTO convertToClassStudentDTO(Enrollment enrollment) {
+        Student student = enrollment.getStudent();
+        UserAccount userAccount = student.getUserAccount();
+
+        // Get branch name from student's user branches
+        String branchName = null;
+        if (userAccount.getUserBranches() != null && !userAccount.getUserBranches().isEmpty()) {
+            branchName = userAccount.getUserBranches().iterator().next().getBranch().getName();
+        }
+
+        return ClassStudentDTO.builder()
+                .id(enrollment.getId())
+                .studentId(student.getId())
+                .studentCode(student.getStudentCode())
+                .fullName(userAccount.getFullName())
+                .email(userAccount.getEmail())
+                .phone(userAccount.getPhone())
+                .avatarUrl(userAccount.getAvatarUrl())
+                .address(userAccount.getAddress())
+                .branchName(branchName)
+                .enrolledAt(enrollment.getEnrolledAt())
+                .enrolledBy(enrollment.getEnrolledByUser() != null ? enrollment.getEnrolledByUser().getFullName()
+                        : "System")
+                .enrolledById(enrollment.getEnrolledBy())
+                .status(enrollment.getStatus())
+                .joinSessionId(enrollment.getJoinSessionId())
+                .joinSessionDate(
+                        enrollment.getJoinSession() != null ? enrollment.getJoinSession().getDate().toString() : null)
+                .capacityOverride(enrollment.getCapacityOverride())
+                .overrideReason(enrollment.getOverrideReason())
                 .build();
     }
 

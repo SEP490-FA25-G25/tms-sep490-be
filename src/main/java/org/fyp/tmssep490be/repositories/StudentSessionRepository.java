@@ -9,11 +9,37 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface StudentSessionRepository extends JpaRepository<StudentSession, StudentSession.StudentSessionId> {
 
     List<StudentSession> findBySessionId(Long sessionId);
+
+    @Query("SELECT DISTINCT ss FROM StudentSession ss " +
+            "JOIN FETCH ss.student student " +
+            "JOIN FETCH student.userAccount " +
+            "JOIN FETCH ss.session s " +
+            "LEFT JOIN FETCH s.timeSlotTemplate tst " +
+            "JOIN FETCH s.classEntity c " +
+            "JOIN FETCH c.subject subj " +
+            "JOIN FETCH c.branch branch " +
+            "LEFT JOIN FETCH s.subjectSession subjSess " +
+            "LEFT JOIN FETCH subjSess.subjectMaterials " +
+            "LEFT JOIN FETCH s.sessionResources sr " +
+            "LEFT JOIN FETCH sr.resource " +
+            "LEFT JOIN FETCH s.teachingSlots ts " +
+            "LEFT JOIN FETCH ts.teacher teacher " +
+            "LEFT JOIN FETCH teacher.userAccount " +
+            "LEFT JOIN FETCH ss.makeupSession " +
+            "LEFT JOIN FETCH ss.originalSession origSess " +
+            "LEFT JOIN FETCH origSess.timeSlotTemplate " +
+            "WHERE ss.student.id = :studentId " +
+            "AND ss.session.id = :sessionId")
+    Optional<StudentSession> findByStudentIdAndSessionId(
+            @Param("studentId") Long studentId,
+            @Param("sessionId") Long sessionId
+    );
 
     @Query("SELECT ss.attendanceStatus, COUNT(ss) FROM StudentSession ss " +
            "JOIN ss.session s " +
@@ -54,5 +80,29 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    // Find all student sessions by student and class for absence rate calculation
+    @Query("SELECT ss FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE ss.student.id = :studentId " +
+           "AND s.classEntity.id = :classId")
+    List<StudentSession> findByStudentIdAndClassEntityId(
+            @Param("studentId") Long studentId,
+            @Param("classId") Long classId
+    );
+
+    @Query("SELECT COUNT(ss) FROM StudentSession ss " +
+           "WHERE ss.session.id = :sessionId " +
+           "AND ss.attendanceStatus != 'CANCELLED'")
+    Long countBySessionId(@Param("sessionId") Long sessionId);
+
+    @Query("SELECT ss FROM StudentSession ss " +
+           "JOIN FETCH ss.session s " +
+           "JOIN FETCH s.classEntity c " +
+           "LEFT JOIN FETCH s.subjectSession " +
+           "LEFT JOIN FETCH s.timeSlotTemplate " +
+           "WHERE ss.student.id = :studentId " +
+           "AND s.status != 'CANCELLED'")
+    List<StudentSession> findAllByStudentId(@Param("studentId") Long studentId);
 
 }

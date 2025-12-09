@@ -2,8 +2,13 @@ package org.fyp.tmssep490be.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.fyp.tmssep490be.entities.enums.Skill;
+import org.fyp.tmssep490be.utils.SkillListConverter;
+
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -35,8 +40,9 @@ public class SubjectSession {
     @Column(name = "student_task", columnDefinition = "TEXT")
     private String studentTask;
 
+    @Convert(converter = SkillListConverter.class)
     @Column(name = "skill", nullable = false, columnDefinition = "TEXT")
-    private String skills; // JSON string: ["READING", "VOCABULARY"]
+    private List<Skill> skills = new ArrayList<>();
 
     @OneToMany(mappedBy = "subjectSession", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

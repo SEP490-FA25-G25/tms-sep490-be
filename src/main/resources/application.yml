@@ -90,3 +90,12 @@ server:
     pool-size: ${EMAIL_ASYNC_POOL_SIZE:10}
     queue-capacity: ${EMAIL_ASYNC_QUEUE_CAPACITY:100}
     thread-name-prefix: ${EMAIL_ASYNC_THREAD_PREFIX:EmailAsync-}
+
+# Scheduler Configuration
+tms:
+  scheduler:
+    jobs:
+      request-expiry:
+        enabled: true
+        cron: "0 0 3 * * ?"  # Daily at 3:00 AM
+        expiry-days: 7

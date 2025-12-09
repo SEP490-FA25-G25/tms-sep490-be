@@ -236,7 +236,7 @@ INSERT INTO user_role (user_id, role_id) SELECT id, 7 FROM user_account WHERE id
 
 INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES
 -- Staff assignments
-(1,1,1), (1,2,1), (2,1,1), (2,2,1), (3,1,2), (4,2,2), (5,1,2), (6,1,2), (6,2,2), (7,1,2), (8,2,4), (9,2,4), (10,1,2), (11,2,4);
+(1,1,1), (1,2,1), (2,1,1), (2,2,1), (3,1,2), (3,2,2), (4,2,2), (5,1,2), (6,1,2), (6,2,2), (7,1,2), (8,2,4), (9,2,4), (10,1,2), (11,2,4);
 -- Teachers - HN (original)
 INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 1, 6 FROM user_account WHERE id BETWEEN 20 AND 27;
 -- Teachers - HCM (original)
@@ -1463,15 +1463,15 @@ INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_
 SELECT (100 + s.id), 1, s.id, 'COMPLETED', '2025-08-25 09:00:00+07', 6, 1, '2025-10-24 18:00:00+07', 24, '2025-08-25 09:00:00+07', '2025-10-24 18:00:00+07'
 FROM generate_series(1, 15) AS s(id);
 
--- Enrollments for Class 2 (HN-IELTS-F2) - 17 students, ongoing
+-- Enrollments for Class 2 (HN-IELTS-F2) - 20 students, ongoing
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
 SELECT (200 + s.id), 2, s.id + 15, 'ENROLLED', '2025-11-01 09:00:00+07', 6, 101, '2025-11-01 09:00:00+07', NOW()
-FROM generate_series(1, 17) AS s(id);
+FROM generate_series(1, 20) AS s(id);
 
--- Enrollments for Class 3 (HCM-IELTS-F1) - 20 students, ongoing online
+-- Enrollments for Class 3 (HCM-IELTS-F1) - 25 students, ongoing online
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
 SELECT (300 + s.id), 3, s.id + 50, 'ENROLLED', '2025-11-08 09:00:00+07', 8, 201, '2025-11-08 09:00:00+07', NOW()
-FROM generate_series(1, 20) AS s(id);
+FROM generate_series(1, 25) AS s(id);
 
 -- Enrollments for Class 4 (HN-IELTS-I1) - 18 students, completed
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, left_at, left_session_id, created_at, updated_at)

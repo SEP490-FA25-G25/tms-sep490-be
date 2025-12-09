@@ -38,14 +38,38 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
     int countByClassIdAndStatus(Long classId, EnrollmentStatus status);
 
-    // Count active enrollments for a student
     int countByStudentIdAndStatus(Long studentId, EnrollmentStatus status);
 
-    // Kiểm tra xem student đã được enroll vào class chưa
     boolean existsByClassIdAndStudentIdAndStatus(Long classId, Long studentId, EnrollmentStatus status);
-    //Tìm kiếm tất cả đăng ký lớp học theo ID lớp học và trạng thái
+
     List<Enrollment> findByClassIdAndStatus(Long classId, EnrollmentStatus status);
 
     List<Enrollment> findByStudentIdAndStatus(Long studentId, EnrollmentStatus status);
 
+    // Find enrollment by studentId, classId and status for request validation
+    @Query("SELECT e FROM Enrollment e WHERE e.student.id = :studentId AND e.classId = :classId AND e.status = :status")
+    Enrollment findByStudentIdAndClassIdAndStatus(
+            @Param("studentId") Long studentId,
+            @Param("classId") Long classId,
+            @Param("status") EnrollmentStatus status
+    );
+
+    @Query("SELECT e FROM Enrollment e WHERE e.student.id = :studentId ORDER BY e.enrolledAt DESC LIMIT 1")
+    Enrollment findLatestEnrollmentByStudent(@Param("studentId") Long studentId);
+
+    @Query("SELECT e FROM Enrollment e " +
+           "JOIN FETCH e.classEntity c " +
+           "JOIN FETCH c.subject sub " +
+           "WHERE e.student.id = :studentId")
+    List<Enrollment> findByStudentIdWithClassAndCourse(@Param("studentId") Long studentId);
+
+    @Query("SELECT COUNT(e) > 0 FROM Enrollment e " +
+           "WHERE e.student.id = :studentId " +
+           "AND e.classId = :classId " +
+           "AND e.status IN :statuses")
+    boolean existsByStudentIdAndClassIdAndStatusIn(
+            @Param("studentId") Long studentId,
+            @Param("classId") Long classId,
+            @Param("statuses") List<EnrollmentStatus> statuses
+    );
 }

@@ -39,6 +39,8 @@ public enum ErrorCode {
     EMAIL_ALREADY_EXISTS(1103, "Email đã tồn tại"),
     STUDENT_ROLE_NOT_FOUND(1105, "Vai trò HỌC VIÊN chưa được cấu hình trong hệ thống"),
     STUDENT_NOT_FOUND(1100, "Không tìm thấy học viên"),
+    STUDENT_SESSION_NOT_FOUND(1106, "Không tìm thấy buổi học của học viên hoặc học viên chưa đăng ký buổi học này"),
+    STUDENT_NOT_ENROLLED_IN_CLASS(1107, "Học viên chưa đăng ký lớp này"),
 
     // Enrollment errors (1200-1299)
     EXCEL_GENERATION_FAILED(1216, "Tạo tệp Excel thất bại"),
@@ -68,8 +70,13 @@ public enum ErrorCode {
     // Class Code Generation errors (4032-4039)
 
     // Teacher errors (3000-3099)
+    TEACHER_NOT_FOUND(3000, "Không tìm thấy giáo viên"),
 
     // Teacher Request errors (5000-5099)
+    TEACHER_REQUEST_NOT_FOUND(5000, "Không tìm thấy yêu cầu giáo viên"),
+    TEACHER_REQUEST_NOT_PENDING(5001, "Yêu cầu không ở trạng thái chờ duyệt"),
+    RESOURCE_NOT_FOUND(5002, "Không tìm thấy tài nguyên"),
+    TIMESLOT_NOT_FOUND(5003, "Không tìm thấy khung giờ"),
 
     // Student Request errors (4100-4199)
 
@@ -80,6 +87,7 @@ public enum ErrorCode {
     // Common errors (9000-9999)
     INVALID_INPUT(9000, "Dữ liệu đầu vào không hợp lệ"),
     UNAUTHORIZED(9401, "Truy cập trái phép"),
+    FORBIDDEN(9403, "Không có quyền truy cập"),
     ;
 
     private final int code;

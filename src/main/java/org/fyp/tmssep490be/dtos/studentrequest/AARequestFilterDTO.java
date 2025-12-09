@@ -18,10 +18,6 @@ public class AARequestFilterDTO {
     @Builder.Default
     private String keyword = null; // Search by student name, student code, or class code
     @Builder.Default
-    private String studentName = null; // Search by student name (deprecated, use keyword)
-    @Builder.Default
-    private String classCode = null; // Search by class code (deprecated, use keyword)
-    @Builder.Default
     private String sessionDateFrom = null; // YYYY-MM-DD
     @Builder.Default
     private String sessionDateTo = null; // YYYY-MM-DD
@@ -38,5 +34,5 @@ public class AARequestFilterDTO {
     @Builder.Default
     private Integer size = 20;
     @Builder.Default
-    private String sort = "submittedAt,asc";
+    private String sort = "submittedAt,desc";
 }

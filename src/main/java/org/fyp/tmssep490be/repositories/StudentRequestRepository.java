@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Repository
@@ -24,8 +25,10 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
             Long studentId, Long sessionId, StudentRequestType requestType, List<RequestStatus> statuses);
 
     @Query("SELECT sr FROM StudentRequest sr " +
+           "JOIN sr.currentClass c " +
+           "JOIN c.branch b " +
            "WHERE sr.status = :status " +
-           "AND sr.currentClass.branch.id IN :branchIds")
+           "AND b.id IN :branchIds")
     Page<StudentRequest> findPendingRequestsByBranches(
             @Param("status") RequestStatus status,
             @Param("branchIds") List<Long> branchIds,
@@ -33,14 +36,18 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
 
 
     @Query("SELECT sr FROM StudentRequest sr " +
-           "WHERE sr.currentClass.branch.id IN :branchIds")
+           "JOIN sr.currentClass c " +
+           "JOIN c.branch b " +
+           "WHERE b.id IN :branchIds")
     Page<StudentRequest> findAllRequestsByBranches(
             @Param("branchIds") List<Long> branchIds,
             Pageable pageable);
 
 
     @Query("SELECT sr FROM StudentRequest sr " +
-           "WHERE sr.currentClass.branch.id IN :branchIds " +
+           "JOIN sr.currentClass c " +
+           "JOIN c.branch b " +
+           "WHERE b.id IN :branchIds " +
            "AND sr.decidedBy.id = :decidedBy")
     Page<StudentRequest> findAllRequestsByBranchesAndDecidedBy(
             @Param("branchIds") List<Long> branchIds,
@@ -48,16 +55,20 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
             Pageable pageable);
 
     @Query("SELECT COUNT(sr) FROM StudentRequest sr " +
+           "JOIN sr.currentClass c " +
+           "JOIN c.branch b " +
            "WHERE sr.status = :status " +
-           "AND sr.currentClass.branch.id IN :branchIds")
+           "AND b.id IN :branchIds")
     long countByStatusAndBranches(
             @Param("status") RequestStatus status,
             @Param("branchIds") List<Long> branchIds);
 
     @Query("SELECT COUNT(sr) FROM StudentRequest sr " +
+           "JOIN sr.currentClass c " +
+           "JOIN c.branch b " +
            "WHERE sr.requestType = :requestType " +
            "AND sr.status = :status " +
-           "AND sr.currentClass.branch.id IN :branchIds")
+           "AND b.id IN :branchIds")
     long countByRequestTypeAndStatusAndBranches(
             @Param("requestType") StudentRequestType requestType,
             @Param("status") RequestStatus status,
@@ -141,10 +152,6 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
             @Param("requestType") StudentRequestType requestType,
             @Param("status") RequestStatus status);
 
-    /**
-     * Dynamic query for student's own requests with flexible filtering
-     * Supports: search, multiple request types, multiple statuses
-     */
     @Query("""
         SELECT sr FROM StudentRequest sr
         WHERE sr.student.id = :studentId
@@ -176,4 +183,25 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
         @Param("status") RequestStatus status,
         @Param("effectiveDate") LocalDate effectiveDate
     );
+
+    @Query("SELECT sr FROM StudentRequest sr " +
+           "WHERE sr.student.id = :studentId " +
+           "AND sr.targetSession.id = :targetSessionId " +
+           "AND sr.requestType = :requestType")
+    List<StudentRequest> findByStudentIdAndTargetSessionIdAndRequestType(
+            @Param("studentId") Long studentId,
+            @Param("targetSessionId") Long targetSessionId,
+            @Param("requestType") StudentRequestType requestType);
+
+    /**
+     * Find requests by status and submitted before cutoff date
+     * Used by RequestExpiryJob to expire old PENDING requests
+     */
+    @Query("SELECT sr FROM StudentRequest sr " +
+           "WHERE sr.status = :status " +
+           "AND sr.submittedAt < :cutoffDate " +
+           "ORDER BY sr.submittedAt ASC")
+    List<StudentRequest> findByStatusAndSubmittedAtBefore(
+            @Param("status") RequestStatus status,
+            @Param("cutoffDate") OffsetDateTime cutoffDate);
 }

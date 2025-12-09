@@ -1,17 +1,29 @@
 package org.fyp.tmssep490be.controllers;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.studentmanagement.*;
+import org.fyp.tmssep490be.entities.enums.Gender;
+import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/students")
@@ -21,6 +33,38 @@ public class StudentController {
 
     private final StudentService studentService;
     private static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+
+    @GetMapping
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<Page<StudentListItemDTO>>> getStudents(
+            @RequestParam(required = false) List<Long> branchIds,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) UserStatus status,
+            @RequestParam(required = false) Gender gender,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "studentCode") String sort,
+            @RequestParam(defaultValue = "asc") String sortDir,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} requesting students list with filters: branchIds={}, search={}, status={}, gender={}",
+                currentUser.getId(), branchIds, search, status, gender);
+
+        // Create pageable with sort
+        Sort.Direction direction = sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sort));
+
+        Page<StudentListItemDTO> students = studentService.getStudents(
+                branchIds, search, status, gender, pageable, currentUser.getId()
+        );
+
+        return ResponseEntity.ok(ResponseObject.<Page<StudentListItemDTO>>builder()
+                .success(true)
+                .message("Students retrieved successfully")
+                .data(students)
+                .build());
+    }
 
     @PostMapping
     @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")

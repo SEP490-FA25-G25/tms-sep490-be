@@ -4,10 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.fyp.tmssep490be.entities.enums.RequestStatus;
-import org.fyp.tmssep490be.entities.enums.StudentRequestType;
-
-import java.util.List;
 
 @Data
 @Builder
@@ -15,16 +11,11 @@ import java.util.List;
 @AllArgsConstructor
 public class RequestFilterDTO {
 
-    // Support both single string (for backward compatibility) and list of enums
     @Builder.Default
-    private String requestType = null; // ABSENCE, MAKEUP, TRANSFER (backward compatibility)
-    @Builder.Default
-    private List<StudentRequestType> requestTypeFilters = null; // Multiple request types
+    private String requestType = null; // ABSENCE, MAKEUP, TRANSFER
 
     @Builder.Default
-    private String status = null; // PENDING, APPROVED, REJECTED, CANCELLED (backward compatibility)
-    @Builder.Default
-    private List<RequestStatus> statusFilters = null; // Multiple statuses
+    private String status = null; // PENDING, APPROVED, REJECTED, CANCELLED
 
     @Builder.Default
     private Integer page = 0;

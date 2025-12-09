@@ -15,8 +15,8 @@ public class TeacherClassListItemDTO {
     private Long id;
     private String code;
     private String name;
-    private String courseName;
-    private String courseCode;
+    private String subjectName;
+    private String subjectCode;
     private String branchName;
     private String branchCode;
 
