@@ -27,7 +27,6 @@ import java.time.LocalDate;
 @RequestMapping("/api/v1/students")
 @Slf4j
 @RequiredArgsConstructor
-@Tag(name = "Student Schedule", description = "APIs for student to view their weekly schedule and session details")
 public class StudentScheduleController {
 
     private final StudentScheduleService studentScheduleService;

@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.entities.enums.HomeworkStatus;
 
-import java.time.LocalDate;
 
 @Data
 @Builder
@@ -19,8 +18,6 @@ public class StudentStatusDTO {
     private AttendanceStatus attendanceStatus;
 
     private HomeworkStatus homeworkStatus;
-
-    private LocalDate homeworkDueDate;
 
     private String homeworkDescription;
 }

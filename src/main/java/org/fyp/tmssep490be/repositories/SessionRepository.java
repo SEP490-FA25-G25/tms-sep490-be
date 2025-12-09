@@ -142,4 +142,16 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("today") LocalDate today,
             @Param("oldStatus") SessionStatus oldStatus,
             @Param("newStatus") SessionStatus newStatus);
+
+    @Query("SELECT s FROM Session s " +
+           "LEFT JOIN FETCH s.timeSlotTemplate tst " +
+           "LEFT JOIN FETCH s.teachingSlots ts " +
+           "LEFT JOIN FETCH ts.teacher t " +
+           "LEFT JOIN FETCH t.userAccount " +
+           "LEFT JOIN FETCH s.sessionResources sr " +
+           "LEFT JOIN FETCH sr.resource " +
+           "WHERE s.classEntity.id = :classId " +
+           "ORDER BY s.date ASC, tst.startTime ASC")
+    List<Session> findAllByClassIdOrderByDateAndTime(@Param("classId") Long classId);
 }
+

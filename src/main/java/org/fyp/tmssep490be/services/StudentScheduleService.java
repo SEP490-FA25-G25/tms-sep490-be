@@ -147,7 +147,6 @@ public class StudentScheduleService {
         StudentStatusDTO studentStatus = StudentStatusDTO.builder()
                 .attendanceStatus(resolveDisplayStatus(studentSession))
                 .homeworkStatus(studentSession.getHomeworkStatus())
-                .homeworkDueDate(null) // Not available in current schema
                 .homeworkDescription(studentSession.getNote())
                 .build();
 
