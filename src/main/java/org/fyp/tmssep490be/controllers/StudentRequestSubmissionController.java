@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.studentrequest.AbsenceRequestDTO;
+import org.fyp.tmssep490be.dtos.studentrequest.MakeupRequestDTO;
 import org.fyp.tmssep490be.dtos.studentrequest.StudentRequestResponseDTO;
 import org.fyp.tmssep490be.dtos.studentrequest.StudentRequestSubmissionDTO;
 import org.fyp.tmssep490be.security.UserPrincipal;
@@ -50,8 +51,16 @@ public class StudentRequestSubmissionController {
                 break;
 
             case "MAKEUP":
-                // TODO: Implement makeup request submission
-                throw new UnsupportedOperationException("Makeup requests not yet implemented");
+                MakeupRequestDTO makeupRequest = MakeupRequestDTO.builder()
+                        .currentClassId(requestDTO.getCurrentClassId())
+                        .targetSessionId(requestDTO.getTargetSessionId())
+                        .makeupSessionId(requestDTO.getMakeupSessionId())
+                        .requestReason(requestDTO.getRequestReason())
+                        .note(requestDTO.getNote())
+                        .build();
+
+                response = studentRequestService.submitMakeupRequest(userId, makeupRequest);
+                break;
 
             case "TRANSFER":
                 // TODO: Implement transfer request submission

@@ -2,7 +2,7 @@
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'request.absence.lead_time_days',
@@ -15,7 +15,6 @@ INSERT INTO system_policy (
     '1',
     '7',
     'days',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -26,7 +25,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.session.suggestion.max_days',
@@ -39,7 +38,6 @@ INSERT INTO system_policy (
     '1',
     '30',
     'days',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -50,7 +48,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.modality_change.require_resource',
@@ -63,7 +61,6 @@ INSERT INTO system_policy (
     NULL,
     NULL,
     NULL,
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -74,7 +71,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.reschedule.require_resource_at_create',
@@ -87,7 +84,6 @@ INSERT INTO system_policy (
     NULL,
     NULL,
     NULL,
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -98,7 +94,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.reschedule.allow_same_day',
@@ -111,7 +107,6 @@ INSERT INTO system_policy (
     NULL,
     NULL,
     NULL,
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -122,7 +117,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.reschedule.min_days_ahead',
@@ -135,7 +130,6 @@ INSERT INTO system_policy (
     '0',
     '7',
     'days',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -146,7 +140,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.reschedule.max_per_course',
@@ -159,7 +153,6 @@ INSERT INTO system_policy (
     '0',
     '20',
     'times',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -170,7 +163,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.request.min_days_before_session',
@@ -183,7 +176,6 @@ INSERT INTO system_policy (
     '0',
     '30',
     'days',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -194,7 +186,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.reschedule.max_per_month',
@@ -207,7 +199,6 @@ INSERT INTO system_policy (
     '0',
     '10',
     'times',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -218,7 +209,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.modality_change.max_per_course',
@@ -231,7 +222,6 @@ INSERT INTO system_policy (
     '0',
     '5',
     'times',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -242,7 +232,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.modality_change.allow_after_start',
@@ -255,7 +245,6 @@ INSERT INTO system_policy (
     NULL,
     NULL,
     NULL,
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -266,7 +255,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.replacement.max_per_month',
@@ -279,7 +268,6 @@ INSERT INTO system_policy (
     '0',
     '10',
     'times',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -290,7 +278,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.request.require_reason',
@@ -303,7 +291,6 @@ INSERT INTO system_policy (
     NULL,
     NULL,
     NULL,
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -314,7 +301,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.request.reason_min_length',
@@ -327,7 +314,6 @@ INSERT INTO system_policy (
     '10',
     '500',
     'characters',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -338,7 +324,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'teacher.request.max_per_day',
@@ -351,7 +337,6 @@ INSERT INTO system_policy (
     '1',
     '20',
     'times',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -362,7 +347,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'request.transfer.max_per_course',
@@ -375,7 +360,6 @@ INSERT INTO system_policy (
     '0',
     '5',
     'times',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -386,7 +370,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'attendance.lock.hours_after_session',
@@ -399,7 +383,6 @@ INSERT INTO system_policy (
     '1',
     '168',
     'hours',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -410,7 +393,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'attendance.auto_absent.enabled',
@@ -423,7 +406,6 @@ INSERT INTO system_policy (
     NULL,
     NULL,
     NULL,
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -434,7 +416,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'request.absence.threshold_percent',
@@ -447,7 +429,6 @@ INSERT INTO system_policy (
     '0.0',
     '100.0',
     'percent',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -458,7 +439,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'request.absence.reason_min_length',
@@ -471,7 +452,6 @@ INSERT INTO system_policy (
     '5',
     '500',
     'characters',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -482,7 +462,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'class.min_enrollment',
@@ -495,7 +475,6 @@ INSERT INTO system_policy (
     '1',
     '50',
     'students',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -506,7 +485,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'student.max_concurrent_enrollments',
@@ -519,7 +498,6 @@ INSERT INTO system_policy (
     '1',
     '10',
     'classes',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -530,7 +508,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'student.default_password',
@@ -543,7 +521,6 @@ INSERT INTO system_policy (
     NULL,
     NULL,
     NULL,
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -554,7 +531,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'student.makeup.weeks_limit',
@@ -567,7 +544,6 @@ INSERT INTO system_policy (
     '1',
     '12',
     'weeks',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -578,7 +554,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'student.makeup.lookback_weeks',
@@ -591,7 +567,6 @@ INSERT INTO system_policy (
     '1',
     '8',
     'weeks',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -602,7 +577,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'TEACHER_AVAILABILITY_CAMPAIGN_ACTIVE',
@@ -615,7 +590,6 @@ INSERT INTO system_policy (
     NULL,
     NULL,
     NULL,
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -626,7 +600,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'TEACHER_AVAILABILITY_LOCK_WINDOW_DAYS',
@@ -639,7 +613,6 @@ INSERT INTO system_policy (
     '0',
     '30',
     'days',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -650,7 +623,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'MIN_WEEKLY_SLOTS_FULLTIME',
@@ -663,7 +636,6 @@ INSERT INTO system_policy (
     '0',
     '50',
     'slots',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -674,7 +646,7 @@ INSERT INTO system_policy (
 INSERT INTO system_policy (
     policy_key, policy_category, policy_name, description,
     value_type, default_value, current_value, min_value, max_value, unit,
-    scope, branch_id, course_id, class_id,
+    branch_id, subject_id, class_id,
     is_active, version, created_by, updated_by
 ) VALUES (
     'MIN_WEEKLY_SLOTS_PARTTIME',
@@ -687,7 +659,6 @@ INSERT INTO system_policy (
     '0',
     '20',
     'slots',
-    'GLOBAL',
     NULL, NULL, NULL,
     true, 1,
     (SELECT id FROM user_account WHERE email = 'admin@tms-edu.vn' LIMIT 1),
@@ -730,3 +701,4 @@ SELECT
     NOW() - INTERVAL '2 weeks',
     2
 FROM system_policy WHERE policy_key = 'request.absence.lead_time_days';
+

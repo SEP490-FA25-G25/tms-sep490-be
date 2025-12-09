@@ -58,6 +58,8 @@ public class MissedSessionDTO {
 
         private String branchName;
 
+        private String branchAddress;
+
         private String modality;
     }
 

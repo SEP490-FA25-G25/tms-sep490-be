@@ -58,6 +58,8 @@ public class MakeupOptionDTO {
 
         private String branchName;
 
+        private String branchAddress;
+
         private String modality;
 
         private Integer availableSlots;
