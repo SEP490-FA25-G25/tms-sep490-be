@@ -32,6 +32,6 @@ build/
 ### VS Code ###
 .vscode/s
 
+# migration (uncommented to include in git)
 # migration
-#migration
 
