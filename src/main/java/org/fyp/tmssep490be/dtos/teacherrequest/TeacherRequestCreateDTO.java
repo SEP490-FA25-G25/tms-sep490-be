@@ -16,6 +16,9 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class TeacherRequestCreateDTO {
 
+    // Teacher ID (dùng khi giáo vụ muốn tạo yêu cầu thay giáo viên)
+    private Long teacherId;
+
     @NotNull(message = "Session ID is required")
     private Long sessionId;
 

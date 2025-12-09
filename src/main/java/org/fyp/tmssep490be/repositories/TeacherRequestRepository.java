@@ -72,5 +72,8 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
            "LEFT JOIN FETCH tr.decidedBy db " +
            "WHERE tr.id = :id")
     java.util.Optional<TeacherRequest> findByIdWithTeacherAndSession(@Param("id") Long id);
+
+    //Kiểm tra xem session có pending request không
+    boolean existsBySessionIdAndStatus(Long sessionId, RequestStatus status);
 }
 

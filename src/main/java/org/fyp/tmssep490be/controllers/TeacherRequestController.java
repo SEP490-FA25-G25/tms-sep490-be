@@ -9,6 +9,7 @@ import org.fyp.tmssep490be.dtos.teacherrequest.MySessionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ModalityResourceSuggestionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestRejectDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestResponseDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.TeacherListDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateDTO;
 import org.fyp.tmssep490be.dtos.schedule.TimeSlotDTO;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
@@ -96,6 +97,24 @@ public class TeacherRequestController {
                 .build());
     }
 
+    // Gợi ý resource cho giáo vụ dựa trên session ID và teacher ID (MODALITY_CHANGE) - khi tạo request mới
+    @GetMapping("/sessions/{sessionId}/modality/resources/staff")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<ModalityResourceSuggestionDTO>>> suggestModalityResourcesForStaffBySession(
+            @PathVariable Long sessionId,
+            @RequestParam Long teacherId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<ModalityResourceSuggestionDTO> suggestions = teacherRequestService.suggestModalityResourcesForStaffBySession(
+                sessionId, teacherId, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<List<ModalityResourceSuggestionDTO>>builder()
+                .success(true)
+                .message("Resources loaded successfully")
+                .data(suggestions)
+                .build());
+    }
+
     // Gợi ý resource cho giáo vụ dựa trên request ID (MODALITY_CHANGE)
     @GetMapping("/{requestId}/modality/resources/staff")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
@@ -167,6 +186,57 @@ public class TeacherRequestController {
                         .message("Teacher requests loaded successfully")
                         .data(requests)
                         .build());
+    }
+
+    //Endpoint để lấy danh sách teachers cho academic staff
+    @GetMapping("/staff/teachers")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<TeacherListDTO>>> getTeachersForStaff(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<TeacherListDTO> teachers = teacherRequestService.getTeachersForStaff(userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<List<TeacherListDTO>>builder()
+                .success(true)
+                .message("Teachers loaded successfully")
+                .data(teachers)
+                .build());
+    }
+
+    //Endpoint để lấy danh sách sessions của teacher cho academic staff
+    @GetMapping("/staff/teachers/{teacherId}/sessions")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<MySessionDTO>>> getTeacherSessionsForStaff(
+            @PathVariable Long teacherId,
+            @RequestParam(value = "days", required = false) Integer days,
+            @RequestParam(value = "classId", required = false) Long classId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<MySessionDTO> sessions = teacherRequestService.getSessionsForTeacherByStaff(
+                teacherId, days, classId, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<List<MySessionDTO>>builder()
+                .success(true)
+                .message("Sessions loaded successfully")
+                .data(sessions)
+                .build());
+    }
+
+    //Endpoint để tạo request cho teacher bởi academic staff (tự động approve)
+    @PostMapping("/staff/create")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> createRequestForTeacher(
+            @Valid @RequestBody TeacherRequestCreateDTO createDTO,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        TeacherRequestResponseDTO request = teacherRequestService.createRequestForTeacherByStaff(
+                createDTO, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
+                .success(true)
+                .message("Request created and approved successfully")
+                .data(request)
+                .build());
     }
 
     //Endpoint để lấy chi tiết request theo ID (cho cả TEACHER và ACADEMIC_AFFAIR)
