@@ -19,5 +19,5 @@ public class StudentStatusDTO {
 
     private HomeworkStatus homeworkStatus;
 
-    private String homeworkDescription;
+    private String note;
 }

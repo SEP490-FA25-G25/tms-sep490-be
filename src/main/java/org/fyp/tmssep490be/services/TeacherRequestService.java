@@ -1388,29 +1388,15 @@ public class TeacherRequestService {
         }
         
         org.fyp.tmssep490be.entities.SubjectSession subjectSession = session.getSubjectSession();
-        String skillsJson = subjectSession.getSkills();
+        List<org.fyp.tmssep490be.entities.enums.Skill> skills = subjectSession.getSkills();
         
-        if (skillsJson == null || skillsJson.trim().isEmpty()) {
+        if (skills == null || skills.isEmpty()) {
             log.warn("SubjectSession {} has no skills requirement", subjectSession.getId());
             return requiredSkills;
         }
         
-        try {
-            // Parse JSON string thành List<String>
-            List<String> skillNames = objectMapper.readValue(skillsJson, new TypeReference<List<String>>() {});
-            
-            // Convert sang Set<Skill>
-            for (String skillName : skillNames) {
-                try {
-                    org.fyp.tmssep490be.entities.enums.Skill skill = org.fyp.tmssep490be.entities.enums.Skill.valueOf(skillName.trim());
-                    requiredSkills.add(skill);
-                } catch (IllegalArgumentException e) {
-                    log.warn("Invalid skill name in SubjectSession {}: {}", subjectSession.getId(), skillName);
-                }
-            }
-        } catch (Exception e) {
-            log.error("Failed to parse skills JSON from SubjectSession {}: {}", subjectSession.getId(), skillsJson, e);
-        }
+        // SubjectSession.skills đã là List<Skill>, chỉ cần chuyển sang Set
+        requiredSkills.addAll(skills);
         
         return requiredSkills;
     }

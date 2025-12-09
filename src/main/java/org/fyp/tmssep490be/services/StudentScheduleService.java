@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.schedule.*;
 import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
+import org.fyp.tmssep490be.entities.enums.Skill;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.EnrollmentRepository;
@@ -147,7 +148,7 @@ public class StudentScheduleService {
         StudentStatusDTO studentStatus = StudentStatusDTO.builder()
                 .attendanceStatus(resolveDisplayStatus(studentSession))
                 .homeworkStatus(studentSession.getHomeworkStatus())
-                .homeworkDescription(studentSession.getNote())
+                .note(studentSession.getNote())
                 .build();
 
         List<MaterialDTO> materials = new ArrayList<>();
@@ -193,22 +194,10 @@ public class StudentScheduleService {
             return new ArrayList<>();
         }
         
-        String skillsText = subjectSession.getSkills().trim();
-        
-        if (skillsText.isEmpty()) {
-            return new ArrayList<>();
-        }
-        
-        if (skillsText.startsWith("[")) {
-            try {
-                return objectMapper.readValue(skillsText, new TypeReference<List<String>>() {});
-            } catch (JsonProcessingException e) {
-                log.warn("Failed to parse skills JSON array: {}", skillsText, e);
-                return new ArrayList<>();
-            }
-        }
-        
-        return List.of(skillsText);
+        // SubjectSession.skills đã là List<Skill>, chỉ cần map sang tên
+        return subjectSession.getSkills().stream()
+                .map(Skill::name)
+                .toList();
     }
 
     private String determineOnlineLink(Session session) {
