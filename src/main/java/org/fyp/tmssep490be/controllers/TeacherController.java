@@ -1,6 +1,7 @@
 package org.fyp.tmssep490be.controllers;
 
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
 import org.fyp.tmssep490be.dtos.teacherclass.ClassStudentDTO;
 import org.fyp.tmssep490be.dtos.teacherclass.TeacherClassListItemDTO;
 import org.fyp.tmssep490be.security.UserPrincipal;
@@ -78,6 +79,28 @@ public class TeacherController {
                         .success(true)
                         .message("Class students retrieved successfully")
                         .data(students)
+                        .build());
+    }
+
+    // Endpoint để lấy danh sách buổi học với metrics điểm danh và bài tập về nhà cho lớp học của giáo viên
+    // Sử dụng cho tab "Buổi học" trong trang chi tiết lớp học
+    @GetMapping("/classes/{classId}/sessions/metrics")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<QASessionListResponse>> getClassSessions(
+            @PathVariable Long classId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        // Lấy ID giáo viên từ JWT token
+        Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
+        
+        // Lấy danh sách buổi học với metrics
+        QASessionListResponse response = teacherClassService.getSessionsWithMetrics(classId, teacherId);
+        
+        return ResponseEntity.ok(
+                ResponseObject.<QASessionListResponse>builder()
+                        .success(true)
+                        .message("Sessions with metrics retrieved successfully")
+                        .data(response)
                         .build());
     }
 }
