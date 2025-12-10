@@ -7,7 +7,6 @@ import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.MappingStatus;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
 import org.fyp.tmssep490be.repositories.*;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -271,6 +270,104 @@ public class SubjectService {
                         ? assessment.getSkills().stream().map(Enum::name).collect(Collectors.toList())
                         : new ArrayList<>())
                 .mappedCLOs(cloMappings)
+                .build();
+    }
+
+    // Lấy danh sách materials của subject theo hierarchy (subject level, phase level, session level)
+    public MaterialHierarchyDTO getSubjectMaterials(Long subjectId, Long studentId) {
+        log.debug("Getting materials hierarchy for subject {}, student {}", subjectId, studentId);
+
+        // Lấy materials ở cấp subject (không thuộc phase hay session nào)
+        List<SubjectMaterialDTO> subjectLevelMaterials = subjectMaterialRepository
+                .findSubjectLevelMaterials(subjectId)
+                .stream()
+                .map(this::convertToMaterialDTO)
+                .collect(Collectors.toList());
+
+        // Lấy phases với materials của chúng
+        List<PhaseMaterialDTO> phaseMaterials = subjectPhaseRepository
+                .findBySubjectIdOrderByPhaseNumberAsc(subjectId)
+                .stream()
+                .map(phase -> {
+                    // Lấy materials ở cấp phase
+                    List<SubjectMaterialDTO> phaseMaterialsList = subjectMaterialRepository
+                            .findPhaseLevelMaterials(phase.getId())
+                            .stream()
+                            .map(this::convertToMaterialDTO)
+                            .collect(Collectors.toList());
+
+                    // Lấy sessions với materials của chúng
+                    List<SessionMaterialDTO> sessionMaterials = subjectSessionRepository
+                            .findByPhaseIdOrderBySequenceNoAsc(phase.getId())
+                            .stream()
+                            .map(session -> {
+                                List<SubjectMaterialDTO> sessionMaterialsList = subjectMaterialRepository
+                                        .findSessionLevelMaterials(session.getId())
+                                        .stream()
+                                        .map(this::convertToMaterialDTO)
+                                        .collect(Collectors.toList());
+
+                                return SessionMaterialDTO.builder()
+                                        .id(session.getId())
+                                        .sequenceNo(session.getSequenceNo())
+                                        .topic(session.getTopic())
+                                        .materials(sessionMaterialsList)
+                                        .skills(session.getSkills() != null
+                                                ? session.getSkills().stream().map(Enum::name).collect(Collectors.toList())
+                                                : new ArrayList<>())
+                                        .totalMaterials(sessionMaterialsList.size())
+                                        .build();
+                            })
+                            .collect(Collectors.toList());
+
+                    return PhaseMaterialDTO.builder()
+                            .id(phase.getId())
+                            .phaseNumber(phase.getPhaseNumber())
+                            .name(phase.getName())
+                            .materials(phaseMaterialsList)
+                            .sessions(sessionMaterials)
+                            .totalMaterials(phaseMaterialsList.size() + sessionMaterials.stream()
+                                    .mapToInt(sm -> sm.getTotalMaterials())
+                                    .sum())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // Tính tổng số materials
+        int totalMaterials = subjectLevelMaterials.size() + phaseMaterials.stream()
+                .mapToInt(pm -> pm.getTotalMaterials())
+                .sum();
+
+        // accessibleMaterials count (tạm thời set bằng totalMaterials, có thể thêm logic check access sau)
+        int accessibleMaterials = totalMaterials;
+
+        return MaterialHierarchyDTO.builder()
+                .subjectLevel(subjectLevelMaterials)
+                .phases(phaseMaterials)
+                .totalMaterials(totalMaterials)
+                .accessibleMaterials(accessibleMaterials)
+                .build();
+    }
+
+    // Chuyển đổi SubjectMaterial sang DTO (có thể thêm logic check access cho student sau)
+    private SubjectMaterialDTO convertToMaterialDTO(SubjectMaterial material) {
+        String scope;
+        if (material.getSubjectSession() != null) {
+            scope = "SESSION";
+        } else if (material.getPhase() != null) {
+            scope = "PHASE";
+        } else {
+            scope = "SUBJECT";
+        }
+
+        return SubjectMaterialDTO.builder()
+                .id(material.getId())
+                .title(material.getTitle())
+                .materialType(material.getMaterialType() != null ? material.getMaterialType().name() : null)
+                .url(material.getUrl())
+                .scope(scope)
+                .phaseId(material.getPhase() != null ? material.getPhase().getId() : null)
+                .sessionId(material.getSubjectSession() != null ? material.getSubjectSession().getId() : null)
                 .build();
     }
 }
