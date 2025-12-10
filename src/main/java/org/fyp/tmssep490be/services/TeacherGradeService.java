@@ -6,10 +6,18 @@ import org.fyp.tmssep490be.dtos.teachergrade.TeacherAssessmentDTO;
 import org.fyp.tmssep490be.dtos.teachergrade.TeacherStudentScoreDTO;
 import org.fyp.tmssep490be.dtos.teachergrade.ScoreInputDTO;
 import org.fyp.tmssep490be.dtos.teachergrade.BatchScoreInputDTO;
+import org.fyp.tmssep490be.dtos.teachergrade.GradebookDTO;
+import org.fyp.tmssep490be.dtos.teachergrade.GradebookAssessmentDTO;
+import org.fyp.tmssep490be.dtos.teachergrade.GradebookStudentDTO;
+import org.fyp.tmssep490be.dtos.teachergrade.GradebookStudentScoreDTO;
+import org.fyp.tmssep490be.dtos.teachergrade.ClassGradesSummaryDTO;
+import org.fyp.tmssep490be.dtos.teachergrade.StudentGradeSummaryDTO;
 import org.fyp.tmssep490be.entities.Assessment;
 import org.fyp.tmssep490be.entities.Score;
 import org.fyp.tmssep490be.entities.SubjectAssessment;
+import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
+import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.AssessmentRepository;
@@ -19,6 +27,7 @@ import org.fyp.tmssep490be.repositories.ScoreRepository;
 import org.fyp.tmssep490be.repositories.TeachingSlotRepository;
 import org.fyp.tmssep490be.repositories.StudentRepository;
 import org.fyp.tmssep490be.repositories.TeacherRepository;
+import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +38,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +53,21 @@ public class TeacherGradeService {
     private final ScoreRepository scoreRepository;
     private final StudentRepository studentRepository;
     private final TeacherRepository teacherRepository;
+    private final StudentSessionRepository studentSessionRepository;
+
+    // Tính % điểm trên thang 100
+    private Double calculatePercentage(Double score, double maxScore) {
+        if (score == null || maxScore <= 0) return null;
+        return (score * 100d / maxScore);
+    }
+
+    // Tính nhãn bucket phân bố điểm
+    private String bucketLabel(double percentage) {
+        if (percentage < 40) return "0-39";
+        if (percentage < 60) return "40-59";
+        if (percentage < 80) return "60-79";
+        return "80-100";
+    }
 
     // Kiểm tra giáo viên có được phân công lớp hay không (dựa trên teaching slot còn hiệu lực)
     private void assertTeacherOwnsClass(Long teacherId, Long classId) {
@@ -113,6 +138,224 @@ public class TeacherGradeService {
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(TeacherAssessmentDTO::getScheduledDate).reversed())
                 .collect(Collectors.toList());
+    }
+
+    // Lấy gradebook (ma trận điểm) của lớp
+    public GradebookDTO getClassGradebook(Long teacherId, Long classId) {
+        classRepository.findById(classId).orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+        assertTeacherOwnsClass(teacherId, classId);
+
+        // Assessments
+        List<Assessment> assessments = assessmentRepository.findByClassEntityId(classId)
+                .stream()
+                .sorted(Comparator.comparing(Assessment::getScheduledDate))
+                .toList();
+
+        List<GradebookAssessmentDTO> assessmentDTOs = assessments.stream()
+                .map(a -> {
+                    SubjectAssessment sa = a.getSubjectAssessment();
+                    return GradebookAssessmentDTO.builder()
+                            .id(a.getId())
+                            .name(sa != null ? sa.getName() : "Assessment " + a.getId())
+                            .kind(sa != null && sa.getKind() != null ? sa.getKind().name() : null)
+                            .maxScore(sa != null && sa.getMaxScore() != null ? sa.getMaxScore().doubleValue() : null)
+                            .scheduledDate(a.getScheduledDate())
+                            .build();
+                })
+                .toList();
+
+        // Enrollments
+        List<org.fyp.tmssep490be.entities.Enrollment> enrollments =
+                enrollmentRepository.findByClassIdAndStatus(classId, EnrollmentStatus.ENROLLED);
+
+        // Precompute score map: assessmentId -> (studentId -> score)
+        Map<Long, Map<Long, Score>> assessmentScoreMap = assessments.stream()
+                .collect(Collectors.toMap(
+                        Assessment::getId,
+                        a -> {
+                            Set<Score> scores = a.getScores();
+                            Stream<Score> scoreStream = scores != null ? scores.stream() : Stream.empty();
+                            return scoreStream.collect(Collectors.toMap(
+                                    s -> s.getStudent().getId(),
+                                    s -> s,
+                                    (s1, s2) -> s1
+                            ));
+                        }
+                ));
+
+        List<GradebookStudentDTO> students = enrollments.stream()
+                .map(e -> {
+                    Long studentId = e.getStudent().getId();
+                    List<GradebookStudentScoreDTO> scores = assessments.stream()
+                            .map(a -> {
+                                Map<Long, Score> m = assessmentScoreMap.getOrDefault(a.getId(), Map.of());
+                                Score sc = m.get(studentId);
+                                SubjectAssessment sa = a.getSubjectAssessment();
+                                double maxScore = sa != null && sa.getMaxScore() != null ? sa.getMaxScore().doubleValue() : 100d;
+                                Double scoreValue = sc != null && sc.getScore() != null ? sc.getScore().doubleValue() : null;
+                                Double percent = calculatePercentage(scoreValue, maxScore);
+                                String gradedByName = sc != null && sc.getGradedBy() != null
+                                        ? sc.getGradedBy().getUserAccount().getFullName()
+                                        : null;
+                                return GradebookStudentScoreDTO.builder()
+                                        .assessmentId(a.getId())
+                                        .score(scoreValue)
+                                        .scorePercentage(percent)
+                                        .feedback(sc != null ? sc.getFeedback() : null)
+                                        .gradedBy(gradedByName)
+                                        .gradedAt(sc != null ? sc.getGradedAt() : null)
+                                        .maxScore(maxScore)
+                                        .build();
+                            })
+                            .toList();
+
+                    // Average & counts
+                    List<Double> percents = scores.stream()
+                            .map(GradebookStudentScoreDTO::getScorePercentage)
+                            .filter(Objects::nonNull)
+                            .toList();
+                    Double avg = percents.isEmpty() ? null : percents.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+                    int gradedCount = (int) percents.size();
+
+                    // Chuyên cần: tính ngay, không cần chờ khóa học kết thúc
+                    List<StudentSession> studentSessions = studentSessionRepository.findByStudentIdAndClassEntityId(studentId, classId);
+                    long present = studentSessions.stream()
+                            .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                            .count();
+                    long absent = studentSessions.stream()
+                            .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT || ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
+                            .count();
+                    long totalDone = present + absent;
+                    Double attendanceRate = totalDone > 0 ? (present * 100d / totalDone) : null;
+                    Double attendanceScore = attendanceRate;
+
+                    return GradebookStudentDTO.builder()
+                            .studentId(studentId)
+                            .studentCode(e.getStudent().getStudentCode())
+                            .studentName(e.getStudent().getUserAccount().getFullName())
+                            .scores(scores)
+                            .averageScore(avg)
+                            .gradedCount(gradedCount)
+                            .totalAssessments(assessments.size())
+                            .attendedSessions((int) present)
+                            .totalSessions((int) totalDone)
+                            .attendanceRate(attendanceRate)
+                            .attendanceScore(attendanceScore)
+                            .attendanceFinalized(true)
+                            .build();
+                })
+                .sorted(Comparator.comparing(GradebookStudentDTO::getStudentCode, Comparator.nullsLast(String::compareTo)))
+                .toList();
+
+        var classInfo = classRepository.findById(classId).orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        return GradebookDTO.builder()
+                .classId(classId)
+                .className(classInfo.getName())
+                .classCode(classInfo.getCode())
+                .assessments(assessmentDTOs)
+                .students(students)
+                .build();
+    }
+
+    // Lấy tổng quan điểm số (summary)
+    public ClassGradesSummaryDTO getClassGradesSummary(Long teacherId, Long classId) {
+        classRepository.findById(classId).orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+        assertTeacherOwnsClass(teacherId, classId);
+
+        List<Assessment> assessments = assessmentRepository.findByClassEntityId(classId);
+        List<org.fyp.tmssep490be.entities.Enrollment> enrollments =
+                enrollmentRepository.findByClassIdAndStatus(classId, EnrollmentStatus.ENROLLED);
+
+        if (assessments.isEmpty() || enrollments.isEmpty()) {
+            return ClassGradesSummaryDTO.builder()
+                    .classId(classId)
+                    .className(classRepository.findById(classId).map(c -> c.getName()).orElse(null))
+                    .classCode(classRepository.findById(classId).map(c -> c.getCode()).orElse(null))
+                    .totalAssessments(assessments.size())
+                    .totalStudents(enrollments.size())
+                    .scoreDistribution(Map.of())
+                    .topStudents(List.of())
+                    .bottomStudents(List.of())
+                    .build();
+        }
+
+        // Tính normalized scores (thang 100) cho từng score
+        List<Double> allPercents = assessments.stream()
+                .flatMap(a -> a.getScores().stream().map(sc -> {
+                    SubjectAssessment sa = a.getSubjectAssessment();
+                    double maxScore = sa != null && sa.getMaxScore() != null ? sa.getMaxScore().doubleValue() : 100d;
+                    Double scoreValue = sc.getScore() != null ? sc.getScore().doubleValue() : null;
+                    return calculatePercentage(scoreValue, maxScore);
+                }))
+                .filter(Objects::nonNull)
+                .toList();
+
+        Double avg = allPercents.isEmpty() ? null : allPercents.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+        Double max = allPercents.isEmpty() ? null : allPercents.stream().mapToDouble(Double::doubleValue).max().orElse(0);
+        Double min = allPercents.isEmpty() ? null : allPercents.stream().mapToDouble(Double::doubleValue).min().orElse(0);
+
+        // Phân bố điểm theo bucket
+        Map<String, Integer> distribution = allPercents.stream()
+                .collect(Collectors.groupingBy(this::bucketLabel, Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+
+        // Tính average theo học viên
+        Map<Long, List<Double>> studentPercents = assessments.stream()
+                .flatMap(a -> a.getScores().stream().map(sc -> {
+                    SubjectAssessment sa = a.getSubjectAssessment();
+                    double maxScore = sa != null && sa.getMaxScore() != null ? sa.getMaxScore().doubleValue() : 100d;
+                    Double scoreValue = sc.getScore() != null ? sc.getScore().doubleValue() : null;
+                    Double percent = calculatePercentage(scoreValue, maxScore);
+                    return percent != null ? Map.entry(sc.getStudent().getId(), percent) : null;
+                }))
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(
+                        Map.Entry::getKey,
+                        Collectors.mapping(Map.Entry::getValue, Collectors.toList())
+                ));
+
+        List<StudentGradeSummaryDTO> studentSummaries = enrollments.stream()
+                .map(e -> {
+                    Long sid = e.getStudent().getId();
+                    List<Double> percents = studentPercents.getOrDefault(sid, List.of());
+                    Double sAvg = percents.isEmpty() ? null : percents.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+                    int gradedCount = percents.size();
+                    return StudentGradeSummaryDTO.builder()
+                            .studentId(sid)
+                            .studentCode(e.getStudent().getStudentCode())
+                            .studentName(e.getStudent().getUserAccount().getFullName())
+                            .averageScore(sAvg)
+                            .gradedCount(gradedCount)
+                            .build();
+                })
+                .sorted(Comparator.comparing(StudentGradeSummaryDTO::getStudentCode, Comparator.nullsLast(String::compareTo)))
+                .toList();
+
+        // Top/bottom theo averageScore
+        List<StudentGradeSummaryDTO> sortedByAvg = studentSummaries.stream()
+                .filter(s -> s.getAverageScore() != null)
+                .sorted(Comparator.comparing(StudentGradeSummaryDTO::getAverageScore).reversed())
+                .toList();
+        List<StudentGradeSummaryDTO> top5 = sortedByAvg.stream().limit(5).toList();
+        List<StudentGradeSummaryDTO> bottom5 = sortedByAvg.isEmpty()
+                ? List.of()
+                : sortedByAvg.stream().sorted(Comparator.comparing(StudentGradeSummaryDTO::getAverageScore)).limit(5).toList();
+
+        var classInfo = classRepository.findById(classId).orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        return ClassGradesSummaryDTO.builder()
+                .classId(classId)
+                .className(classInfo.getName())
+                .classCode(classInfo.getCode())
+                .totalAssessments(assessments.size())
+                .totalStudents(enrollments.size())
+                .averageScore(avg)
+                .highestScore(max)
+                .lowestScore(min)
+                .scoreDistribution(distribution)
+                .topStudents(top5)
+                .bottomStudents(bottom5)
+                .build();
     }
 
     // Kiểm tra giáo viên sở hữu assessment thông qua lớp
