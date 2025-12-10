@@ -1,8 +1,14 @@
 package org.fyp.tmssep490be.dtos.subject;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class SubjectPLODTO {
     private Long id;
     private String code;

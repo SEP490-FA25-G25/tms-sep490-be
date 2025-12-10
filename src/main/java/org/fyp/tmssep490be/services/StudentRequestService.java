@@ -48,6 +48,7 @@ public class StudentRequestService {
     private final EnrollmentRepository enrollmentRepository;
     private final ClassRepository classRepository;
     private final UserAccountRepository userAccountRepository;
+    private final NotificationService notificationService;
 
     public Page<StudentRequestResponseDTO> getMyRequests(Long userId, RequestFilterDTO filter) {
         log.debug("Getting requests for student user {}", userId);
@@ -631,7 +632,6 @@ public class StudentRequestService {
         request.setNote(dto.getNote());
         request = studentRequestRepository.save(request);
 
-        // Handle ABSENCE requests
         if (request.getRequestType().equals(StudentRequestType.ABSENCE) && request.getTargetSession() != null) {
             markSessionAsExcused(
                     request.getStudent(),
@@ -641,9 +641,12 @@ public class StudentRequestService {
             );
         }
 
-        // Handle MAKEUP requests - validate capacity and create student session
         if (request.getRequestType().equals(StudentRequestType.MAKEUP)) {
             executeMakeupApproval(request);
+        }
+
+        if (request.getRequestType().equals(StudentRequestType.TRANSFER)) {
+            executeTransfer(request);
         }
 
         log.info("Request {} approved by user {}", requestId, decidedById);
@@ -1449,25 +1452,16 @@ public class StudentRequestService {
             }
         }
 
-        // Fetch classes using flexible criteria
         List<ClassEntity> targetClasses = classRepository.findByFlexibleCriteria(
             subjectId, excludeClassId, statuses, branchId, modality);
 
-        // Filter by capacity and map to DTOs with changes summary
         List<TransferOptionDTO> availableClasses = targetClasses.stream()
-                .filter(cls -> {
-                    Integer currentEnrollmentCount = classRepository.countEnrolledStudents(cls.getId());
-                    int currentEnrollment = currentEnrollmentCount != null ? currentEnrollmentCount : 0;
-                    return cls.getMaxCapacity() != null && currentEnrollment < cls.getMaxCapacity();
-                })
                 .map(cls -> mapToTransferOptionDTOWithChanges(cls, currentClass))
                 .sorted(this::compareByCompatibility)
                 .collect(Collectors.toList());
 
-        // Build current class info
         TransferOptionsResponseDTO.CurrentClassInfo currentClassInfo = buildCurrentClassInfo(currentClass);
 
-        // Build transfer criteria summary
         TransferOptionsResponseDTO.TransferCriteria transferCriteria =
             TransferOptionsResponseDTO.TransferCriteria.builder()
                 .branchChange(targetBranchId != null && !targetBranchId.equals(currentClass.getBranch().getId()))
@@ -1510,7 +1504,6 @@ public class StudentRequestService {
 
     private StudentRequestResponseDTO submitTransferRequestInternal(Long studentId, TransferRequestDTO dto,
                                                                      UserAccount submittedBy, boolean autoApprove) {
-        // 1. Validate enrollment
         Enrollment currentEnrollment = enrollmentRepository
                 .findByStudentIdAndClassIdAndStatus(studentId, dto.getCurrentClassId(), EnrollmentStatus.ENROLLED);
 
@@ -1536,7 +1529,6 @@ public class StudentRequestService {
             throw new BusinessRuleException("PENDING_TRANSFER_EXISTS", "You already have a pending transfer request");
         }
 
-        // 4. Validate target class
         ClassEntity targetClass = classRepository.findById(dto.getTargetClassId())
                 .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
 
@@ -1559,12 +1551,17 @@ public class StudentRequestService {
             throw new BusinessRuleException("INVALID_CLASS_STATUS", "Target class must be SCHEDULED or ONGOING");
         }
 
-        // 5. Check capacity
+        // 5. Check capacity (allow AA override when autoApprove is true)
         Integer enrolledCount = classRepository.countEnrolledStudents(dto.getTargetClassId());
         int enrolled = enrolledCount != null ? enrolledCount : 0;
-
+        
         if (enrolled >= targetClass.getMaxCapacity()) {
-            throw new BusinessRuleException("CLASS_FULL", "Target class is full");
+            if (autoApprove) {
+                log.warn("AA override: Transferring student {} to full class {} ({}/{} enrolled)",
+                        studentId, targetClass.getCode(), enrolled, targetClass.getMaxCapacity());
+            } else {
+                throw new BusinessRuleException("CLASS_FULL", "Target class is full");
+            }
         }
 
         // 6. Validate effective date and session
@@ -1611,9 +1608,9 @@ public class StudentRequestService {
 
         request = studentRequestRepository.save(request);
 
-        // 9. If auto-approved, execute transfer immediately
+        // 9. If auto-approved, execute transfer immediately (with override info if provided)
         if (autoApprove) {
-            executeTransfer(request);
+            executeTransfer(request, dto.getCapacityOverride(), dto.getOverrideReason());
         }
 
         log.info("Transfer request created with ID: {} - Status: {}", request.getId(), request.getStatus());
@@ -1622,6 +1619,11 @@ public class StudentRequestService {
 
     @Transactional
     public void executeTransfer(StudentRequest request) {
+        executeTransfer(request, null, null);
+    }
+
+    @Transactional
+    public void executeTransfer(StudentRequest request, Boolean capacityOverride, String overrideReason) {
         log.info("Executing transfer for request {}", request.getId());
 
         Long studentId = request.getStudent().getId();
@@ -1637,8 +1639,11 @@ public class StudentRequestService {
         Integer currentEnrollment = classRepository.countEnrolledStudents(targetClassLocked.getId());
         int enrolled = currentEnrollment != null ? currentEnrollment : 0;
 
-        if (enrolled >= targetClassLocked.getMaxCapacity()) {
-            throw new BusinessRuleException("CLASS_FULL", "Target class became full during transfer execution");
+        // Allow approved requests to proceed even if class became full (AA override case)
+        boolean isCapacityOverride = enrolled >= targetClassLocked.getMaxCapacity();
+        if (isCapacityOverride) {
+            log.warn("Executing transfer to full class {} for request {} (AA override: {})",
+                    targetClass.getCode(), request.getId(), capacityOverride);
         }
 
         // 2. Update old enrollment → TRANSFERRED
@@ -1651,33 +1656,44 @@ public class StudentRequestService {
 
         oldEnrollment.setStatus(EnrollmentStatus.TRANSFERRED);
         oldEnrollment.setLeftAt(OffsetDateTime.now());
+        oldEnrollment.setLeftSessionId(effectiveSession.getId());
         oldEnrollment.setLeftSession(effectiveSession);
         enrollmentRepository.save(oldEnrollment);
 
         log.info("Updated old enrollment {} to TRANSFERRED", oldEnrollment.getId());
 
-        // 3. Create new enrollment → ENROLLED
+        // 3. Create new enrollment → ENROLLED (with capacity override info if applicable)
         Enrollment newEnrollment = Enrollment.builder()
-                .student(request.getStudent())
-                .classEntity(targetClass)
+                .studentId(request.getStudent().getId())
+                .classId(targetClass.getId())
                 .status(EnrollmentStatus.ENROLLED)
                 .enrolledAt(OffsetDateTime.now())
-                .joinSession(effectiveSession)
+                .joinSessionId(effectiveSession.getId())
+                .enrolledBy(request.getDecidedBy() != null ? request.getDecidedBy().getId() : null)
+                .capacityOverride(Boolean.TRUE.equals(capacityOverride) || isCapacityOverride)
+                .overrideReason(overrideReason)
                 .build();
         newEnrollment = enrollmentRepository.save(newEnrollment);
 
-        log.info("Created new enrollment {} for target class {}", newEnrollment.getId(), targetClass.getId());
+        log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
+                newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
 
-        // 4. Remove future StudentSessions from old class (from effectiveDate onwards)
-        List<Session> futureSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
-                currentClass.getId(), effectiveDate);
+        // 4. Mark future StudentSessions from old class as transferred (from effectiveDate onwards)
+        // Query StudentSession directly instead of Session to ensure we only update existing records
+        List<StudentSession> futureOldSessions = studentSessionRepository
+                .findByStudentIdAndClassEntityIdAndSessionDateAfterOrEqual(
+                        studentId, currentClass.getId(), effectiveDate);
 
-        for (Session session : futureSessions) {
-            StudentSession.StudentSessionId ssId = new StudentSession.StudentSessionId(studentId, session.getId());
-            studentSessionRepository.deleteById(ssId);
+        for (StudentSession ss : futureOldSessions) {
+            ss.setAttendanceStatus(AttendanceStatus.ABSENT);
+            ss.setIsTransferredOut(true);
+            ss.setNote(String.format("Student transferred out to class %s. Request ID: %d", 
+                    targetClass.getCode(), request.getId()));
+            ss.setRecordedAt(OffsetDateTime.now());
         }
+        studentSessionRepository.saveAll(futureOldSessions);
 
-        log.info("Deleted {} future StudentSessions from old class", futureSessions.size());
+        log.info("Marked {} future StudentSessions as transferred from old class", futureOldSessions.size());
 
         // 5. Create StudentSessions for new class (future sessions from effectiveDate)
         List<Session> newClassSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
@@ -1705,29 +1721,29 @@ public class StudentRequestService {
 
         log.info("Created {} StudentSessions for new class", createdCount);
         log.info("Transfer execution completed for request {}", request.getId());
+        
+        // 6. Send notifications to student
+        sendTransferExecutionNotifications(request);
     }
 
     private TransferEligibilityDTO.CurrentClassInfo mapToCurrentClassInfoWithQuota(Enrollment enrollment, Long studentId) {
         ClassEntity classEntity = enrollment.getClassEntity();
         Long subjectId = classEntity.getSubject().getId();
 
-        // Đếm số request transfer cho request này
         long approvedTransfers = studentRequestRepository.countByStudentIdAndRequestTypeAndStatusAndTargetClassSubjectId(
                 studentId, StudentRequestType.TRANSFER, RequestStatus.APPROVED, subjectId);
 
         int used = (int) approvedTransfers;
         int remaining = Math.max(0, MAX_TRANSFERS_PER_COURSE - used);
 
-        // Check for pending transfer request for this class
         boolean hasPending = studentRequestRepository.existsByStudentIdAndCurrentClassIdAndRequestTypeAndStatusIn(
                 studentId, classEntity.getId(), StudentRequestType.TRANSFER, List.of(RequestStatus.PENDING));
 
         String scheduleInfo = formatScheduleInfo(classEntity);
+        String scheduleTime = getScheduleTimeFromSessions(classEntity.getId());
 
-        // Get all sessions for timeline view - just raw data, frontend will compute UI logic
         List<Session> classSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
 
-        // Map sessions to DTO - only raw data
         List<TransferEligibilityDTO.SessionInfo> allSessions = classSessions.stream()
                 .map(session -> {
                     String timeSlot = "TBA";
@@ -1761,10 +1777,12 @@ public class StudentRequestService {
                 .subjectName(classEntity.getSubject().getName())
                 .branchId(classEntity.getBranch().getId())
                 .branchName(classEntity.getBranch().getName())
+                .branchAddress(classEntity.getBranch().getAddress())
                 .modality(classEntity.getModality().name())
                 .enrollmentStatus(enrollment.getStatus().name())
                 .enrollmentDate(enrollment.getEnrolledAt() != null ? enrollment.getEnrolledAt().toLocalDate().toString() : null)
                 .scheduleInfo(scheduleInfo)
+                .scheduleTime(scheduleTime)
                 .allSessions(allSessions)
                 .transferQuota(TransferEligibilityDTO.TransferQuota.builder()
                         .used(used)
@@ -1789,21 +1807,18 @@ public class StudentRequestService {
         int enrolled = enrolledCount != null ? enrolledCount : 0;
         int availableSlots = targetClass.getMaxCapacity() - enrolled;
 
-        // Analyze content gap
         TransferOptionDTO.ContentGapAnalysis contentGapAnalysis = analyzeContentGap(currentClass, targetClass);
 
-        // Can transfer if has available slots and reasonable content gap
         boolean canTransfer = availableSlots > 0 && 
                              (contentGapAnalysis == null || 
                               !"MAJOR".equals(contentGapAnalysis.getGapLevel()));
 
         String scheduleDays = formatScheduleDays(targetClass.getScheduleDays());
-        String scheduleTime = "Varies by session"; // Time slots vary per session
+        
+        String scheduleTime = getScheduleTimeFromSessions(targetClass.getId());
 
-        // Get upcoming sessions (next 4 sessions) - for backward compatibility
         List<TransferOptionDTO.UpcomingSession> upcomingSessions = getUpcomingSessionsForClass(targetClass.getId());
 
-        // Get all sessions for horizontal timeline view
         List<TransferOptionDTO.SessionInfo> allSessions = getAllSessionsForClass(targetClass.getId());
 
         return TransferOptionDTO.builder()
@@ -1814,6 +1829,7 @@ public class StudentRequestService {
                 .subjectName(targetClass.getSubject() != null ? targetClass.getSubject().getName() : null)
                 .branchId(targetClass.getBranch().getId())
                 .branchName(targetClass.getBranch().getName())
+                .branchAddress(targetClass.getBranch().getAddress())
                 .modality(targetClass.getModality().name())
                 .scheduleDays(scheduleDays)
                 .scheduleTime(scheduleTime)
@@ -1862,14 +1878,10 @@ public class StudentRequestService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get all sessions for a class with status flags for timeline view
-     */
     private List<TransferOptionDTO.SessionInfo> getAllSessionsForClass(Long classId) {
         LocalDate today = LocalDate.now();
         List<Session> allSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
         
-        // Find upcoming session (next PLANNED session in future)
         Long upcomingSessionId = allSessions.stream()
                 .filter(s -> s.getStatus() == SessionStatus.PLANNED && !s.getDate().isBefore(today))
                 .sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate()))
@@ -1978,6 +1990,48 @@ public class StudentRequestService {
             case 6 -> "Sat";
             case 7 -> "Sun";
             default -> String.valueOf(dayNum);
+        };
+    }
+
+    private String getScheduleTimeFromSessions(Long classId) {
+        List<Session> allSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
+        
+        if (allSessions.isEmpty()) {
+            return "TBA";
+        }
+
+        Map<Integer, String> dayToTimeSlot = new java.util.LinkedHashMap<>();
+        
+        allSessions.stream()
+            .filter(s -> s.getStatus() == SessionStatus.PLANNED && s.getTimeSlotTemplate() != null)
+            .forEach(session -> {
+                int dayOfWeek = session.getDate().getDayOfWeek().getValue();
+                if (!dayToTimeSlot.containsKey(dayOfWeek)) {
+                    TimeSlotTemplate ts = session.getTimeSlotTemplate();
+                    dayToTimeSlot.put(dayOfWeek, ts.getStartTime() + "-" + ts.getEndTime());
+                }
+            });
+
+        if (dayToTimeSlot.isEmpty()) {
+            return "TBA";
+        }
+
+        return dayToTimeSlot.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(e -> dayOfWeekToVietnamese(e.getKey()) + " " + e.getValue())
+            .collect(Collectors.joining(", "));
+    }
+
+    private String dayOfWeekToVietnamese(int dayOfWeek) {
+        return switch (dayOfWeek) {
+            case 1 -> "T2";
+            case 2 -> "T3";
+            case 3 -> "T4";
+            case 4 -> "T5";
+            case 5 -> "T6";
+            case 6 -> "T7";
+            case 7 -> "CN";
+            default -> "T" + dayOfWeek;
         };
     }
 
@@ -2095,5 +2149,36 @@ public class StudentRequestService {
             severityOrder.getOrDefault(severityA, 0),
             severityOrder.getOrDefault(severityB, 0)
         );
+    }
+
+    /**
+     * Send notification to student when transfer is executed successfully
+     */
+    private void sendTransferExecutionNotifications(StudentRequest request) {
+        String oldClassCode = request.getCurrentClass().getCode();
+        String newClassCode = request.getTargetClass().getCode();
+        String effectiveDate = request.getEffectiveDate() != null ?
+                request.getEffectiveDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A";
+
+        try {
+            String title = "Chuyển lớp thành công";
+            String message = String.format(
+                    "Bạn đã chuyển từ lớp %s sang lớp %s thành công. Ngày hiệu lực: %s",
+                    oldClassCode, newClassCode, effectiveDate
+            );
+
+            notificationService.createNotificationWithReference(
+                    request.getStudent().getUserAccount().getId(),
+                    NotificationType.CLASS_REMINDER,
+                    title,
+                    message,
+                    "StudentRequest",
+                    request.getId()
+            );
+
+            log.info("Sent transfer notification to student {}", request.getStudent().getId());
+        } catch (Exception e) {
+            log.error("Failed to send notification for transfer {}: {}", request.getId(), e.getMessage());
+        }
     }
 }

@@ -65,18 +65,10 @@ public class Enrollment {
     @JoinColumn(name = "enrolled_by", insertable = false, updatable = false)
     private UserAccount enrolledByUser;
 
-    /**
-     * Indicates if this enrollment exceeded class capacity
-     * True when enrollment was approved despite exceeding max_capacity
-     */
     @Column(name = "capacity_override", nullable = false)
     @Builder.Default
     private Boolean capacityOverride = false;
 
-    /**
-     * Reason for capacity override (required when capacityOverride = true)
-     * Min 20 characters, explains why capacity limit was exceeded
-     */
     @Column(name = "override_reason", columnDefinition = "TEXT")
     private String overrideReason;
 

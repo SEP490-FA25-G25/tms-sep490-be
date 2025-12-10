@@ -21,6 +21,7 @@ public class TransferOptionDTO {
     private String subjectName;
     private Long branchId;
     private String branchName;
+    private String branchAddress;    
     private String modality;
     private String scheduleDays;
     private String scheduleTime;
@@ -32,6 +33,7 @@ public class TransferOptionDTO {
     private Integer availableSlots;
     private String classStatus;
     private Boolean canTransfer;
+    
     private ContentGapAnalysis contentGapAnalysis;
     private Changes changes;
     private List<UpcomingSession> upcomingSessions;
@@ -92,8 +94,8 @@ public class TransferOptionDTO {
         private Integer subjectSessionNumber;
         private String subjectSessionTitle;
         private String timeSlot;
-        private String status; // PLANNED, DONE, CANCELLED
+        private String status; 
         private Boolean isPast;
-        private Boolean isUpcoming; // Next session to attend
+        private Boolean isUpcoming; 
     }
 }

@@ -36,4 +36,8 @@ public class TransferRequestDTO {
 
     // For AA on-behalf requests only
     private Long studentId;
+    
+    // For capacity override (AA only)
+    private Boolean capacityOverride;
+    private String overrideReason;
 }

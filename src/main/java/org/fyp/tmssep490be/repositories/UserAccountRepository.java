@@ -19,7 +19,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     @EntityGraph(attributePaths = { "userRoles", "userRoles.role" })
     Optional<UserAccount> findByEmail(String email);
 
-    @EntityGraph(attributePaths = { "userRoles", "userRoles.role" })
+    @EntityGraph(attributePaths = { "userRoles", "userRoles.role", "userBranches", "userBranches.branch" })
     Optional<UserAccount> findById(Long id);
 
     @Override

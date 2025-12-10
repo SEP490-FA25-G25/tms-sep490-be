@@ -116,6 +116,7 @@ public class UserAccountService {
     @Transactional
     public UserResponse updateUser(Long userId, UpdateUserRequest request) {
         log.info("Updating user with ID: {}", userId);
+        log.info("Request data - roleIds: {}, branchIds: {}", request.getRoleIds(), request.getBranchIds());
 
         // Tìm user theo userId
         UserAccount user = userAccountRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
@@ -147,13 +148,20 @@ public class UserAccountService {
         }
 
         // Lưu vào db
-        userAccountRepository.save(user);
+        // userAccountRepository.save(user);
 
         // Cập nhật role
         if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+            log.info("Updating roles for user {}: {}", user.getId(), request.getRoleIds());
 
-            // Xóa tất cả role cũ
-            userRoleRepository.deleteByUserAccount(user);
+            // Xóa tất cả role cũ (dùng deleteAll)
+            if (user.getUserRoles() != null && !user.getUserRoles().isEmpty()) {
+                userRoleRepository.deleteAll(user.getUserRoles());
+                userRoleRepository.flush();
+            }
+            
+           
+            user.getUserRoles().clear();
 
             // Thêm role mới
             for (Long roleId : request.getRoleIds()) {
@@ -164,14 +172,28 @@ public class UserAccountService {
                 userRole.setUserAccount(user);
                 userRole.setRole(role);
                 userRoleRepository.save(userRole);
+                
+                user.getUserRoles().add(userRole);
+                
+                log.info("Added role {} for user {}", roleId, user.getId());
             }
+        } else {
+            log.info("No roleIds provided, keeping existing roles for user {}", user.getId());
         }
 
         // Cập nhật branch
         if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
+            log.info("Updating branches for user {}: {}", user.getId(), request.getBranchIds());
 
-            // Xóa tất cả branch cũ
-            userBranchesRepository.deleteByUserAccount(user);
+            // Xóa tất cả branch cũ (dùng deleteAll)
+            if (user.getUserBranches() != null && !user.getUserBranches().isEmpty()) {
+                userBranchesRepository.deleteAll(user.getUserBranches());
+                userBranchesRepository.flush();
+            }
+            // userBranchesRepository.deleteByUserAccount(user); // KO DÙNG JPQL DELETE NỮA
+            
+            // Đồng bộ collection trong memory
+            user.getUserBranches().clear();
 
             // Thêm branch mới
             for (Long branchId : request.getBranchIds()) {
@@ -180,13 +202,23 @@ public class UserAccountService {
                 userBranch.setUserAccount(user);
                 userBranch.setBranch(branch);
                 userBranchesRepository.save(userBranch);
+                
+                // Add vào memory
+                user.getUserBranches().add(userBranch);
+                
+                log.info("Added branch {} for user {}", branchId, user.getId());
             }
+        } else {
+            log.info("No branchIds provided, keeping existing branches for user {}", user.getId());
         }
 
         log.info("User updated successfully with ID: {}", user.getId());
 
-        return mapToResponse(user);
+        // Không cần refresh entity nữa vì đã sync memory
+        // UserAccount refreshedUser = userAccountRepository.findById(user.getId())
+        //         .orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + user.getId()));
 
+        return mapToResponse(user);
 
     }
 

@@ -12,6 +12,8 @@ import org.fyp.tmssep490be.dtos.teachergrade.TeacherAssessmentDTO;
 import org.fyp.tmssep490be.dtos.teachergrade.TeacherStudentScoreDTO;
 import org.fyp.tmssep490be.dtos.teachergrade.ScoreInputDTO;
 import org.fyp.tmssep490be.dtos.teachergrade.BatchScoreInputDTO;
+import org.fyp.tmssep490be.dtos.teachergrade.GradebookDTO;
+import org.fyp.tmssep490be.dtos.teachergrade.ClassGradesSummaryDTO;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.TeacherGradeService;
 import org.fyp.tmssep490be.utils.TeacherContextHelper;
@@ -131,6 +133,42 @@ public class TeacherGradeController {
                         .success(true)
                         .message("Scores saved successfully")
                         .data(scores)
+                        .build()
+        );
+    }
+
+    // Lấy gradebook (ma trận điểm) của lớp
+    @GetMapping("/classes/{classId}/gradebook")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<GradebookDTO>> getClassGradebook(
+            @PathVariable Long classId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
+        GradebookDTO gradebook = teacherGradeService.getClassGradebook(teacherId, classId);
+        return ResponseEntity.ok(
+                ResponseObject.<GradebookDTO>builder()
+                        .success(true)
+                        .message("Gradebook retrieved successfully")
+                        .data(gradebook)
+                        .build()
+        );
+    }
+
+    // Lấy tổng quan điểm số của lớp
+    @GetMapping("/classes/{classId}/summary")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<ClassGradesSummaryDTO>> getClassGradesSummary(
+            @PathVariable Long classId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
+        ClassGradesSummaryDTO summary = teacherGradeService.getClassGradesSummary(teacherId, classId);
+        return ResponseEntity.ok(
+                ResponseObject.<ClassGradesSummaryDTO>builder()
+                        .success(true)
+                        .message("Grades summary retrieved successfully")
+                        .data(summary)
                         .build()
         );
     }
