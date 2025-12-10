@@ -1,0 +1,46 @@
+# Build artifacts
+**/target/
+*.jar
+*.war
+
+# IDE files
+**/.idea/
+**/*.iml
+**/.vscode/
+**/.DS_Store
+
+# Git
+**/.git/
+**/.gitignore
+
+# Logs
+*.log
+**/logs/
+
+# Node modules (sẽ được install lại trong build)
+**/node_modules/
+**/dist/
+**/.vite/
+
+# Environment files
+**/.env
+**/.env.*
+!**/.env.example
+
+# Documentation (giữ DOCKER.md)
+tms-sep490-be/docs/
+tms-sep490-fe/docs/
+tms-sep490-be-deprecated/
+
+# Tests
+**/test/
+**/*.test.js
+**/*.test.ts
+**/*.spec.js
+**/*.spec.ts
+
+# Other
+*.swp
+*.swo
+*~
+**/.cache/
