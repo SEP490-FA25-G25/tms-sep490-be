@@ -73,7 +73,10 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             "WHERE ss.student.id = :studentId " +
             "AND s.date BETWEEN :startDate AND :endDate " +
             "AND s.status != 'CANCELLED' " +
-            "AND (ss.isTransferredOut IS NULL OR ss.isTransferredOut = false) " +
+            "AND (" +
+            "  EXISTS (SELECT 1 FROM Enrollment e WHERE e.studentId = :studentId AND e.classId = s.classEntity.id AND e.status = 'ENROLLED') " +
+            "  OR s.status = 'DONE'" +
+            ") " +
             "AND (:classId IS NULL OR s.classEntity.id = :classId) " +
             "ORDER BY s.date ASC, tst.startTime ASC")
     List<StudentSession> findWeeklyScheduleByStudentId(

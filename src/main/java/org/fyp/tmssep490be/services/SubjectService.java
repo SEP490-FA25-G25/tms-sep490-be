@@ -34,6 +34,7 @@ public class SubjectService {
     private final SubjectPhaseRepository subjectPhaseRepository;
     private final SubjectSessionRepository subjectSessionRepository;
     private final SubjectSessionCLOMappingRepository subjectSessionCLOMappingRepository;
+    private final SubjectCLORepository cloRepository;
     private final SubjectAssessmentRepository subjectAssessmentRepository;
     private final SubjectAssessmentCLOMappingRepository subjectAssessmentCLOMappingRepository;
     private final SubjectMaterialRepository subjectMaterialRepository;
@@ -357,15 +358,15 @@ public class SubjectService {
                 .name(subject.getName())
                 .code(subject.getCode())
                 .description(subject.getDescription())
-                .prerequisites(subject.getPrerequisites())
+                .thumbnailUrl(subject.getThumbnailUrl())
                 .durationHours(subject.getTotalHours())
+                .numberOfSessions(subject.getNumberOfSessions())
+                .hoursPerSession(subject.getHoursPerSession())
                 .scoreScale(subject.getScoreScale())
+                .prerequisites(subject.getPrerequisites())
                 .targetAudience(subject.getTargetAudience())
                 .teachingMethods(subject.getTeachingMethods())
                 .effectiveDate(subject.getEffectiveDate())
-                .numberOfSessions(subject.getNumberOfSessions())
-                .hoursPerSession(subject.getHoursPerSession())
-                .thumbnailUrl(subject.getThumbnailUrl())
                 .build();
 
         // Map CLOs
