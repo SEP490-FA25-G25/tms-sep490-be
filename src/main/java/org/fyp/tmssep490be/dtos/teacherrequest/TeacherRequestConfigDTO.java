@@ -19,10 +19,6 @@ public class TeacherRequestConfigDTO {
      // Nếu false: giáo viên có thể bỏ qua bước chọn resource, staff sẽ chọn khi duyệt.
     private boolean requireResourceAtModalityChangeCreate;
 
-     // Số ngày tối thiểu trước khi tạo yêu cầu (đổi lịch, dạy thay, đổi phương thức).
-     // Giáo viên phải gửi yêu cầu trước ít nhất X ngày so với ngày diễn ra session.
-    private int minDaysBeforeSession;
-
      // Độ dài tối thiểu của lý do yêu cầu (ký tự).
      // Giáo viên phải nhập lý do có độ dài tối thiểu X ký tự.
     private int reasonMinLength;

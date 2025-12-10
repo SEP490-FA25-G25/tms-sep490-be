@@ -162,6 +162,105 @@ public class SubjectService {
         return getSubjectDetails(subject.getId());
     }
 
+    // ========== UPDATE SUBJECT ==========
+    @Transactional
+    public SubjectDetailDTO updateSubject(Long id, CreateSubjectRequestDTO request, Long userId) {
+        log.info("Updating subject ID: {}", id);
+
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        // Update Basic Info
+        SubjectBasicInfoDTO basicInfo = request.getBasicInfo();
+        subject.setName(basicInfo.getName());
+        subject.setCode(basicInfo.getCode());
+        subject.setDescription(basicInfo.getDescription());
+        subject.setPrerequisites(basicInfo.getPrerequisites());
+        subject.setTotalHours(basicInfo.getDurationHours());
+        subject.setScoreScale(basicInfo.getScoreScale());
+        subject.setTargetAudience(basicInfo.getTargetAudience());
+        subject.setTeachingMethods(basicInfo.getTeachingMethods());
+        subject.setEffectiveDate(basicInfo.getEffectiveDate());
+        subject.setNumberOfSessions(basicInfo.getNumberOfSessions());
+        subject.setHoursPerSession(basicInfo.getHoursPerSession());
+        subject.setThumbnailUrl(basicInfo.getThumbnailUrl());
+
+        // Recalculate total hours
+        if (subject.getNumberOfSessions() != null && subject.getHoursPerSession() != null) {
+            subject.setTotalHours(subject.getHoursPerSession()
+                    .multiply(java.math.BigDecimal.valueOf(subject.getNumberOfSessions())).intValue());
+        }
+
+        // Update Curriculum
+        if (basicInfo.getSubjectId() != null) {
+            Curriculum curriculum = curriculumRepository.findById(basicInfo.getSubjectId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khung chương trình"));
+            subject.setCurriculum(curriculum);
+        }
+
+        // Update Level
+        if (basicInfo.getLevelId() != null) {
+            Level level = levelRepository.findById(basicInfo.getLevelId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ"));
+            subject.setLevel(level);
+        }
+
+        // Update status
+        if (request.getStatus() != null) {
+            try {
+                subject.setStatus(SubjectStatus.valueOf(request.getStatus()));
+            } catch (IllegalArgumentException e) {
+                // Ignore invalid status
+            }
+        }
+
+        // Keep approval status consistent
+        if (subject.getStatus() == SubjectStatus.SUBMITTED) {
+            subject.setApprovalStatus(ApprovalStatus.PENDING);
+            if (subject.getSubmittedAt() == null) {
+                subject.setSubmittedAt(OffsetDateTime.now());
+            }
+        } else if (subject.getStatus() == SubjectStatus.DRAFT) {
+            subject.setApprovalStatus(null);
+            subject.setSubmittedAt(null);
+        }
+
+        subject = subjectRepository.save(subject);
+
+        // Clear and recreate child entities (simplified approach)
+        // 1. Clear existing CLOs (cascade will delete mappings)
+        subjectCLORepository.deleteBySubjectId(id);
+
+        // 2. Clear existing Phases (cascade will delete sessions and materials)
+        subjectPhaseRepository.deleteBySubjectId(id);
+
+        // 3. Clear existing Assessments
+        subjectAssessmentRepository.deleteBySubjectId(id);
+
+        // 4. Clear existing Materials (subject-level only)
+        subjectMaterialRepository.deleteBySubjectIdAndPhaseIsNullAndSubjectSessionIsNull(id);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // Reload subject to avoid stale state
+        subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        // Recreate child entities
+        Map<String, CLO> cloMap = createCLOs(subject, request.getClos());
+        createStructure(subject, request.getStructure(), cloMap);
+        createAssessments(subject, request.getAssessments(), cloMap);
+        createMaterials(subject, request.getMaterials());
+
+        log.info("Subject update completed successfully");
+
+        entityManager.flush();
+        entityManager.clear();
+
+        return getSubjectDetails(id);
+    }
+
     // ========== CREATE CLOs ==========
     private Map<String, CLO> createCLOs(Subject subject, List<SubjectCLODTO> cloDTOs) {
         if (cloDTOs == null) {

@@ -1,9 +1,5 @@
 package org.fyp.tmssep490be.controllers;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,8 +24,6 @@ import java.util.List;
 @RequestMapping("/api/v1/teacher/grades")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Teacher Grade Management", description = "APIs for teachers to manage student grades and assessments")
-@SecurityRequirement(name = "bearerAuth")
 public class TeacherGradeController {
 
     private final TeacherGradeService teacherGradeService;
@@ -38,13 +32,8 @@ public class TeacherGradeController {
     // Lấy danh sách bài kiểm tra của lớp
     @GetMapping("/classes/{classId}/assessments")
     @PreAuthorize("hasRole('TEACHER')")
-    @Operation(
-            summary = "Get class assessments",
-            description = "Get list of assessments for a class with optional filter (all, upcoming, graded, overdue)"
-    )
     public ResponseEntity<ResponseObject<List<TeacherAssessmentDTO>>> getClassAssessments(
-            @Parameter(description = "Class ID") @PathVariable Long classId,
-            @Parameter(description = "Filter type: all, upcoming, graded, overdue")
+            @PathVariable Long classId,
             @RequestParam(required = false, defaultValue = "all") String filter,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {

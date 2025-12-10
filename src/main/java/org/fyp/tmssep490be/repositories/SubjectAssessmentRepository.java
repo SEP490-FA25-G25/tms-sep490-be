@@ -15,4 +15,8 @@ public interface SubjectAssessmentRepository extends JpaRepository<SubjectAssess
     // Tìm assessment theo subject
     @Query("SELECT ca FROM SubjectAssessment ca WHERE ca.subject.id = :subjectId")
     List<SubjectAssessment> findBySubjectId(@Param("subjectId") Long subjectId);
+
+    @Modifying
+    @Query("DELETE FROM SubjectAssessment ca WHERE ca.subject.id = :subjectId")
+    void deleteBySubjectId(@Param("subjectId") Long subjectId);
 }
