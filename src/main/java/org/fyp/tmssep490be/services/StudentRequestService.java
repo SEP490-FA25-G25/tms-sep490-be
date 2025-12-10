@@ -1455,9 +1455,36 @@ public class StudentRequestService {
         List<ClassEntity> targetClasses = classRepository.findByFlexibleCriteria(
             subjectId, excludeClassId, statuses, branchId, modality);
 
+        // Get current class progress
+        Integer currentSessionNum = sessionRepository.findLastCompletedSessionNumber(currentClass.getId());
+        
+        // Filter and sort: only show classes within ±2 sessions content gap, prioritize smaller gap
         List<TransferOptionDTO> availableClasses = targetClasses.stream()
                 .map(cls -> mapToTransferOptionDTOWithChanges(cls, currentClass))
-                .sorted(this::compareByCompatibility)
+                .filter(dto -> {
+                    // Filter by content gap: only include classes within ±2 sessions
+                    Integer targetSessionNum = sessionRepository.findLastCompletedSessionNumber(dto.getClassId());
+                    if (currentSessionNum == null || targetSessionNum == null) {
+                        return true; // Include if no progress info available
+                    }
+                    int gap = Math.abs(targetSessionNum - currentSessionNum);
+                    return gap <= 2; // Only show classes within ±2 sessions
+                })
+                .sorted((a, b) -> {
+                    // Primary sort: by content gap (lower is better)
+                    Integer aSessionNum = sessionRepository.findLastCompletedSessionNumber(a.getClassId());
+                    Integer bSessionNum = sessionRepository.findLastCompletedSessionNumber(b.getClassId());
+                    
+                    if (currentSessionNum != null && aSessionNum != null && bSessionNum != null) {
+                        int aGap = Math.abs(aSessionNum - currentSessionNum);
+                        int bGap = Math.abs(bSessionNum - currentSessionNum);
+                        int gapCompare = Integer.compare(aGap, bGap);
+                        if (gapCompare != 0) return gapCompare;
+                    }
+                    
+                    // Secondary sort: by available slots (higher is better)
+                    return Integer.compare(b.getAvailableSlots(), a.getAvailableSlots());
+                })
                 .collect(Collectors.toList());
 
         TransferOptionsResponseDTO.CurrentClassInfo currentClassInfo = buildCurrentClassInfo(currentClass);
@@ -1474,20 +1501,6 @@ public class StudentRequestService {
                 .transferCriteria(transferCriteria)
                 .availableClasses(availableClasses)
                 .build();
-    }
-
-    @Transactional
-    public StudentRequestResponseDTO submitTransferRequest(Long userId, TransferRequestDTO dto) {
-        log.info("Submitting transfer request for user {} from class {} to class {}",
-                userId, dto.getCurrentClassId(), dto.getTargetClassId());
-
-        Student student = studentRepository.findByUserAccountId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
-
-        UserAccount submittedBy = userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        return submitTransferRequestInternal(student.getId(), dto, submittedBy, false);
     }
 
     @Transactional
@@ -2007,11 +2020,9 @@ public class StudentRequestService {
         int enrolled = enrolledCount != null ? enrolledCount : 0;
         int availableSlots = targetClass.getMaxCapacity() - enrolled;
 
-        TransferOptionDTO.ContentGapAnalysis contentGapAnalysis = analyzeContentGap(currentClass, targetClass);
+        String progressNote = getProgressComparison(currentClass.getId(), targetClass.getId());
 
-        boolean canTransfer = availableSlots > 0 && 
-                             (contentGapAnalysis == null || 
-                              !"MAJOR".equals(contentGapAnalysis.getGapLevel()));
+        boolean canTransfer = availableSlots > 0;
 
         String scheduleDays = formatScheduleDays(targetClass.getScheduleDays());
         
@@ -2041,7 +2052,7 @@ public class StudentRequestService {
                 .availableSlots(availableSlots)
                 .classStatus(targetClass.getStatus().name())
                 .canTransfer(canTransfer)
-                .contentGapAnalysis(contentGapAnalysis)
+                .progressNote(progressNote)
                 .upcomingSessions(upcomingSessions)
                 .allSessions(allSessions)
                 .build();
@@ -2260,95 +2271,29 @@ public class StudentRequestService {
         return completedSessions != null ? completedSessions.size() : 0;
     }
 
-    private TransferOptionDTO.ContentGapAnalysis analyzeContentGap(ClassEntity currentClass, ClassEntity targetClass) {
-        // Get completed subject sessions in current class
-        List<Session> completedSessions = sessionRepository.findByClassEntityIdAndStatusIn(
-                currentClass.getId(), List.of(SessionStatus.DONE));
-
-        List<Long> completedSubjectSessionIds = completedSessions.stream()
-                .filter(s -> s.getSubjectSession() != null)
-                .map(s -> s.getSubjectSession().getId())
-                .distinct()
-                .collect(Collectors.toList());
-
-        // Get target class's past sessions (already happened)
-        List<Session> targetPastSessions = sessionRepository.findByClassEntityIdAndDateBefore(
-                targetClass.getId(), LocalDate.now());
-
-        // Find gap: sessions target class covered but current class hasn't
-        List<TransferOptionDTO.ContentGapSession> gapSessions = targetPastSessions.stream()
-                .filter(s -> s.getSubjectSession() != null)
-                .filter(s -> !completedSubjectSessionIds.contains(s.getSubjectSession().getId()))
-                .map(s -> TransferOptionDTO.ContentGapSession.builder()
-                        .courseSessionNumber(s.getSubjectSession().getSequenceNo())
-                        .courseSessionTitle(s.getSubjectSession().getTopic())
-                        .scheduledDate(s.getDate().toString())
-                        .build())
-                .collect(Collectors.toList());
-
-        if (gapSessions.isEmpty()) {
-            return null; // No gap
+    /**
+     * Simple progress comparison between current and target class
+     * Returns a human-readable string instead of complex gap analysis
+     */
+    private String getProgressComparison(Long currentClassId, Long targetClassId) {
+        Integer currentSessionNum = sessionRepository.findLastCompletedSessionNumber(currentClassId);
+        Integer targetSessionNum = sessionRepository.findLastCompletedSessionNumber(targetClassId);
+        
+        if (currentSessionNum == null || targetSessionNum == null) {
+            return "Chưa có thông tin tiến độ";
         }
-
-        int gapCount = gapSessions.size();
-        String severity = gapCount <= 2 ? "MINOR" : gapCount <= 5 ? "MODERATE" : "MAJOR";
-
-        List<String> recommendedActions = switch (severity) {
-            case "MINOR" -> List.of("Review missed topics with teacher", "Self-study recommended materials");
-            case "MODERATE" -> List.of("Schedule makeup sessions", "Request additional support from teacher");
-            case "MAJOR" -> List.of("Consider intensive catch-up sessions", "May need to retake from earlier session");
-            default -> List.of();
-        };
-
-        String impactDescription = switch (severity) {
-            case "MINOR" -> "Small content gap - easily manageable with self-study";
-            case "MODERATE" -> "Moderate gap - may need additional support to catch up";
-            case "MAJOR" -> "Significant gap - recommend consulting with academic advisor before transfer";
-            default -> "";
-        };
-
-        return TransferOptionDTO.ContentGapAnalysis.builder()
-                .gapLevel(severity)
-                .missedSessions(gapCount)
-                .totalSessions(targetPastSessions.size())
-                .gapSessions(gapSessions)
-                .recommendedActions(recommendedActions)
-                .impactDescription(impactDescription)
-                .build();
-    }
-
-    private int compareByCompatibility(TransferOptionDTO a, TransferOptionDTO b) {
-        int changesA = countChanges(a.getChanges());
-        int changesB = countChanges(b.getChanges());
-
-        if (changesA != changesB) {
-            return Integer.compare(changesA, changesB);
+        
+        int diff = targetSessionNum - currentSessionNum;
+        
+        if (diff == 0) {
+            return "Tiến độ tương đương (Buổi " + currentSessionNum + ")";
+        } else if (Math.abs(diff) <= 2) {
+            return String.format("Tiến độ gần tương đương (Chênh %d buổi)", Math.abs(diff));
+        } else if (diff > 0) {
+            return String.format("Lớp mới nhanh hơn %d buổi", diff);
+        } else {
+            return String.format("Lớp mới chậm hơn %d buổi", Math.abs(diff));
         }
-
-        // Secondary sort by content gap severity
-        String severityA = a.getContentGapAnalysis() != null ? a.getContentGapAnalysis().getGapLevel() : "NONE";
-        String severityB = b.getContentGapAnalysis() != null ? b.getContentGapAnalysis().getGapLevel() : "NONE";
-        return compareSeverity(severityA, severityB);
-    }
-
-    private int countChanges(TransferOptionDTO.Changes changes) {
-        if (changes == null) return 0;
-
-        int count = 0;
-        if (changes.getBranch() != null && !changes.getBranch().equals("No change")) count++;
-        if (changes.getModality() != null && !changes.getModality().equals("No change")) count++;
-        if (changes.getSchedule() != null && !changes.getSchedule().equals("No change")) count++;
-        return count;
-    }
-
-    private int compareSeverity(String severityA, String severityB) {
-        Map<String, Integer> severityOrder = Map.of(
-            "NONE", 0, "MINOR", 1, "MODERATE", 2, "MAJOR", 3
-        );
-        return Integer.compare(
-            severityOrder.getOrDefault(severityA, 0),
-            severityOrder.getOrDefault(severityB, 0)
-        );
     }
 
     /**

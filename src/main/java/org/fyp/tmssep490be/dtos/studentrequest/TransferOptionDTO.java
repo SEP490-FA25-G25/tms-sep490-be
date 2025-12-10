@@ -33,34 +33,11 @@ public class TransferOptionDTO {
     private Integer availableSlots;
     private String classStatus;
     private Boolean canTransfer;
+    private String progressNote; // Simple progress comparison, e.g., "Chênh 3 buổi"
     
-    private ContentGapAnalysis contentGapAnalysis;
     private Changes changes;
     private List<UpcomingSession> upcomingSessions;
     private List<SessionInfo> allSessions; // All sessions for timeline view
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ContentGapAnalysis {
-        private String gapLevel; // NONE, MINOR, MODERATE, MAJOR
-        private Integer missedSessions;
-        private Integer totalSessions;
-        private List<ContentGapSession> gapSessions;
-        private List<String> recommendedActions;
-        private String impactDescription;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ContentGapSession {
-        private Integer courseSessionNumber;
-        private String courseSessionTitle;
-        private String scheduledDate;
-    }
 
     @Data
     @Builder

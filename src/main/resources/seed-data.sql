@@ -644,175 +644,175 @@ INSERT INTO teacher_availability (teacher_id, time_slot_template_id, day_of_week
 INSERT INTO teacher_availability (teacher_id, time_slot_template_id, day_of_week, effective_date, created_at, updated_at) VALUES
 
 -- Teacher 28 (Chris Evans): 100% available Mon/Wed/Fri
-(28, 9, 1, '2024-02-01', NOW(), NOW()),
-(28, 9, 3, '2024-02-01', NOW(), NOW()),
-(28, 9, 5, '2024-02-01', NOW(), NOW()),
+(9, 9, 1, '2024-02-01', NOW(), NOW()),
+(9, 9, 3, '2024-02-01', NOW(), NOW()),
+(9, 9, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 29 (Olivia White): 100% available Mon/Wed/Fri
-(29, 9, 1, '2024-02-01', NOW(), NOW()),
-(29, 9, 3, '2024-02-01', NOW(), NOW()),
-(29, 9, 5, '2024-02-01', NOW(), NOW()),
+(10, 9, 1, '2024-02-01', NOW(), NOW()),
+(10, 9, 3, '2024-02-01', NOW(), NOW()),
+(10, 9, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 30 (Daniel Harris): 100% available all weekdays
-(30, 9, 1, '2024-02-01', NOW(), NOW()),
-(30, 9, 2, '2024-02-01', NOW(), NOW()),
-(30, 9, 3, '2024-02-01', NOW(), NOW()),
-(30, 9, 4, '2024-02-01', NOW(), NOW()),
-(30, 9, 5, '2024-02-01', NOW(), NOW()),
+(11, 9, 1, '2024-02-01', NOW(), NOW()),
+(11, 9, 2, '2024-02-01', NOW(), NOW()),
+(11, 9, 3, '2024-02-01', NOW(), NOW()),
+(11, 9, 4, '2024-02-01', NOW(), NOW()),
+(11, 9, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 31 (Sophia Clark): PARTIAL - only Mon/Wed (missing Fri)
-(31, 9, 1, '2024-02-01', NOW(), NOW()),
-(31, 9, 3, '2024-02-01', NOW(), NOW()),
+(12, 9, 1, '2024-02-01', NOW(), NOW()),
+(12, 9, 3, '2024-02-01', NOW(), NOW()),
 
 -- Teacher 28 (Chris Evans): 100% available Mon/Wed/Fri
-(28, 10, 1, '2024-02-01', NOW(), NOW()),
-(28, 10, 3, '2024-02-01', NOW(), NOW()),
-(28, 10, 5, '2024-02-01', NOW(), NOW()),
+(9, 10, 1, '2024-02-01', NOW(), NOW()),
+(9, 10, 3, '2024-02-01', NOW(), NOW()),
+(9, 10, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 29 (Olivia White): 100% available Mon/Wed/Fri
-(29, 10, 1, '2024-02-01', NOW(), NOW()),
-(29, 10, 3, '2024-02-01', NOW(), NOW()),
-(29, 10, 5, '2024-02-01', NOW(), NOW()),
+(10, 10, 1, '2024-02-01', NOW(), NOW()),
+(10, 10, 3, '2024-02-01', NOW(), NOW()),
+(10, 10, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 30 (Daniel Harris): 100% available all weekdays
-(30, 10, 1, '2024-02-01', NOW(), NOW()),
-(30, 10, 2, '2024-02-01', NOW(), NOW()),
-(30, 10, 3, '2024-02-01', NOW(), NOW()),
-(30, 10, 4, '2024-02-01', NOW(), NOW()),
-(30, 10, 5, '2024-02-01', NOW(), NOW()),
+(11, 10, 1, '2024-02-01', NOW(), NOW()),
+(11, 10, 2, '2024-02-01', NOW(), NOW()),
+(11, 10, 3, '2024-02-01', NOW(), NOW()),
+(11, 10, 4, '2024-02-01', NOW(), NOW()),
+(11, 10, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 32 (Matthew Lewis): 100% available Mon/Wed/Fri
-(32, 10, 1, '2024-02-01', NOW(), NOW()),
-(32, 10, 3, '2024-02-01', NOW(), NOW()),
-(32, 10, 5, '2024-02-01', NOW(), NOW()),
+(13, 10, 1, '2024-02-01', NOW(), NOW()),
+(13, 10, 3, '2024-02-01', NOW(), NOW()),
+(13, 10, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 41 (Robert Lee - TOEIC): 100% available Mon/Wed/Fri
-(41, 10, 1, '2024-02-01', NOW(), NOW()),
-(41, 10, 3, '2024-02-01', NOW(), NOW()),
-(41, 10, 5, '2024-02-01', NOW(), NOW()),
+(22, 10, 1, '2024-02-01', NOW(), NOW()),
+(22, 10, 3, '2024-02-01', NOW(), NOW()),
+(22, 10, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 31 (Sophia Clark): PARTIAL - only Mon/Wed
-(31, 10, 1, '2024-02-01', NOW(), NOW()),
-(31, 10, 3, '2024-02-01', NOW(), NOW()),
+(12, 10, 1, '2024-02-01', NOW(), NOW()),
+(12, 10, 3, '2024-02-01', NOW(), NOW()),
 -- Teacher 33 (Ava Robinson): Tue/Thu only (MISMATCH for Mon/Wed/Fri classes)
-(33, 10, 2, '2024-02-01', NOW(), NOW()),
-(33, 10, 4, '2024-02-01', NOW(), NOW()),
+(14, 10, 2, '2024-02-01', NOW(), NOW()),
+(14, 10, 4, '2024-02-01', NOW(), NOW()),
 
 -- Teacher 28 (Chris Evans): 100% available Mon/Wed/Fri
-(28, 11, 1, '2024-02-01', NOW(), NOW()),
-(28, 11, 3, '2024-02-01', NOW(), NOW()),
-(28, 11, 5, '2024-02-01', NOW(), NOW()),
+(9, 11, 1, '2024-02-01', NOW(), NOW()),
+(9, 11, 3, '2024-02-01', NOW(), NOW()),
+(9, 11, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 32 (Matthew Lewis): 100% available all weekdays
-(32, 11, 1, '2024-02-01', NOW(), NOW()),
-(32, 11, 2, '2024-02-01', NOW(), NOW()),
-(32, 11, 3, '2024-02-01', NOW(), NOW()),
-(32, 11, 4, '2024-02-01', NOW(), NOW()),
-(32, 11, 5, '2024-02-01', NOW(), NOW()),
+(13, 11, 1, '2024-02-01', NOW(), NOW()),
+(13, 11, 2, '2024-02-01', NOW(), NOW()),
+(13, 11, 3, '2024-02-01', NOW(), NOW()),
+(13, 11, 4, '2024-02-01', NOW(), NOW()),
+(13, 11, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 34 (Andrew Walker): 100% available all weekdays
-(34, 11, 1, '2024-02-01', NOW(), NOW()),
-(34, 11, 2, '2024-02-01', NOW(), NOW()),
-(34, 11, 3, '2024-02-01', NOW(), NOW()),
-(34, 11, 4, '2024-02-01', NOW(), NOW()),
-(34, 11, 5, '2024-02-01', NOW(), NOW()),
+(15, 11, 1, '2024-02-01', NOW(), NOW()),
+(15, 11, 2, '2024-02-01', NOW(), NOW()),
+(15, 11, 3, '2024-02-01', NOW(), NOW()),
+(15, 11, 4, '2024-02-01', NOW(), NOW()),
+(15, 11, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 33 (Ava Robinson): Tue/Thu/Sat only (MISMATCH for Mon/Wed/Fri)
-(33, 11, 2, '2024-02-01', NOW(), NOW()),
-(33, 11, 4, '2024-02-01', NOW(), NOW()),
+(14, 11, 2, '2024-02-01', NOW(), NOW()),
+(14, 11, 4, '2024-02-01', NOW(), NOW()),
 
 -- Teacher 29 (Olivia White): 100% available Mon/Wed/Fri
-(29, 12, 1, '2024-02-01', NOW(), NOW()),
-(29, 12, 3, '2024-02-01', NOW(), NOW()),
-(29, 12, 5, '2024-02-01', NOW(), NOW()),
+(10, 12, 1, '2024-02-01', NOW(), NOW()),
+(10, 12, 3, '2024-02-01', NOW(), NOW()),
+(10, 12, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 31 (Sophia Clark): 100% available Mon/Wed/Fri
-(31, 12, 1, '2024-02-01', NOW(), NOW()),
-(31, 12, 3, '2024-02-01', NOW(), NOW()),
-(31, 12, 5, '2024-02-01', NOW(), NOW()),
+(12, 12, 1, '2024-02-01', NOW(), NOW()),
+(12, 12, 3, '2024-02-01', NOW(), NOW()),
+(12, 12, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 35 (Isabella Young): 100% available all weekdays
-(35, 12, 1, '2024-02-01', NOW(), NOW()),
-(35, 12, 2, '2024-02-01', NOW(), NOW()),
-(35, 12, 3, '2024-02-01', NOW(), NOW()),
-(35, 12, 4, '2024-02-01', NOW(), NOW()),
-(35, 12, 5, '2024-02-01', NOW(), NOW()),
+(16, 12, 1, '2024-02-01', NOW(), NOW()),
+(16, 12, 2, '2024-02-01', NOW(), NOW()),
+(16, 12, 3, '2024-02-01', NOW(), NOW()),
+(16, 12, 4, '2024-02-01', NOW(), NOW()),
+(16, 12, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 34 (Andrew Walker): Tue/Thu only (MISMATCH)
-(34, 12, 2, '2024-02-01', NOW(), NOW()),
-(34, 12, 4, '2024-02-01', NOW(), NOW()),
+(15, 12, 2, '2024-02-01', NOW(), NOW()),
+(15, 12, 4, '2024-02-01', NOW(), NOW()),
 
 -- Teacher 30 (Daniel Harris): 100% available Mon/Wed/Fri
-(30, 13, 1, '2024-02-01', NOW(), NOW()),
-(30, 13, 3, '2024-02-01', NOW(), NOW()),
-(30, 13, 5, '2024-02-01', NOW(), NOW()),
+(11, 13, 1, '2024-02-01', NOW(), NOW()),
+(11, 13, 3, '2024-02-01', NOW(), NOW()),
+(11, 13, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 33 (Ava Robinson): 100% available Mon/Wed/Fri
-(33, 13, 1, '2024-02-01', NOW(), NOW()),
-(33, 13, 3, '2024-02-01', NOW(), NOW()),
-(33, 13, 5, '2024-02-01', NOW(), NOW()),
+(14, 13, 1, '2024-02-01', NOW(), NOW()),
+(14, 13, 3, '2024-02-01', NOW(), NOW()),
+(14, 13, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 35 (Isabella Young): 100% available Mon/Wed/Fri
-(35, 13, 1, '2024-02-01', NOW(), NOW()),
-(35, 13, 3, '2024-02-01', NOW(), NOW()),
-(35, 13, 5, '2024-02-01', NOW(), NOW()),
+(16, 13, 1, '2024-02-01', NOW(), NOW()),
+(16, 13, 3, '2024-02-01', NOW(), NOW()),
+(16, 13, 5, '2024-02-01', NOW(), NOW()),
 -- Teacher 41 (Robert Lee - TOEIC): Tue/Thu only
-(41, 13, 2, '2024-02-01', NOW(), NOW()),
-(41, 13, 4, '2024-02-01', NOW(), NOW()),
+(22, 13, 2, '2024-02-01', NOW(), NOW()),
+(22, 13, 4, '2024-02-01', NOW(), NOW()),
 
 -- Teacher 32 (Matthew Lewis): Tue/Thu only
-(32, 14, 2, '2024-02-01', NOW(), NOW()),
-(32, 14, 4, '2024-02-01', NOW(), NOW()),
+(13, 14, 2, '2024-02-01', NOW(), NOW()),
+(13, 14, 4, '2024-02-01', NOW(), NOW()),
 -- Teacher 34 (Andrew Walker): 100% available Mon/Wed/Fri
-(34, 14, 1, '2024-02-01', NOW(), NOW()),
-(34, 14, 3, '2024-02-01', NOW(), NOW()),
-(34, 14, 5, '2024-02-01', NOW(), NOW()),
+(15, 14, 1, '2024-02-01', NOW(), NOW()),
+(15, 14, 3, '2024-02-01', NOW(), NOW()),
+(15, 14, 5, '2024-02-01', NOW(), NOW()),
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- SLOT 15: HCM Weekend Morning 2.5h (08:30-11:00) - ALL DAYS
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Teacher 28 (Chris Evans): 100% available Mon/Wed/Fri + Weekend
-(28, 15, 1, '2024-02-01', NOW(), NOW()),
-(28, 15, 3, '2024-02-01', NOW(), NOW()),
-(28, 15, 5, '2024-02-01', NOW(), NOW()),
-(28, 15, 6, '2024-02-01', NOW(), NOW()),  -- Saturday
-(28, 15, 0, '2024-02-01', NOW(), NOW()),  -- Sunday
+(9, 15, 1, '2024-02-01', NOW(), NOW()),
+(9, 15, 3, '2024-02-01', NOW(), NOW()),
+(9, 15, 5, '2024-02-01', NOW(), NOW()),
+(9, 15, 6, '2024-02-01', NOW(), NOW()),  -- Saturday
+(9, 15, 7, '2024-02-01', NOW(), NOW()),  -- Sunday
 -- Teacher 29 (Olivia White): 100% available Mon/Wed/Fri + Weekend
-(29, 15, 1, '2024-02-01', NOW(), NOW()),
-(29, 15, 3, '2024-02-01', NOW(), NOW()),
-(29, 15, 5, '2024-02-01', NOW(), NOW()),
-(29, 15, 6, '2024-02-01', NOW(), NOW()),
-(29, 15, 0, '2024-02-01', NOW(), NOW()),
+(10, 15, 1, '2024-02-01', NOW(), NOW()),
+(10, 15, 3, '2024-02-01', NOW(), NOW()),
+(10, 15, 5, '2024-02-01', NOW(), NOW()),
+(10, 15, 6, '2024-02-01', NOW(), NOW()),
+(10, 15, 7, '2024-02-01', NOW(), NOW()),
 -- Teacher 30 (Daniel Harris): 100% available all days
-(30, 15, 1, '2024-02-01', NOW(), NOW()),
-(30, 15, 2, '2024-02-01', NOW(), NOW()),
-(30, 15, 3, '2024-02-01', NOW(), NOW()),
-(30, 15, 4, '2024-02-01', NOW(), NOW()),
-(30, 15, 5, '2024-02-01', NOW(), NOW()),
-(30, 15, 6, '2024-02-01', NOW(), NOW()),
-(30, 15, 0, '2024-02-01', NOW(), NOW()),
+(11, 15, 1, '2024-02-01', NOW(), NOW()),
+(11, 15, 2, '2024-02-01', NOW(), NOW()),
+(11, 15, 3, '2024-02-01', NOW(), NOW()),
+(11, 15, 4, '2024-02-01', NOW(), NOW()),
+(11, 15, 5, '2024-02-01', NOW(), NOW()),
+(11, 15, 6, '2024-02-01', NOW(), NOW()),
+(11, 15, 7, '2024-02-01', NOW(), NOW()),
 -- Teacher 41 (Robert Lee - TOEIC): 100% available Mon/Wed/Fri + Weekend
-(41, 15, 1, '2024-02-01', NOW(), NOW()),
-(41, 15, 3, '2024-02-01', NOW(), NOW()),
-(41, 15, 5, '2024-02-01', NOW(), NOW()),
-(41, 15, 6, '2024-02-01', NOW(), NOW()),
-(41, 15, 0, '2024-02-01', NOW(), NOW()),
+(22, 15, 1, '2024-02-01', NOW(), NOW()),
+(22, 15, 3, '2024-02-01', NOW(), NOW()),
+(22, 15, 5, '2024-02-01', NOW(), NOW()),
+(22, 15, 6, '2024-02-01', NOW(), NOW()),
+(22, 15, 7, '2024-02-01', NOW(), NOW()),
 -- Teacher 42 (David Sunday - Weekend): Weekend ONLY
-(42, 15, 6, '2024-02-01', NOW(), NOW()),
-(42, 15, 0, '2024-02-01', NOW(), NOW()),
+(23, 15, 6, '2024-02-01', NOW(), NOW()),
+(23, 15, 7, '2024-02-01', NOW(), NOW()),
 -- Teacher 31 (Sophia Clark): PARTIAL - only Mon/Wed
-(31, 15, 1, '2024-02-01', NOW(), NOW()),
-(31, 15, 3, '2024-02-01', NOW(), NOW()),
+(12, 15, 1, '2024-02-01', NOW(), NOW()),
+(12, 15, 3, '2024-02-01', NOW(), NOW()),
 -- Teacher 28 (Chris Evans): 100% available Mon/Wed/Fri + Weekend
-(28, 16, 1, '2024-02-01', NOW(), NOW()),
-(28, 16, 3, '2024-02-01', NOW(), NOW()),
-(28, 16, 5, '2024-02-01', NOW(), NOW()),
-(28, 16, 6, '2024-02-01', NOW(), NOW()),
-(28, 16, 0, '2024-02-01', NOW(), NOW()),
+(9, 16, 1, '2024-02-01', NOW(), NOW()),
+(9, 16, 3, '2024-02-01', NOW(), NOW()),
+(9, 16, 5, '2024-02-01', NOW(), NOW()),
+(9, 16, 6, '2024-02-01', NOW(), NOW()),
+(9, 16, 7, '2024-02-01', NOW(), NOW()),
 -- Teacher 32 (Matthew Lewis): 100% available all days
-(32, 16, 1, '2024-02-01', NOW(), NOW()),
-(32, 16, 3, '2024-02-01', NOW(), NOW()),
-(32, 16, 5, '2024-02-01', NOW(), NOW()),
-(32, 16, 6, '2024-02-01', NOW(), NOW()),
-(32, 16, 0, '2024-02-01', NOW(), NOW()),
+(13, 16, 1, '2024-02-01', NOW(), NOW()),
+(13, 16, 3, '2024-02-01', NOW(), NOW()),
+(13, 16, 5, '2024-02-01', NOW(), NOW()),
+(13, 16, 6, '2024-02-01', NOW(), NOW()),
+(13, 16, 7, '2024-02-01', NOW(), NOW()),
 -- Teacher 34 (Andrew Walker): 100% available all days
-(34, 16, 1, '2024-02-01', NOW(), NOW()),
-(34, 16, 2, '2024-02-01', NOW(), NOW()),
-(34, 16, 3, '2024-02-01', NOW(), NOW()),
-(34, 16, 4, '2024-02-01', NOW(), NOW()),
-(34, 16, 5, '2024-02-01', NOW(), NOW()),
-(34, 16, 6, '2024-02-01', NOW(), NOW()),
-(34, 16, 0, '2024-02-01', NOW(), NOW()),
+(15, 16, 1, '2024-02-01', NOW(), NOW()),
+(15, 16, 2, '2024-02-01', NOW(), NOW()),
+(15, 16, 3, '2024-02-01', NOW(), NOW()),
+(15, 16, 4, '2024-02-01', NOW(), NOW()),
+(15, 16, 5, '2024-02-01', NOW(), NOW()),
+(15, 16, 6, '2024-02-01', NOW(), NOW()),
+(15, 16, 7, '2024-02-01', NOW(), NOW()),
 -- Teacher 42 (David Sunday - Weekend): Weekend ONLY
-(42, 16, 6, '2024-02-01', NOW(), NOW()),
-(42, 16, 0, '2024-02-01', NOW(), NOW()),
+(23, 16, 6, '2024-02-01', NOW(), NOW()),
+(23, 16, 7, '2024-02-01', NOW(), NOW()),
 -- Teacher 35 (Isabella Young): Weekend ONLY
-(35, 16, 6, '2024-02-01', NOW(), NOW()),
-(35, 16, 0, '2024-02-01', NOW(), NOW());
+(16, 16, 6, '2024-02-01', NOW(), NOW()),
+(16, 16, 7, '2024-02-01', NOW(), NOW());
 -- Teachers with NO AVAILABILITY (for testing "Chưa đăng ký lịch"):
 -- Teacher 3, 11, 24: NO AVAILABILITY
 
@@ -1178,10 +1178,7 @@ INSERT INTO subject_material (subject_id, phase_id, subject_session_id, title, d
 (2, 3, 26, 'Advanced Listening Audio', 'Audio for advanced listening practice.', 'MEDIA', '/materials/sessions/26/audio.mp3', 5),
 -- Phase 4: Test Strategies
 (2, 4, NULL, 'IELTS Test Strategies Handbook', 'Strategies for all 4 skills.', 'DOCUMENT', '/materials/phases/4/strategies.pdf', 5),
-(2, 4, 37, 'Speaking Part 2 Cue Cards', 'Practice cue cards for Speaking Part 2.', 'DOCUMENT', '/materials/sessions/37/cue-cards.pdf', 5),
--- Phase 5: Mock Tests
-(2, 5, NULL, 'Mock Test Instructions', 'Instructions for taking mock tests.', 'DOCUMENT', '/materials/phases/5/instructions.pdf', 5),
-(2, 5, 49, 'Full Mock Test 1', 'Complete mock test paper.', 'DOCUMENT', '/materials/sessions/49/test1.pdf', 5);
+(2, 4, 37, 'Speaking Part 2 Cue Cards', 'Practice cue cards for Speaking Part 2.', 'DOCUMENT', '/materials/sessions/37/cue-cards.pdf', 5);
 
 -- Course Materials for IELTS Advanced (Course 3)
 INSERT INTO subject_material (subject_id, phase_id, subject_session_id, title, description, material_type, url, uploaded_by) VALUES
@@ -1953,6 +1950,151 @@ INSERT INTO qa_report (id, class_id, reported_by, report_type, status, content, 
 (19, 6, 11, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'SUBMITTED', 'Lớp buổi tối thường xuyên có học viên đến muộn do tắc đường. Xem xét lùi giờ học xuống 15 phút nếu khả thi.', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
 (20, 4, 10, 'TEACHING_QUALITY_ASSESSMENT', 'DRAFT', 'Chưa có dữ liệu đánh giá (Lớp chưa bắt đầu). Lên kế hoạch dự giờ ngay tuần đầu tiên.', '2025-11-01 10:00:00+07', '2025-11-01 10:00:00+07');
 
+-- ================================================================================================
+-- TEST DATA FOR TRANSFER REQUEST (SMART FILTERING)
+-- Context Date: 2025-12-10
+-- Current Class: HN-IELTS-F2 (ID 2) - Progress: Session 11 Completed
+-- ================================================================================================
+
+-- 1. Create Target Classes (B, C, D, E, F)
+INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date, planned_end_date, schedule_days, max_capacity, status, approval_status, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
+-- Class B: Gap 0 (Same progress), 5 slots left (15 enrolled)
+(101, 1, 1, 'HN-IELTS-TEST-B', 'IELTS Test Class B (Gap 0)', 'OFFLINE', '2025-11-14', '2026-01-08', ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, NOW(), NOW(), NOW(), NOW()),
+-- Class C: Gap 0 (Same progress), 3 slots left (17 enrolled)
+(102, 1, 1, 'HN-IELTS-TEST-C', 'IELTS Test Class C (Gap 0)', 'OFFLINE', '2025-11-14', '2026-01-08', ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, NOW(), NOW(), NOW(), NOW()),
+-- Class D: Gap 1 (Faster by 1 session), 8 slots left (12 enrolled)
+(103, 1, 1, 'HN-IELTS-TEST-D', 'IELTS Test Class D (Gap 1)', 'OFFLINE', '2025-11-12', '2026-01-06', ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, NOW(), NOW(), NOW(), NOW()),
+-- Class E: Gap 2 (Slower by 2 sessions), 10 slots left (10 enrolled)
+(104, 1, 1, 'HN-IELTS-TEST-E', 'IELTS Test Class E (Gap 2)', 'OFFLINE', '2025-11-19', '2026-01-13', ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, NOW(), NOW(), NOW(), NOW()),
+-- Class F: Gap 5 (Faster by 5 sessions), 20 slots left (0 enrolled) - SHOULD BE FILTERED
+(105, 1, 1, 'HN-IELTS-TEST-F', 'IELTS Test Class F (Gap 5)', 'OFFLINE', '2025-11-03', '2025-12-28', ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, NOW(), NOW(), NOW(), NOW());
+
+-- 3. Create Enrollments to simulate capacity
+-- We use a helper to insert bulk enrollments. 
+-- Note: We reuse student IDs 10-50 for these dummy enrollments.
+-- Class B: 15 students
+INSERT INTO enrollment (student_id, class_id, status, enrolled_at, created_at, updated_at)
+SELECT id, 101, 'ENROLLED', NOW(), NOW(), NOW() FROM student WHERE id BETWEEN 10 AND 24;
+
+-- Class C: 17 students
+INSERT INTO enrollment (student_id, class_id, status, enrolled_at, created_at, updated_at)
+SELECT id, 102, 'ENROLLED', NOW(), NOW(), NOW() FROM student WHERE id BETWEEN 25 AND 41;
+
+-- Class D: 12 students
+INSERT INTO enrollment (student_id, class_id, status, enrolled_at, created_at, updated_at)
+SELECT id, 103, 'ENROLLED', NOW(), NOW(), NOW() FROM student WHERE id BETWEEN 42 AND 53;
+
+-- Class E: 10 students
+INSERT INTO enrollment (student_id, class_id, status, enrolled_at, created_at, updated_at)
+SELECT id, 104, 'ENROLLED', NOW(), NOW(), NOW() FROM student WHERE id BETWEEN 54 AND 63;
+
+-- Class F: 0 students (No insert needed)
+
+-- 4. Create Sessions & Progress (Crucial for Content Gap)
+-- We generate sessions with specific dates relative to '2025-12-10' to establish progress.
+-- We use EXPLICIT IDs (starting from 1800) to avoid sequence conflicts with previous data.
+
+-- Class B (Gap 0): Sessions 1-11 DONE, 12-16 PLANNED
+WITH ordered_sessions AS (
+    SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn 
+    FROM subject_session WHERE phase_id IN (1,2)
+)
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, status, created_at, updated_at)
+SELECT 
+    1800 + os.rn,
+    101,
+    os.id,
+    2,
+    '2025-11-14'::date + ((os.rn - 1) * 2 || ' days')::interval,
+    CASE WHEN os.rn <= 11 THEN 'DONE' ELSE 'PLANNED' END,
+    NOW(),
+    NOW()
+FROM ordered_sessions os WHERE os.rn <= 16;
+
+-- Class C (Gap 0): Sessions 1-11 DONE, 12-16 PLANNED
+WITH ordered_sessions AS (
+    SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn 
+    FROM subject_session WHERE phase_id IN (1,2)
+)
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, status, created_at, updated_at)
+SELECT 
+    1850 + os.rn,
+    102,
+    os.id,
+    3,
+    '2025-11-14'::date + ((os.rn - 1) * 2 || ' days')::interval,
+    CASE WHEN os.rn <= 11 THEN 'DONE' ELSE 'PLANNED' END,
+    NOW(),
+    NOW()
+FROM ordered_sessions os WHERE os.rn <= 16;
+
+-- Class D (Gap 1): Sessions 1-12 DONE, 13-17 PLANNED (Faster by 1)
+WITH ordered_sessions AS (
+    SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn 
+    FROM subject_session WHERE phase_id IN (1,2)
+)
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, status, created_at, updated_at)
+SELECT 
+    1900 + os.rn,
+    103,
+    os.id,
+    4,
+    '2025-11-12'::date + ((os.rn - 1) * 2 || ' days')::interval,
+    CASE WHEN os.rn <= 12 THEN 'DONE' ELSE 'PLANNED' END,
+    NOW(),
+    NOW()
+FROM ordered_sessions os WHERE os.rn <= 17;
+
+-- Class E (Gap 2): Sessions 1-9 DONE, 10-14 PLANNED (Slower by 2)
+WITH ordered_sessions AS (
+    SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn 
+    FROM subject_session WHERE phase_id IN (1,2)
+)
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, status, created_at, updated_at)
+SELECT 
+    1950 + os.rn,
+    104,
+    os.id,
+    5,
+    '2025-11-19'::date + ((os.rn - 1) * 2 || ' days')::interval,
+    CASE WHEN os.rn <= 9 THEN 'DONE' ELSE 'PLANNED' END,
+    NOW(),
+    NOW()
+FROM ordered_sessions os WHERE os.rn <= 14;
+
+-- Class F (Gap 5): Sessions 1-16 DONE, 17-21 PLANNED (Much Faster - should be FILTERED)
+WITH ordered_sessions AS (
+    SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn 
+    FROM subject_session WHERE phase_id IN (1,2)
+)
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, status, created_at, updated_at)
+SELECT 
+    2000 + os.rn,
+    105,
+    os.id,
+    6,
+    '2025-11-03'::date + ((os.rn - 1) * 2 || ' days')::interval,
+    CASE WHEN os.rn <= 16 THEN 'DONE' ELSE 'PLANNED' END,
+    NOW(),
+    NOW()
+FROM ordered_sessions os WHERE os.rn <= 21;
+
+-- Assign Teachers to Sessions (Teaching Slots)
+INSERT INTO teaching_slot (session_id, teacher_id, status)
+SELECT id, 20, 'SCHEDULED' FROM session WHERE class_id = 101;
+
+INSERT INTO teaching_slot (session_id, teacher_id, status)
+SELECT id, 21, 'SCHEDULED' FROM session WHERE class_id = 102;
+
+INSERT INTO teaching_slot (session_id, teacher_id, status)
+SELECT id, 22, 'SCHEDULED' FROM session WHERE class_id = 103;
+
+INSERT INTO teaching_slot (session_id, teacher_id, status)
+SELECT id, 23, 'SCHEDULED' FROM session WHERE class_id = 104;
+
+INSERT INTO teaching_slot (session_id, teacher_id, status)
+SELECT id, 24, 'SCHEDULED' FROM session WHERE class_id = 105;
+
 -- ========== FINAL SEQUENCE UPDATES ==========
 SELECT setval('center_id_seq', (SELECT MAX(id) FROM center), true);
 SELECT setval('branch_id_seq', (SELECT MAX(id) FROM branch), true);
@@ -1963,7 +2105,7 @@ SELECT setval('student_id_seq', (SELECT MAX(id) FROM student), true);
 SELECT setval('curriculum_id_seq', (SELECT MAX(id) FROM subject), true);
 SELECT setval('level_id_seq', (SELECT MAX(id) FROM level), true);
 SELECT setval('plo_id_seq', (SELECT MAX(id) FROM plo), true);
-SELECT setval('subject_id_seq', (SELECT MAX(id) FROM course), true);
+SELECT setval('subject_id_seq', (SELECT MAX(id) FROM subject), true);
 SELECT setval('subject_phase_id_seq', (SELECT MAX(id) FROM subject_phase), true);
 SELECT setval('clo_id_seq', (SELECT MAX(id) FROM clo), true);
 SELECT setval('subject_session_id_seq', (SELECT MAX(id) FROM subject_session), true);

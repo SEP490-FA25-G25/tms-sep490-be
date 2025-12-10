@@ -192,5 +192,14 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     List<Session> findPreviousSessionsByClassIdAndDate(
             @Param("classId") Long classId,
             @Param("date") java.time.LocalDate date);
+
+    @Query("""
+        SELECT COALESCE(MAX(ss.sequenceNo), 0)
+        FROM Session s
+        JOIN s.subjectSession ss
+        WHERE s.classEntity.id = :classId
+          AND s.status = 'DONE'
+        """)
+    Integer findLastCompletedSessionNumber(@Param("classId") Long classId);
 }
 
