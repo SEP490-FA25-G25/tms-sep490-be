@@ -36,6 +36,7 @@ public class UserAccountService {
     private final BranchRepository branchRepository;
     private final UserRoleRepository userRoleRepository;
     private final UserBranchesRepository userBranchesRepository;
+    private final EmailService emailService;
 
     @Transactional
     public UserResponse createUser(CreateUserRequest request) {
@@ -86,6 +87,26 @@ public class UserAccountService {
                 userBranchesRepository.save(userBranch);
             }
         }
+
+        // Lấy danh sách tên chi nhánh
+        String branchNames = "";
+        if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
+            branchNames = request.getBranchIds().stream()
+                    .map(branchId -> branchRepository.findById(branchId)
+                            .map(Branch::getName)
+                            .orElse(""))
+                    .filter(name -> !name.isEmpty())
+                    .collect(Collectors.joining(", "));
+        }
+
+// Gửi email thông tin đăng nhập
+        emailService.sendNewUserCredentialsAsync(
+                user.getEmail(),
+                user.getFullName(),
+                user.getEmail(),
+                request.getPassword(),
+                branchNames
+        );
 
         // Chuyển entity -> response DTO và return
         return mapToResponse(user);
@@ -193,22 +214,14 @@ public class UserAccountService {
     }
 
     @Transactional(readOnly = true)
-    public Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status) {
-        log.info("Getting all users with search: {}, role: {}, status: {}", search, role, status);
-
-        // Convert status string sang enum
-        UserStatus userStatus = null;
+    public Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status, Long branchId) {
+        log.info("Getting all users with search: {}, role: {}, status: {}, branchId: {}", search, role, status, branchId);
+        UserStatus statusEnum = null;
         if (status != null && !status.isEmpty()) {
-            userStatus = UserStatus.valueOf(status);
+            statusEnum = UserStatus.valueOf(status);
         }
 
-        Page<UserAccount> users = userAccountRepository.findAllWithFilters(
-                search,
-                role,
-                userStatus,
-                pageable
-        );
-
+        Page<UserAccount> users = userAccountRepository.findAllWithFilters(search, role, statusEnum, branchId, pageable);
         return users.map(this::mapToResponse);
     }
 
@@ -237,6 +250,10 @@ public class UserAccountService {
 
     public boolean checkEmailExists(String email) {
         return userAccountRepository.existsByEmail(email);
+    }
+
+    public boolean checkPhoneExists(String phone) {
+        return userAccountRepository.existsByPhone(phone);
     }
 
     private UserResponse mapToResponse(UserAccount user) {

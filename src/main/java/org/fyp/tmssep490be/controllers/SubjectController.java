@@ -36,4 +36,5 @@ public class SubjectController {
                 .data(subjects)
                 .build());
     }
+
 }

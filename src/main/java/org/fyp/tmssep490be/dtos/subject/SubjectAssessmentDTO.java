@@ -1,19 +1,37 @@
 package org.fyp.tmssep490be.dtos.subject;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
 import java.util.List;
 
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class SubjectAssessmentDTO {
     private Long id;
     private String name;
-    private String type; // AssessmentKind enum value
-    private BigDecimal weight;
+    private String description;
+
+    // HEAD fields
+    private String type; // Enum name
     private BigDecimal maxScore;
     private Integer durationMinutes;
-    private String description;
-    private String note;
+    private List<String> mappedCLOs; // List of CLO codes
+
+    // Main fields
+    private String assessmentType;
+    private BigDecimal weight;
+    private String duration;
+    private List<Long> sessionIds;
+    private List<String> cloMappings;
+    private Boolean isCompleted;
+    private BigDecimal achievedScore;
+    private String completedAt;
     private List<String> skills;
-    private List<String> mappedCLOs;
+    private String note;
 }
