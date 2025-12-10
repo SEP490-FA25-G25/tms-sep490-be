@@ -4,11 +4,13 @@ import org.fyp.tmssep490be.dtos.attendance.AttendanceMatrixDTO;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
 import org.fyp.tmssep490be.dtos.subject.SubjectDetailDTO;
+import org.fyp.tmssep490be.dtos.teacher.TeacherProfileDTO;
 import org.fyp.tmssep490be.dtos.teacherclass.ClassStudentDTO;
 import org.fyp.tmssep490be.dtos.teacherclass.TeacherClassListItemDTO;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.AttendanceService;
 import org.fyp.tmssep490be.services.TeacherClassService;
+import org.fyp.tmssep490be.services.TeacherService;
 import org.fyp.tmssep490be.utils.TeacherContextHelper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -32,11 +34,13 @@ public class TeacherController {
     private final TeacherClassService teacherClassService;
     private final TeacherContextHelper teacherContextHelper;
     private final AttendanceService attendanceService;
+    private final TeacherService teacherService;
 
-    public TeacherController(TeacherClassService teacherClassService, TeacherContextHelper teacherContextHelper, AttendanceService attendanceService) {
+    public TeacherController(TeacherClassService teacherClassService, TeacherContextHelper teacherContextHelper, AttendanceService attendanceService, TeacherService teacherService) {
         this.teacherClassService = teacherClassService;
         this.teacherContextHelper = teacherContextHelper;
         this.attendanceService = attendanceService;
+        this.teacherService = teacherService;
     }
 
     //Endpoint để lấy tất cả lớp học mà giáo viên được phân công
@@ -150,6 +154,20 @@ public class TeacherController {
                         .success(true)
                         .message("Class curriculum retrieved successfully")
                         .data(data)
+                        .build());
+    }
+
+    // Endpoint để lấy thông tin profile của giáo viên hiện tại
+    @GetMapping("/me/profile")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<TeacherProfileDTO>> getMyProfile(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        TeacherProfileDTO profile = teacherService.getMyProfile(userPrincipal.getId());
+        return ResponseEntity.ok(
+                ResponseObject.<TeacherProfileDTO>builder()
+                        .success(true)
+                        .message("Teacher profile retrieved successfully")
+                        .data(profile)
                         .build());
     }
 }
