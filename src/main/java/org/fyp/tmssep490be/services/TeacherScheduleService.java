@@ -42,35 +42,35 @@ public class TeacherScheduleService {
     public WeeklyScheduleResponseDTO getWeeklySchedule(Long teacherId, LocalDate weekStart, Long classId) {
         log.info("Getting weekly schedule for teacher: {}, week: {}, class: {}", teacherId, weekStart, classId);
 
-        // 1. Validate weekStart is Monday
+        // 1. Kiểm tra weekStart phải là thứ Hai
         if (weekStart.getDayOfWeek() != DayOfWeek.MONDAY) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "weekStart must be a Monday");
         }
 
-        // 2. Calculate week range
+        // 2. Tính phạm vi tuần
         LocalDate weekEnd = weekStart.plusDays(6);
 
-        // 3. Fetch teacher
+        // 3. Lấy thông tin giáo viên
         Teacher teacher = teacherRepository.findById(teacherId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND));
 
-        // 4. Fetch all sessions for this week (all statuses)
+        // 4. Lấy tất cả buổi trong tuần (mọi trạng thái)
         List<Session> sessions = sessionRepository.findWeeklySessionsForTeacher(
                 teacherId, weekStart, weekEnd, classId);
 
         log.debug("Found {} sessions for week {} to {}", sessions.size(), weekStart, weekEnd);
 
-        // 5. Get all time slots from branches where teacher has classes
+        // 5. Lấy toàn bộ khung giờ của các cơ sở mà giáo viên có lớp
         List<TimeSlotDTO> timeSlots = getAllTimeSlotsForTeacher(teacherId);
 
-        // 6. Group by day of week
+        // 6. Gom nhóm theo ngày trong tuần
         Map<DayOfWeek, List<SessionSummaryDTO>> scheduleMap = sessions.stream()
                 .collect(Collectors.groupingBy(
                         s -> s.getDate().getDayOfWeek(),
                         Collectors.mapping(this::mapToSessionSummaryDTO, Collectors.toList())
                 ));
 
-        // 7. Ensure all days exist in map (even if empty)
+        // 7. Đảm bảo đủ 7 ngày trong map (kể cả rỗng)
         for (DayOfWeek day : DayOfWeek.values()) {
             scheduleMap.putIfAbsent(day, new ArrayList<>());
         }
@@ -80,12 +80,12 @@ public class TeacherScheduleService {
                 scheduleMap.values().stream().mapToInt(List::size).sum(),
                 scheduleMap.values().stream().filter(list -> !list.isEmpty()).count());
 
-        // 8. Build response
+        // 8. Xây dựng response
         return WeeklyScheduleResponseDTO.builder()
                 .weekStart(weekStart)
                 .weekEnd(weekEnd)
-                .studentId(teacher.getId()) // Reuse field for teacherId
-                .studentName(teacher.getUserAccount().getFullName()) // Reuse field for teacherName
+                .studentId(teacher.getId())
+                .studentName(teacher.getUserAccount().getFullName())
                 .timeSlots(timeSlots)
                 .schedule(scheduleMap)
                 .build();
@@ -95,11 +95,11 @@ public class TeacherScheduleService {
     public TeacherSessionDetailDTO getSessionDetail(Long teacherId, Long sessionId) {
         log.info("Getting session detail for teacher: {}, session: {}", teacherId, sessionId);
 
-        // 1. Fetch session with authorization check
+        // 1. Lấy session và kiểm tra quyền truy cập
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
 
-        // 2. Verify teacher is assigned to this session
+        // 2. Xác nhận giáo viên đang được phân công cho session này
         boolean isAssigned = session.getTeachingSlots().stream()
                 .anyMatch(ts -> ts.getTeacher() != null && ts.getTeacher().getId().equals(teacherId));
 
@@ -115,7 +115,7 @@ public class TeacherScheduleService {
         ClassEntity classEntity = session.getClassEntity();
         SubjectSession subjectSession = session.getSubjectSession();
 
-        // Get teacher from teaching slots
+        // Lấy thông tin giáo viên từ teaching slots
         String teacherName = session.getTeachingSlots().stream()
                 .filter(ts -> ts.getTeacher() != null)
                 .map(ts -> ts.getTeacher().getUserAccount().getFullName())
@@ -153,7 +153,7 @@ public class TeacherScheduleService {
                 .sequenceNo(subjectSession != null ? subjectSession.getSequenceNo() : null)
                 .build();
 
-        // Note: TeacherSessionDetailDTO doesn't need StudentStatusDTO
+        // Lưu ý: TeacherSessionDetailDTO không cần StudentStatusDTO
 
         List<MaterialDTO> materials = new ArrayList<>();
         if (subjectSession != null && !subjectSession.getSubjectMaterials().isEmpty()) {
@@ -170,12 +170,10 @@ public class TeacherScheduleService {
                     .orElse(null);
         }
 
-        // Build MakeupInfoDTO if applicable (check if session has makeup info)
         MakeupInfoDTO makeupInfo = null;
-        // Note: Makeup info for teacher sessions might be stored differently
-        // For now, we'll leave it null unless we find makeup-related data
+        // Lưu ý: Thông tin dạy bù có thể lưu khác; tạm để null nếu không có dữ liệu
 
-        // Get attendance summary
+        // Tính tóm tắt điểm danh
         long totalStudents = session.getStudentSessions().size();
         long presentCount = session.getStudentSessions().stream()
                 .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
@@ -183,19 +181,18 @@ public class TeacherScheduleService {
         long absentCount = session.getStudentSessions().stream()
                 .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
                 .count();
-        // Note: AttendanceStatus enum doesn't have LATE status
-        // Set to 0 for now
+                
         long lateCount = 0;
         long excusedCount = session.getStudentSessions().stream()
                 .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
                 .count();
         
-        // Check if attendance has been submitted (any student has non-PLANNED status)
+        // Kiểm tra xem đã chốt điểm danh (có SV nào khác PLANNED)
         boolean attendanceSubmitted = session.getStudentSessions().stream()
                 .anyMatch(ss -> ss.getAttendanceStatus() != null && 
                                ss.getAttendanceStatus() != AttendanceStatus.PLANNED);
 
-        // Build attendance summary
+        // Xây dựng attendance summary
         AttendanceSummaryDTO attendanceSummary = AttendanceSummaryDTO.builder()
                 .totalStudents(totalStudents)
                 .presentCount(presentCount)
@@ -228,7 +225,7 @@ public class TeacherScheduleService {
 
         Object skillsRaw = subjectSession.getSkills();
 
-        // Case 1: String (JSON array hoặc text đơn)
+        // Trường hợp 1: String (mảng JSON hoặc chuỗi đơn)
         if (skillsRaw instanceof String) {
             String skillsText = ((String) skillsRaw).trim();
 
@@ -248,7 +245,7 @@ public class TeacherScheduleService {
             return List.of(skillsText);
         }
 
-        // Case 2: List<?> (enum Skill hoặc String)
+        // Trường hợp 2: List<?> (enum Skill hoặc String)
         if (skillsRaw instanceof List<?>) {
             List<?> skillList = (List<?>) skillsRaw;
             return skillList.stream()
@@ -258,7 +255,7 @@ public class TeacherScheduleService {
                             String txt = ((String) item).trim();
                             return txt.isEmpty() ? null : txt;
                         }
-                        // enum Skill
+                        // Enum Skill
                         String txt = item.toString();
                         return txt != null && !txt.trim().isEmpty() ? txt.trim() : null;
                     })
@@ -266,7 +263,7 @@ public class TeacherScheduleService {
                     .collect(Collectors.toList());
         }
 
-        // Fallback
+        // Phương án dự phòng
         return new ArrayList<>();
     }
 
@@ -307,8 +304,8 @@ public class TeacherScheduleService {
     private List<TimeSlotDTO> getAllTimeSlotsForTeacher(Long teacherId) {
         log.debug("Getting all time slots for teacher: {}", teacherId);
 
-        // 1. Get all branches where teacher has classes
-        // Query sessions in a wide date range to get all branches
+        // 1. Lấy tất cả chi nhánh nơi giáo viên có lớp
+        // Dò phiên dạy trong dải ngày rộng để gom đủ chi nhánh
         LocalDate fromDate = LocalDate.now().minusYears(1);
         LocalDate toDate = LocalDate.now().plusYears(1);
         List<Session> allSessions = sessionRepository.findWeeklySessionsForTeacher(
@@ -325,25 +322,25 @@ public class TeacherScheduleService {
 
         log.debug("Teacher {} has sessions in {} branches", teacherId, branchIds.size());
 
-        // 2. Union time slots from all branches
+        // 2. Hợp nhất toàn bộ time slot từ các chi nhánh
         List<TimeSlotTemplate> allTimeSlots = branchIds.stream()
                 .flatMap(branchId -> timeSlotTemplateRepository
                         .findByBranchIdOrderByStartTimeAsc(branchId).stream())
                 .toList();
 
-        // 3. Group by TimeRange (startTime, endTime) to merge duplicates
+        // 3. Gom nhóm theo TimeRange (startTime, endTime) để gộp trùng
         Map<TimeRange, List<TimeSlotTemplate>> groupedByTimeRange = allTimeSlots.stream()
                 .collect(Collectors.groupingBy(
                         ts -> new TimeRange(ts.getStartTime(), ts.getEndTime())
                 ));
 
-        // 4. Merge duplicates and build DTOs
+        // 4. Gộp trùng và dựng DTO
         List<TimeSlotDTO> mergedTimeSlots = groupedByTimeRange.entrySet().stream()
                 .map(entry -> {
                     TimeRange timeRange = entry.getKey();
                     List<TimeSlotTemplate> slots = entry.getValue();
 
-                    // If multiple time slots with same time range, merge their names
+                    // Nếu nhiều slot cùng khung giờ, gộp tên
                     String mergedName;
                     Long timeSlotTemplateId;
                     if (slots.size() == 1) {
@@ -351,12 +348,12 @@ public class TeacherScheduleService {
                         mergedName = slot.getName();
                         timeSlotTemplateId = slot.getId();
                     } else {
-                        // Merge names from different branches
+                        // Gộp tên từ các chi nhánh khác nhau
                         mergedName = slots.stream()
                                 .map(TimeSlotTemplate::getName)
                                 .distinct()
                                 .collect(Collectors.joining(" / "));
-                        timeSlotTemplateId = slots.get(0).getId(); // Use first one as representative
+                        timeSlotTemplateId = slots.get(0).getId(); // Dùng slot đầu làm đại diện
                     }
 
                     return TimeSlotDTO.builder()
@@ -369,7 +366,7 @@ public class TeacherScheduleService {
                 .sorted(Comparator.comparing(TimeSlotDTO::getStartTime))
                 .collect(Collectors.toList());
 
-        log.debug("Merged {} unique time slots for teacher {}", mergedTimeSlots.size(), teacherId);
+        log.debug("Đã gộp {} khung giờ duy nhất cho giáo viên {}", mergedTimeSlots.size(), teacherId);
         return mergedTimeSlots;
     }
 
@@ -378,7 +375,7 @@ public class TeacherScheduleService {
         SubjectSession subjectSession = session.getSubjectSession();
         TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
 
-        // Extract resource information
+        // Lấy thông tin resource
         String resourceName = null;
         ResourceType resourceType = null;
         String onlineLink = null;
@@ -389,18 +386,17 @@ public class TeacherScheduleService {
             resourceName = resource.getName();
             resourceType = resource.getResourceType();
 
-            // If virtual resource, the name is typically the zoom link or label
+            // Nếu resource ảo, name thường là link/phòng online
             if (resourceType == ResourceType.VIRTUAL) {
                 onlineLink = resource.getName(); // Store zoom link
             }
         }
 
-        // Note: Attendance summary is not included in SessionSummaryDTO
-        // It's only available in TeacherSessionDetailDTO
+        // Lưu ý: Attendance summary không nằm trong SessionSummaryDTO mà ở TeacherSessionDetailDTO
 
         return SessionSummaryDTO.builder()
                 .sessionId(session.getId())
-                .studentSessionId(null) // Not applicable for teacher
+                .studentSessionId(null) // Không dùng cho giáo viên
                 .classId(classEntity.getId())
                 .date(session.getDate())
                 .dayOfWeek(session.getDate().getDayOfWeek())
@@ -417,9 +413,9 @@ public class TeacherScheduleService {
                 .modality(classEntity.getModality())
                 .location(determineLocationForSummary(classEntity, session))
                 .branchName(classEntity.getBranch().getName())
-                .attendanceStatus(null) // Not applicable for teacher
-                .isMakeup(false) // TODO: Check if session is makeup
-                .makeupInfo(null) // TODO: Build makeup info if applicable
+                .attendanceStatus(null) // Không áp dụng cho giáo viên
+                .isMakeup(false) // TODO: Kiểm tra buổi dạy bù
+                .makeupInfo(null) // TODO: Bổ sung thông tin dạy bù nếu có
                 .resourceName(resourceName)
                 .resourceType(resourceType)
                 .onlineLink(onlineLink)
@@ -456,11 +452,8 @@ public class TeacherScheduleService {
     private String determineLocation(ClassEntity classEntity, Session session) {
         if (classEntity.getModality() == org.fyp.tmssep490be.entities.enums.Modality.OFFLINE) {
             return classEntity.getBranch().getName();
-        } else if (classEntity.getModality() == org.fyp.tmssep490be.entities.enums.Modality.ONLINE) {
-            return "Online";
-        } else {
-            return "Hybrid";
         }
+        return "Online";
     }
 
     @lombok.Value
