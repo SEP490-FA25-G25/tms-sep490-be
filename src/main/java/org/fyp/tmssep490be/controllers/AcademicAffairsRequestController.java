@@ -168,6 +168,18 @@ public class AcademicAffairsRequestController {
         return ResponseEntity.ok(ResponseObject.success("Retrieved makeup options successfully", response));
     }
 
+    @PostMapping("/absence/on-behalf")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> submitAbsenceOnBehalf(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody AbsenceRequestDTO dto) {
+
+        StudentRequestResponseDTO response = studentRequestService.submitAbsenceRequestOnBehalf(
+                currentUser.getId(), dto);
+
+        return ResponseEntity.ok(ResponseObject.success("Absence request created and auto-approved", response));
+    }
+
     @PostMapping("/makeup-requests/on-behalf")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> submitMakeupOnBehalf(

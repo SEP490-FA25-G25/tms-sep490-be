@@ -535,6 +535,85 @@ public class StudentRequestService {
     }
 
     @Transactional
+    public StudentRequestResponseDTO submitAbsenceRequestOnBehalf(Long decidedById, AbsenceRequestDTO dto) {
+        log.info("AA user {} submitting absence request on-behalf for student {} - session: {}",
+                decidedById, dto.getStudentId(), dto.getTargetSessionId());
+
+        if (dto.getStudentId() == null) {
+            throw new BusinessRuleException("MISSING_STUDENT_ID", "Student ID is required for on-behalf requests");
+        }
+
+        Student student = studentRepository.findById(dto.getStudentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found for ID: " + dto.getStudentId()));
+
+        Session session = sessionRepository.findById(dto.getTargetSessionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+
+        if (session.getClassEntity() == null || !session.getClassEntity().getId().equals(dto.getCurrentClassId())) {
+            throw new BusinessRuleException("SESSION_CLASS_MISMATCH", "Session does not belong to the selected class");
+        }
+
+        // AA can create absence requests for future sessions only
+        if (session.getDate().isBefore(LocalDate.now())) {
+            throw new BusinessRuleException("PAST_SESSION", "Cannot request absence for past sessions");
+        }
+
+        if (!session.getStatus().equals(SessionStatus.PLANNED)) {
+            throw new BusinessRuleException("INVALID_SESSION_STATUS", "Session must be in PLANNED status");
+        }
+
+        Enrollment enrollment = enrollmentRepository
+                .findByStudentIdAndClassIdAndStatus(student.getId(), dto.getCurrentClassId(), EnrollmentStatus.ENROLLED);
+
+        if (enrollment == null) {
+            throw new BusinessRuleException("NOT_ENROLLED", "Student is not enrolled in this class");
+        }
+
+        StudentSession.StudentSessionId studentSessionId = new StudentSession.StudentSessionId(student.getId(), dto.getTargetSessionId());
+        boolean hasStudentSession = studentSessionRepository.findById(studentSessionId).isPresent();
+        if (!hasStudentSession) {
+            throw new BusinessRuleException("SESSION_NOT_ASSIGNED", "Student is not assigned to this session");
+        }
+
+        if (hasDuplicateRequest(student.getId(), dto.getTargetSessionId(), StudentRequestType.ABSENCE)) {
+            throw new BusinessRuleException("DUPLICATE_REQUEST", "Duplicate absence request for this session");
+        }
+
+        ClassEntity classEntity = classRepository.findById(dto.getCurrentClassId())
+                .orElseThrow(() -> new ResourceNotFoundException("Class not found"));
+        UserAccount submittedBy = userAccountRepository.findById(decidedById)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Create request with auto-approved status
+        StudentRequest request = StudentRequest.builder()
+                .student(student)
+                .requestType(StudentRequestType.ABSENCE)
+                .currentClass(classEntity)
+                .targetSession(session)
+                .requestReason(dto.getRequestReason())
+                .note(dto.getNote())
+                .status(RequestStatus.APPROVED)  // Auto-approve for AA on-behalf
+                .submittedBy(submittedBy)
+                .submittedAt(OffsetDateTime.now())
+                .decidedBy(submittedBy)  // AA is both submitter and approver
+                .decidedAt(OffsetDateTime.now())
+                .build();
+
+        request = studentRequestRepository.save(request);
+        log.info("Absence request created and auto-approved with id: {}", request.getId());
+
+        // Mark the session as EXCUSED immediately since it's auto-approved
+        markSessionAsExcused(
+                student,
+                session,
+                String.format("Vắng có phép được tạo và duyệt bởi AA lúc %s. Request ID: %d",
+                        OffsetDateTime.now(), request.getId())
+        );
+
+        return mapToStudentRequestResponseDTO(request);
+    }
+
+    @Transactional
     public StudentRequestResponseDTO approveRequest(Long requestId, Long decidedById, ApprovalDTO dto) {
         StudentRequest request = studentRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
@@ -992,11 +1071,10 @@ public class StudentRequestService {
             throw new BusinessRuleException("INVALID_SESSION", "Target session must have subject session defined");
         }
 
-        // Sử dụng hardcoded constant: số tuần giới hạn tìm buổi học bù
+        // Business Rule: SAME-BRANCH ONLY - không cho phép học bù ở branch khác
         int weeksLimit = MAKEUP_WEEKS_LIMIT;
 
         // Find makeup options with same subject session (same content)
-        // Business Rule: Same branch → allow all modalities; Different branch → ONLINE only
         List<Session> makeupOptions = sessionRepository.findMakeupSessionOptions(
                 targetSession.getSubjectSession().getId(),
                 targetSessionId,
@@ -1121,20 +1199,16 @@ public class StudentRequestService {
         }
 
         // Calculate match score
-        boolean branchMatch = session.getClassEntity().getBranch().getId()
-                .equals(targetSession.getClassEntity().getBranch().getId());
         boolean modalityMatch = session.getClassEntity().getModality()
                 .equals(targetSession.getClassEntity().getModality());
 
         int score = 0;
-        //Cùng chi nhánh thì + 10, khác thì không +
-        if (branchMatch) score += 10;
-        //Cùng hình thức học thì + 5, khác thì không cộng
+        // Cùng hình thức học thì + 5, khác thì không cộng
         if (modalityMatch) score += 5;
 
         long weeksUntil = ChronoUnit.WEEKS.between(LocalDate.now(), session.getDate());
         int dateProximityScore = (int) Math.max(0, 3 - weeksUntil); // +3 this week, +2 next, +1 in 2 weeks
-        //weeksUntil = 0 -> 3-0 =3 -> điểm cao
+        // weeksUntil = 0 -> 3-0 = 3 -> điểm cao
         // tương tự như vậy weeksUntil = 3 -> 3-3 = 0 điểm vì quá xa
         score += dateProximityScore;
 
@@ -1193,7 +1267,6 @@ public class StudentRequestService {
                 .availableSlots(availableSlots)
                 .maxCapacity(session.getClassEntity().getMaxCapacity())
                 .matchScore(MakeupOptionDTO.MatchScore.builder()
-                        .branchMatch(branchMatch)
                         .modalityMatch(modalityMatch)
                         .capacityOk(capacityOk)
                         .dateProximityScore(dateProximityScore)

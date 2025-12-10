@@ -92,8 +92,6 @@ public class MakeupOptionDTO {
     @AllArgsConstructor
     @Builder
     public static class MatchScore {
-        private Boolean branchMatch;
-
         private Boolean modalityMatch;
 
         private Boolean capacityOk;
