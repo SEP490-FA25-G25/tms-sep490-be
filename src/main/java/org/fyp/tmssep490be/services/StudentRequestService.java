@@ -2312,13 +2312,11 @@ public class StudentRequestService {
                     oldClassCode, newClassCode, effectiveDate
             );
 
-            notificationService.createNotificationWithReference(
+            notificationService.createNotification(
                     request.getStudent().getUserAccount().getId(),
-                    NotificationType.CLASS_REMINDER,
+                    NotificationType.NOTIFICATION,
                     title,
-                    message,
-                    "StudentRequest",
-                    request.getId()
+                    message
             );
 
             log.info("Sent transfer notification to student {}", request.getStudent().getId());

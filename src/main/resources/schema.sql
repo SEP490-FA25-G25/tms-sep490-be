@@ -693,19 +693,11 @@ CREATE TABLE notification (
   type VARCHAR(50) NOT NULL,
   title VARCHAR(200) NOT NULL,
   message TEXT NOT NULL,
-  priority VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
   status VARCHAR(20) NOT NULL DEFAULT 'UNREAD',
   read_at TIMESTAMPTZ,
-  action_url VARCHAR(500),
-  reference_type VARCHAR(50),
-  reference_id BIGINT,
-  metadata JSONB,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  expires_at TIMESTAMPTZ,
   CONSTRAINT fk_notification_recipient FOREIGN KEY(recipient_id) REFERENCES user_account(id) ON DELETE CASCADE,
-  CONSTRAINT chk_notification_type CHECK (type IN ('REQUEST_APPROVAL', 'CLASS_REMINDER', 'LICENSE_WARNING', 'FEEDBACK_REMINDER', 'SYSTEM_ALERT', 'GRADE_NOTIFICATION', 'ASSIGNMENT_DEADLINE')),
-  CONSTRAINT chk_notification_priority CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')),
+  CONSTRAINT chk_notification_type CHECK (type IN ('SYSTEM', 'REQUEST', 'REMINDER', 'NOTIFICATION')),
   CONSTRAINT chk_notification_status CHECK (status IN ('UNREAD', 'READ', 'ARCHIVED'))
 );
 
@@ -855,16 +847,8 @@ CREATE INDEX idx_teacher_request_new_resource ON teacher_request(new_resource_id
 CREATE INDEX idx_teacher_request_new_session ON teacher_request(new_session_id);
 CREATE INDEX idx_teacher_request_decided_by ON teacher_request(decided_by);
 
-CREATE INDEX idx_notification_recipient ON notification(recipient_id);
-CREATE INDEX idx_notification_status ON notification(status);
-CREATE INDEX idx_notification_type ON notification(type);
-CREATE INDEX idx_notification_priority ON notification(priority);
-CREATE INDEX idx_notification_created_at ON notification(created_at);
-CREATE INDEX idx_notification_expires_at ON notification(expires_at);
 CREATE INDEX idx_notification_recipient_status ON notification(recipient_id, status);
 CREATE INDEX idx_notification_type_created ON notification(type, created_at);
-CREATE INDEX idx_notification_priority_status ON notification(priority, status);
-CREATE INDEX idx_notification_reference ON notification(reference_type, reference_id);
 
 -- Indexes cho các query filter thường dùng (status, date ranges)
 

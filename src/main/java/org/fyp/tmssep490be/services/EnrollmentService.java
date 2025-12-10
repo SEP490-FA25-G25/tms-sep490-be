@@ -462,13 +462,11 @@ public class EnrollmentService {
                     classEntity.getStartDate() != null ? classEntity.getStartDate().toString() : "sớm",
                     buildScheduleDisplay(classEntity));
 
-            notificationService.createNotificationWithReference(
+            notificationService.createNotification(
                     studentUserId,
-                    NotificationType.CLASS_REMINDER,
+                    NotificationType.NOTIFICATION,
                     title,
-                    message,
-                    "Enrollment",
-                    enrollment.getId());
+                    message);
 
             log.debug("Đã gửi enrollment confirmation notification cho student {}", enrollment.getStudentId());
         } catch (Exception e) {
@@ -528,13 +526,11 @@ public class EnrollmentService {
                         .map(UserAccount::getId)
                         .collect(Collectors.toList());
 
-                notificationService.sendBulkNotificationsWithReference(
+                notificationService.sendBulkNotifications(
                         recipientIds,
-                        NotificationType.SYSTEM_ALERT,
+                        NotificationType.SYSTEM,
                         title,
-                        message,
-                        "Class",
-                        classEntity.getId());
+                        message);
 
                 log.info("Đã gửi enrollment notification cho {} Academic Affairs users về class {}",
                         academicAffairsUsers.size(), classEntity.getId());
