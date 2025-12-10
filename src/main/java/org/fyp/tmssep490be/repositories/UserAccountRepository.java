@@ -38,7 +38,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
             @Param("roleCode") String roleCode,
             @Param("branchIds") List<Long> branchIds);
 
-    @Query("SELECT u FROM UserAccount u " +
+    @EntityGraph(attributePaths = { "userRoles", "userRoles.role", "userBranches", "userBranches.branch" })
+    @Query("SELECT DISTINCT u FROM UserAccount u " +
             "LEFT JOIN u.userRoles ur " +
             "LEFT JOIN ur.role r " +
             "WHERE (:search IS NULL OR u.fullName LIKE %:search% OR u.email LIKE %:search%) " +
@@ -49,6 +50,4 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
             @Param("role") String role,
             @Param("status") UserStatus status,
             Pageable pageable);
-
-
 }

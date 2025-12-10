@@ -70,6 +70,7 @@ public class UserAccountService {
         for (Long roleId : request.getRoleIds()) {
             Role role = roleRepository.findById(roleId).orElseThrow(() -> new IllegalArgumentException("Role không tồn tại: " + roleId));
             UserRole userRole = new UserRole();
+            userRole.setId(new UserRole.UserRoleId(user.getId(), roleId));
             userRole.setUserAccount(user);
             userRole.setRole(role);
             userRoleRepository.save(userRole);
@@ -137,6 +138,8 @@ public class UserAccountService {
             for (Long roleId : request.getRoleIds()) {
                 Role role = roleRepository.findById(roleId).orElseThrow(() -> new IllegalArgumentException("Role không tồn tại: " + roleId));
                 UserRole userRole = new UserRole();
+                // Khởi tạo composite key cho UserRole
+                userRole.setId(new UserRole.UserRoleId(user.getId(), roleId));
                 userRole.setUserAccount(user);
                 userRole.setRole(role);
                 userRoleRepository.save(userRole);
@@ -181,6 +184,7 @@ public class UserAccountService {
         log.info("User set to inactive successfully with ID: {}", user.getId());
     }
 
+    @Transactional(readOnly = true)
     public UserResponse getUserById(Long userId) {
         log.info("Getting user with ID: {}", userId);
 
@@ -188,6 +192,7 @@ public class UserAccountService {
         return mapToResponse(user);
     }
 
+    @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status) {
         log.info("Getting all users with search: {}, role: {}, status: {}", search, role, status);
 
@@ -207,6 +212,7 @@ public class UserAccountService {
         return users.map(this::mapToResponse);
     }
 
+    @Transactional(readOnly = true)
     public UserResponse getUserByEmail(String email) {
         log.info("Getting user by email: {}", email);
 
