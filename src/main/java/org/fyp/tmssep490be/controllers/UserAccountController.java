@@ -60,17 +60,17 @@ public class UserAccountController {
             @RequestParam(defaultValue = "id,desc") String sort,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String role,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long branch) {
 
-        // Parse sort parameter (format: "field,direction")
         String[] sortParams = sort.split(",");
         String sortField = sortParams[0];
-        Sort.Direction sortDirection = sortParams.length > 1 && sortParams[1].equalsIgnoreCase("desc") 
-                ? Sort.Direction.DESC 
+        Sort.Direction sortDirection = sortParams.length > 1 && sortParams[1].equalsIgnoreCase("desc")
+                ? Sort.Direction.DESC
                 : Sort.Direction.ASC;
-        
+
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortField));
-        Page<UserResponse> users = userAccountService.getAllUsers(pageable, search, role, status);
+        Page<UserResponse> users = userAccountService.getAllUsers(pageable, search, role, status, branch);  // <-- THÊM branch
         return ResponseEntity.ok(ResponseObject.success("Lấy danh sách người dùng thành công", users));
     }
 

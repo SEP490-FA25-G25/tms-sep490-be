@@ -214,22 +214,14 @@ public class UserAccountService {
     }
 
     @Transactional(readOnly = true)
-    public Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status) {
-        log.info("Getting all users with search: {}, role: {}, status: {}", search, role, status);
-
-        // Convert status string sang enum
-        UserStatus userStatus = null;
+    public Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status, Long branchId) {
+        log.info("Getting all users with search: {}, role: {}, status: {}, branchId: {}", search, role, status, branchId);
+        UserStatus statusEnum = null;
         if (status != null && !status.isEmpty()) {
-            userStatus = UserStatus.valueOf(status);
+            statusEnum = UserStatus.valueOf(status);
         }
 
-        Page<UserAccount> users = userAccountRepository.findAllWithFilters(
-                search,
-                role,
-                userStatus,
-                pageable
-        );
-
+        Page<UserAccount> users = userAccountRepository.findAllWithFilters(search, role, statusEnum, branchId, pageable);
         return users.map(this::mapToResponse);
     }
 
