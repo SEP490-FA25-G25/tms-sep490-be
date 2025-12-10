@@ -83,6 +83,10 @@ public enum ErrorCode {
     // Make-up Request specific errors (4112-4119)
 
     // Attendance errors (1300-1399)
+    ATTENDANCE_RECORDS_EMPTY(1300, "Danh sách điểm danh trống"),
+    SESSION_ALREADY_DONE(1301, "Buổi học đã khóa, không thể sửa"),
+    HOMEWORK_STATUS_INVALID_NO_PREVIOUS_HOMEWORK(1302, "Buổi trước không có bài, chỉ được chọn NO_HOMEWORK"),
+    HOMEWORK_STATUS_INVALID_HAS_PREVIOUS_HOMEWORK(1303, "Buổi trước có bài tập, không được chọn NO_HOMEWORK"),
 
     // Common errors (9000-9999)
     INVALID_INPUT(9000, "Dữ liệu đầu vào không hợp lệ"),

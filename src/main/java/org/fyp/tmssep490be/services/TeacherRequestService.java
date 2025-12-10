@@ -40,7 +40,6 @@ import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -60,13 +59,12 @@ public class TeacherRequestService {
     private final SessionResourceRepository sessionResourceRepository;
     private final TeachingSlotRepository teachingSlotRepository;
     private final UserBranchesRepository userBranchesRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
     private final UserAccountRepository userAccountRepository;
     private final ResourceRepository resourceRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
     private final PolicyService policyService;
 
-    // Giáo viên tạo yêu cầu (hiện mới hỗ trợ MODALITY_CHANGE)
+    // Giáo viên tạo yêu cầu
     @Transactional
     public TeacherRequestResponseDTO createRequest(TeacherRequestCreateDTO createDTO, Long userId) {
         log.info("Creating teacher request type {} for user {}", createDTO.getRequestType(), userId);
@@ -95,10 +93,17 @@ public class TeacherRequestService {
         if (session.getStatus() != SessionStatus.PLANNED) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Session is not in PLANNED status");
         }
-        int minDaysBeforeSession = policyService.getGlobalInt("teacher.request.min_days_before_session", 1);
-        LocalDate minAllowedDate = LocalDate.now().plusDays(minDaysBeforeSession);
-        if (session.getDate().isBefore(minAllowedDate)) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Session is too close to request (" + minDaysBeforeSession + " day(s) required)");
+        int minDaysBeforeSession = policyService.getGlobalInt("teacher.request.min_days_before_session", 0);
+        LocalDate today = LocalDate.now();
+        // Không cho phép chọn buổi trong quá khứ; cho phép cùng ngày nếu policy = 0
+        if (session.getDate().isBefore(today)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session date is in the past");
+        }
+        if (minDaysBeforeSession > 0) {
+            LocalDate minAllowedDate = today.plusDays(minDaysBeforeSession);
+            if (session.getDate().isBefore(minAllowedDate)) {
+                throw new CustomException(ErrorCode.INVALID_INPUT, "Session is too close to request (" + minDaysBeforeSession + " day(s) required)");
+            }
         }
 
         TeacherRequestType requestType = createDTO.getRequestType();
@@ -783,7 +788,11 @@ public class TeacherRequestService {
 
         TimeSlotTemplate newTimeSlot = request.getNewTimeSlot();
 
+        // Nếu chưa có decidedBy, fallback sang submittedBy để hiển thị người tạo (đặc biệt với WAITING_CONFIRM)
         UserAccount decidedBy = request.getDecidedBy();
+        UserAccount submittedBy = request.getSubmittedBy();
+        UserAccount handler = decidedBy != null ? decidedBy : submittedBy;
+        OffsetDateTime decidedAt = request.getDecidedAt() != null ? request.getDecidedAt() : request.getSubmittedAt();
 
         // Xử lý modality cho MODALITY_CHANGE
         Modality currentModality = null;
@@ -814,10 +823,10 @@ public class TeacherRequestService {
                 .newSessionEndTime(newTimeSlot != null ? newTimeSlot.getEndTime() : null)
                 .requestReason(request.getRequestReason())
                 .submittedAt(request.getSubmittedAt())
-                .decidedAt(request.getDecidedAt())
-                .decidedById(decidedBy != null ? decidedBy.getId() : null)
-                .decidedByName(decidedBy != null ? decidedBy.getFullName() : null)
-                .decidedByEmail(decidedBy != null ? decidedBy.getEmail() : null)
+                .decidedAt(decidedAt)
+                .decidedById(handler != null ? handler.getId() : null)
+                .decidedByName(handler != null ? handler.getFullName() : null)
+                .decidedByEmail(handler != null ? handler.getEmail() : null)
                 .currentModality(currentModality)
                 .newModality(newModality)
                 .build();
@@ -946,12 +955,12 @@ public class TeacherRequestService {
         List<Session> sessions = sessionRepository.findUpcomingSessionsForTeacher(
                 teacher.getId(), fromDate, toDate, classId);
 
-        // Map sang DTO và kiểm tra pending requests
+        // Chỉ gợi ý session chưa diễn ra
         return sessions.stream()
+                .filter(this::isUpcomingSession)
                 .map(session -> {
                     MySessionDTO dto = mapToMySessionDTO(session);
                     if (dto != null) {
-                        // Kiểm tra xem session có pending request không
                         boolean hasPending = teacherRequestRepository.existsBySessionIdAndStatus(
                                 session.getId(), RequestStatus.PENDING);
                         dto.setHasPendingRequest(hasPending);
@@ -1004,6 +1013,18 @@ public class TeacherRequestService {
                 .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
         if (!isOwner) {
             throw new CustomException(ErrorCode.FORBIDDEN, "Teacher is not assigned to this session");
+        }
+
+        int minDaysBeforeSession = policyService.getGlobalInt("teacher.request.min_days_before_session", 0);
+        LocalDate today = LocalDate.now();
+        if (session.getDate().isBefore(today)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session date is in the past");
+        }
+        if (minDaysBeforeSession > 0) {
+            LocalDate minAllowedDate = today.plusDays(minDaysBeforeSession);
+            if (session.getDate().isBefore(minAllowedDate)) {
+                throw new CustomException(ErrorCode.INVALID_INPUT, "Session is too close to request (" + minDaysBeforeSession + " day(s) required)");
+            }
         }
 
         // Chỉ cho phép tạo yêu cầu cho buổi PLANNED
@@ -1128,6 +1149,9 @@ public class TeacherRequestService {
         Teacher replacementTeacher = request.getReplacementTeacher();
         UserAccount replacementTeacherAccount = replacementTeacher != null ? replacementTeacher.getUserAccount() : null;
         UserAccount decidedBy = request.getDecidedBy();
+        UserAccount submittedBy = request.getSubmittedBy();
+        UserAccount handler = decidedBy != null ? decidedBy : submittedBy;
+        OffsetDateTime decidedAt = request.getDecidedAt() != null ? request.getDecidedAt() : request.getSubmittedAt();
         Resource newResource = request.getNewResource();
         TimeSlotTemplate newTimeSlot = request.getNewTimeSlot();
 
@@ -1147,10 +1171,21 @@ public class TeacherRequestService {
                 .requestReason(request.getRequestReason())
                 .note(request.getNote())
                 .submittedAt(request.getSubmittedAt())
-                .decidedAt(request.getDecidedAt())
-                .decidedById(decidedBy != null ? decidedBy.getId() : null)
-                .decidedByName(decidedBy != null ? decidedBy.getFullName() : null)
-                .decidedByEmail(decidedBy != null ? decidedBy.getEmail() : null);
+                .decidedAt(decidedAt)
+                .decidedById(handler != null ? handler.getId() : null)
+                .decidedByName(handler != null ? handler.getFullName() : null)
+                .decidedByEmail(handler != null ? handler.getEmail() : null);
+
+        // Debug log to trace who is shown as handler in responses
+        log.debug(
+                "mapToResponseDTO id={} type={} status={} decidedBy={} submittedBy={} handler={}",
+                request.getId(),
+                request.getRequestType(),
+                request.getStatus(),
+                decidedBy != null ? decidedBy.getFullName() : null,
+                submittedBy != null ? submittedBy.getFullName() : null,
+                handler != null ? handler.getFullName() : null
+        );
 
         // Hiển thị thông tin dựa trên yêu cầu
         switch (request.getRequestType()) {
@@ -1221,6 +1256,7 @@ public class TeacherRequestService {
                 teacher.getId(), fromDate, toDate, classId);
 
         return sessions.stream()
+                .filter(this::isUpcomingSession)
                 .map(this::mapToMySessionDTO)
                 .collect(Collectors.toList());
     }
@@ -1243,6 +1279,29 @@ public class TeacherRequestService {
                 .topic(subjectSession != null ? subjectSession.getTopic() : null)
                 .hasPendingRequest(false)
                 .build();
+    }
+
+    
+      //Chỉ giữ các session chưa diễn ra:
+      //- Ngày sau hôm nay, hoặc
+      //- Cùng ngày nhưng startTime còn ở tương lai
+    private boolean isUpcomingSession(Session session) {
+        if (session == null || session.getDate() == null) {
+            return false;
+        }
+        LocalDate today = LocalDate.now();
+        if (session.getDate().isAfter(today)) {
+            return true;
+        }
+        if (session.getDate().isEqual(today)) {
+            TimeSlotTemplate slot = session.getTimeSlotTemplate();
+            if (slot != null && slot.getStartTime() != null) {
+                return slot.getStartTime().isAfter(java.time.LocalTime.now());
+            }
+            // Nếu không có startTime, không chắc trạng thái -> loại bỏ để tránh gợi ý buổi đã diễn ra
+            return false;
+        }
+        return false;
     }
 
     //Gợi ý giáo viên dạy thay cho REPLACEMENT request (cho teacher)

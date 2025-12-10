@@ -175,5 +175,25 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
            "WHERE s.classEntity.id = :classId " +
            "ORDER BY s.date ASC, tst.startTime ASC")
     List<Session> findAllByClassIdOrderByDateAndTime(@Param("classId") Long classId);
+
+    List<Session> findByClassEntityIdAndStatusIn(Long classId, List<SessionStatus> statuses);
+
+    @Query("SELECT s FROM Session s WHERE s.classEntity.id = :classId AND s.date >= :date ORDER BY s.date ASC")
+    List<Session> findByClassEntityIdAndDateAfterOrEqual(@Param("classId") Long classId, @Param("date") LocalDate date);
+
+    @Query("SELECT s FROM Session s WHERE s.classEntity.id = :classId AND s.date < :date ORDER BY s.date ASC")
+    List<Session> findByClassEntityIdAndDateBefore(@Param("classId") Long classId, @Param("date") LocalDate date);
+    /**
+     * Find previous sessions in the same class before a date
+     * Ordered desc by date/time for "latest previous" lookup
+     */
+    @Query("SELECT s FROM Session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.date < :date " +
+           "AND s.status <> 'CANCELLED' " +
+           "ORDER BY s.date DESC, s.timeSlotTemplate.startTime DESC")
+    List<Session> findPreviousSessionsByClassIdAndDate(
+            @Param("classId") Long classId,
+            @Param("date") java.time.LocalDate date);
 }
 

@@ -14,14 +14,16 @@ import java.time.OffsetDateTime;
 @AllArgsConstructor
 public class SubjectDTO {
     private Long id;
-    private String code;
     private String name;
+    private String code;
     private String status;
+    private String requesterName;
     private String approvalStatus;
     private String rejectionReason;
-    private LocalDate effectiveDate;
-    private OffsetDateTime submittedAt;
-    private OffsetDateTime decidedAt;
-    private OffsetDateTime createdAt;
-    private OffsetDateTime updatedAt;
+    private java.time.OffsetDateTime submittedAt;
+    private java.time.OffsetDateTime decidedAt;
+    @com.fasterxml.jackson.annotation.JsonFormat(shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    private java.time.LocalDate effectiveDate;
+    private java.time.OffsetDateTime createdAt;
+    private java.time.OffsetDateTime updatedAt;
 }

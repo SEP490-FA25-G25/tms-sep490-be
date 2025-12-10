@@ -20,10 +20,6 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 
     Optional<Student> findByUserAccountId(Long userId);
 
-    /**
-     * Find all available students for enrollment in a class
-     * Students must: be from same branch, ACTIVE status, not already enrolled
-     */
     @Query("SELECT s FROM Student s " +
            "INNER JOIN s.userAccount u " +
            "INNER JOIN u.userBranches ub " +
