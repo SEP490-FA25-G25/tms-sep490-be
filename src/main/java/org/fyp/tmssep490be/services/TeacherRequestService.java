@@ -64,6 +64,8 @@ public class TeacherRequestService {
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
     private final PolicyService policyService;
 
+    private static final int MIN_REASON_LENGTH = 10;
+
     // Giáo viên tạo yêu cầu
     @Transactional
     public TeacherRequestResponseDTO createRequest(TeacherRequestCreateDTO createDTO, Long userId) {
@@ -72,11 +74,10 @@ public class TeacherRequestService {
         Teacher teacher = teacherRepository.findByUserAccountId(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher profile not found for current user"));
 
-        // Validate lý do tối thiểu theo policy
-        int minReasonLength = policyService.getGlobalInt("teacher.request.reason_min_length", 15);
+        // Validate lý do tối thiểu
         String reason = createDTO.getReason() != null ? createDTO.getReason().trim() : "";
-        if (reason.length() < minReasonLength) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Reason must be at least " + minReasonLength + " characters");
+        if (reason.length() < MIN_REASON_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Reason must be at least " + MIN_REASON_LENGTH + " characters");
         }
 
         // Lấy session và kiểm tra quyền sở hữu
@@ -1001,11 +1002,10 @@ public class TeacherRequestService {
             throw new CustomException(ErrorCode.FORBIDDEN, "You don't have permission to create request for this teacher");
         }
 
-        // Validate lý do tối thiểu theo policy
-        int minReasonLength = policyService.getGlobalInt("teacher.request.reason_min_length", 15);
+        // Validate lý do tối thiểu
         String reason = createDTO.getReason() != null ? createDTO.getReason().trim() : "";
-        if (reason.length() < minReasonLength) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Reason must be at least " + minReasonLength + " characters");
+        if (reason.length() < MIN_REASON_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Reason must be at least " + MIN_REASON_LENGTH + " characters");
         }
 
         // Lấy session và kiểm tra quyền sở hữu

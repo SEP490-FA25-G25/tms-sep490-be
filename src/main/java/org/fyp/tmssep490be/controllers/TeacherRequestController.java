@@ -14,7 +14,6 @@ import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateDTO;
 import org.fyp.tmssep490be.dtos.schedule.TimeSlotDTO;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.security.UserPrincipal;
-import org.fyp.tmssep490be.services.PolicyService;
 import org.fyp.tmssep490be.services.TeacherRequestService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -36,15 +35,10 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/teacher-requests")
 @Slf4j
+@lombok.RequiredArgsConstructor
 public class TeacherRequestController {
 
     private final TeacherRequestService teacherRequestService;
-    private final PolicyService policyService;
-
-    public TeacherRequestController(TeacherRequestService teacherRequestService, PolicyService policyService) {
-        this.teacherRequestService = teacherRequestService;
-        this.policyService = policyService;
-    }
 
     //Endpoint để lấy tất cả yêu cầu của giáo viên hiện tại
     @GetMapping("/me")
@@ -146,16 +140,11 @@ public class TeacherRequestController {
     @GetMapping("/config")
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ResponseObject<TeacherRequestConfigDTO>> getTeacherRequestConfig() {
-        boolean requireResourceAtRescheduleCreate = policyService.getGlobalBoolean(
-                "teacher.reschedule.require_resource_at_create", true);
-        boolean requireResourceAtModalityChangeCreate = policyService.getGlobalBoolean(
-                "teacher.modality_change.require_resource", true);
-        int minDaysBeforeSession = policyService.getGlobalInt(
-                "teacher.request.min_days_before_session", 1);
-        int reasonMinLength = policyService.getGlobalInt(
-                "teacher.request.reason_min_length", 15);
-        int timeWindowDays = policyService.getGlobalInt(
-                "teacher.session.suggestion.max_days", 14);
+        boolean requireResourceAtRescheduleCreate = true;
+        boolean requireResourceAtModalityChangeCreate = true;
+        int minDaysBeforeSession = 1;
+        int reasonMinLength = 10;
+        int timeWindowDays = 14;
 
         TeacherRequestConfigDTO config = TeacherRequestConfigDTO.builder()
                 .requireResourceAtRescheduleCreate(requireResourceAtRescheduleCreate)
