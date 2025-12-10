@@ -65,7 +65,7 @@ SELECT setval('student_feedback_id_seq', 1, false);
 SELECT setval('student_feedback_response_id_seq', 1, false);
 SELECT setval('qa_report_id_seq', 1, false);
 SELECT setval('subject_material_id_seq', 1, false);
-SELECT setval('time_slot_template_id_seq', 16, false);
+SELECT setval('time_slot_template_id_seq', 26, false);
 SELECT setval('resource_id_seq', 1, false);
 SELECT setval('replacement_skill_assessment_id_seq', 1, false);
 SELECT setval('feedback_question_id_seq', 1, false);
@@ -193,7 +193,21 @@ INSERT INTO time_slot_template (id, branch_id, name, start_time, end_time, creat
 (14, 2, 'HCM Evening Late 2.5h', '19:00:00', '21:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
 -- Weekend Special Slots
 (15, 2, 'HCM Weekend Morning 2.5h', '08:30:00', '11:00:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
-(16, 2, 'HCM Weekend Afternoon 2.5h', '14:00:00', '16:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
+(16, 2, 'HCM Weekend Afternoon 2.5h', '14:00:00', '16:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+
+-- Additional 1.5h Time Slots for Ha Noi Branch
+(17, 1, 'HN Morning Slot 1 1.5h', '08:40:00', '10:10:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(18, 1, 'HN Morning Slot 2 1.5h', '10:20:00', '11:50:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(19, 1, 'HN Afternoon Slot 1 1.5h', '12:40:00', '14:10:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(20, 1, 'HN Afternoon Slot 2 1.5h', '14:20:00', '15:50:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(21, 1, 'HN Late Afternoon 1.5h', '16:00:00', '17:30:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+
+-- Additional 1.5h Time Slots for Ho Chi Minh Branch
+(22, 2, 'HCM Morning Slot 1 1.5h', '08:40:00', '10:10:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(23, 2, 'HCM Morning Slot 2 1.5h', '10:20:00', '11:50:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(24, 2, 'HCM Afternoon Slot 1 1.5h', '12:40:00', '14:10:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(25, 2, 'HCM Afternoon Slot 2 1.5h', '14:20:00', '15:50:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(26, 2, 'HCM Late Afternoon 1.5h', '16:00:00', '17:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
 
 -- Resources (Rooms & Zoom) - Comprehensive for Testing
 INSERT INTO resource (id, branch_id, resource_type, code, name, capacity, capacity_override, created_at, updated_at) VALUES
@@ -873,7 +887,7 @@ INSERT INTO plo (id, curriculum_id, code, description, created_at, updated_at) V
 INSERT INTO subject (id, curriculum_id, level_id, logical_subject_code, version, code, name, description, total_hours, number_of_sessions, hours_per_session, prerequisites, target_audience, teaching_methods, score_scale, status, approval_status, decided_by_manager, decided_at, rejection_reason, created_by, created_at, updated_at, effective_date) VALUES
 -- IELTS Courses
 (1, 1, 1, 'IELTS-FOUND-2025', 1, 'IELTS-FOUND-2025-V1', 'IELTS Foundation 2025', 'Khóa học nền tảng cho người mới bắt đầu, mục tiêu band 3.0-4.0', 60, 24, 2.5, 'Không yêu cầu kiến thức nền tảng.', 'Học viên mất gốc hoặc mới bắt đầu học tiếng Anh.', 'Communicative Language Teaching (CLT) kết hợp bài tập thực hành.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-20 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-20 14:00:00+07', '2024-09-01'),
-(2, 1, 3, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 75, 30, 2.5, 'Hoàn thành khóa Foundation hoặc IELTS 4.0+', 'Học viên có nền tảng cơ bản, mục tiêu band 5.0-5.5.', 'Chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-25 14:00:00+07', '2024-09-01'),
+(2, 1, 3, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 60, 24, 2.5, 'Hoàn thành khóa Foundation hoặc IELTS 4.0+', 'Học viên có nền tảng cơ bản, mục tiêu band 5.0-5.5.', 'Chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-25 14:00:00+07', '2024-09-01'),
 (3, 1, 4, 'IELTS-ADV-2025', 1, 'IELTS-ADV-2025-V1', 'IELTS Advanced 2025', 'Khóa học nâng cao, mục tiêu band 6.5+', 100, 40, 2.5, 'Hoàn thành khóa Intermediate hoặc IELTS 5.5+', 'Học viên muốn đạt band 6.5+ để du học hoặc làm việc.', 'Luyện đề cường độ cao và phản hồi cá nhân hóa.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-08-25 14:00:00+07', '2024-09-01'),
 -- TOEIC Courses (subject_id = 2, level_id = 8,9,11 for TOEIC levels)
 (4, 2, 8, 'TOEIC-FOUND-2025', 1, 'TOEIC-FOUND-2025-V1', 'TOEIC Foundation 2025', 'Nền tảng TOEIC cho người mới, mục tiêu 300-450', 50, 20, 2.5, 'Không yêu cầu kiến thức nền tảng.', 'Sinh viên, người đi làm mới bắt đầu học TOEIC.', 'Làm quen với format đề thi và từ vựng cơ bản.', '0-990', 'ACTIVE', 'APPROVED', 2, '2024-09-01 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-09-01 14:00:00+07', '2024-09-15'),
@@ -887,8 +901,7 @@ INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, c
 -- Course Phases for IELTS Intermediate (Course 2)
 INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
 (3, 2, 1, 'Skill Building', 5, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(4, 2, 2, 'Test Strategies', 5, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(5, 2, 3, 'Mock Tests & Review', 3, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+(4, 2, 2, 'Test Strategies', 5, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
 -- Course Phases for IELTS Advanced (Course 3)
 INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
@@ -927,18 +940,18 @@ INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, ski
 (11, 1, 11, 'Reading: Details and Facts', 'Find specific information', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (12, 1, 12, 'Writing: Connecting Ideas', 'Use simple connectors', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 -- Phase 2: Foundation Practice (Sessions 13-24)
-(13, 2, 1, 'Listening: Following Instructions', 'Complete tasks from audio', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(14, 2, 2, 'Speaking: Asking Questions', 'Practice question forms', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(15, 2, 3, 'Reading: Short Stories', 'Read and summarize', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(16, 2, 4, 'Writing: Describing People and Places', 'Write descriptions', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(17, 2, 5, 'Listening: News and Announcements', 'Understand main points', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(18, 2, 6, 'Speaking: Giving Opinions', 'Express simple opinions', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(19, 2, 7, 'Reading: Understanding Context', 'Use context clues', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(20, 2, 8, 'Writing: Personal Letters', 'Write informal letters', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(21, 2, 9, 'Practice Test: Listening & Reading', 'Complete practice test', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(22, 2, 10, 'Practice Test: Writing & Speaking', 'Complete practice test', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(23, 2, 11, 'Review and Feedback', 'Review all skills', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(24, 2, 12, 'Final Assessment', 'Complete final test', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+(13, 2, 13, 'Listening: Following Instructions', 'Complete tasks from audio', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(14, 2, 14, 'Speaking: Asking Questions', 'Practice question forms', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(15, 2, 15, 'Reading: Short Stories', 'Read and summarize', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(16, 2, 16, 'Writing: Describing People and Places', 'Write descriptions', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(17, 2, 17, 'Listening: News and Announcements', 'Understand main points', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(18, 2, 18, 'Speaking: Giving Opinions', 'Express simple opinions', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(19, 2, 19, 'Reading: Understanding Context', 'Use context clues', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(20, 2, 20, 'Writing: Personal Letters', 'Write informal letters', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(21, 2, 21, 'Practice Test: Listening & Reading', 'Complete practice test', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(22, 2, 22, 'Practice Test: Writing & Speaking', 'Complete practice test', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(23, 2, 23, 'Review and Feedback', 'Review all skills', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(24, 2, 24, 'Final Assessment', 'Complete final test', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
 -- Course 2: IELTS Intermediate (30 sessions)
 -- Phase 3: 12 sessions
@@ -947,12 +960,9 @@ SELECT 24 + s.idx, 3, s.idx, 'IELTS Int Skill Building ' || s.idx, 'Practice ski
 FROM generate_series(1, 12) AS s(idx);
 -- Phase 4: 12 sessions
 INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 36 + s.idx, 4, s.idx, 'IELTS Int Strategies ' || s.idx, 'Learn strategies', 'GENERAL', NOW(), NOW()
+SELECT 36 + s.idx, 4, 12 + s.idx, 'IELTS Int Strategies ' || s.idx, 'Learn strategies', 'GENERAL', NOW(), NOW()
 FROM generate_series(1, 12) AS s(idx);
--- Phase 5: 6 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 48 + s.idx, 5, s.idx, 'IELTS Int Mock Test ' || s.idx, 'Do mock test', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 6) AS s(idx);
+
 
 -- Course 3: IELTS Advanced (40 sessions)
 -- Phase 6: 15 sessions
@@ -1273,15 +1283,15 @@ INSERT INTO subject_assessment (id, subject_id, name, kind, duration_minutes, ma
 
 -- Classes: 18 total (3 per course x 6 courses), NO HYBRID
 INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
--- IELTS Foundation (Course 1) - 3 classes
-(1, 1, 1, 'HN-IELTS-F1', 'HN IELTS Foundation 1', 'OFFLINE', '2025-09-01', '2025-10-24', '2025-10-24', ARRAY[1,3,5]::smallint[], 20, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-08-24 10:00:00+07', '2025-08-25 14:00:00+07', '2025-08-24 10:00:00+07', '2025-10-24 18:00:00+07'),
-(2, 1, 1, 'HN-IELTS-F2', 'HN IELTS Foundation 2', 'OFFLINE', '2025-11-10', '2026-01-02', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-01 10:00:00+07', '2025-11-02 14:00:00+07', '2025-11-01 10:00:00+07', '2025-11-10 08:00:00+07'),
-(3, 2, 1, 'HCM-IELTS-F1', 'HCM IELTS Foundation 1', 'ONLINE', '2025-11-17', '2026-01-09', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-08 10:00:00+07', '2025-11-09 14:00:00+07', '2025-11-08 10:00:00+07', '2025-11-17 08:00:00+07'),
+-- IELTS Foundation (Course 1) - 3 classes (Staggered: Fast, Standard, Slow)
+(1, 1, 1, 'HN-IELTS-F1', 'HN IELTS Foundation 1 (Fast)', 'OFFLINE', '2025-10-27', '2025-12-19', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-10-20 10:00:00+07', '2025-10-21 14:00:00+07', '2025-10-20 10:00:00+07', NOW()),
+(2, 1, 1, 'HN-IELTS-F2', 'HN IELTS Foundation 2 (Standard)', 'OFFLINE', '2025-11-14', '2026-01-08', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-01 10:00:00+07', '2025-11-02 14:00:00+07', '2025-11-01 10:00:00+07', NOW()),
+(3, 1, 1, 'HN-IELTS-F3', 'HN IELTS Foundation 3 (Slow)', 'OFFLINE', '2025-12-03', '2026-01-26', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', NOW()),
 
--- IELTS Intermediate (Course 2) - 3 classes (30 sessions)
-(4, 1, 2, 'HN-IELTS-I1', 'HN IELTS Intermediate 1', 'OFFLINE', '2025-09-08', '2025-11-29', '2025-11-29', ARRAY[2,4,6]::smallint[], 20, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-08-31 10:00:00+07', '2025-09-01 14:00:00+07', '2025-08-31 10:00:00+07', '2025-11-29 18:00:00+07'),
-(5, 1, 2, 'HN-IELTS-I2', 'HN IELTS Intermediate 2', 'ONLINE', '2025-11-18', '2026-01-24', NULL, ARRAY[1,3,5]::smallint[], 18, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-07 10:00:00+07', '2025-11-08 14:00:00+07', '2025-11-07 10:00:00+07', '2025-11-18 08:00:00+07'),
-(6, 2, 2, 'HCM-IELTS-I1', 'HCM IELTS Intermediate 1', 'ONLINE', '2025-11-24', '2026-01-30', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-09 10:00:00+07', '2025-11-10 14:00:00+07', '2025-11-09 10:00:00+07', '2025-11-24 08:00:00+07'),
+-- IELTS Intermediate (Course 2) - 3 classes (Staggered: Fast, Standard, Slow)
+(4, 1, 2, 'HN-IELTS-I1', 'HN IELTS Intermediate 1 (Fast)', 'OFFLINE', '2025-10-27', '2025-12-19', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-10-20 10:00:00+07', '2025-10-21 14:00:00+07', '2025-10-20 10:00:00+07', NOW()),
+(5, 1, 2, 'HN-IELTS-I2', 'HN IELTS Intermediate 2 (Standard)', 'OFFLINE', '2025-11-14', '2026-01-08', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-01 10:00:00+07', '2025-11-02 14:00:00+07', '2025-11-01 10:00:00+07', NOW()),
+(6, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Slow)', 'OFFLINE', '2025-12-03', '2026-01-26', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', NOW()),
 
 -- IELTS Advanced (Course 3) - 3 classes (40 sessions)
 (7, 1, 3, 'HN-IELTS-A1', 'HN IELTS Advanced 1', 'ONLINE', '2025-09-22', '2026-01-09', '2026-01-09', ARRAY[1,3,5]::smallint[], 15, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-09-15 10:00:00+07', '2025-09-16 14:00:00+07', '2025-09-15 10:00:00+07', '2026-01-09 18:00:00+07'),
@@ -1303,57 +1313,61 @@ INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date
 (17, 1, 6, 'HN-TOEIC-A2', 'HN TOEIC Advanced 2', 'ONLINE', '2025-12-15', '2026-02-20', NULL, ARRAY[2,4,6]::smallint[], 15, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-05 10:00:00+07', '2025-12-06 14:00:00+07', '2025-12-05 10:00:00+07', '2025-12-06 14:00:00+07'),
 (18, 2, 6, 'HCM-TOEIC-A1', 'HCM TOEIC Advanced 1', 'OFFLINE', '2025-12-08', '2026-02-12', NULL, ARRAY[1,3,5]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', '2025-12-08 08:00:00+07');
 
--- Generate Sessions for Class 1 (HN-IELTS-F1) - COMPLETED
+-- Generate Sessions for Class 1 (HN-IELTS-F1 - Fast)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-SELECT s.idx, 1, s.idx, 1, ('2025-09-01'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'DONE', 'Completed.', '2025-08-25 10:00:00+07', NOW()
+SELECT s.idx, 1, s.idx, 1, ('2025-10-27'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+CASE WHEN ('2025-10-27'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END,
+'Session note.', '2025-10-20 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
 
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 1 FROM session WHERE class_id = 1;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 1, 'SCHEDULED' FROM session WHERE class_id = 1;
 
--- Generate Sessions for Class 2 (HN-IELTS-F2) - ONGOING
+-- Generate Sessions for Class 2 (HN-IELTS-F2 - Standard)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 100 + s.idx, 2, s.idx, 1, ('2025-11-10'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
-  CASE WHEN ('2025-11-10'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-05' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-01 10:00:00+07', NOW()
+SELECT 100 + s.idx, 2, s.idx, 1, ('2025-11-14'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+  CASE WHEN ('2025-11-14'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-01 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
 
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 2 FROM session WHERE class_id = 2;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 2, 'SCHEDULED' FROM session WHERE class_id = 2;
 
--- Generate Sessions for Class 3 (HCM-IELTS-F1) - ONGOING ONLINE
+-- Generate Sessions for Class 3 (HN-IELTS-F3 - Slow)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 200 + s.idx, 3, s.idx, 13, ('2025-11-17'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS',
-  CASE WHEN ('2025-11-17'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END) < '2025-12-05' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-08 10:00:00+07', NOW()
+SELECT 200 + s.idx, 3, s.idx, 1, ('2025-12-03'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+  CASE WHEN ('2025-12-03'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-25 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
 
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 8 FROM session WHERE class_id = 3;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 9, 'SCHEDULED' FROM session WHERE class_id = 3;
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 3 FROM session WHERE class_id = 3;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 3, 'SCHEDULED' FROM session WHERE class_id = 3;
 
--- Generate Sessions for Class 4 (HN-IELTS-I1) - COMPLETED
+-- Generate Sessions for Class 4 (HN-IELTS-I1 - Fast)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-SELECT 300 + s.idx, 4, 24 + s.idx, 2, ('2025-09-08'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS', 'DONE', 'Completed.', '2025-08-31 10:00:00+07', NOW()
-FROM generate_series(1, 30) AS s(idx);
+SELECT 300 + s.idx, 4, 24 + s.idx, 2, ('2025-10-27'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+CASE WHEN ('2025-10-27'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END,
+'Session note.', '2025-10-20 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
 
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 3 FROM session WHERE class_id = 4;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 3, 'SCHEDULED' FROM session WHERE class_id = 4;
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 9 FROM session WHERE class_id = 4;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 4, 'SCHEDULED' FROM session WHERE class_id = 4;
 
--- Generate Sessions for Class 5 (HN-IELTS-I2) - ONGOING ONLINE
+-- Generate Sessions for Class 5 (HN-IELTS-I2 - Standard)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 400 + s.idx, 5, 24 + s.idx, 5, ('2025-11-18'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
-  CASE WHEN ('2025-11-18'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-05' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-07 10:00:00+07', NOW()
-FROM generate_series(1, 30) AS s(idx);
+SELECT 400 + s.idx, 5, 24 + s.idx, 2, ('2025-11-14'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+  CASE WHEN ('2025-11-14'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-01 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
 
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 4 FROM session WHERE class_id = 5;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 4, 'SCHEDULED' FROM session WHERE class_id = 5;
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 10 FROM session WHERE class_id = 5;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 5, 'SCHEDULED' FROM session WHERE class_id = 5;
 
--- Generate Sessions for Class 6 (HCM-IELTS-I1) - ONGOING
+-- Generate Sessions for Class 6 (HN-IELTS-I3 - Slow)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 500 + s.idx, 6, 24 + s.idx, 11, ('2025-11-24'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS',
-  CASE WHEN ('2025-11-24'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END) < '2025-12-05' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-09 10:00:00+07', NOW()
-FROM generate_series(1, 30) AS s(idx);
+SELECT 500 + s.idx, 6, 24 + s.idx, 2, ('2025-12-03'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+  CASE WHEN ('2025-12-03'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-25 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
 
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 5 FROM session WHERE class_id = 6;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 10, 'SCHEDULED' FROM session WHERE class_id = 6;
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 11 FROM session WHERE class_id = 6;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 6, 'SCHEDULED' FROM session WHERE class_id = 6;
 
 -- Generate Sessions for Class 7 (HN-IELTS-A1) - COMPLETED
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
@@ -1458,35 +1472,38 @@ INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 22, 'SCHED
 
 -- ========== TIER 5: ENROLLMENTS & ATTENDANCE ==========
 
--- Enrollments for Class 1 (HN-IELTS-F1) - 15 students, all completed
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, left_at, left_session_id, created_at, updated_at)
-SELECT (100 + s.id), 1, s.id, 'COMPLETED', '2025-08-25 09:00:00+07', 6, 1, '2025-10-24 18:00:00+07', 24, '2025-08-25 09:00:00+07', '2025-10-24 18:00:00+07'
+-- Enrollments for Class 1 (HN-IELTS-F1) - 15 students (IDs 2-16)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT (100 + s.id), 1, s.id + 1, 'ENROLLED', '2025-10-20 09:00:00+07', 6, 1, '2025-10-20 09:00:00+07', NOW()
 FROM generate_series(1, 15) AS s(id);
 
--- Enrollments for Class 2 (HN-IELTS-F2) - 20 students, ongoing
+-- Enrollments for Class 2 (HN-IELTS-F2) - 20 students (Student 1 + IDs 17-35)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at) VALUES
+(200, 2, 1, 'ENROLLED', '2025-11-01 09:00:00+07', 6, 101, '2025-11-01 09:00:00+07', NOW());
+
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (200 + s.id), 2, s.id + 15, 'ENROLLED', '2025-11-01 09:00:00+07', 6, 101, '2025-11-01 09:00:00+07', NOW()
+SELECT (201 + s.id), 2, s.id + 16, 'ENROLLED', '2025-11-01 09:00:00+07', 6, 101, '2025-11-01 09:00:00+07', NOW()
+FROM generate_series(1, 19) AS s(id);
+
+-- Enrollments for Class 3 (HN-IELTS-F3) - 20 students
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT (300 + s.id), 3, s.id + 35, 'ENROLLED', '2025-11-25 09:00:00+07', 6, 201, '2025-11-25 09:00:00+07', NOW()
 FROM generate_series(1, 20) AS s(id);
 
--- Enrollments for Class 3 (HCM-IELTS-F1) - 25 students, ongoing online
+-- Enrollments for Class 4 (HN-IELTS-I1) - 18 students
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (300 + s.id), 3, s.id + 50, 'ENROLLED', '2025-11-08 09:00:00+07', 8, 201, '2025-11-08 09:00:00+07', NOW()
-FROM generate_series(1, 25) AS s(id);
-
--- Enrollments for Class 4 (HN-IELTS-I1) - 18 students, completed
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, left_at, left_session_id, created_at, updated_at)
-SELECT (400 + s.id), 4, s.id + 32, 'COMPLETED', '2025-08-31 09:00:00+07', 6, 301, '2025-11-15 18:00:00+07', 324, '2025-08-31 09:00:00+07', '2025-11-15 18:00:00+07'
+SELECT (400 + s.id), 4, s.id + 55, 'ENROLLED', '2025-10-20 09:00:00+07', 6, 301, '2025-10-20 09:00:00+07', NOW()
 FROM generate_series(1, 18) AS s(id);
 
--- Enrollments for Class 5 (HN-IELTS-I2) - 15 students, ongoing online
+-- Enrollments for Class 5 (HN-IELTS-I2) - 15 students
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (500 + s.id), 5, s.id, 'ENROLLED', '2025-11-07 09:00:00+07', 6, 401, '2025-11-07 09:00:00+07', NOW()
+SELECT (500 + s.id), 5, s.id + 73, 'ENROLLED', '2025-11-07 09:00:00+07', 6, 401, '2025-11-07 09:00:00+07', NOW()
 FROM generate_series(1, 15) AS s(id);
 
--- Enrollments for Class 6 (HCM-IELTS-I1) - 18 students, ongoing
+-- Enrollments for Class 6 (HN-IELTS-I3) - 12 students (Remaining)
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (600 + s.id), 6, s.id + 70, 'ENROLLED', '2025-11-09 09:00:00+07', 8, 501, '2025-11-09 09:00:00+07', NOW()
-FROM generate_series(1, 18) AS s(id);
+SELECT (600 + s.id), 6, s.id + 88, 'ENROLLED', '2025-11-25 09:00:00+07', 6, 501, '2025-11-25 09:00:00+07', NOW()
+FROM generate_series(1, 12) AS s(id);
 
 -- Enrollments for Class 7 (HN-IELTS-A1) - 12 students, completed
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, left_at, left_session_id, created_at, updated_at)
@@ -1573,17 +1590,17 @@ ON CONFLICT (student_id, session_id) DO NOTHING;
 -- ========== PHASE 3: EDGE CASES & ENHANCEMENTS ==========
 
 -- 1. High Absence Scenario (Test Attendance Warnings)
--- Student 16 (in Class 2) has been absent for most sessions
+-- Student 17 (in Class 2) has been absent for most sessions
 UPDATE student_session
 SET attendance_status = 'ABSENT'
-WHERE student_id = 16 -- Student ID 16 is enrolled in Class 2 (Enrollment ID 201)
+WHERE student_id = 17 -- Student ID 17 is enrolled in Class 2 (Enrollment ID 201)
   AND session_id IN (SELECT id FROM session WHERE class_id = 2 AND status = 'DONE');
 
--- 2. Student.0001 Absent on 2025-12-02 (Class 5 HN-IELTS-I2, Session 407)
--- student.0001@gmail.com (student_id = 1) absent on session 407 (2025-12-02)
+-- 2. Student.0001 Absent on Session 105 (Class 2 HN-IELTS-F2)
+-- student.0001@gmail.com (student_id = 1) absent on session 105
 UPDATE student_session
 SET attendance_status = 'ABSENT'
-WHERE student_id = 1 AND session_id = 407;
+WHERE student_id = 1 AND session_id = 105;
 
 -- 3. Teacher Forgot Attendance Scenario (Test Reminders)
 -- Note: We no longer delete StudentSession records as they are needed for schedule display
@@ -1678,10 +1695,10 @@ INSERT INTO teacher_request (id, teacher_id, session_id, request_type, new_date,
 
 -- Assessments for Class 2 (scheduled and completed)
 INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(1, 2, 1, '2025-10-18 08:00:00+07', '2025-10-18 08:00:00+07', '2025-10-18 08:00:00+07', '2025-10-18 08:00:00+07'), -- Listening Quiz 1 - completed
-(2, 2, 2, '2025-10-21 08:00:00+07', '2025-10-21 08:00:00+07', '2025-10-21 08:00:00+07', '2025-10-21 08:00:00+07'), -- Speaking Quiz 1 - completed
-(3, 2, 5, '2025-11-08 08:00:00+07', NULL, '2025-10-15 08:00:00+07', '2025-10-15 08:00:00+07'), -- Midterm - scheduled
-(4, 2, 6, '2025-11-27 08:00:00+07', NULL, '2025-10-15 08:00:00+07', '2025-10-15 08:00:00+07'); -- Final - scheduled
+(1, 2, 1, '2025-11-21 08:00:00+07', '2025-11-21 08:00:00+07', '2025-11-14 08:00:00+07', '2025-11-21 08:00:00+07'), -- Listening Quiz 1 - completed
+(2, 2, 2, '2025-11-26 08:00:00+07', '2025-11-26 08:00:00+07', '2025-11-14 08:00:00+07', '2025-11-26 08:00:00+07'), -- Speaking Quiz 1 - completed
+(3, 2, 5, '2025-12-10 08:00:00+07', NULL, '2025-11-14 08:00:00+07', '2025-11-14 08:00:00+07'), -- Midterm - today
+(4, 2, 6, '2026-01-07 08:00:00+07', NULL, '2025-11-14 08:00:00+07', '2025-11-14 08:00:00+07'); -- Final - scheduled
 
 -- Assessments for Class 16 (HN-INT-O1) - Ongoing class for teacher grading demo
 -- Uses course_assessment ids 7 and 8 (Intermediate course)
@@ -1695,8 +1712,8 @@ INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, act
 
 -- Class 4 (IELTS Intermediate - Completed)
 INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(30, 4, 7, '2025-10-15 08:00:00+07', '2025-10-15 08:00:00+07', '2025-10-01 08:00:00+07', '2025-10-15 08:00:00+07'),
-(31, 4, 8, '2025-11-10 08:00:00+07', '2025-11-10 08:00:00+07', '2025-10-01 08:00:00+07', '2025-11-10 08:00:00+07');
+(30, 4, 7, '2025-11-24 08:00:00+07', '2025-11-24 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-24 08:00:00+07'),
+(31, 4, 8, '2025-12-19 08:00:00+07', NULL, '2025-10-27 08:00:00+07', '2025-10-27 08:00:00+07');
 
 -- Class 7 (IELTS Advanced - Completed)
 INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
@@ -1726,16 +1743,16 @@ INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, act
 
 -- Scores for completed assessments (Listening Quiz 1)
 INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at) VALUES
-(1, 1, 18.0, 'Good listening skills', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(1, 2, 16.5, 'Need more practice on numbers', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(1, 3, 19.0, 'Excellent performance', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(1, 4, 15.0, 'Satisfactory', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(1, 5, 17.5, 'Good work', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(1, 6, 14.0, 'Need improvement', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(1, 7, 18.5, 'Very good', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(1, 8, 16.0, 'Good progress', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(1, 9, 17.0, 'Well done', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07'),
-(1, 10, 15.5, 'Fair performance', 1, '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07', '2025-10-19 10:00:00+07');
+(1, 1, 18.0, 'Good listening skills', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
+(1, 2, 16.5, 'Need more practice on numbers', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
+(1, 3, 19.0, 'Excellent performance', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
+(1, 4, 15.0, 'Satisfactory', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
+(1, 5, 17.5, 'Good work', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
+(1, 6, 14.0, 'Need improvement', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
+(1, 7, 18.5, 'Very good', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
+(1, 8, 16.0, 'Good progress', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
+(1, 9, 17.0, 'Well done', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
+(1, 10, 15.5, 'Fair performance', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07');
 
 -- Scores for Class 16, Writing Task 2 Assignment (assessment_id = 20)
 -- Students 1-10 are enrolled in Class 16
@@ -1761,12 +1778,12 @@ INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded
 
 -- Assessments for Class 1 (COMPLETED)
 INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(10, 1, 1, '2025-07-21 08:00:00+07', '2025-07-21 08:00:00+07', '2025-07-21 08:00:00+07', '2025-07-21 08:00:00+07'), -- Listening Quiz 1
-(11, 1, 2, '2025-07-28 08:00:00+07', '2025-07-28 08:00:00+07', '2025-07-28 08:00:00+07', '2025-07-28 08:00:00+07'), -- Speaking Quiz 1
-(12, 1, 3, '2025-08-04 08:00:00+07', '2025-08-04 08:00:00+07', '2025-08-04 08:00:00+07', '2025-08-04 08:00:00+07'), -- Reading Quiz 1
-(13, 1, 4, '2025-08-11 08:00:00+07', '2025-08-11 08:00:00+07', '2025-08-11 08:00:00+07', '2025-08-11 08:00:00+07'), -- Writing Assignment 1
-(14, 1, 5, '2025-08-18 08:00:00+07', '2025-08-18 08:00:00+07', '2025-08-18 08:00:00+07', '2025-08-18 08:00:00+07'), -- Midterm Exam
-(15, 1, 6, '2025-09-01 08:00:00+07', '2025-09-01 08:00:00+07', '2025-09-01 08:00:00+07', '2025-09-01 08:00:00+07'); -- Final Exam
+(10, 1, 1, '2025-11-03 08:00:00+07', '2025-11-03 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-03 08:00:00+07'), -- Listening Quiz 1
+(11, 1, 2, '2025-11-07 08:00:00+07', '2025-11-07 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-07 08:00:00+07'), -- Speaking Quiz 1
+(12, 1, 3, '2025-11-17 08:00:00+07', '2025-11-17 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-17 08:00:00+07'), -- Reading Quiz 1
+(13, 1, 4, '2025-11-21 08:00:00+07', '2025-11-21 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-21 08:00:00+07'), -- Writing Assignment 1
+(14, 1, 5, '2025-11-26 08:00:00+07', '2025-11-26 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-26 08:00:00+07'), -- Midterm Exam
+(15, 1, 6, '2025-12-19 08:00:00+07', NULL, '2025-10-27 08:00:00+07', '2025-10-27 08:00:00+07'); -- Final Exam
 
 -- Scores for Class 1, Midterm Exam (assessment_id = 14)
 INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at)
@@ -1776,19 +1793,10 @@ SELECT
     60 + floor(random() * 35)::int, -- Score between 60 and 94
     'Good overall performance on the midterm.',
     3, -- Graded by Teacher 3
-    '2025-08-20 10:00:00+07'
+    '2025-11-28 10:00:00+07'
 FROM generate_series(1, 15) AS s(id);
 
--- Scores for Class 1, Final Exam (assessment_id = 15)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at)
-SELECT
-    15,
-    s.id,
-    65 + floor(random() * 30)::int, -- Score between 65 and 94, showing improvement
-    'Solid performance on the final exam. Well done.',
-    3, -- Graded by Teacher 3
-    '2025-09-03 10:00:00+07'
-FROM generate_series(1, 15) AS s(id);
+
 
 -- =========================================
 -- ADDITIONAL SCORES FOR COMPLETED CLASSES
@@ -1799,10 +1807,7 @@ FROM generate_series(1, 15) AS s(id);
 INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
 SELECT 30, e.student_id, 60 + floor(random() * 30)::int, 'Good effort on writing task.', 6, NOW(), NOW(), NOW()
 FROM enrollment e WHERE e.class_id = 4;
--- Assessment 31 (Final)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 31, e.student_id, 65 + floor(random() * 30)::int, 'Final exam results.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 4;
+
 
 -- Scores for Class 7 (IELTS Advanced)
 -- Assessment 32 (Writing Portfolio)

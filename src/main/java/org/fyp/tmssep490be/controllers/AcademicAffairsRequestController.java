@@ -1,31 +1,31 @@
 package org.fyp.tmssep490be.controllers;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.dtos.schedule.WeeklyScheduleResponseDTO;
 import org.fyp.tmssep490be.dtos.studentrequest.*;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentRequestService;
+import org.fyp.tmssep490be.services.StudentScheduleService;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+
 @RestController
 @RequestMapping("/api/v1/academic-requests")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Academic Affairs Request Management", description = "APIs for Academic Affairs staff to manage student requests")
-@SecurityRequirement(name = "Bearer Authentication")
 public class AcademicAffairsRequestController {
 
     private final StudentRequestService studentRequestService;
+    private final StudentScheduleService studentScheduleService;
 
     @GetMapping("/pending")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
@@ -105,11 +105,10 @@ public class AcademicAffairsRequestController {
     }
 
     @GetMapping("/{requestId}")
-    @Operation(summary = "Get request details for review", description = "Retrieve detailed information about a specific request for Academic Affairs review")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentRequestDetailDTO>> getRequestDetails(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @Parameter(description = "Request ID") @PathVariable Long requestId) {
+            @PathVariable Long requestId) {
 
         StudentRequestDetailDTO request = studentRequestService.getRequestDetailsForAA(requestId);
 
@@ -117,11 +116,10 @@ public class AcademicAffairsRequestController {
     }
 
     @PutMapping("/{requestId}/approve")
-    @Operation(summary = "Approve request", description = "Approve a pending student request")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> approveRequest(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @Parameter(description = "Request ID") @PathVariable Long requestId,
+            @PathVariable Long requestId,
             @Valid @RequestBody ApprovalDTO approvalDTO) {
 
         Long decidedById = currentUser.getId();
@@ -131,11 +129,10 @@ public class AcademicAffairsRequestController {
     }
 
     @PutMapping("/{requestId}/reject")
-    @Operation(summary = "Reject request", description = "Reject a pending student request")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> rejectRequest(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @Parameter(description = "Request ID") @PathVariable Long requestId,
+            @PathVariable Long requestId,
             @Valid @RequestBody RejectionDTO rejectionDTO) {
 
         Long decidedById = currentUser.getId();
@@ -146,13 +143,10 @@ public class AcademicAffairsRequestController {
 
     @GetMapping("/students/{studentId}/missed-sessions")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
-    @Operation(summary = "Get student missed sessions (AA)", description = "Get missed sessions for a specific student for on-behalf makeup request creation")
     public ResponseEntity<ResponseObject<MissedSessionsResponseDTO>> getStudentMissedSessions(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @Parameter(description = "Student ID", required = true) @PathVariable Long studentId,
-            @Parameter(description = "Number of weeks to look back (default: 4)")
+            @PathVariable Long studentId,
             @RequestParam(required = false) Integer weeksBack,
-            @Parameter(description = "Exclude sessions with existing makeup requests (default: true)")
             @RequestParam(required = false) Boolean excludeRequested) {
 
         MissedSessionsResponseDTO response = studentRequestService.getMissedSessionsForStudent(
@@ -163,11 +157,9 @@ public class AcademicAffairsRequestController {
 
     @GetMapping("/makeup-options")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
-    @Operation(summary = "Get makeup options for student (AA)", description = "Get available makeup sessions for a specific missed session (for AA to create makeup requests on behalf)")
     public ResponseEntity<ResponseObject<MakeupOptionsResponseDTO>> getMakeupOptionsForStudent(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @Parameter(description = "Student ID", required = true) @RequestParam Long studentId,
-            @Parameter(description = "Target session ID (the missed session to makeup)", required = true)
+            @RequestParam Long studentId,
             @RequestParam Long targetSessionId) {
 
         MakeupOptionsResponseDTO response = studentRequestService.getMakeupOptionsForStudent(
@@ -176,9 +168,20 @@ public class AcademicAffairsRequestController {
         return ResponseEntity.ok(ResponseObject.success("Retrieved makeup options successfully", response));
     }
 
+    @PostMapping("/absence/on-behalf")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> submitAbsenceOnBehalf(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody AbsenceRequestDTO dto) {
+
+        StudentRequestResponseDTO response = studentRequestService.submitAbsenceRequestOnBehalf(
+                currentUser.getId(), dto);
+
+        return ResponseEntity.ok(ResponseObject.success("Absence request created and auto-approved", response));
+    }
+
     @PostMapping("/makeup-requests/on-behalf")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
-    @Operation(summary = "Submit makeup request on-behalf", description = "Create makeup request for student (auto-approved)")
     public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> submitMakeupOnBehalf(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @Valid @RequestBody MakeupRequestDTO dto) {
@@ -187,5 +190,80 @@ public class AcademicAffairsRequestController {
                 currentUser.getId(), dto);
 
         return ResponseEntity.ok(ResponseObject.success("Makeup request created and auto-approved", response));
+    }
+
+    @GetMapping("/students/{studentId}/transfer-eligibility")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<TransferEligibilityDTO>> getStudentTransferEligibility(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long studentId) {
+
+        TransferEligibilityDTO response = studentRequestService.getTransferEligibilityForStudent(studentId);
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved transfer eligibility successfully", response));
+    }
+
+    @GetMapping("/transfer-options")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<TransferOptionsResponseDTO>> getFlexibleTransferOptions(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam Long currentClassId,
+            @RequestParam(required = false) Long targetBranchId,
+            @RequestParam(required = false) String targetModality,
+            @RequestParam(required = false) Boolean scheduleOnly) {
+
+        TransferOptionsResponseDTO response = studentRequestService.getTransferOptionsFlexible(
+                currentClassId, targetBranchId, targetModality, scheduleOnly);
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved transfer options successfully", response));
+    }
+
+    @PostMapping("/transfer-requests/on-behalf")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> submitTransferOnBehalf(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody TransferRequestDTO dto) {
+
+        StudentRequestResponseDTO response = studentRequestService.submitTransferRequestOnBehalf(
+                currentUser.getId(), dto);
+
+        return ResponseEntity.ok(ResponseObject.success("Transfer request created and auto-approved", response));
+    }
+
+    @GetMapping("/students/{studentId}/schedule")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<WeeklyScheduleResponseDTO>> getStudentSchedule(
+            @PathVariable Long studentId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam(required = false) Long classId) {
+
+        log.info("Academic Affairs requesting schedule for student: {}, week: {}, class: {}",
+                studentId, weekStart, classId);
+
+        if (weekStart == null) {
+            weekStart = studentScheduleService.getCurrentWeekStart();
+            log.debug("Using current week start: {}", weekStart);
+        }
+
+        // Validate weekStart is Monday
+        if (weekStart.getDayOfWeek() != java.time.DayOfWeek.MONDAY) {
+            log.warn("Invalid weekStart provided: {} (not a Monday)", weekStart);
+            return ResponseEntity.badRequest().body(
+                    ResponseObject.<WeeklyScheduleResponseDTO>builder()
+                            .success(false)
+                            .message("weekStart must be a Monday (ISO 8601 format: YYYY-MM-DD)")
+                            .build()
+            );
+        }
+
+        WeeklyScheduleResponseDTO schedule = studentScheduleService.getWeeklySchedule(studentId, weekStart, classId);
+
+        return ResponseEntity.ok(
+                ResponseObject.<WeeklyScheduleResponseDTO>builder()
+                        .success(true)
+                        .message("Student schedule retrieved successfully")
+                        .data(schedule)
+                        .build()
+        );
     }
 }

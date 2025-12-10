@@ -1,9 +1,13 @@
 package org.fyp.tmssep490be.controllers;
 
+import org.fyp.tmssep490be.dtos.attendance.AttendanceMatrixDTO;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
+import org.fyp.tmssep490be.dtos.subject.SubjectDetailDTO;
 import org.fyp.tmssep490be.dtos.teacherclass.ClassStudentDTO;
 import org.fyp.tmssep490be.dtos.teacherclass.TeacherClassListItemDTO;
 import org.fyp.tmssep490be.security.UserPrincipal;
+import org.fyp.tmssep490be.services.AttendanceService;
 import org.fyp.tmssep490be.services.TeacherClassService;
 import org.fyp.tmssep490be.utils.TeacherContextHelper;
 import org.springframework.data.domain.Page;
@@ -27,10 +31,12 @@ public class TeacherController {
 
     private final TeacherClassService teacherClassService;
     private final TeacherContextHelper teacherContextHelper;
+    private final AttendanceService attendanceService;
 
-    public TeacherController(TeacherClassService teacherClassService, TeacherContextHelper teacherContextHelper) {
+    public TeacherController(TeacherClassService teacherClassService, TeacherContextHelper teacherContextHelper, AttendanceService attendanceService) {
         this.teacherClassService = teacherClassService;
         this.teacherContextHelper = teacherContextHelper;
+        this.attendanceService = attendanceService;
     }
 
     //Endpoint để lấy tất cả lớp học mà giáo viên được phân công
@@ -78,6 +84,72 @@ public class TeacherController {
                         .success(true)
                         .message("Class students retrieved successfully")
                         .data(students)
+                        .build());
+    }
+
+    // Endpoint để lấy danh sách buổi học với metrics điểm danh và bài tập về nhà cho lớp học của giáo viên
+    // Sử dụng cho tab "Buổi học" trong trang chi tiết lớp học
+    @GetMapping("/classes/{classId}/sessions/metrics")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<QASessionListResponse>> getClassSessions(
+            @PathVariable Long classId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        // Lấy ID giáo viên từ JWT token
+        Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
+        
+        // Lấy danh sách buổi học với metrics
+        QASessionListResponse response = teacherClassService.getSessionsWithMetrics(classId, teacherId);
+        
+        return ResponseEntity.ok(
+                ResponseObject.<QASessionListResponse>builder()
+                        .success(true)
+                        .message("Sessions with metrics retrieved successfully")
+                        .data(response)
+                        .build());
+    }
+
+    // Endpoint để lấy ma trận điểm danh cho lớp học của giáo viên
+    // Sử dụng cho tab "Ma trận điểm danh" trong trang chi tiết lớp học
+    @GetMapping("/classes/{classId}/matrix")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<AttendanceMatrixDTO>> getClassAttendanceMatrix(
+            @PathVariable Long classId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        // Lấy ID giáo viên từ JWT token
+        Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
+        
+        // Lấy ma trận điểm danh
+        AttendanceMatrixDTO data = attendanceService.getClassAttendanceMatrix(teacherId, classId);
+        
+        return ResponseEntity.ok(
+                ResponseObject.<AttendanceMatrixDTO>builder()
+                        .success(true)
+                        .message("Attendance matrix retrieved successfully")
+                        .data(data)
+                        .build());
+    }
+
+    // Endpoint để lấy giáo trình (curriculum/syllabus) cho lớp học của giáo viên
+    // Sử dụng cho tab "Giáo trình" trong trang chi tiết lớp học
+    @GetMapping("/classes/{classId}/curriculum")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<SubjectDetailDTO>> getClassCurriculum(
+            @PathVariable Long classId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        // Lấy ID giáo viên từ JWT token
+        Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
+        
+        // Lấy giáo trình từ classId (lấy subjectId từ class rồi gọi SubjectService.getSubjectSyllabus)
+        SubjectDetailDTO data = teacherClassService.getClassCurriculum(classId, teacherId);
+        
+        return ResponseEntity.ok(
+                ResponseObject.<SubjectDetailDTO>builder()
+                        .success(true)
+                        .message("Class curriculum retrieved successfully")
+                        .data(data)
                         .build());
     }
 }

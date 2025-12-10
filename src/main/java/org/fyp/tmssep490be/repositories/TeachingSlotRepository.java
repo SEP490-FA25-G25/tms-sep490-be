@@ -30,17 +30,13 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
     List<TeachingSlot> findByClassEntityIdAndStatus(@Param("classId") Long classId,
                                                     @Param("status") TeachingSlotStatus status);
 
-    /**
-     * Check teacher ownership on session (active slot)
-     */
+    // Kiểm tra giáo viên có sở hữu buổi học không (slot đang hoạt động)
     boolean existsByIdSessionIdAndIdTeacherIdAndStatusIn(
         Long sessionId,
         Long teacherId,
         List<TeachingSlotStatus> statuses);
 
-    /**
-     * Find teaching slots by teacher and date (exclude cancelled sessions)
-     */
+    // Tìm teaching slots theo giáo viên và ngày (loại trừ các buổi học đã hủy)
     @Query("""
         SELECT ts FROM TeachingSlot ts
         JOIN FETCH ts.session s
@@ -59,9 +55,7 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
         @Param("teacherId") Long teacherId,
         @Param("date") java.time.LocalDate date);
 
-    /**
-     * Get teaching slots of a session with teacher/user loaded
-     */
+    // Lấy teaching slots của một buổi học với thông tin giáo viên/user đã load
     @Query("""
         SELECT ts FROM TeachingSlot ts
         JOIN FETCH ts.teacher t
@@ -70,4 +64,16 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
           AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
         """)
     List<TeachingSlot> findBySessionIdWithTeacher(@Param("sessionId") Long sessionId);
+
+    // Kiểm tra giáo viên có được phân công vào lớp học không
+    @Query("""
+        SELECT COUNT(ts) > 0 FROM TeachingSlot ts
+        JOIN ts.session s
+        WHERE ts.teacher.id = :teacherId
+          AND s.classEntity.id = :classId
+          AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
+        """)
+    boolean existsByTeacherIdAndClassEntityId(
+        @Param("teacherId") Long teacherId,
+        @Param("classId") Long classId);
 }

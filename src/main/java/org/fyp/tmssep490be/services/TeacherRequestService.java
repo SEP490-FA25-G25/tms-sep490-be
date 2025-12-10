@@ -226,14 +226,17 @@ public class TeacherRequestService {
             throw new CustomException(ErrorCode.FORBIDDEN, "You are not assigned to this session");
         }
 
-        // Chỉ gợi ý cho session PLANNED
+        // Validate session status: chỉ gợi ý resource cho session PLANNED
         if (session.getStatus() != SessionStatus.PLANNED) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Session is not in PLANNED status");
         }
 
+        // Validate session có đầy đủ thông tin cần thiết để query resource
+        // Cần branch để filter resource theo chi nhánh (resource phải cùng branch với class)
         if (session.getClassEntity() == null || session.getClassEntity().getBranch() == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Session branch is missing");
         }
+        // Cần timeSlot để check resource availability tại khung giờ đó
         if (session.getTimeSlotTemplate() == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Session time slot is missing");
         }

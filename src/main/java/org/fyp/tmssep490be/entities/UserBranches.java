@@ -16,7 +16,7 @@ import java.time.OffsetDateTime;
 public class UserBranches implements Serializable {
 
     @EmbeddedId
-    private UserBranchesId id;
+    private UserBranchesId id = new UserBranchesId();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("userId")

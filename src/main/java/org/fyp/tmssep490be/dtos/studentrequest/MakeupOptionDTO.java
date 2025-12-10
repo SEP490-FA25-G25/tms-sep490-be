@@ -65,6 +65,12 @@ public class MakeupOptionDTO {
         private Integer availableSlots;
 
         private Integer maxCapacity;
+
+        private String resourceName;
+
+        private String resourceType;
+
+        private String onlineLink;
     }
 
     @Data
@@ -86,8 +92,6 @@ public class MakeupOptionDTO {
     @AllArgsConstructor
     @Builder
     public static class MatchScore {
-        private Boolean branchMatch;
-
         private Boolean modalityMatch;
 
         private Boolean capacityOk;

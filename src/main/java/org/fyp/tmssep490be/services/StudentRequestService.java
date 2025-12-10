@@ -4,11 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.studentrequest.*;
 import org.fyp.tmssep490be.entities.*;
-import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
-import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
-import org.fyp.tmssep490be.entities.enums.RequestStatus;
-import org.fyp.tmssep490be.entities.enums.SessionStatus;
-import org.fyp.tmssep490be.entities.enums.StudentRequestType;
+import org.fyp.tmssep490be.entities.enums.*;
 import org.fyp.tmssep490be.exceptions.BusinessRuleException;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
@@ -38,6 +34,12 @@ public class StudentRequestService {
 
     private static final double ABSENCE_THRESHOLD_PERCENT = 20.0;
 
+    private static final int MAKEUP_LOOKBACK_WEEKS = 2;      // Số tuần nhìn lại để tìm buổi vắng
+    private static final int MAKEUP_WEEKS_LIMIT = 4;         // Giới hạn số tuần cho phép xin học bù
+    private static final int MAX_TRANSFERS_PER_COURSE = 1;   // Số lần transfer tối đa mỗi khóa học
+    private static final int ABSENCE_LEAD_TIME_DAYS = 1;     // Số ngày trước buổi học cần xin phép
+    private static final int REASON_MIN_LENGTH = 10;         // Độ dài tối thiểu của lý do
+
     private final StudentRequestRepository studentRequestRepository;
     private final StudentRepository studentRepository;
     private final UserBranchesRepository userBranchesRepository;
@@ -46,7 +48,6 @@ public class StudentRequestService {
     private final EnrollmentRepository enrollmentRepository;
     private final ClassRepository classRepository;
     private final UserAccountRepository userAccountRepository;
-    private final SystemPolicyRepository systemPolicyRepository;
 
     public Page<StudentRequestResponseDTO> getMyRequests(Long userId, RequestFilterDTO filter) {
         log.debug("Getting requests for student user {}", userId);
@@ -499,10 +500,10 @@ public class StudentRequestService {
             throw new BusinessRuleException("DUPLICATE_REQUEST", "Duplicate absence request for this session");
         }
 
-        int leadTimeDays = getPolicyIntValue("request.absence.lead_time_days", 1);
+        // Validate lead time using hardcoded constant
         long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), session.getDate());
-        if (daysUntil < leadTimeDays) {
-            log.warn("Absence request submitted with insufficient lead time: {} days (required: {})", daysUntil, leadTimeDays);
+        if (daysUntil < ABSENCE_LEAD_TIME_DAYS) {
+            log.warn("Absence request submitted with insufficient lead time: {} days (required: {})", daysUntil, ABSENCE_LEAD_TIME_DAYS);
         }
 
         double absenceRate = calculateAbsenceRate(student.getId(), dto.getCurrentClassId());
@@ -529,6 +530,85 @@ public class StudentRequestService {
 
         request = studentRequestRepository.save(request);
         log.info("Absence request created successfully with id: {}", request.getId());
+
+        return mapToStudentRequestResponseDTO(request);
+    }
+
+    @Transactional
+    public StudentRequestResponseDTO submitAbsenceRequestOnBehalf(Long decidedById, AbsenceRequestDTO dto) {
+        log.info("AA user {} submitting absence request on-behalf for student {} - session: {}",
+                decidedById, dto.getStudentId(), dto.getTargetSessionId());
+
+        if (dto.getStudentId() == null) {
+            throw new BusinessRuleException("MISSING_STUDENT_ID", "Student ID is required for on-behalf requests");
+        }
+
+        Student student = studentRepository.findById(dto.getStudentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found for ID: " + dto.getStudentId()));
+
+        Session session = sessionRepository.findById(dto.getTargetSessionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+
+        if (session.getClassEntity() == null || !session.getClassEntity().getId().equals(dto.getCurrentClassId())) {
+            throw new BusinessRuleException("SESSION_CLASS_MISMATCH", "Session does not belong to the selected class");
+        }
+
+        // AA can create absence requests for future sessions only
+        if (session.getDate().isBefore(LocalDate.now())) {
+            throw new BusinessRuleException("PAST_SESSION", "Cannot request absence for past sessions");
+        }
+
+        if (!session.getStatus().equals(SessionStatus.PLANNED)) {
+            throw new BusinessRuleException("INVALID_SESSION_STATUS", "Session must be in PLANNED status");
+        }
+
+        Enrollment enrollment = enrollmentRepository
+                .findByStudentIdAndClassIdAndStatus(student.getId(), dto.getCurrentClassId(), EnrollmentStatus.ENROLLED);
+
+        if (enrollment == null) {
+            throw new BusinessRuleException("NOT_ENROLLED", "Student is not enrolled in this class");
+        }
+
+        StudentSession.StudentSessionId studentSessionId = new StudentSession.StudentSessionId(student.getId(), dto.getTargetSessionId());
+        boolean hasStudentSession = studentSessionRepository.findById(studentSessionId).isPresent();
+        if (!hasStudentSession) {
+            throw new BusinessRuleException("SESSION_NOT_ASSIGNED", "Student is not assigned to this session");
+        }
+
+        if (hasDuplicateRequest(student.getId(), dto.getTargetSessionId(), StudentRequestType.ABSENCE)) {
+            throw new BusinessRuleException("DUPLICATE_REQUEST", "Duplicate absence request for this session");
+        }
+
+        ClassEntity classEntity = classRepository.findById(dto.getCurrentClassId())
+                .orElseThrow(() -> new ResourceNotFoundException("Class not found"));
+        UserAccount submittedBy = userAccountRepository.findById(decidedById)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Create request with auto-approved status
+        StudentRequest request = StudentRequest.builder()
+                .student(student)
+                .requestType(StudentRequestType.ABSENCE)
+                .currentClass(classEntity)
+                .targetSession(session)
+                .requestReason(dto.getRequestReason())
+                .note(dto.getNote())
+                .status(RequestStatus.APPROVED)  // Auto-approve for AA on-behalf
+                .submittedBy(submittedBy)
+                .submittedAt(OffsetDateTime.now())
+                .decidedBy(submittedBy)  // AA is both submitter and approver
+                .decidedAt(OffsetDateTime.now())
+                .build();
+
+        request = studentRequestRepository.save(request);
+        log.info("Absence request created and auto-approved with id: {}", request.getId());
+
+        // Mark the session as EXCUSED immediately since it's auto-approved
+        markSessionAsExcused(
+                student,
+                session,
+                String.format("Vắng có phép được tạo và duyệt bởi AA lúc %s. Request ID: %d",
+                        OffsetDateTime.now(), request.getId())
+        );
 
         return mapToStudentRequestResponseDTO(request);
     }
@@ -897,32 +977,21 @@ public class StudentRequestService {
                 .build();
     }
 
+    /**
+     * Returns student request configuration with hardcoded policy values.
+     * Previously these values were fetched from SystemPolicy table.
+     */
     public StudentRequestConfigDTO getStudentRequestConfig() {
         return StudentRequestConfigDTO.builder()
-                .makeupLookbackWeeks(getPolicyIntValue("student.makeup.lookback_weeks", 2))
-                .makeupWeeksLimit(getPolicyIntValue("student.makeup.weeks_limit", 4))
-                .maxTransfersPerCourse(getPolicyIntValue("request.transfer.max_per_course", 1))
-                .absenceLeadTimeDays(getPolicyIntValue("request.absence.lead_time_days", 1))
-                .reasonMinLength(getPolicyIntValue("request.absence.reason_min_length", 10))
+                .makeupLookbackWeeks(MAKEUP_LOOKBACK_WEEKS)
+                .makeupWeeksLimit(MAKEUP_WEEKS_LIMIT)
+                .maxTransfersPerCourse(MAX_TRANSFERS_PER_COURSE)
+                .absenceLeadTimeDays(ABSENCE_LEAD_TIME_DAYS)
+                .reasonMinLength(REASON_MIN_LENGTH)
                 .build();
     }
 
-    // Helper methods để lấy policy values từ DB
-    private Integer getPolicyIntValue(String policyKey, Integer defaultValue) {
-        return systemPolicyRepository.findFirstByPolicyKeyOrderByIdAsc(policyKey)
-                .map(policy -> {
-                    try {
-                        return Integer.parseInt(policy.getCurrentValue());
-                    } catch (NumberFormatException e) {
-                        log.warn("Invalid integer value for policy {}: {}", policyKey, policy.getCurrentValue());
-                        return defaultValue;
-                    }
-                })
-                .orElseGet(() -> {
-                    log.warn("Policy not found: {}, using default value: {}", policyKey, defaultValue);
-                    return defaultValue;
-                });
-    }
+    // Policy helper methods removed - using hardcoded constants instead
 
     @Transactional
     public StudentRequestResponseDTO cancelRequest(Long requestId, Long userId) {
@@ -955,8 +1024,8 @@ public class StudentRequestService {
     }
 
     public MissedSessionsResponseDTO getMissedSessionsForStudent(Long studentId, Integer weeksBack, Boolean excludeRequested) {
-        // Nếu client không truyền weeksBack, lấy từ policy
-        int lookbackWeeks = weeksBack != null ? weeksBack : getPolicyIntValue("student.makeup.lookback_weeks", 2);
+        // Nếu client không truyền weeksBack, sử dụng hardcoded constant
+        int lookbackWeeks = weeksBack != null ? weeksBack : MAKEUP_LOOKBACK_WEEKS;
 
         boolean excludeRequestedSessions = excludeRequested != null ? excludeRequested : true;
 
@@ -1002,11 +1071,10 @@ public class StudentRequestService {
             throw new BusinessRuleException("INVALID_SESSION", "Target session must have subject session defined");
         }
 
-        // Lấy policy: số tuần giới hạn tìm buổi học bù
-        int weeksLimit = getPolicyIntValue("student.makeup.weeks_limit", 4);
+        // Business Rule: SAME-BRANCH ONLY - không cho phép học bù ở branch khác
+        int weeksLimit = MAKEUP_WEEKS_LIMIT;
 
         // Find makeup options with same subject session (same content)
-        // Business Rule: Same branch → allow all modalities; Different branch → ONLINE only
         List<Session> makeupOptions = sessionRepository.findMakeupSessionOptions(
                 targetSession.getSubjectSession().getId(),
                 targetSessionId,
@@ -1076,6 +1144,20 @@ public class StudentRequestService {
 
         int daysAgo = (int) ChronoUnit.DAYS.between(session.getDate(), LocalDate.now());
 
+        String resourceName = null;
+        String resourceType = null;
+        String onlineLink = null;
+        
+        if (!session.getSessionResources().isEmpty()) {
+            Resource resource = session.getSessionResources().iterator().next().getResource();
+            resourceName = resource.getName();
+            resourceType = resource.getResourceType().name();
+            
+            if (resource.getResourceType() == ResourceType.VIRTUAL) {
+                onlineLink = resource.getMeetingUrl();
+            }
+        }
+
         return MissedSessionDTO.builder()
                 .sessionId(session.getId())
                 .date(session.getDate())
@@ -1089,7 +1171,11 @@ public class StudentRequestService {
                         .className(classEntity.getName())
                         .branchId(classEntity.getBranch().getId())
                         .branchName(classEntity.getBranch().getName())
+                        .branchAddress(classEntity.getBranch().getAddress())
                         .modality(classEntity.getModality().name())
+                        .resourceName(resourceName)
+                        .resourceType(resourceType)
+                        .onlineLink(onlineLink)
                         .build())
                 .timeSlotInfo(MissedSessionDTO.TimeSlotInfo.builder()
                         .startTime(timeSlot != null ? timeSlot.getStartTime().toString() : null)
@@ -1113,20 +1199,16 @@ public class StudentRequestService {
         }
 
         // Calculate match score
-        boolean branchMatch = session.getClassEntity().getBranch().getId()
-                .equals(targetSession.getClassEntity().getBranch().getId());
         boolean modalityMatch = session.getClassEntity().getModality()
                 .equals(targetSession.getClassEntity().getModality());
 
         int score = 0;
-        //Cùng chi nhánh thì + 10, khác thì không +
-        if (branchMatch) score += 10;
-        //Cùng hình thức học thì + 5, khác thì không cộng
+        // Cùng hình thức học thì + 5, khác thì không cộng
         if (modalityMatch) score += 5;
 
         long weeksUntil = ChronoUnit.WEEKS.between(LocalDate.now(), session.getDate());
         int dateProximityScore = (int) Math.max(0, 3 - weeksUntil); // +3 this week, +2 next, +1 in 2 weeks
-        //weeksUntil = 0 -> 3-0 =3 -> điểm cao
+        // weeksUntil = 0 -> 3-0 = 3 -> điểm cao
         // tương tự như vậy weeksUntil = 3 -> 3-3 = 0 điểm vì quá xa
         score += dateProximityScore;
 
@@ -1141,6 +1223,20 @@ public class StudentRequestService {
         SubjectSession subjectSession = session.getSubjectSession();
         TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
 
+        String resourceName = null;
+        String resourceType = null;
+        String onlineLink = null;
+        
+        if (!session.getSessionResources().isEmpty()) {
+            Resource resource = session.getSessionResources().iterator().next().getResource();
+            resourceName = resource.getName();
+            resourceType = resource.getResourceType().name();
+            
+            if (resource.getResourceType() == ResourceType.VIRTUAL) {
+                onlineLink = resource.getMeetingUrl();
+            }
+        }
+
         return MakeupOptionDTO.builder()
                 .sessionId(session.getId())
                 .date(session.getDate())
@@ -1154,9 +1250,13 @@ public class StudentRequestService {
                         .className(session.getClassEntity().getName())
                         .branchId(session.getClassEntity().getBranch().getId())
                         .branchName(session.getClassEntity().getBranch().getName())
+                        .branchAddress(session.getClassEntity().getBranch().getAddress())
                         .modality(session.getClassEntity().getModality().name())
                         .availableSlots(availableSlots)
                         .maxCapacity(session.getClassEntity().getMaxCapacity())
+                        .resourceName(resourceName)
+                        .resourceType(resourceType)
+                        .onlineLink(onlineLink)
                         .build())
                 .timeSlotInfo(MakeupOptionDTO.TimeSlotInfo.builder()
                         .startTime(timeSlot != null ? timeSlot.getStartTime().toString() : null)
@@ -1167,7 +1267,6 @@ public class StudentRequestService {
                 .availableSlots(availableSlots)
                 .maxCapacity(session.getClassEntity().getMaxCapacity())
                 .matchScore(MakeupOptionDTO.MatchScore.builder()
-                        .branchMatch(branchMatch)
                         .modalityMatch(modalityMatch)
                         .capacityOk(capacityOk)
                         .dateProximityScore(dateProximityScore)
@@ -1271,5 +1370,730 @@ public class StudentRequestService {
         ss.setRecordedAt(OffsetDateTime.now());
 
         studentSessionRepository.save(ss);
+    }
+
+    public TransferEligibilityDTO getTransferEligibility(Long userId) {
+        Student student = studentRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
+
+        return getTransferEligibilityInternal(student.getId());
+    }
+
+    public TransferEligibilityDTO getTransferEligibilityForStudent(Long studentId) {
+        return getTransferEligibilityInternal(studentId);
+    }
+
+    private TransferEligibilityDTO getTransferEligibilityInternal(Long studentId) {
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
+
+        // Chỉ lấy những lớp mà student đang học
+        List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatusIn(
+                student.getId(), List.of(EnrollmentStatus.ENROLLED));
+
+        // với từng enrollment -> lấy ra thông tin của lớp học đó và tính transfer quota
+        // database sẽ đếm số lần student đã transfer approved cho subject này
+        // và so sánh với hardcoded constant để tính remaining quota = max - used
+        List<TransferEligibilityDTO.CurrentClassInfo> currentClasses = enrollments.stream()
+                .map(enrollment -> mapToCurrentClassInfoWithQuota(enrollment, student.getId()))
+                .collect(Collectors.toList());
+
+        TransferEligibilityDTO.TransferPolicyInfo policyInfo = TransferEligibilityDTO.TransferPolicyInfo.builder()
+                .maxTransfersPerSubject(MAX_TRANSFERS_PER_COURSE)
+                .requiresAAApproval(false)
+                .policyDescription("Maximum 1 transfer per subject. Same branch & modality changes are auto-approved.")
+                .build();
+
+        boolean eligible = !currentClasses.isEmpty() && 
+                currentClasses.stream().anyMatch(c -> c.getTransferQuota().getRemaining() > 0);
+
+        return TransferEligibilityDTO.builder()
+                .eligibleForTransfer(eligible) // có đủ điều kiện transfer không
+                .ineligibilityReason(eligible ? null : "No eligible enrollments or transfer limit exceeded")
+                .currentClasses(currentClasses) // danh sách lớp đang học
+                .policyInfo(policyInfo) // thông tin transfer
+                .build();
+    }
+
+    public TransferOptionsResponseDTO getTransferOptionsFlexible(
+            Long currentClassId, Long targetBranchId, String targetModality, Boolean scheduleOnly) {
+
+        ClassEntity currentClass = classRepository.findById(currentClassId)
+                .orElseThrow(() -> new ResourceNotFoundException("Current class not found with ID: " + currentClassId));
+
+        // Build filter parameters
+        Long subjectId = currentClass.getSubject().getId();
+        Long excludeClassId = currentClassId;
+        List<org.fyp.tmssep490be.entities.enums.ClassStatus> statuses = List.of(
+                org.fyp.tmssep490be.entities.enums.ClassStatus.SCHEDULED, 
+                org.fyp.tmssep490be.entities.enums.ClassStatus.ONGOING);
+        Long branchId = currentClass.getBranch().getId();
+        org.fyp.tmssep490be.entities.enums.Modality modality = null;
+
+        // SAME-BRANCH VALIDATION: targetBranchId must equal current class branch (defensive)
+        if (targetBranchId != null && !targetBranchId.equals(branchId)) {
+            throw new BusinessRuleException("CROSS_BRANCH_NOT_SUPPORTED",
+                "Không thể chuyển sang lớp ở chi nhánh khác. " +
+                "Vui lòng liên hệ Sale để đăng ký lớp mới tại chi nhánh mong muốn.");
+        }
+
+        // Modality handling: if scheduleOnly => lock to current modality; else allow override
+        if (Boolean.TRUE.equals(scheduleOnly)) {
+            modality = currentClass.getModality();
+        } else if (targetModality != null) {
+            try {
+                modality = org.fyp.tmssep490be.entities.enums.Modality.valueOf(targetModality);
+            } catch (IllegalArgumentException e) {
+                throw new BusinessRuleException("INVALID_MODALITY",
+                    "Invalid modality: " + targetModality + ". Must be OFFLINE or ONLINE");
+            }
+        }
+
+        // Fetch classes using flexible criteria
+        List<ClassEntity> targetClasses = classRepository.findByFlexibleCriteria(
+            subjectId, excludeClassId, statuses, branchId, modality);
+
+        // Filter by capacity and map to DTOs with changes summary
+        List<TransferOptionDTO> availableClasses = targetClasses.stream()
+                .filter(cls -> {
+                    Integer currentEnrollmentCount = classRepository.countEnrolledStudents(cls.getId());
+                    int currentEnrollment = currentEnrollmentCount != null ? currentEnrollmentCount : 0;
+                    return cls.getMaxCapacity() != null && currentEnrollment < cls.getMaxCapacity();
+                })
+                .map(cls -> mapToTransferOptionDTOWithChanges(cls, currentClass))
+                .sorted(this::compareByCompatibility)
+                .collect(Collectors.toList());
+
+        // Build current class info
+        TransferOptionsResponseDTO.CurrentClassInfo currentClassInfo = buildCurrentClassInfo(currentClass);
+
+        // Build transfer criteria summary
+        TransferOptionsResponseDTO.TransferCriteria transferCriteria =
+            TransferOptionsResponseDTO.TransferCriteria.builder()
+                .branchChange(targetBranchId != null && !targetBranchId.equals(currentClass.getBranch().getId()))
+                .modalityChange(targetModality != null && !targetModality.equals(currentClass.getModality().name()))
+                .scheduleChange(Boolean.TRUE.equals(scheduleOnly))
+                .build();
+
+        return TransferOptionsResponseDTO.builder()
+                .currentClass(currentClassInfo)
+                .transferCriteria(transferCriteria)
+                .availableClasses(availableClasses)
+                .build();
+    }
+
+    @Transactional
+    public StudentRequestResponseDTO submitTransferRequest(Long userId, TransferRequestDTO dto) {
+        log.info("Submitting transfer request for user {} from class {} to class {}",
+                userId, dto.getCurrentClassId(), dto.getTargetClassId());
+
+        Student student = studentRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
+
+        UserAccount submittedBy = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        return submitTransferRequestInternal(student.getId(), dto, submittedBy, false);
+    }
+
+    @Transactional
+    public StudentRequestResponseDTO submitTransferRequestOnBehalf(Long decidedById, TransferRequestDTO dto) {
+        if (dto.getStudentId() == null) {
+            throw new BusinessRuleException("MISSING_STUDENT_ID", "Student ID is required for on-behalf transfer requests");
+        }
+
+        UserAccount submittedBy = userAccountRepository.findById(decidedById)
+                .orElseThrow(() -> new ResourceNotFoundException("AA user not found"));
+
+        return submitTransferRequestInternal(dto.getStudentId(), dto, submittedBy, true);
+    }
+
+    private StudentRequestResponseDTO submitTransferRequestInternal(Long studentId, TransferRequestDTO dto,
+                                                                     UserAccount submittedBy, boolean autoApprove) {
+        // 1. Validate enrollment
+        Enrollment currentEnrollment = enrollmentRepository
+                .findByStudentIdAndClassIdAndStatus(studentId, dto.getCurrentClassId(), EnrollmentStatus.ENROLLED);
+
+        if (currentEnrollment == null) {
+            throw new BusinessRuleException("NOT_ENROLLED", "Student is not enrolled in current class");
+        }
+
+        // 2. Check transfer quota (ONE transfer per subject)
+        Long subjectId = currentEnrollment.getClassEntity().getSubject().getId();
+        if (hasExceededTransferLimit(studentId, subjectId)) {
+            throw new BusinessRuleException("TRANSFER_QUOTA_EXCEEDED", 
+                "Transfer quota exceeded. Maximum 1 transfer per subject.");
+        }
+
+        // 3. Check concurrent requests
+        boolean hasPendingTransfer = studentRequestRepository
+                .existsByStudentIdAndRequestTypeAndStatusIn(
+                        studentId,
+                        StudentRequestType.TRANSFER,
+                        List.of(RequestStatus.PENDING));
+
+        if (hasPendingTransfer) {
+            throw new BusinessRuleException("PENDING_TRANSFER_EXISTS", "You already have a pending transfer request");
+        }
+
+        // 4. Validate target class
+        ClassEntity targetClass = classRepository.findById(dto.getTargetClassId())
+                .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
+
+        // Must be same subject
+        if (!targetClass.getSubject().getId().equals(currentEnrollment.getClassEntity().getSubject().getId())) {
+            throw new BusinessRuleException("DIFFERENT_SUBJECT", "Target class must be for the same subject");
+        }
+
+        // Must be same branch (same-branch transfer only)
+        ClassEntity currentClass = currentEnrollment.getClassEntity();
+        if (!targetClass.getBranch().getId().equals(currentClass.getBranch().getId())) {
+            throw new BusinessRuleException("CROSS_BRANCH_NOT_SUPPORTED",
+                "Không thể chuyển sang lớp ở chi nhánh khác. " +
+                "Vui lòng liên hệ Sale để đăng ký lớp mới tại chi nhánh mong muốn.");
+        }
+
+        // Must be SCHEDULED or ONGOING
+        if (!List.of(org.fyp.tmssep490be.entities.enums.ClassStatus.SCHEDULED, 
+                    org.fyp.tmssep490be.entities.enums.ClassStatus.ONGOING).contains(targetClass.getStatus())) {
+            throw new BusinessRuleException("INVALID_CLASS_STATUS", "Target class must be SCHEDULED or ONGOING");
+        }
+
+        // 5. Check capacity
+        Integer enrolledCount = classRepository.countEnrolledStudents(dto.getTargetClassId());
+        int enrolled = enrolledCount != null ? enrolledCount : 0;
+
+        if (enrolled >= targetClass.getMaxCapacity()) {
+            throw new BusinessRuleException("CLASS_FULL", "Target class is full");
+        }
+
+        // 6. Validate effective date and session
+        if (dto.getEffectiveDate().isBefore(LocalDate.now())) {
+            throw new BusinessRuleException("PAST_EFFECTIVE_DATE", "Effective date must be in the future");
+        }
+
+        Session effectiveSession = sessionRepository.findById(dto.getSessionId())
+                .orElseThrow(() -> new BusinessRuleException("INVALID_SESSION", "Effective session not found"));
+
+        if (!effectiveSession.getClassEntity().getId().equals(dto.getTargetClassId())) {
+            throw new BusinessRuleException("SESSION_CLASS_MISMATCH", "Session does not belong to target class");
+        }
+
+        if (!effectiveSession.getDate().equals(dto.getEffectiveDate())) {
+            throw new BusinessRuleException("SESSION_DATE_MISMATCH", "Session date does not match effective date");
+        }
+
+        // 7. Create request
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
+
+        // currentClass already retrieved from enrollment above
+
+        StudentRequest request = StudentRequest.builder()
+                .student(student)
+                .requestType(StudentRequestType.TRANSFER)
+                .currentClass(currentClass)
+                .targetClass(targetClass)
+                .effectiveDate(dto.getEffectiveDate())
+                .effectiveSession(effectiveSession)
+                .requestReason(dto.getRequestReason())
+                .note(dto.getNote())
+                .status(autoApprove ? RequestStatus.APPROVED : RequestStatus.PENDING)
+                .submittedBy(submittedBy)
+                .submittedAt(OffsetDateTime.now())
+                .build();
+
+        // 8. If auto-approve (AA on-behalf)
+        if (autoApprove) {
+            request.setDecidedBy(submittedBy);
+            request.setDecidedAt(OffsetDateTime.now());
+        }
+
+        request = studentRequestRepository.save(request);
+
+        // 9. If auto-approved, execute transfer immediately
+        if (autoApprove) {
+            executeTransfer(request);
+        }
+
+        log.info("Transfer request created with ID: {} - Status: {}", request.getId(), request.getStatus());
+        return mapToStudentRequestResponseDTO(request);
+    }
+
+    @Transactional
+    public void executeTransfer(StudentRequest request) {
+        log.info("Executing transfer for request {}", request.getId());
+
+        Long studentId = request.getStudent().getId();
+        ClassEntity currentClass = request.getCurrentClass();
+        ClassEntity targetClass = request.getTargetClass();
+        LocalDate effectiveDate = request.getEffectiveDate();
+        Session effectiveSession = request.getEffectiveSession();
+
+        // 1. Re-validate capacity with pessimistic lock to prevent race condition
+        ClassEntity targetClassLocked = classRepository.findByIdWithLock(targetClass.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
+
+        Integer currentEnrollment = classRepository.countEnrolledStudents(targetClassLocked.getId());
+        int enrolled = currentEnrollment != null ? currentEnrollment : 0;
+
+        if (enrolled >= targetClassLocked.getMaxCapacity()) {
+            throw new BusinessRuleException("CLASS_FULL", "Target class became full during transfer execution");
+        }
+
+        // 2. Update old enrollment → TRANSFERRED
+        Enrollment oldEnrollment = enrollmentRepository
+                .findByStudentIdAndClassIdAndStatus(studentId, currentClass.getId(), EnrollmentStatus.ENROLLED);
+
+        if (oldEnrollment == null) {
+            throw new BusinessRuleException("ENROLLMENT_NOT_FOUND", "Current enrollment not found");
+        }
+
+        oldEnrollment.setStatus(EnrollmentStatus.TRANSFERRED);
+        oldEnrollment.setLeftAt(OffsetDateTime.now());
+        oldEnrollment.setLeftSession(effectiveSession);
+        enrollmentRepository.save(oldEnrollment);
+
+        log.info("Updated old enrollment {} to TRANSFERRED", oldEnrollment.getId());
+
+        // 3. Create new enrollment → ENROLLED
+        Enrollment newEnrollment = Enrollment.builder()
+                .student(request.getStudent())
+                .classEntity(targetClass)
+                .status(EnrollmentStatus.ENROLLED)
+                .enrolledAt(OffsetDateTime.now())
+                .joinSession(effectiveSession)
+                .build();
+        newEnrollment = enrollmentRepository.save(newEnrollment);
+
+        log.info("Created new enrollment {} for target class {}", newEnrollment.getId(), targetClass.getId());
+
+        // 4. Remove future StudentSessions from old class (from effectiveDate onwards)
+        List<Session> futureSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
+                currentClass.getId(), effectiveDate);
+
+        for (Session session : futureSessions) {
+            StudentSession.StudentSessionId ssId = new StudentSession.StudentSessionId(studentId, session.getId());
+            studentSessionRepository.deleteById(ssId);
+        }
+
+        log.info("Deleted {} future StudentSessions from old class", futureSessions.size());
+
+        // 5. Create StudentSessions for new class (future sessions from effectiveDate)
+        List<Session> newClassSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
+                targetClass.getId(), effectiveDate);
+
+        int createdCount = 0;
+        for (Session session : newClassSessions) {
+            StudentSession.StudentSessionId ssId = new StudentSession.StudentSessionId(studentId, session.getId());
+            
+            // Skip if already exists (shouldn't happen, but defensive check)
+            if (studentSessionRepository.existsById(ssId)) {
+                log.warn("StudentSession already exists for student {} session {}, skipping", studentId, session.getId());
+                continue;
+            }
+
+            StudentSession ss = StudentSession.builder()
+                    .id(ssId)
+                    .student(request.getStudent())
+                    .session(session)
+                    .attendanceStatus(AttendanceStatus.PLANNED)
+                    .build();
+            studentSessionRepository.save(ss);
+            createdCount++;
+        }
+
+        log.info("Created {} StudentSessions for new class", createdCount);
+        log.info("Transfer execution completed for request {}", request.getId());
+    }
+
+    private TransferEligibilityDTO.CurrentClassInfo mapToCurrentClassInfoWithQuota(Enrollment enrollment, Long studentId) {
+        ClassEntity classEntity = enrollment.getClassEntity();
+        Long subjectId = classEntity.getSubject().getId();
+
+        // Đếm số request transfer cho request này
+        long approvedTransfers = studentRequestRepository.countByStudentIdAndRequestTypeAndStatusAndTargetClassSubjectId(
+                studentId, StudentRequestType.TRANSFER, RequestStatus.APPROVED, subjectId);
+
+        int used = (int) approvedTransfers;
+        int remaining = Math.max(0, MAX_TRANSFERS_PER_COURSE - used);
+
+        // Check for pending transfer request for this class
+        boolean hasPending = studentRequestRepository.existsByStudentIdAndCurrentClassIdAndRequestTypeAndStatusIn(
+                studentId, classEntity.getId(), StudentRequestType.TRANSFER, List.of(RequestStatus.PENDING));
+
+        String scheduleInfo = formatScheduleInfo(classEntity);
+
+        // Get all sessions for timeline view - just raw data, frontend will compute UI logic
+        List<Session> classSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
+
+        // Map sessions to DTO - only raw data
+        List<TransferEligibilityDTO.SessionInfo> allSessions = classSessions.stream()
+                .map(session -> {
+                    String timeSlot = "TBA";
+                    if (session.getTimeSlotTemplate() != null) {
+                        timeSlot = session.getTimeSlotTemplate().getStartTime() + "-" + 
+                                  session.getTimeSlotTemplate().getEndTime();
+                    }
+                    
+                    Integer sessionNumber = session.getSubjectSession() != null ? 
+                            session.getSubjectSession().getSequenceNo() : null;
+                    String topic = session.getSubjectSession() != null ? 
+                            session.getSubjectSession().getTopic() : "TBA";
+
+                    return TransferEligibilityDTO.SessionInfo.builder()
+                            .sessionId(session.getId())
+                            .date(session.getDate())
+                            .subjectSessionNumber(sessionNumber)
+                            .subjectSessionTitle(topic)
+                            .timeSlot(timeSlot)
+                            .status(session.getStatus().name())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        return TransferEligibilityDTO.CurrentClassInfo.builder()
+                .enrollmentId(enrollment.getId())
+                .classId(classEntity.getId())
+                .classCode(classEntity.getCode())
+                .className(classEntity.getName())
+                .subjectId(subjectId)
+                .subjectName(classEntity.getSubject().getName())
+                .branchId(classEntity.getBranch().getId())
+                .branchName(classEntity.getBranch().getName())
+                .modality(classEntity.getModality().name())
+                .enrollmentStatus(enrollment.getStatus().name())
+                .enrollmentDate(enrollment.getEnrolledAt() != null ? enrollment.getEnrolledAt().toLocalDate().toString() : null)
+                .scheduleInfo(scheduleInfo)
+                .allSessions(allSessions)
+                .transferQuota(TransferEligibilityDTO.TransferQuota.builder()
+                        .used(used)
+                        .limit(MAX_TRANSFERS_PER_COURSE)
+                        .remaining(remaining)
+                        .build())
+                .hasPendingTransfer(hasPending)
+                .canTransfer(remaining > 0 && !hasPending)
+                .build();
+    }
+
+
+    private boolean hasExceededTransferLimit(Long studentId, Long subjectId) {
+        long approvedTransfers = studentRequestRepository.countByStudentIdAndRequestTypeAndStatusAndTargetClassSubjectId(
+                studentId, StudentRequestType.TRANSFER, RequestStatus.APPROVED, subjectId);
+
+        return approvedTransfers >= MAX_TRANSFERS_PER_COURSE;
+    }
+
+    private TransferOptionDTO mapToTransferOptionDTO(ClassEntity targetClass, ClassEntity currentClass) {
+        Integer enrolledCount = classRepository.countEnrolledStudents(targetClass.getId());
+        int enrolled = enrolledCount != null ? enrolledCount : 0;
+        int availableSlots = targetClass.getMaxCapacity() - enrolled;
+
+        // Analyze content gap
+        TransferOptionDTO.ContentGapAnalysis contentGapAnalysis = analyzeContentGap(currentClass, targetClass);
+
+        // Can transfer if has available slots and reasonable content gap
+        boolean canTransfer = availableSlots > 0 && 
+                             (contentGapAnalysis == null || 
+                              !"MAJOR".equals(contentGapAnalysis.getGapLevel()));
+
+        String scheduleDays = formatScheduleDays(targetClass.getScheduleDays());
+        String scheduleTime = "Varies by session"; // Time slots vary per session
+
+        // Get upcoming sessions (next 4 sessions) - for backward compatibility
+        List<TransferOptionDTO.UpcomingSession> upcomingSessions = getUpcomingSessionsForClass(targetClass.getId());
+
+        // Get all sessions for horizontal timeline view
+        List<TransferOptionDTO.SessionInfo> allSessions = getAllSessionsForClass(targetClass.getId());
+
+        return TransferOptionDTO.builder()
+                .classId(targetClass.getId())
+                .classCode(targetClass.getCode())
+                .className(targetClass.getName())
+                .subjectId(targetClass.getSubject() != null ? targetClass.getSubject().getId() : null)
+                .subjectName(targetClass.getSubject() != null ? targetClass.getSubject().getName() : null)
+                .branchId(targetClass.getBranch().getId())
+                .branchName(targetClass.getBranch().getName())
+                .modality(targetClass.getModality().name())
+                .scheduleDays(scheduleDays)
+                .scheduleTime(scheduleTime)
+                .startDate(targetClass.getStartDate())
+                .endDate(targetClass.getPlannedEndDate())
+                .currentSession(countCompletedSessions(targetClass.getId()))
+                .maxCapacity(targetClass.getMaxCapacity())
+                .enrolledCount(enrolled)
+                .availableSlots(availableSlots)
+                .classStatus(targetClass.getStatus().name())
+                .canTransfer(canTransfer)
+                .contentGapAnalysis(contentGapAnalysis)
+                .upcomingSessions(upcomingSessions)
+                .allSessions(allSessions)
+                .build();
+    }
+
+    private List<TransferOptionDTO.UpcomingSession> getUpcomingSessionsForClass(Long classId) {
+        LocalDate today = LocalDate.now();
+        List<Session> upcomingSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(classId, today);
+
+        return upcomingSessions.stream()
+                .filter(session -> session.getStatus() == SessionStatus.PLANNED)
+                .sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate()))
+                .limit(4)
+                .map(session -> {
+                    String timeSlot = "TBA";
+                    if (session.getTimeSlotTemplate() != null) {
+                        timeSlot = session.getTimeSlotTemplate().getStartTime() + "-" + 
+                                  session.getTimeSlotTemplate().getEndTime();
+                    }
+                    
+                    Integer sessionNumber = session.getSubjectSession() != null ? 
+                            session.getSubjectSession().getSequenceNo() : null;
+                    String topic = session.getSubjectSession() != null ? 
+                            session.getSubjectSession().getTopic() : "TBA";
+                    
+                    return TransferOptionDTO.UpcomingSession.builder()
+                            .sessionId(session.getId())
+                            .date(session.getDate())
+                            .subjectSessionNumber(sessionNumber)
+                            .subjectSessionTitle(topic)
+                            .timeSlot(timeSlot)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all sessions for a class with status flags for timeline view
+     */
+    private List<TransferOptionDTO.SessionInfo> getAllSessionsForClass(Long classId) {
+        LocalDate today = LocalDate.now();
+        List<Session> allSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
+        
+        // Find upcoming session (next PLANNED session in future)
+        Long upcomingSessionId = allSessions.stream()
+                .filter(s -> s.getStatus() == SessionStatus.PLANNED && !s.getDate().isBefore(today))
+                .sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate()))
+                .findFirst()
+                .map(Session::getId)
+                .orElse(null);
+
+        return allSessions.stream()
+                .map(session -> {
+                    String timeSlot = "TBA";
+                    if (session.getTimeSlotTemplate() != null) {
+                        timeSlot = session.getTimeSlotTemplate().getStartTime() + "-" + 
+                                  session.getTimeSlotTemplate().getEndTime();
+                    }
+                    
+                    Integer sessionNumber = session.getSubjectSession() != null ? 
+                            session.getSubjectSession().getSequenceNo() : null;
+                    String topic = session.getSubjectSession() != null ? 
+                            session.getSubjectSession().getTopic() : "TBA";
+                    
+                    boolean isPast = session.getDate().isBefore(today) || session.getStatus() == SessionStatus.DONE;
+                    boolean isUpcoming = session.getId().equals(upcomingSessionId);
+
+                    return TransferOptionDTO.SessionInfo.builder()
+                            .sessionId(session.getId())
+                            .date(session.getDate())
+                            .subjectSessionNumber(sessionNumber)
+                            .subjectSessionTitle(topic)
+                            .timeSlot(timeSlot)
+                            .status(session.getStatus().name())
+                            .isPast(isPast)
+                            .isUpcoming(isUpcoming)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    private TransferOptionDTO mapToTransferOptionDTOWithChanges(ClassEntity targetClass, ClassEntity currentClass) {
+        TransferOptionDTO dto = mapToTransferOptionDTO(targetClass, currentClass);
+
+        // Build changes summary
+        TransferOptionDTO.Changes changes = TransferOptionDTO.Changes.builder()
+                .branch(buildChangeText(currentClass.getBranch().getName(), targetClass.getBranch().getName()))
+                .modality(buildChangeText(currentClass.getModality().name(), targetClass.getModality().name()))
+                .schedule(buildScheduleChangeText(currentClass, targetClass))
+                .build();
+
+        dto.setChanges(changes);
+        return dto;
+    }
+
+    private String buildChangeText(String currentValue, String targetValue) {
+        if (currentValue == null || targetValue == null) {
+            return "Unknown";
+        }
+        return currentValue.equals(targetValue) ? "No change" : currentValue + " → " + targetValue;
+    }
+
+    private String buildScheduleChangeText(ClassEntity currentClass, ClassEntity targetClass) {
+        String currentSchedule = formatScheduleInfo(currentClass);
+        String targetSchedule = formatScheduleInfo(targetClass);
+
+        if (currentSchedule.equals(targetSchedule)) {
+            return "No change";
+        }
+        return currentSchedule + " → " + targetSchedule;
+    }
+
+    private String formatScheduleInfo(ClassEntity classEntity) {
+        StringBuilder schedule = new StringBuilder();
+
+        // Format schedule days (e.g., "Mon, Wed, Fri")
+        if (classEntity.getScheduleDays() != null && classEntity.getScheduleDays().length > 0) {
+            String days = formatScheduleDays(classEntity.getScheduleDays());
+            schedule.append(days);
+        }
+
+        // Add date range
+        if (classEntity.getStartDate() != null) {
+            if (schedule.length() > 0) schedule.append(" - ");
+            schedule.append(classEntity.getStartDate());
+            if (classEntity.getPlannedEndDate() != null) {
+                schedule.append(" to ").append(classEntity.getPlannedEndDate());
+            }
+        }
+
+        return schedule.length() > 0 ? schedule.toString() : "Schedule TBD";
+    }
+
+    private String formatScheduleDays(Short[] scheduleDays) {
+        if (scheduleDays == null || scheduleDays.length == 0) {
+            return "TBD";
+        }
+        return Arrays.stream(scheduleDays)
+                .map(this::dayOfWeekToString)
+                .collect(Collectors.joining(", "));
+    }
+
+    private String dayOfWeekToString(Short dayNum) {
+        return switch (dayNum) {
+            case 1 -> "Mon";
+            case 2 -> "Tue";
+            case 3 -> "Wed";
+            case 4 -> "Thu";
+            case 5 -> "Fri";
+            case 6 -> "Sat";
+            case 7 -> "Sun";
+            default -> String.valueOf(dayNum);
+        };
+    }
+
+    private TransferOptionsResponseDTO.CurrentClassInfo buildCurrentClassInfo(ClassEntity currentClass) {
+        int currentSessionCount = countCompletedSessions(currentClass.getId());
+
+        return TransferOptionsResponseDTO.CurrentClassInfo.builder()
+                .id(currentClass.getId())
+                .code(currentClass.getCode())
+                .name(currentClass.getName())
+                .subjectId(currentClass.getSubject().getId())
+                .branchId(currentClass.getBranch().getId())
+                .branchName(currentClass.getBranch().getName())
+                .modality(currentClass.getModality().name())
+                .scheduleDays(formatScheduleInfo(currentClass))
+                .scheduleTime("Varies by session")
+                .currentSession(currentSessionCount)
+                .build();
+    }
+
+    private int countCompletedSessions(Long classId) {
+        List<Session> completedSessions = sessionRepository.findByClassEntityIdAndStatusIn(
+            classId,
+            List.of(SessionStatus.DONE, SessionStatus.CANCELLED)
+        );
+        return completedSessions != null ? completedSessions.size() : 0;
+    }
+
+    private TransferOptionDTO.ContentGapAnalysis analyzeContentGap(ClassEntity currentClass, ClassEntity targetClass) {
+        // Get completed subject sessions in current class
+        List<Session> completedSessions = sessionRepository.findByClassEntityIdAndStatusIn(
+                currentClass.getId(), List.of(SessionStatus.DONE));
+
+        List<Long> completedSubjectSessionIds = completedSessions.stream()
+                .filter(s -> s.getSubjectSession() != null)
+                .map(s -> s.getSubjectSession().getId())
+                .distinct()
+                .collect(Collectors.toList());
+
+        // Get target class's past sessions (already happened)
+        List<Session> targetPastSessions = sessionRepository.findByClassEntityIdAndDateBefore(
+                targetClass.getId(), LocalDate.now());
+
+        // Find gap: sessions target class covered but current class hasn't
+        List<TransferOptionDTO.ContentGapSession> gapSessions = targetPastSessions.stream()
+                .filter(s -> s.getSubjectSession() != null)
+                .filter(s -> !completedSubjectSessionIds.contains(s.getSubjectSession().getId()))
+                .map(s -> TransferOptionDTO.ContentGapSession.builder()
+                        .courseSessionNumber(s.getSubjectSession().getSequenceNo())
+                        .courseSessionTitle(s.getSubjectSession().getTopic())
+                        .scheduledDate(s.getDate().toString())
+                        .build())
+                .collect(Collectors.toList());
+
+        if (gapSessions.isEmpty()) {
+            return null; // No gap
+        }
+
+        int gapCount = gapSessions.size();
+        String severity = gapCount <= 2 ? "MINOR" : gapCount <= 5 ? "MODERATE" : "MAJOR";
+
+        List<String> recommendedActions = switch (severity) {
+            case "MINOR" -> List.of("Review missed topics with teacher", "Self-study recommended materials");
+            case "MODERATE" -> List.of("Schedule makeup sessions", "Request additional support from teacher");
+            case "MAJOR" -> List.of("Consider intensive catch-up sessions", "May need to retake from earlier session");
+            default -> List.of();
+        };
+
+        String impactDescription = switch (severity) {
+            case "MINOR" -> "Small content gap - easily manageable with self-study";
+            case "MODERATE" -> "Moderate gap - may need additional support to catch up";
+            case "MAJOR" -> "Significant gap - recommend consulting with academic advisor before transfer";
+            default -> "";
+        };
+
+        return TransferOptionDTO.ContentGapAnalysis.builder()
+                .gapLevel(severity)
+                .missedSessions(gapCount)
+                .totalSessions(targetPastSessions.size())
+                .gapSessions(gapSessions)
+                .recommendedActions(recommendedActions)
+                .impactDescription(impactDescription)
+                .build();
+    }
+
+    private int compareByCompatibility(TransferOptionDTO a, TransferOptionDTO b) {
+        int changesA = countChanges(a.getChanges());
+        int changesB = countChanges(b.getChanges());
+
+        if (changesA != changesB) {
+            return Integer.compare(changesA, changesB);
+        }
+
+        // Secondary sort by content gap severity
+        String severityA = a.getContentGapAnalysis() != null ? a.getContentGapAnalysis().getGapLevel() : "NONE";
+        String severityB = b.getContentGapAnalysis() != null ? b.getContentGapAnalysis().getGapLevel() : "NONE";
+        return compareSeverity(severityA, severityB);
+    }
+
+    private int countChanges(TransferOptionDTO.Changes changes) {
+        if (changes == null) return 0;
+
+        int count = 0;
+        if (changes.getBranch() != null && !changes.getBranch().equals("No change")) count++;
+        if (changes.getModality() != null && !changes.getModality().equals("No change")) count++;
+        if (changes.getSchedule() != null && !changes.getSchedule().equals("No change")) count++;
+        return count;
+    }
+
+    private int compareSeverity(String severityA, String severityB) {
+        Map<String, Integer> severityOrder = Map.of(
+            "NONE", 0, "MINOR", 1, "MODERATE", 2, "MAJOR", 3
+        );
+        return Integer.compare(
+            severityOrder.getOrDefault(severityA, 0),
+            severityOrder.getOrDefault(severityB, 0)
+        );
     }
 }

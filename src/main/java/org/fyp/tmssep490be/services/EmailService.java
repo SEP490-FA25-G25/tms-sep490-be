@@ -78,6 +78,17 @@ public class EmailService {
         sendEmailWithTemplateAsync(to, subject, "emails/new-student-credentials", templateData);
     }
 
+    public void sendNewUserCredentialsAsync(String to, String fullName, String email, String password, String branchName) {
+        String subject = "Chào mừng đến với Hệ thống TMS - Thông tin đăng nhập";
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("fullName", fullName);
+        templateData.put("email", email);
+        templateData.put("password", password);
+        templateData.put("branchName", branchName);
+        templateData.put("loginUrl", frontendUrl + "/login");
+
+        sendEmailWithTemplateAsync(to, subject, "emails/new-useraccount-credentials", templateData);
+    }
     public void sendEmailWithTemplateAsync(String to, String subject, String templateName, Map<String, Object> templateData) {
         try {
             Context context = new Context();

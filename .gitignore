@@ -32,6 +32,8 @@ build/
 ### VS Code ###
 .vscode/s
 
-# migration
-#migration
+# migration (uncommented to include in git)
+migration
+migration/SUBJECT_MIGRATION_COPY_PASTE.md
+
 

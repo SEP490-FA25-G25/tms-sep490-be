@@ -1,9 +1,5 @@
 package org.fyp.tmssep490be.controllers;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -87,6 +83,23 @@ public class StudentController {
                         .message("Student created successfully")
                         .data(response)
                         .build());
+    }
+    
+    @GetMapping("/{studentId}")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<StudentDetailDTO>> getStudentDetail(
+            @PathVariable Long studentId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} requesting details for student {}", currentUser.getId(), studentId);
+
+        StudentDetailDTO studentDetail = studentService.getStudentDetail(studentId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<StudentDetailDTO>builder()
+                .success(true)
+                .message("Student details retrieved successfully")
+                .data(studentDetail)
+                .build());
     }
 
     // Template học viên của lớp khi đưa cho sale, sale lấy template và gửi lại giáo vụ những người đăng ký và add vào hệ thống
