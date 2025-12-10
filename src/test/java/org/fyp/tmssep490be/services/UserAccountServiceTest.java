@@ -1,5 +1,6 @@
 package org.fyp.tmssep490be.services;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.fyp.tmssep490be.services.EmailService;
 
 import org.fyp.tmssep490be.dtos.user.CreateUserRequest;
 import org.fyp.tmssep490be.dtos.user.UpdateUserRequest;
@@ -27,7 +28,7 @@ class UserAccountServiceTest {
     @Mock private BranchRepository branchRepository;
     @Mock private UserRoleRepository userRoleRepository;
     @Mock private UserBranchesRepository userBranchesRepository;
-
+    @Mock private EmailService emailService;
     @InjectMocks
     private UserAccountService userAccountService;
 
@@ -62,6 +63,7 @@ class UserAccountServiceTest {
 
         when(userAccountRepository.existsByEmail("new@fpt.edu.vn")).thenReturn(false);
         when(passwordEncoder.encode("123456")).thenReturn("hashed");
+
         when(userAccountRepository.save(any())).thenAnswer(inv -> {
             UserAccount u = inv.getArgument(0);
             u.setId(100L);
@@ -77,11 +79,17 @@ class UserAccountServiceTest {
         b.setName("Branch 10");
         when(branchRepository.findById(10L)).thenReturn(Optional.of(b));
 
+        // 🔥 FIX: mock email service call (otherwise NPE)
+        doNothing().when(emailService)
+                .sendNewUserCredentialsAsync(anyString(), anyString(), anyString(), anyString(), anyString());
+
         UserResponse res = userAccountService.createUser(req);
 
         assertEquals("new@fpt.edu.vn", res.getEmail());
         verify(userRoleRepository, times(1)).save(any());
         verify(userBranchesRepository, times(1)).save(any());
+        verify(emailService, times(1))
+                .sendNewUserCredentialsAsync(anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
