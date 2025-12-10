@@ -11,6 +11,7 @@ import org.fyp.tmssep490be.dtos.teacherrequest.TeacherListDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ModalityResourceSuggestionDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateDTO;
 import org.fyp.tmssep490be.dtos.teacherrequest.ReplacementCandidateSkillDTO;
+import org.fyp.tmssep490be.dtos.teacherrequest.TeacherRequestConfigDTO;
 import org.fyp.tmssep490be.dtos.schedule.TimeSlotDTO;
 import org.fyp.tmssep490be.entities.Resource;
 import org.fyp.tmssep490be.entities.Session;
@@ -40,7 +41,6 @@ import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
@@ -62,7 +62,12 @@ public class TeacherRequestService {
     private final UserAccountRepository userAccountRepository;
     private final ResourceRepository resourceRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
-    private final PolicyService policyService;
+
+    private static final int MIN_REASON_LENGTH = 10;
+    private static final boolean REQUIRE_RESOURCE_FOR_MODALITY_CHANGE = true;
+    private static final boolean REQUIRE_RESOURCE_FOR_RESCHEDULE = true;
+    private static final boolean REQUIRE_REPLACEMENT_TEACHER = true;
+    private static final int TIME_WINDOW_DAYS = 14;
 
     // Giáo viên tạo yêu cầu
     @Transactional
@@ -72,11 +77,10 @@ public class TeacherRequestService {
         Teacher teacher = teacherRepository.findByUserAccountId(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher profile not found for current user"));
 
-        // Validate lý do tối thiểu theo policy
-        int minReasonLength = policyService.getGlobalInt("teacher.request.reason_min_length", 15);
+        // Validate lý do tối thiểu
         String reason = createDTO.getReason() != null ? createDTO.getReason().trim() : "";
-        if (reason.length() < minReasonLength) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Reason must be at least " + minReasonLength + " characters");
+        if (reason.length() < MIN_REASON_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Reason must be at least " + MIN_REASON_LENGTH + " characters");
         }
 
         // Lấy session và kiểm tra quyền sở hữu
@@ -89,21 +93,14 @@ public class TeacherRequestService {
             throw new CustomException(ErrorCode.FORBIDDEN, "You are not assigned to this session");
         }
 
-        // Chỉ cho phép tạo yêu cầu cho buổi PLANNED và còn đủ thời gian theo policy
+        // Chỉ cho phép tạo yêu cầu cho buổi PLANNED và còn đủ thời gian
         if (session.getStatus() != SessionStatus.PLANNED) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Session is not in PLANNED status");
         }
-        int minDaysBeforeSession = policyService.getGlobalInt("teacher.request.min_days_before_session", 0);
         LocalDate today = LocalDate.now();
-        // Không cho phép chọn buổi trong quá khứ; cho phép cùng ngày nếu policy = 0
+        // Không cho phép chọn buổi trong quá khứ
         if (session.getDate().isBefore(today)) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Session date is in the past");
-        }
-        if (minDaysBeforeSession > 0) {
-            LocalDate minAllowedDate = today.plusDays(minDaysBeforeSession);
-            if (session.getDate().isBefore(minAllowedDate)) {
-                throw new CustomException(ErrorCode.INVALID_INPUT, "Session is too close to request (" + minDaysBeforeSession + " day(s) required)");
-            }
         }
 
         TeacherRequestType requestType = createDTO.getRequestType();
@@ -139,10 +136,9 @@ public class TeacherRequestService {
 
     // Xử lý MODALITY_CHANGE request khi teacher tạo
     private void handleModalityChangeRequest(TeacherRequest request, TeacherRequestCreateDTO createDTO) {
-        // MODALITY_CHANGE: yêu cầu resource (phòng) theo policy
-        boolean requireResource = policyService.getGlobalBoolean("teacher.modality_change.require_resource", true);
+        // MODALITY_CHANGE: yêu cầu resource (phòng) bắt buộc
         Long newResourceId = createDTO.getNewResourceId();
-        if (requireResource && newResourceId == null) {
+        if (REQUIRE_RESOURCE_FOR_MODALITY_CHANGE && newResourceId == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Resource is required for MODALITY_CHANGE requests");
         }
         if (newResourceId != null) {
@@ -177,21 +173,23 @@ public class TeacherRequestService {
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Time slot not found"));
         request.setNewTimeSlot(timeSlot);
 
-        // Validate newResourceId bắt buộc
-        if (newResourceId == null) {
+        // Validate newResourceId bắt buộc nếu REQUIRE_RESOURCE_FOR_RESCHEDULE = true
+        if (REQUIRE_RESOURCE_FOR_RESCHEDULE && newResourceId == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "New resource ID is required for RESCHEDULE requests");
         }
-        Resource resource = resourceRepository.findById(newResourceId)
-                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Resource not found"));
-        request.setNewResource(resource);
+        if (newResourceId != null) {
+            Resource resource = resourceRepository.findById(newResourceId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Resource not found"));
+            request.setNewResource(resource);
+        }
     }
 
     // Xử lý REPLACEMENT request khi teacher tạo
     private void handleReplacementRequest(TeacherRequest request, TeacherRequestCreateDTO createDTO, Teacher requestingTeacher) {
-        // REPLACEMENT: replacementTeacherId là bắt buộc khi teacher tạo
+        // REPLACEMENT: replacementTeacherId là bắt buộc nếu REQUIRE_REPLACEMENT_TEACHER = true
         Long replacementTeacherId = createDTO.getReplacementTeacherId();
         
-        if (replacementTeacherId == null) {
+        if (REQUIRE_REPLACEMENT_TEACHER && replacementTeacherId == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Replacement teacher ID is required for REPLACEMENT requests");
         }
 
@@ -1001,11 +999,10 @@ public class TeacherRequestService {
             throw new CustomException(ErrorCode.FORBIDDEN, "You don't have permission to create request for this teacher");
         }
 
-        // Validate lý do tối thiểu theo policy
-        int minReasonLength = policyService.getGlobalInt("teacher.request.reason_min_length", 15);
+        // Validate lý do tối thiểu
         String reason = createDTO.getReason() != null ? createDTO.getReason().trim() : "";
-        if (reason.length() < minReasonLength) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Reason must be at least " + minReasonLength + " characters");
+        if (reason.length() < MIN_REASON_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Reason must be at least " + MIN_REASON_LENGTH + " characters");
         }
 
         // Lấy session và kiểm tra quyền sở hữu
@@ -1018,16 +1015,9 @@ public class TeacherRequestService {
             throw new CustomException(ErrorCode.FORBIDDEN, "Teacher is not assigned to this session");
         }
 
-        int minDaysBeforeSession = policyService.getGlobalInt("teacher.request.min_days_before_session", 0);
         LocalDate today = LocalDate.now();
         if (session.getDate().isBefore(today)) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Session date is in the past");
-        }
-        if (minDaysBeforeSession > 0) {
-            LocalDate minAllowedDate = today.plusDays(minDaysBeforeSession);
-            if (session.getDate().isBefore(minAllowedDate)) {
-                throw new CustomException(ErrorCode.INVALID_INPUT, "Session is too close to request (" + minDaysBeforeSession + " day(s) required)");
-            }
         }
 
         // Chỉ cho phép tạo yêu cầu cho buổi PLANNED
@@ -1844,12 +1834,11 @@ public class TeacherRequestService {
         }
 
         // Validate lý do từ chối
-        int minReasonLength = policyService.getGlobalInt("teacher.request.reason_min_length", 15);
         if (reason == null || reason.trim().isEmpty()) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Rejection reason is required");
         }
-        if (reason.trim().length() < minReasonLength) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Rejection reason must be at least " + minReasonLength + " characters");
+        if (reason.trim().length() < MIN_REASON_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Rejection reason must be at least " + MIN_REASON_LENGTH + " characters");
         }
 
         // Khi replacement teacher từ chối, request trở lại PENDING để giáo vụ có thể xử lý lại
@@ -2193,6 +2182,16 @@ public class TeacherRequestService {
                 requestId, replacementTeacherId, academicStaffUserId);
 
         return mapToResponseDTO(request);
+    }
+
+    // Lấy config cho teacher request
+    public TeacherRequestConfigDTO getTeacherRequestConfig() {
+        return TeacherRequestConfigDTO.builder()
+                .requireResourceAtRescheduleCreate(REQUIRE_RESOURCE_FOR_RESCHEDULE)
+                .requireResourceAtModalityChangeCreate(REQUIRE_RESOURCE_FOR_MODALITY_CHANGE)
+                .reasonMinLength(MIN_REASON_LENGTH)
+                .timeWindowDays(TIME_WINDOW_DAYS)
+                .build();
     }
 }
 

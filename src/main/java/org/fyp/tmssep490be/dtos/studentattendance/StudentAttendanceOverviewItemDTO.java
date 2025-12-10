@@ -29,5 +29,6 @@ public class StudentAttendanceOverviewItemDTO {
     private int excused;
     private int upcoming;
     private String status;
+    private String enrollmentStatus;  // ENROLLED, TRANSFERRED, COMPLETED
     private OffsetDateTime lastUpdated;
 }

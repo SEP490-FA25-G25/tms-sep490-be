@@ -23,50 +23,78 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth")
 public class SubjectController {
 
-    private final SubjectService subjectService;
+        private final SubjectService subjectService;
 
-    @GetMapping
-    @Operation(summary = "Get all subjects", description = "Lấy danh sách môn học")
-    public ResponseEntity<ResponseObject<List<SubjectDTO>>> getAllSubjects(
-            @RequestParam(required = false) Long curriculumId,
-            @RequestParam(required = false) Long levelId) {
-        log.info("Getting all subjects - curriculumId: {}, levelId: {}", curriculumId, levelId);
-        List<SubjectDTO> subjects = subjectService.getAllSubjects(curriculumId, levelId);
-        return ResponseEntity.ok(ResponseObject.<List<SubjectDTO>>builder()
-                .success(true)
-                .message("Subjects retrieved successfully")
-                .data(subjects)
-                .build());
-    }
+        @GetMapping
+        @Operation(summary = "Get all subjects", description = "Lấy danh sách môn học")
+        public ResponseEntity<ResponseObject<List<SubjectDTO>>> getAllSubjects(
+                        @RequestParam(required = false) Long curriculumId,
+                        @RequestParam(required = false) Long levelId) {
+                log.info("Getting all subjects - curriculumId: {}, levelId: {}", curriculumId, levelId);
+                List<SubjectDTO> subjects = subjectService.getAllSubjects(curriculumId, levelId);
+                return ResponseEntity.ok(ResponseObject.<List<SubjectDTO>>builder()
+                                .success(true)
+                                .message("Subjects retrieved successfully")
+                                .data(subjects)
+                                .build());
+        }
 
-    @PostMapping
-    @Operation(summary = "Create subject", description = "Tạo môn học mới")
-    public ResponseEntity<ResponseObject<SubjectDetailDTO>> createSubject(
-            @RequestBody CreateSubjectRequestDTO request,
-            @AuthenticationPrincipal UserPrincipal currentUser) {
-        log.info("Creating new subject: {}", request.getBasicInfo().getName());
-        Long userId = currentUser != null ? currentUser.getId() : null;
-        SubjectDetailDTO result = subjectService.createSubject(request, userId);
-        return ResponseEntity.ok(ResponseObject.<SubjectDetailDTO>builder()
-                .success(true)
-                .message("Subject created successfully")
-                .data(result)
-                .build());
-    }
+        @PostMapping
+        @Operation(summary = "Create subject", description = "Tạo môn học mới")
+        public ResponseEntity<ResponseObject<SubjectDetailDTO>> createSubject(
+                        @RequestBody CreateSubjectRequestDTO request,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                log.info("Creating new subject: {}", request.getBasicInfo().getName());
+                Long userId = currentUser != null ? currentUser.getId() : null;
+                SubjectDetailDTO result = subjectService.createSubject(request, userId);
+                return ResponseEntity.ok(ResponseObject.<SubjectDetailDTO>builder()
+                                .success(true)
+                                .message("Subject created successfully")
+                                .data(result)
+                                .build());
+        }
 
-    @GetMapping("/next-version")
-    @Operation(summary = "Get next version number", description = "Get the next available version number for a subject code pattern")
-    public ResponseEntity<ResponseObject<Integer>> getNextVersion(
-            @RequestParam String subjectCode,
-            @RequestParam String levelCode,
-            @RequestParam Integer year) {
-        log.info("Getting next version for {}-{}-{}", subjectCode, levelCode, year);
-        Integer nextVersion = subjectService.getNextVersionNumber(subjectCode, levelCode, year);
-        return ResponseEntity.ok(ResponseObject.<Integer>builder()
-                .success(true)
-                .message("Next version number retrieved")
-                .data(nextVersion)
-                .build());
-    }
+        @GetMapping("/next-version")
+        @Operation(summary = "Get next version number", description = "Get the next available version number for a subject code pattern")
+        public ResponseEntity<ResponseObject<Integer>> getNextVersion(
+                        @RequestParam String subjectCode,
+                        @RequestParam String levelCode,
+                        @RequestParam Integer year) {
+                log.info("Getting next version for {}-{}-{}", subjectCode, levelCode, year);
+                Integer nextVersion = subjectService.getNextVersionNumber(subjectCode, levelCode, year);
+                return ResponseEntity.ok(ResponseObject.<Integer>builder()
+                                .success(true)
+                                .message("Next version number retrieved")
+                                .data(nextVersion)
+                                .build());
+        }
+
+        @GetMapping("/{id}")
+        @Operation(summary = "Get subject by ID", description = "Lấy chi tiết môn học theo ID")
+        public ResponseEntity<ResponseObject<SubjectDetailDTO>> getSubjectById(@PathVariable Long id) {
+                log.info("Getting subject by ID: {}", id);
+                SubjectDetailDTO subject = subjectService.getSubjectDetails(id);
+                return ResponseEntity.ok(ResponseObject.<SubjectDetailDTO>builder()
+                                .success(true)
+                                .message("Subject retrieved successfully")
+                                .data(subject)
+                                .build());
+        }
+
+        @PutMapping("/{id}")
+        @Operation(summary = "Update subject", description = "Cập nhật môn học")
+        public ResponseEntity<ResponseObject<SubjectDetailDTO>> updateSubject(
+                        @PathVariable Long id,
+                        @RequestBody CreateSubjectRequestDTO request,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                log.info("Updating subject ID: {}", id);
+                Long userId = currentUser != null ? currentUser.getId() : null;
+                SubjectDetailDTO result = subjectService.updateSubject(id, request, userId);
+                return ResponseEntity.ok(ResponseObject.<SubjectDetailDTO>builder()
+                                .success(true)
+                                .message("Subject updated successfully")
+                                .data(result)
+                                .build());
+        }
 
 }

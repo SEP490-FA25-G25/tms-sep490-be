@@ -34,6 +34,7 @@ public class SubjectService {
     private final SubjectPhaseRepository subjectPhaseRepository;
     private final SubjectSessionRepository subjectSessionRepository;
     private final SubjectSessionCLOMappingRepository subjectSessionCLOMappingRepository;
+    private final SubjectCLORepository cloRepository;
     private final SubjectAssessmentRepository subjectAssessmentRepository;
     private final SubjectAssessmentCLOMappingRepository subjectAssessmentCLOMappingRepository;
     private final SubjectMaterialRepository subjectMaterialRepository;
@@ -161,6 +162,105 @@ public class SubjectService {
         return getSubjectDetails(subject.getId());
     }
 
+    // ========== UPDATE SUBJECT ==========
+    @Transactional
+    public SubjectDetailDTO updateSubject(Long id, CreateSubjectRequestDTO request, Long userId) {
+        log.info("Updating subject ID: {}", id);
+
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        // Update Basic Info
+        SubjectBasicInfoDTO basicInfo = request.getBasicInfo();
+        subject.setName(basicInfo.getName());
+        subject.setCode(basicInfo.getCode());
+        subject.setDescription(basicInfo.getDescription());
+        subject.setPrerequisites(basicInfo.getPrerequisites());
+        subject.setTotalHours(basicInfo.getDurationHours());
+        subject.setScoreScale(basicInfo.getScoreScale());
+        subject.setTargetAudience(basicInfo.getTargetAudience());
+        subject.setTeachingMethods(basicInfo.getTeachingMethods());
+        subject.setEffectiveDate(basicInfo.getEffectiveDate());
+        subject.setNumberOfSessions(basicInfo.getNumberOfSessions());
+        subject.setHoursPerSession(basicInfo.getHoursPerSession());
+        subject.setThumbnailUrl(basicInfo.getThumbnailUrl());
+
+        // Recalculate total hours
+        if (subject.getNumberOfSessions() != null && subject.getHoursPerSession() != null) {
+            subject.setTotalHours(subject.getHoursPerSession()
+                    .multiply(java.math.BigDecimal.valueOf(subject.getNumberOfSessions())).intValue());
+        }
+
+        // Update Curriculum
+        if (basicInfo.getSubjectId() != null) {
+            Curriculum curriculum = curriculumRepository.findById(basicInfo.getSubjectId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khung chương trình"));
+            subject.setCurriculum(curriculum);
+        }
+
+        // Update Level
+        if (basicInfo.getLevelId() != null) {
+            Level level = levelRepository.findById(basicInfo.getLevelId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ"));
+            subject.setLevel(level);
+        }
+
+        // Update status
+        if (request.getStatus() != null) {
+            try {
+                subject.setStatus(SubjectStatus.valueOf(request.getStatus()));
+            } catch (IllegalArgumentException e) {
+                // Ignore invalid status
+            }
+        }
+
+        // Keep approval status consistent
+        if (subject.getStatus() == SubjectStatus.SUBMITTED) {
+            subject.setApprovalStatus(ApprovalStatus.PENDING);
+            if (subject.getSubmittedAt() == null) {
+                subject.setSubmittedAt(OffsetDateTime.now());
+            }
+        } else if (subject.getStatus() == SubjectStatus.DRAFT) {
+            subject.setApprovalStatus(null);
+            subject.setSubmittedAt(null);
+        }
+
+        subject = subjectRepository.save(subject);
+
+        // Clear and recreate child entities (simplified approach)
+        // 1. Clear existing CLOs (cascade will delete mappings)
+        subjectCLORepository.deleteBySubjectId(id);
+
+        // 2. Clear existing Phases (cascade will delete sessions and materials)
+        subjectPhaseRepository.deleteBySubjectId(id);
+
+        // 3. Clear existing Assessments
+        subjectAssessmentRepository.deleteBySubjectId(id);
+
+        // 4. Clear existing Materials (subject-level only)
+        subjectMaterialRepository.deleteBySubjectIdAndPhaseIsNullAndSubjectSessionIsNull(id);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // Reload subject to avoid stale state
+        subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        // Recreate child entities
+        Map<String, CLO> cloMap = createCLOs(subject, request.getClos());
+        createStructure(subject, request.getStructure(), cloMap);
+        createAssessments(subject, request.getAssessments(), cloMap);
+        createMaterials(subject, request.getMaterials());
+
+        log.info("Subject update completed successfully");
+
+        entityManager.flush();
+        entityManager.clear();
+
+        return getSubjectDetails(id);
+    }
+
     // ========== CREATE CLOs ==========
     private Map<String, CLO> createCLOs(Subject subject, List<SubjectCLODTO> cloDTOs) {
         if (cloDTOs == null) {
@@ -227,9 +327,9 @@ public class SubjectService {
                     SubjectMaterial material = SubjectMaterial.builder()
                             .subject(subject)
                             .phase(phase)
-                            .title(materialDTO.getTitle())
-                            .materialType(materialDTO.getMaterialType() != null
-                                    ? MaterialType.valueOf(materialDTO.getMaterialType())
+                            .title(materialDTO.getName())
+                            .materialType(materialDTO.getType() != null
+                                    ? MaterialType.valueOf(materialDTO.getType())
                                     : MaterialType.OTHER)
                             .url(materialDTO.getUrl() != null ? materialDTO.getUrl() : "")
                             .build();
@@ -273,9 +373,9 @@ public class SubjectService {
                             SubjectMaterial material = SubjectMaterial.builder()
                                     .subject(subject)
                                     .subjectSession(session)
-                                    .title(materialDTO.getTitle())
-                                    .materialType(materialDTO.getMaterialType() != null
-                                            ? MaterialType.valueOf(materialDTO.getMaterialType())
+                                    .title(materialDTO.getName())
+                                    .materialType(materialDTO.getType() != null
+                                            ? MaterialType.valueOf(materialDTO.getType())
                                             : MaterialType.OTHER)
                                     .url(materialDTO.getUrl() != null ? materialDTO.getUrl() : "")
                                     .build();
@@ -335,9 +435,9 @@ public class SubjectService {
         for (SubjectMaterialDTO dto : materialDTOs) {
             SubjectMaterial material = SubjectMaterial.builder()
                     .subject(subject)
-                    .title(dto.getTitle())
-                    .materialType(dto.getMaterialType() != null
-                            ? MaterialType.valueOf(dto.getMaterialType())
+                    .title(dto.getName()) // Frontend sends 'name', entity uses 'title'
+                    .materialType(dto.getType() != null
+                            ? MaterialType.valueOf(dto.getType())
                             : MaterialType.OTHER)
                     .url(dto.getUrl() != null ? dto.getUrl() : "")
                     .build();
@@ -357,15 +457,15 @@ public class SubjectService {
                 .name(subject.getName())
                 .code(subject.getCode())
                 .description(subject.getDescription())
-                .prerequisites(subject.getPrerequisites())
+                .thumbnailUrl(subject.getThumbnailUrl())
                 .durationHours(subject.getTotalHours())
+                .numberOfSessions(subject.getNumberOfSessions())
+                .hoursPerSession(subject.getHoursPerSession())
                 .scoreScale(subject.getScoreScale())
+                .prerequisites(subject.getPrerequisites())
                 .targetAudience(subject.getTargetAudience())
                 .teachingMethods(subject.getTeachingMethods())
                 .effectiveDate(subject.getEffectiveDate())
-                .numberOfSessions(subject.getNumberOfSessions())
-                .hoursPerSession(subject.getHoursPerSession())
-                .thumbnailUrl(subject.getThumbnailUrl())
                 .build();
 
         // Map CLOs
@@ -398,8 +498,8 @@ public class SubjectService {
                                         .findBySubjectSessionId(session.getId()).stream()
                                         .map(material -> SubjectMaterialDTO.builder()
                                                 .id(material.getId())
-                                                .title(material.getTitle())
-                                                .materialType(material.getMaterialType() != null
+                                                .name(material.getTitle())
+                                                .type(material.getMaterialType() != null
                                                         ? material.getMaterialType().name()
                                                         : null)
                                                 .url(material.getUrl())
@@ -426,8 +526,8 @@ public class SubjectService {
                             .findByPhaseIdAndSubjectSessionIsNull(phase.getId()).stream()
                             .map(material -> SubjectMaterialDTO.builder()
                                     .id(material.getId())
-                                    .title(material.getTitle())
-                                    .materialType(material.getMaterialType() != null
+                                    .name(material.getTitle())
+                                    .type(material.getMaterialType() != null
                                             ? material.getMaterialType().name()
                                             : null)
                                     .url(material.getUrl())
@@ -479,11 +579,11 @@ public class SubjectService {
         List<SubjectMaterialDTO> materials = subject.getSubjectMaterials().stream()
                 .map(material -> SubjectMaterialDTO.builder()
                         .id(material.getId())
-                        .title(material.getTitle())
-                        .materialType(material.getMaterialType() != null ? material.getMaterialType().name() : null)
+                        .name(material.getTitle())
+                        .type(material.getMaterialType() != null ? material.getMaterialType().name() : null)
                         .url(material.getUrl())
                         .scope(material.getPhase() != null ? "PHASE"
-                                : (material.getSubjectSession() != null ? "SESSION" : "SUBJECT"))
+                                : (material.getSubjectSession() != null ? "SESSION" : "COURSE"))
                         .phaseId(material.getPhase() != null ? material.getPhase().getId() : null)
                         .sessionId(material.getSubjectSession() != null ? material.getSubjectSession().getId() : null)
                         .build())
@@ -622,8 +722,8 @@ public class SubjectService {
 
         return SubjectMaterialDTO.builder()
                 .id(material.getId())
-                .title(material.getTitle())
-                .materialType(material.getMaterialType() != null ? material.getMaterialType().name() : null)
+                .name(material.getTitle())
+                .type(material.getMaterialType() != null ? material.getMaterialType().name() : null)
                 .url(material.getUrl())
                 .scope(scope)
                 .phaseId(phaseId)

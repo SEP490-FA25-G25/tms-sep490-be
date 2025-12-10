@@ -12,6 +12,7 @@ import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
+import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.repositories.EnrollmentRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
@@ -58,11 +59,36 @@ public class StudentAttendanceService {
                     // Get sessions for this class (may be empty)
                     List<StudentSession> classSessions = sessionsByClass.getOrDefault(classId, List.of());
 
-                    // Filter out CANCELLED sessions
+                    // Filter sessions by enrollment metadata and status
                     List<StudentSession> activeSessions = classSessions.stream()
                             .filter(ss -> {
                                 Session session = ss.getSession();
-                                return session != null && session.getStatus() != SessionStatus.CANCELLED;
+                                if (session == null || session.getStatus() == SessionStatus.CANCELLED) {
+                                    return false;
+                                }
+                                
+                                // Filter transferred out sessions
+                                if (Boolean.TRUE.equals(ss.getIsTransferredOut())) {
+                                    return false;
+                                }
+                                
+                                Long sessionId = session.getId();
+                                Long joinId = enrollment.getJoinSessionId();
+                                Long leftId = enrollment.getLeftSessionId();
+                                
+                                // Filter by enrollment timeline
+                                if (enrollment.getStatus() == EnrollmentStatus.TRANSFERRED) {
+                                    // Only sessions <= leftSessionId
+                                    return leftId == null || sessionId <= leftId;
+                                } else if (enrollment.getStatus() == EnrollmentStatus.ENROLLED) {
+                                    // Only sessions >= joinSessionId
+                                    return joinId == null || sessionId >= joinId;
+                                } else if (enrollment.getStatus() == EnrollmentStatus.COMPLETED) {
+                                    // Sessions from join to end
+                                    return joinId == null || sessionId >= joinId;
+                                }
+                                
+                                return true;
                             })
                             .toList();
 
@@ -101,6 +127,7 @@ public class StudentAttendanceService {
                             .excused(excused)
                             .upcoming(upcoming)
                             .status(classEntity.getStatus().name())
+                            .enrollmentStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : null)
                             .lastUpdated(null) // Can be set if needed
                             .build();
                 })
@@ -114,11 +141,57 @@ public class StudentAttendanceService {
     public StudentAttendanceReportResponseDTO getReport(Long studentId, Long classId) {
         log.info("Getting attendance report for student: {} in class: {}", studentId, classId);
         
+        // Get enrollment to determine timeline boundaries
+        Enrollment enrollment = enrollmentRepository.findByStudentIdAndClassId(studentId, classId);
+        if (enrollment == null) {
+            log.warn("No enrollment found for student {} in class {}", studentId, classId);
+            // Return empty report if no enrollment found
+            return StudentAttendanceReportResponseDTO.builder()
+                    .classId(classId)
+                    .summary(StudentAttendanceReportResponseDTO.Summary.builder()
+                            .totalSessions(0)
+                            .attended(0)
+                            .absent(0)
+                            .excused(0)
+                            .upcoming(0)
+                            .attendanceRate(0.0)
+                            .build())
+                    .sessions(List.of())
+                    .build();
+        }
+        
         List<StudentSession> studentSessions = studentSessionRepository.findByStudentIdAndClassEntityId(studentId, classId);
+        
+        // Filter sessions by enrollment metadata
         List<StudentSession> activeSessions = studentSessions.stream()
                 .filter(ss -> {
                     Session session = ss.getSession();
-                    return session != null && session.getStatus() != SessionStatus.CANCELLED;
+                    if (session == null || session.getStatus() == SessionStatus.CANCELLED) {
+                        return false;
+                    }
+                    
+                    // Filter transferred out sessions
+                    if (Boolean.TRUE.equals(ss.getIsTransferredOut())) {
+                        return false;
+                    }
+                    
+                    Long sessionId = session.getId();
+                    Long joinId = enrollment.getJoinSessionId();
+                    Long leftId = enrollment.getLeftSessionId();
+                    
+                    // Filter by enrollment timeline
+                    if (enrollment.getStatus() == EnrollmentStatus.TRANSFERRED) {
+                        // Only sessions <= leftSessionId
+                        return leftId == null || sessionId <= leftId;
+                    } else if (enrollment.getStatus() == EnrollmentStatus.ENROLLED) {
+                        // Only sessions >= joinSessionId
+                        return joinId == null || sessionId >= joinId;
+                    } else if (enrollment.getStatus() == EnrollmentStatus.COMPLETED) {
+                        // Sessions from join to end
+                        return joinId == null || sessionId >= joinId;
+                    }
+                    
+                    return true;
                 })
                 .toList();
 
@@ -244,6 +317,7 @@ public class StudentAttendanceService {
                 .startDate(startDate)
                 .actualEndDate(actualEndDate)
                 .status(status)
+                .enrollmentStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : null)
                 .summary(summary)
                 .sessions(sessionItems)
                 .build();

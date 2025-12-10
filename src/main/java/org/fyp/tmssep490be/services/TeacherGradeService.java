@@ -122,7 +122,7 @@ public class TeacherGradeService {
                     return TeacherAssessmentDTO.builder()
                             .id(a.getId())
                             .classId(classId)
-                            .courseAssessmentId(sa != null ? sa.getId() : null)
+                            .subjectAssessmentId(sa != null ? sa.getId() : null)
                             .name(sa != null ? sa.getName() : "Assessment " + a.getId())
                             .description(sa != null ? sa.getDescription() : null)
                             .kind(sa != null && sa.getKind() != null ? sa.getKind().name() : null)

@@ -68,4 +68,6 @@ public class SessionSummaryDTO {
     private ResourceType resourceType;
 
     private String onlineLink;
+
+    private String resourceCode;
 }

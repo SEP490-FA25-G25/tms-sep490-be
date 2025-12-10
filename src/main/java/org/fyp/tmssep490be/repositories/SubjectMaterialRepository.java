@@ -2,6 +2,7 @@ package org.fyp.tmssep490be.repositories;
 
 import org.fyp.tmssep490be.entities.SubjectMaterial;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -40,4 +41,9 @@ public interface SubjectMaterialRepository extends JpaRepository<SubjectMaterial
 
     // Tìm material ở cấp phase (không thuộc session)
     List<SubjectMaterial> findByPhaseIdAndSubjectSessionIsNull(Long phaseId);
+
+    // Xóa material ở cấp subject (không thuộc phase hay session)
+    @Modifying
+    @Query("DELETE FROM SubjectMaterial m WHERE m.subject.id = :subjectId AND m.phase IS NULL AND m.subjectSession IS NULL")
+    void deleteBySubjectIdAndPhaseIsNullAndSubjectSessionIsNull(@Param("subjectId") Long subjectId);
 }

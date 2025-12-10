@@ -11,8 +11,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SubjectMaterialDTO {
     private Long id;
-    private String title;
-    private String materialType;
+    private String name; // Changed from 'title' to match frontend
+    private String type; // Changed from 'materialType' to match frontend
     private String url;
     private String scope;
     private Long phaseId;

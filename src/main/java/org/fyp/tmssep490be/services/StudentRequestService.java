@@ -1455,9 +1455,36 @@ public class StudentRequestService {
         List<ClassEntity> targetClasses = classRepository.findByFlexibleCriteria(
             subjectId, excludeClassId, statuses, branchId, modality);
 
+        // Get current class progress
+        Integer currentSessionNum = sessionRepository.findLastCompletedSessionNumber(currentClass.getId());
+        
+        // Filter and sort: only show classes within ±2 sessions content gap, prioritize smaller gap
         List<TransferOptionDTO> availableClasses = targetClasses.stream()
                 .map(cls -> mapToTransferOptionDTOWithChanges(cls, currentClass))
-                .sorted(this::compareByCompatibility)
+                .filter(dto -> {
+                    // Filter by content gap: only include classes within ±2 sessions
+                    Integer targetSessionNum = sessionRepository.findLastCompletedSessionNumber(dto.getClassId());
+                    if (currentSessionNum == null || targetSessionNum == null) {
+                        return true; // Include if no progress info available
+                    }
+                    int gap = Math.abs(targetSessionNum - currentSessionNum);
+                    return gap <= 2; // Only show classes within ±2 sessions
+                })
+                .sorted((a, b) -> {
+                    // Primary sort: by content gap (lower is better)
+                    Integer aSessionNum = sessionRepository.findLastCompletedSessionNumber(a.getClassId());
+                    Integer bSessionNum = sessionRepository.findLastCompletedSessionNumber(b.getClassId());
+                    
+                    if (currentSessionNum != null && aSessionNum != null && bSessionNum != null) {
+                        int aGap = Math.abs(aSessionNum - currentSessionNum);
+                        int bGap = Math.abs(bSessionNum - currentSessionNum);
+                        int gapCompare = Integer.compare(aGap, bGap);
+                        if (gapCompare != 0) return gapCompare;
+                    }
+                    
+                    // Secondary sort: by available slots (higher is better)
+                    return Integer.compare(b.getAvailableSlots(), a.getAvailableSlots());
+                })
                 .collect(Collectors.toList());
 
         TransferOptionsResponseDTO.CurrentClassInfo currentClassInfo = buildCurrentClassInfo(currentClass);
@@ -1477,21 +1504,10 @@ public class StudentRequestService {
     }
 
     @Transactional
-    public StudentRequestResponseDTO submitTransferRequest(Long userId, TransferRequestDTO dto) {
-        log.info("Submitting transfer request for user {} from class {} to class {}",
-                userId, dto.getCurrentClassId(), dto.getTargetClassId());
-
-        Student student = studentRepository.findByUserAccountId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
-
-        UserAccount submittedBy = userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        return submitTransferRequestInternal(student.getId(), dto, submittedBy, false);
-    }
-
-    @Transactional
     public StudentRequestResponseDTO submitTransferRequestOnBehalf(Long decidedById, TransferRequestDTO dto) {
+        log.info("AA submitting transfer request on behalf of student {} from class {} to class {}",
+                dto.getStudentId(), dto.getCurrentClassId(), dto.getTargetClassId());
+        
         if (dto.getStudentId() == null) {
             throw new BusinessRuleException("MISSING_STUDENT_ID", "Student ID is required for on-behalf transfer requests");
         }
@@ -1499,7 +1515,194 @@ public class StudentRequestService {
         UserAccount submittedBy = userAccountRepository.findById(decidedById)
                 .orElseThrow(() -> new ResourceNotFoundException("AA user not found"));
 
-        return submitTransferRequestInternal(dto.getStudentId(), dto, submittedBy, true);
+        Long studentId = dto.getStudentId();
+        
+        // 1. Validate current enrollment
+        Enrollment currentEnrollment = enrollmentRepository
+                .findByStudentIdAndClassIdAndStatus(studentId, dto.getCurrentClassId(), EnrollmentStatus.ENROLLED);
+
+        if (currentEnrollment == null) {
+            throw new BusinessRuleException("NOT_ENROLLED", "Student is not enrolled in current class");
+        }
+
+        // 2. Check transfer quota (ONE transfer per subject)
+        Long subjectId = currentEnrollment.getClassEntity().getSubject().getId();
+        if (hasExceededTransferLimit(studentId, subjectId)) {
+            throw new BusinessRuleException("TRANSFER_QUOTA_EXCEEDED", 
+                "Transfer quota exceeded. Maximum 1 transfer per subject.");
+        }
+
+        // 3. Check concurrent requests
+        boolean hasPendingTransfer = studentRequestRepository
+                .existsByStudentIdAndRequestTypeAndStatusIn(
+                        studentId,
+                        StudentRequestType.TRANSFER,
+                        List.of(RequestStatus.PENDING));
+
+        if (hasPendingTransfer) {
+            throw new BusinessRuleException("PENDING_TRANSFER_EXISTS", "You already have a pending transfer request");
+        }
+
+        ClassEntity targetClass = classRepository.findById(dto.getTargetClassId())
+                .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
+
+        // 4. Validate same subject
+        if (!targetClass.getSubject().getId().equals(currentEnrollment.getClassEntity().getSubject().getId())) {
+            throw new BusinessRuleException("DIFFERENT_SUBJECT", "Target class must be for the same subject");
+        }
+
+        // 5. Validate same branch (same-branch transfer only)
+        ClassEntity currentClass = currentEnrollment.getClassEntity();
+        if (!targetClass.getBranch().getId().equals(currentClass.getBranch().getId())) {
+            throw new BusinessRuleException("CROSS_BRANCH_NOT_SUPPORTED",
+                "Không thể chuyển sang lớp ở chi nhánh khác. " +
+                "Vui lòng liên hệ Sale để đăng ký lớp mới tại chi nhánh mong muốn.");
+        }
+
+        // 6. Validate class status
+        if (!List.of(org.fyp.tmssep490be.entities.enums.ClassStatus.SCHEDULED, 
+                    org.fyp.tmssep490be.entities.enums.ClassStatus.ONGOING).contains(targetClass.getStatus())) {
+            throw new BusinessRuleException("INVALID_CLASS_STATUS", "Target class must be SCHEDULED or ONGOING");
+        }
+
+        // 7. Check capacity with pessimistic lock
+        ClassEntity targetClassLocked = classRepository.findByIdWithLock(targetClass.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
+        
+        Integer enrolledCount = classRepository.countEnrolledStudents(targetClassLocked.getId());
+        int enrolled = enrolledCount != null ? enrolledCount : 0;
+        
+        boolean isCapacityOverride = enrolled >= targetClassLocked.getMaxCapacity();
+        if (isCapacityOverride) {
+            log.warn("AA override: Transferring student {} to full class {} ({}/{} enrolled)",
+                    studentId, targetClass.getCode(), enrolled, targetClassLocked.getMaxCapacity());
+        }
+
+        // 8. Validate effective date and session
+        if (dto.getEffectiveDate().isBefore(LocalDate.now())) {
+            throw new BusinessRuleException("PAST_EFFECTIVE_DATE", "Effective date must be in the future");
+        }
+
+        Session effectiveSession = sessionRepository.findById(dto.getSessionId())
+                .orElseThrow(() -> new BusinessRuleException("INVALID_SESSION", "Effective session not found"));
+
+        if (!effectiveSession.getClassEntity().getId().equals(dto.getTargetClassId())) {
+            throw new BusinessRuleException("SESSION_CLASS_MISMATCH", "Session does not belong to target class");
+        }
+
+        if (!effectiveSession.getDate().equals(dto.getEffectiveDate())) {
+            throw new BusinessRuleException("SESSION_DATE_MISMATCH", "Session date does not match effective date");
+        }
+
+        // 9. Get student entity
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
+
+        // 10. Create and save request
+        StudentRequest request = StudentRequest.builder()
+                .student(student)
+                .requestType(StudentRequestType.TRANSFER)
+                .currentClass(currentClass)
+                .targetClass(targetClass)
+                .effectiveDate(dto.getEffectiveDate())
+                .effectiveSession(effectiveSession)
+                .requestReason(dto.getRequestReason())
+                .note(dto.getNote())
+                .status(RequestStatus.APPROVED)  // Auto-approve for AA
+                .submittedBy(submittedBy)
+                .submittedAt(OffsetDateTime.now())
+                .decidedBy(submittedBy)
+                .decidedAt(OffsetDateTime.now())
+                .build();
+
+        request = studentRequestRepository.save(request);
+        
+        log.info("Transfer request created with ID: {} - Status: APPROVED", request.getId());
+
+        // 11. Execute transfer inline (no nested @Transactional)
+        log.info("Executing transfer for request {}", request.getId());
+        
+        // Find the last session of OLD class before effective date
+        List<Session> oldClassSessions = sessionRepository.findAllByClassIdOrderByDateAndTime(currentClass.getId())
+                .stream()
+                .filter(s -> s.getDate().isBefore(dto.getEffectiveDate()))
+                .sorted((s1, s2) -> s2.getDate().compareTo(s1.getDate()))
+                .toList();
+        
+        Session lastSessionInOldClass = oldClassSessions.isEmpty() ? null : oldClassSessions.get(0);
+        
+        // Update old enrollment → TRANSFERRED
+        currentEnrollment.setStatus(EnrollmentStatus.TRANSFERRED);
+        currentEnrollment.setLeftAt(OffsetDateTime.now());
+        currentEnrollment.setLeftSessionId(lastSessionInOldClass != null ? lastSessionInOldClass.getId() : null);
+        currentEnrollment.setLeftSession(lastSessionInOldClass);
+        enrollmentRepository.save(currentEnrollment);
+
+        log.info("Updated old enrollment {} to TRANSFERRED, leftSessionId: {}", 
+                currentEnrollment.getId(), lastSessionInOldClass != null ? lastSessionInOldClass.getId() : "null");
+
+        // Create new enrollment → ENROLLED
+        Enrollment newEnrollment = Enrollment.builder()
+                .studentId(student.getId())
+                .classId(targetClass.getId())
+                .status(EnrollmentStatus.ENROLLED)
+                .enrolledAt(OffsetDateTime.now())
+                .joinSessionId(effectiveSession.getId())
+                .enrolledBy(submittedBy.getId())
+                .capacityOverride(Boolean.TRUE.equals(dto.getCapacityOverride()) || isCapacityOverride)
+                .overrideReason(dto.getOverrideReason())
+                .build();
+        newEnrollment = enrollmentRepository.save(newEnrollment);
+
+        log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
+                newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
+
+        // Mark future StudentSessions from old class as transferred
+        List<StudentSession> futureOldSessions = studentSessionRepository
+                .findByStudentIdAndClassEntityIdAndSessionDateAfterOrEqual(
+                        studentId, currentClass.getId(), dto.getEffectiveDate());
+
+        for (StudentSession ss : futureOldSessions) {
+            ss.setAttendanceStatus(AttendanceStatus.ABSENT);
+            ss.setIsTransferredOut(true);
+            ss.setNote(String.format("Student transferred out to class %s. Request ID: %d", 
+                    targetClass.getCode(), request.getId()));
+            ss.setRecordedAt(OffsetDateTime.now());
+        }
+        studentSessionRepository.saveAll(futureOldSessions);
+
+        log.info("Marked {} future StudentSessions as transferred from old class", futureOldSessions.size());
+
+        // Create StudentSessions for new class
+        List<Session> newClassSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
+                targetClass.getId(), dto.getEffectiveDate());
+
+        int createdCount = 0;
+        for (Session session : newClassSessions) {
+            StudentSession.StudentSessionId ssId = new StudentSession.StudentSessionId(studentId, session.getId());
+            
+            if (studentSessionRepository.existsById(ssId)) {
+                log.warn("StudentSession already exists for student {} session {}, skipping", studentId, session.getId());
+                continue;
+            }
+
+            StudentSession ss = StudentSession.builder()
+                    .id(ssId)
+                    .student(student)
+                    .session(session)
+                    .attendanceStatus(AttendanceStatus.PLANNED)
+                    .build();
+            studentSessionRepository.save(ss);
+            createdCount++;
+        }
+
+        log.info("Created {} StudentSessions for new class", createdCount);
+        log.info("Transfer execution completed for request {}", request.getId());
+        
+        // Send notifications
+        sendTransferExecutionNotifications(request);
+
+        return mapToStudentRequestResponseDTO(request);
     }
 
     private StudentRequestResponseDTO submitTransferRequestInternal(Long studentId, TransferRequestDTO dto,
@@ -1654,13 +1857,23 @@ public class StudentRequestService {
             throw new BusinessRuleException("ENROLLMENT_NOT_FOUND", "Current enrollment not found");
         }
 
+        // Find the last session of OLD class before effective date
+        List<Session> oldClassSessions = sessionRepository.findAllByClassIdOrderByDateAndTime(currentClass.getId())
+                .stream()
+                .filter(s -> s.getDate().isBefore(effectiveDate))
+                .sorted((s1, s2) -> s2.getDate().compareTo(s1.getDate()))
+                .toList();
+        
+        Session lastSessionInOldClass = oldClassSessions.isEmpty() ? null : oldClassSessions.get(0);
+
         oldEnrollment.setStatus(EnrollmentStatus.TRANSFERRED);
         oldEnrollment.setLeftAt(OffsetDateTime.now());
-        oldEnrollment.setLeftSessionId(effectiveSession.getId());
-        oldEnrollment.setLeftSession(effectiveSession);
+        oldEnrollment.setLeftSessionId(lastSessionInOldClass != null ? lastSessionInOldClass.getId() : null);
+        oldEnrollment.setLeftSession(lastSessionInOldClass);
         enrollmentRepository.save(oldEnrollment);
 
-        log.info("Updated old enrollment {} to TRANSFERRED", oldEnrollment.getId());
+        log.info("Updated old enrollment {} to TRANSFERRED, leftSessionId: {}", 
+                oldEnrollment.getId(), lastSessionInOldClass != null ? lastSessionInOldClass.getId() : "null");
 
         // 3. Create new enrollment → ENROLLED (with capacity override info if applicable)
         Enrollment newEnrollment = Enrollment.builder()
@@ -1807,11 +2020,9 @@ public class StudentRequestService {
         int enrolled = enrolledCount != null ? enrolledCount : 0;
         int availableSlots = targetClass.getMaxCapacity() - enrolled;
 
-        TransferOptionDTO.ContentGapAnalysis contentGapAnalysis = analyzeContentGap(currentClass, targetClass);
+        String progressNote = getProgressComparison(currentClass.getId(), targetClass.getId());
 
-        boolean canTransfer = availableSlots > 0 && 
-                             (contentGapAnalysis == null || 
-                              !"MAJOR".equals(contentGapAnalysis.getGapLevel()));
+        boolean canTransfer = availableSlots > 0;
 
         String scheduleDays = formatScheduleDays(targetClass.getScheduleDays());
         
@@ -1841,7 +2052,7 @@ public class StudentRequestService {
                 .availableSlots(availableSlots)
                 .classStatus(targetClass.getStatus().name())
                 .canTransfer(canTransfer)
-                .contentGapAnalysis(contentGapAnalysis)
+                .progressNote(progressNote)
                 .upcomingSessions(upcomingSessions)
                 .allSessions(allSessions)
                 .build();
@@ -2060,95 +2271,29 @@ public class StudentRequestService {
         return completedSessions != null ? completedSessions.size() : 0;
     }
 
-    private TransferOptionDTO.ContentGapAnalysis analyzeContentGap(ClassEntity currentClass, ClassEntity targetClass) {
-        // Get completed subject sessions in current class
-        List<Session> completedSessions = sessionRepository.findByClassEntityIdAndStatusIn(
-                currentClass.getId(), List.of(SessionStatus.DONE));
-
-        List<Long> completedSubjectSessionIds = completedSessions.stream()
-                .filter(s -> s.getSubjectSession() != null)
-                .map(s -> s.getSubjectSession().getId())
-                .distinct()
-                .collect(Collectors.toList());
-
-        // Get target class's past sessions (already happened)
-        List<Session> targetPastSessions = sessionRepository.findByClassEntityIdAndDateBefore(
-                targetClass.getId(), LocalDate.now());
-
-        // Find gap: sessions target class covered but current class hasn't
-        List<TransferOptionDTO.ContentGapSession> gapSessions = targetPastSessions.stream()
-                .filter(s -> s.getSubjectSession() != null)
-                .filter(s -> !completedSubjectSessionIds.contains(s.getSubjectSession().getId()))
-                .map(s -> TransferOptionDTO.ContentGapSession.builder()
-                        .courseSessionNumber(s.getSubjectSession().getSequenceNo())
-                        .courseSessionTitle(s.getSubjectSession().getTopic())
-                        .scheduledDate(s.getDate().toString())
-                        .build())
-                .collect(Collectors.toList());
-
-        if (gapSessions.isEmpty()) {
-            return null; // No gap
+    /**
+     * Simple progress comparison between current and target class
+     * Returns a human-readable string instead of complex gap analysis
+     */
+    private String getProgressComparison(Long currentClassId, Long targetClassId) {
+        Integer currentSessionNum = sessionRepository.findLastCompletedSessionNumber(currentClassId);
+        Integer targetSessionNum = sessionRepository.findLastCompletedSessionNumber(targetClassId);
+        
+        if (currentSessionNum == null || targetSessionNum == null) {
+            return "Chưa có thông tin tiến độ";
         }
-
-        int gapCount = gapSessions.size();
-        String severity = gapCount <= 2 ? "MINOR" : gapCount <= 5 ? "MODERATE" : "MAJOR";
-
-        List<String> recommendedActions = switch (severity) {
-            case "MINOR" -> List.of("Review missed topics with teacher", "Self-study recommended materials");
-            case "MODERATE" -> List.of("Schedule makeup sessions", "Request additional support from teacher");
-            case "MAJOR" -> List.of("Consider intensive catch-up sessions", "May need to retake from earlier session");
-            default -> List.of();
-        };
-
-        String impactDescription = switch (severity) {
-            case "MINOR" -> "Small content gap - easily manageable with self-study";
-            case "MODERATE" -> "Moderate gap - may need additional support to catch up";
-            case "MAJOR" -> "Significant gap - recommend consulting with academic advisor before transfer";
-            default -> "";
-        };
-
-        return TransferOptionDTO.ContentGapAnalysis.builder()
-                .gapLevel(severity)
-                .missedSessions(gapCount)
-                .totalSessions(targetPastSessions.size())
-                .gapSessions(gapSessions)
-                .recommendedActions(recommendedActions)
-                .impactDescription(impactDescription)
-                .build();
-    }
-
-    private int compareByCompatibility(TransferOptionDTO a, TransferOptionDTO b) {
-        int changesA = countChanges(a.getChanges());
-        int changesB = countChanges(b.getChanges());
-
-        if (changesA != changesB) {
-            return Integer.compare(changesA, changesB);
+        
+        int diff = targetSessionNum - currentSessionNum;
+        
+        if (diff == 0) {
+            return "Tiến độ tương đương (Buổi " + currentSessionNum + ")";
+        } else if (Math.abs(diff) <= 2) {
+            return String.format("Tiến độ gần tương đương (Chênh %d buổi)", Math.abs(diff));
+        } else if (diff > 0) {
+            return String.format("Lớp mới nhanh hơn %d buổi", diff);
+        } else {
+            return String.format("Lớp mới chậm hơn %d buổi", Math.abs(diff));
         }
-
-        // Secondary sort by content gap severity
-        String severityA = a.getContentGapAnalysis() != null ? a.getContentGapAnalysis().getGapLevel() : "NONE";
-        String severityB = b.getContentGapAnalysis() != null ? b.getContentGapAnalysis().getGapLevel() : "NONE";
-        return compareSeverity(severityA, severityB);
-    }
-
-    private int countChanges(TransferOptionDTO.Changes changes) {
-        if (changes == null) return 0;
-
-        int count = 0;
-        if (changes.getBranch() != null && !changes.getBranch().equals("No change")) count++;
-        if (changes.getModality() != null && !changes.getModality().equals("No change")) count++;
-        if (changes.getSchedule() != null && !changes.getSchedule().equals("No change")) count++;
-        return count;
-    }
-
-    private int compareSeverity(String severityA, String severityB) {
-        Map<String, Integer> severityOrder = Map.of(
-            "NONE", 0, "MINOR", 1, "MODERATE", 2, "MAJOR", 3
-        );
-        return Integer.compare(
-            severityOrder.getOrDefault(severityA, 0),
-            severityOrder.getOrDefault(severityB, 0)
-        );
     }
 
     /**
@@ -2167,13 +2312,11 @@ public class StudentRequestService {
                     oldClassCode, newClassCode, effectiveDate
             );
 
-            notificationService.createNotificationWithReference(
+            notificationService.createNotification(
                     request.getStudent().getUserAccount().getId(),
-                    NotificationType.CLASS_REMINDER,
+                    NotificationType.NOTIFICATION,
                     title,
-                    message,
-                    "StudentRequest",
-                    request.getId()
+                    message
             );
 
             log.info("Sent transfer notification to student {}", request.getStudent().getId());

@@ -45,8 +45,19 @@ public class ClassDetailDTO {
     private List<TeacherSummaryDTO> teachers;
 
     private String scheduleSummary;
+    private List<ScheduleDetailDTO> scheduleDetails;
 
     private EnrollmentSummary enrollmentSummary;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ScheduleDetailDTO {
+        private String day;
+        private String startTime;
+        private String endTime;
+    }
 
     @Data
     @Builder

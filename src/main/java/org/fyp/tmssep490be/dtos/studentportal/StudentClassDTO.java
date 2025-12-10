@@ -24,7 +24,7 @@ public class StudentClassDTO {
     private String subjectCode;
 
     private Long branchId;
-    private String branchName;
+    private String branchAddress;
 
     private String modality;
     private String status;
@@ -32,7 +32,8 @@ public class StudentClassDTO {
     private LocalDate plannedEndDate;
     private LocalDate actualEndDate;
 
-    private String scheduleSummary; 
+    private String scheduleSummary;
+    private List<ScheduleDetailDTO> scheduleDetails;
 
     private Long enrollmentId;
     private OffsetDateTime enrollmentDate;
@@ -41,6 +42,14 @@ public class StudentClassDTO {
     private Integer totalSessions;
     private Integer completedSessions;
 
-    private List<String> instructorNames;
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ScheduleDetailDTO {
+        private String day;        
+        private String startTime;  
+        private String endTime;   
+    }
 }
 

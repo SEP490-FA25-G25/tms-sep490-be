@@ -74,4 +74,15 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     );
 
     List<Enrollment> findByStudentIdAndStatusIn(Long studentId, List<EnrollmentStatus> statuses);
+
+    // Find enrollment by studentId and classId (any status) for attendance report filtering
+    @Query("SELECT e FROM Enrollment e " +
+           "LEFT JOIN FETCH e.joinSession " +
+           "LEFT JOIN FETCH e.leftSession " +
+           "WHERE e.student.id = :studentId " +
+           "AND e.classId = :classId")
+    Enrollment findByStudentIdAndClassId(
+            @Param("studentId") Long studentId,
+            @Param("classId") Long classId
+    );
 }
