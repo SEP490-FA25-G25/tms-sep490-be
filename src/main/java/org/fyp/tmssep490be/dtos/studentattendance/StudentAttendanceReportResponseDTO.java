@@ -22,6 +22,7 @@ public class StudentAttendanceReportResponseDTO {
     private LocalDate startDate;
     private LocalDate actualEndDate;
     private String status;
+    private String enrollmentStatus;  // ENROLLED, TRANSFERRED, COMPLETED
 
     private Summary summary;
     private List<StudentAttendanceReportSessionDTO> sessions;

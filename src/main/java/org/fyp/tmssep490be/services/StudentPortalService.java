@@ -146,35 +146,74 @@ public class StudentPortalService {
             throw new CustomException(ErrorCode.CLASS_NOT_FOUND);
         }
 
-        // Validate student enrollment (allow both ENROLLED and COMPLETED for history access)
-        List<EnrollmentStatus> allowedStatuses = Arrays.asList(EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED);
-        if (!enrollmentRepository.existsByStudentIdAndClassIdAndStatusIn(studentId, classId, allowedStatuses)) {
+        // Get enrollment to check status and timeline (allow ENROLLED, COMPLETED, TRANSFERRED for history)
+        Enrollment enrollment = enrollmentRepository.findByStudentIdAndClassId(studentId, classId);
+        if (enrollment == null) {
             throw new CustomException(ErrorCode.STUDENT_NOT_ENROLLED_IN_CLASS);
         }
 
         // Get all sessions for the class
         List<Session> allSessions = sessionRepository.findAllByClassIdOrderByDateAndTime(classId);
         
-        // Loại bỏ các buổi đã bị hủy để thống nhất với báo cáo điểm danh
-        List<Session> activeSessions = allSessions.stream()
-                .filter(session -> session.getStatus() != SessionStatus.CANCELLED)
+        // Filter sessions by enrollment timeline
+        List<Session> relevantSessions = allSessions.stream()
+                .filter(session -> {
+                    if (session.getStatus() == SessionStatus.CANCELLED) {
+                        return false;
+                    }
+                    
+                    Long sessionId = session.getId();
+                    Long joinId = enrollment.getJoinSessionId();
+                    Long leftId = enrollment.getLeftSessionId();
+                    
+                    // Filter by enrollment timeline
+                    if (enrollment.getStatus() == EnrollmentStatus.TRANSFERRED) {
+                        // Only sessions <= leftSessionId
+                        return leftId == null || sessionId <= leftId;
+                    } else if (enrollment.getStatus() == EnrollmentStatus.ENROLLED) {
+                        // Only sessions >= joinSessionId
+                        return joinId == null || sessionId >= joinId;
+                    } else if (enrollment.getStatus() == EnrollmentStatus.COMPLETED) {
+                        // Sessions from join to end
+                        return joinId == null || sessionId >= joinId;
+                    }
+                    
+                    return true;
+                })
                 .toList();
 
         // Separate upcoming and past sessions
         LocalDate today = LocalDate.now();
-        List<Session> upcomingSessions = activeSessions.stream()
+        List<Session> upcomingSessions = relevantSessions.stream()
                 .filter(session -> !session.getDate().isBefore(today) && session.getStatus() == SessionStatus.PLANNED)
                 .toList();
 
-        List<Session> pastSessions = activeSessions.stream()
+        List<Session> pastSessions = relevantSessions.stream()
                 .filter(session -> session.getDate().isBefore(today) || session.getStatus() != SessionStatus.PLANNED)
                 .toList();
 
-        // Get student sessions for attendance data
+        // Get student sessions for attendance data - filter by enrollment timeline and isTransferredOut
         List<StudentSession> studentSessions = studentSessionRepository.findAllByStudentId(studentId)
                 .stream()
                 .filter(ss -> ss.getSession().getClassEntity().getId().equals(classId))
                 .filter(ss -> ss.getSession().getStatus() != SessionStatus.CANCELLED)
+                .filter(ss -> !Boolean.TRUE.equals(ss.getIsTransferredOut()))  // Filter transferred out sessions
+                .filter(ss -> {
+                    Long sessionId = ss.getSession().getId();
+                    Long joinId = enrollment.getJoinSessionId();
+                    Long leftId = enrollment.getLeftSessionId();
+                    
+                    // Filter by enrollment timeline
+                    if (enrollment.getStatus() == EnrollmentStatus.TRANSFERRED) {
+                        return leftId == null || sessionId <= leftId;
+                    } else if (enrollment.getStatus() == EnrollmentStatus.ENROLLED) {
+                        return joinId == null || sessionId >= joinId;
+                    } else if (enrollment.getStatus() == EnrollmentStatus.COMPLETED) {
+                        return joinId == null || sessionId >= joinId;
+                    }
+                    
+                    return true;
+                })
                 .toList();
 
         // Convert to DTOs
@@ -194,6 +233,8 @@ public class StudentPortalService {
                 .upcomingSessions(upcomingSessionDTOs)
                 .pastSessions(pastSessionDTOs)
                 .studentSessions(studentSessionDTOs)
+                .enrollmentStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : null)
+                .leftAt(enrollment.getLeftAt() != null ? enrollment.getLeftAt().toLocalDate() : null)
                 .build();
     }
 
