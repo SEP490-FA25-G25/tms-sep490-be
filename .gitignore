@@ -35,3 +35,6 @@ build/
 # migration
 migration
 
+# Environment variables (contains secrets)
+.env
+.env.*
