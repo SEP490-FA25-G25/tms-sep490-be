@@ -65,7 +65,7 @@ SELECT setval('student_feedback_id_seq', 1, false);
 SELECT setval('student_feedback_response_id_seq', 1, false);
 SELECT setval('qa_report_id_seq', 1, false);
 SELECT setval('subject_material_id_seq', 1, false);
-SELECT setval('time_slot_template_id_seq', 16, false);
+SELECT setval('time_slot_template_id_seq', 26, false);
 SELECT setval('resource_id_seq', 1, false);
 SELECT setval('replacement_skill_assessment_id_seq', 1, false);
 SELECT setval('feedback_question_id_seq', 1, false);
@@ -193,7 +193,21 @@ INSERT INTO time_slot_template (id, branch_id, name, start_time, end_time, creat
 (14, 2, 'HCM Evening Late 2.5h', '19:00:00', '21:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
 -- Weekend Special Slots
 (15, 2, 'HCM Weekend Morning 2.5h', '08:30:00', '11:00:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
-(16, 2, 'HCM Weekend Afternoon 2.5h', '14:00:00', '16:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
+(16, 2, 'HCM Weekend Afternoon 2.5h', '14:00:00', '16:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+
+-- Additional 1.5h Time Slots for Ha Noi Branch
+(17, 1, 'HN Morning Slot 1 1.5h', '08:40:00', '10:10:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(18, 1, 'HN Morning Slot 2 1.5h', '10:20:00', '11:50:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(19, 1, 'HN Afternoon Slot 1 1.5h', '12:40:00', '14:10:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(20, 1, 'HN Afternoon Slot 2 1.5h', '14:20:00', '15:50:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(21, 1, 'HN Late Afternoon 1.5h', '16:00:00', '17:30:00', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+
+-- Additional 1.5h Time Slots for Ho Chi Minh Branch
+(22, 2, 'HCM Morning Slot 1 1.5h', '08:40:00', '10:10:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(23, 2, 'HCM Morning Slot 2 1.5h', '10:20:00', '11:50:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(24, 2, 'HCM Afternoon Slot 1 1.5h', '12:40:00', '14:10:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(25, 2, 'HCM Afternoon Slot 2 1.5h', '14:20:00', '15:50:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(26, 2, 'HCM Late Afternoon 1.5h', '16:00:00', '17:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
 
 -- Resources (Rooms & Zoom) - Comprehensive for Testing
 INSERT INTO resource (id, branch_id, resource_type, code, name, capacity, capacity_override, created_at, updated_at) VALUES
