@@ -65,6 +65,12 @@ public class MakeupOptionDTO {
         private Integer availableSlots;
 
         private Integer maxCapacity;
+
+        private String resourceName;
+
+        private String resourceType;
+
+        private String onlineLink;
     }
 
     @Data

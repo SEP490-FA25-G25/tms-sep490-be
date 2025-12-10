@@ -74,11 +74,13 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             "AND s.date BETWEEN :startDate AND :endDate " +
             "AND s.status != 'CANCELLED' " +
             "AND (ss.isTransferredOut IS NULL OR ss.isTransferredOut = false) " +
+            "AND (:classId IS NULL OR s.classEntity.id = :classId) " +
             "ORDER BY s.date ASC, tst.startTime ASC")
     List<StudentSession> findWeeklyScheduleByStudentId(
             @Param("studentId") Long studentId,
             @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate
+            @Param("endDate") LocalDate endDate,
+            @Param("classId") Long classId
     );
 
     // Find all student sessions by student and class for absence rate calculation
