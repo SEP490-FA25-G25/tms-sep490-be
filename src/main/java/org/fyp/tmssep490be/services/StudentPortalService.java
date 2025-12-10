@@ -86,10 +86,8 @@ public class StudentPortalService {
         List<ClassStatus> classStatuses = resolveClassStatuses(classStatusFilters);
         Set<Modality> modalities = resolveModalities(modalityFilters);
 
-        // Get all enrollments for the student with filtered enrollment statuses
         List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatusIn(studentId, enrollmentStatuses);
 
-        // Apply filters
         List<Enrollment> filteredEnrollments = enrollments.stream()
                 .filter(enrollment -> {
                     ClassEntity classEntity = enrollment.getClassEntity();
@@ -508,7 +506,8 @@ public class StudentPortalService {
 
     private List<EnrollmentStatus> resolveEnrollmentStatuses(List<String> filters) {
         if (filters == null || filters.isEmpty()) {
-            return Arrays.asList(EnrollmentStatus.values());
+            // Default: only show active enrollments (not transferred, dropped, or cancelled)
+            return Arrays.asList(EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED);
         }
 
         return filters.stream()

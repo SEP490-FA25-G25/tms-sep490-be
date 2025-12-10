@@ -128,4 +128,15 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             """)
     List<StudentSession> findBySessionIds(@Param("sessionIds") List<Long> sessionIds);
 
+    @Query("SELECT ss FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE ss.student.id = :studentId " +
+           "AND s.classEntity.id = :classId " +
+           "AND s.date >= :date")
+    List<StudentSession> findByStudentIdAndClassEntityIdAndSessionDateAfterOrEqual(
+            @Param("studentId") Long studentId,
+            @Param("classId") Long classId,
+            @Param("date") LocalDate date
+    );
+
 }
