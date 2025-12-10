@@ -1,6 +1,6 @@
 package org.fyp.tmssep490be.repositories;
 
-import org.fyp.tmssep490be.entities.SubjectAssessment;
+import org.fyp.tmssep490be.entities.SubjectSessionCLOMapping;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,9 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface SubjectAssessmentRepository extends JpaRepository<SubjectAssessment, Long> {
-
-    // Tìm assessment theo subject
-    @Query("SELECT ca FROM SubjectAssessment ca WHERE ca.subject.id = :subjectId")
-    List<SubjectAssessment> findBySubjectId(@Param("subjectId") Long subjectId);
+public interface SubjectSessionCLOMappingRepository extends JpaRepository<SubjectSessionCLOMapping, Long> {
+    // Tìm mapping theo session - dùng derived query như deprecated
+    List<SubjectSessionCLOMapping> findBySessionId(Long sessionId);
 }

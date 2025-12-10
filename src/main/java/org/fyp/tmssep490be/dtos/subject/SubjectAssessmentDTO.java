@@ -25,8 +25,7 @@ public class SubjectAssessmentDTO {
 
     // Main fields
     private String assessmentType;
-    private BigDecimal weight; // Shared name but different type in Main (BigDecimal) vs HEAD (Double). Using
-                               // BigDecimal as it's safer.
+    private BigDecimal weight;
     private String duration;
     private List<Long> sessionIds;
     private List<String> cloMappings;

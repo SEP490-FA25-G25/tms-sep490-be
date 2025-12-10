@@ -7,9 +7,9 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Data@Builde
+
+@NoAr @AllArgConstrutor
 public class SubjectCLODTO {
     private Long id;
     private String code;
@@ -17,11 +17,13 @@ public class SubjectCLODTO {
 
     // HEAD fields
     private List<String> mappedPLOs; // List of PLO codes
- 
+
     // Main fields
-    private String competencyLevel;
+        priate String competencyLevel;
     private List<String> assessmentMethods;
-    private List<SubjectPLODTO> relatedPLOs;
+
     private Boolean isAchieved;
     private Double achievementRate;
 }
+
+
