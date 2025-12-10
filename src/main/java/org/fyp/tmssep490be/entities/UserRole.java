@@ -15,7 +15,7 @@ import java.io.Serializable;
 public class UserRole implements Serializable {
 
     @EmbeddedId
-    private UserRoleId id;
+    private UserRoleId id = new UserRoleId(); // Khởi tạo mặc định để tránh lỗi khi @MapsId set giá trị
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("userId")
