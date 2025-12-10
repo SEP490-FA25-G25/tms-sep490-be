@@ -1,146 +1,297 @@
 package org.fyp.tmssep490be.services;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
-import org.fyp.tmssep490be.dtos.user.UpdateUserRequest;
-import org.fyp.tmssep490be.entities.Role;
 import org.fyp.tmssep490be.dtos.user.CreateUserRequest;
+import org.fyp.tmssep490be.dtos.user.UpdateUserRequest;
 import org.fyp.tmssep490be.dtos.user.UserResponse;
-import org.fyp.tmssep490be.entities.UserAccount;
-import org.fyp.tmssep490be.entities.enums.Gender;
+import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.fyp.tmssep490be.repositories.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.mockito.*;
 
-import java.util.Optional;
-import java.util.Set;
+import org.springframework.data.domain.*;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import java.time.LocalDate;
+import java.util.*;
+
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-@ExtendWith(MockitoExtension.class)
 class UserAccountServiceTest {
 
-    @Mock
-    private UserAccountRepository userAccountRepository;
-
-    @Mock
-    private PasswordEncoder passwordEncoder;
-
-    @Mock
-    private RoleRepository roleRepository;
-
-    @Mock
-    private BranchRepository branchRepository;
-
-    @Mock
-    private UserRoleRepository userRoleRepository;
-
-    @Mock
-    private UserBranchesRepository userBranchesRepository;
+    @Mock private UserAccountRepository userAccountRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private RoleRepository roleRepository;
+    @Mock private BranchRepository branchRepository;
+    @Mock private UserRoleRepository userRoleRepository;
+    @Mock private UserBranchesRepository userBranchesRepository;
 
     @InjectMocks
     private UserAccountService userAccountService;
 
-    private CreateUserRequest validRequest;
-
     @BeforeEach
-    void setUp() {
-        validRequest = new CreateUserRequest();
-        validRequest.setEmail("huyentrang@gmail.com");
-        validRequest.setPassword("12345678");
-        validRequest.setFullName("Huyen Trang");
-        validRequest.setGender(Gender.FEMALE);
-        validRequest.setStatus(UserStatus.ACTIVE);
-        validRequest.setRoleIds(Set.of(1L));
+    void init() {
+        MockitoAnnotations.openMocks(this);
     }
 
-    @Test
-    void createUser_WhenEmailExists_ShouldThrowException() {
-        when(userAccountRepository.existsByEmail("huyentrang@gmail.com")).thenReturn(true);
-
-        assertThrows(IllegalArgumentException.class,
-                () -> userAccountService.createUser(validRequest));
+    // Helper
+    private UserAccount user(long id) {
+        UserAccount u = new UserAccount();
+        u.setId(id);
+        u.setEmail("test@fpt.edu.vn");
+        u.setFullName("Tester");
+        u.setStatus(UserStatus.ACTIVE);
+        return u;
     }
 
+    // ==========================================================
+    // CREATE USER
+    // ==========================================================
+
     @Test
-    void createUser_WhenValidRequest_ShouldReturnUserResponse() {
-        when(userAccountRepository.existsByEmail(any())).thenReturn(false);
-        when(passwordEncoder.encode(any())).thenReturn("encodedPassword");
-        when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> {
-            UserAccount user = invocation.getArgument(0);
-            user.setId(1L);
-            return user;
+    void createUser_success() {
+        CreateUserRequest req = new CreateUserRequest();
+        req.setEmail("new@fpt.edu.vn");
+        req.setPassword("123456");
+        req.setFullName("New User");
+        req.setRoleIds(Set.of(1L));
+        req.setBranchIds(Set.of(10L));
+        req.setStatus(UserStatus.ACTIVE);
+
+        when(userAccountRepository.existsByEmail("new@fpt.edu.vn")).thenReturn(false);
+        when(passwordEncoder.encode("123456")).thenReturn("hashed");
+        when(userAccountRepository.save(any())).thenAnswer(inv -> {
+            UserAccount u = inv.getArgument(0);
+            u.setId(100L);
+            return u;
         });
 
-        Role mockRole = new Role();
-        mockRole.setId(1L);
-        mockRole.setCode("ADMIN");
-        when(roleRepository.findById(1L)).thenReturn(Optional.of(mockRole));
+        Role r = new Role();
+        r.setId(1L);
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(r));
 
+        Branch b = new Branch();
+        b.setId(10L);
+        b.setName("Branch 10");
+        when(branchRepository.findById(10L)).thenReturn(Optional.of(b));
 
-        UserResponse response = userAccountService.createUser(validRequest);
+        UserResponse res = userAccountService.createUser(req);
 
-        assertNotNull(response);
-        assertEquals("huyentrang@gmail.com", response.getEmail());
-        verify(userAccountRepository).save(any(UserAccount.class));
+        assertEquals("new@fpt.edu.vn", res.getEmail());
+        verify(userRoleRepository, times(1)).save(any());
+        verify(userBranchesRepository, times(1)).save(any());
     }
 
     @Test
-    void updateUser_WhenUserNotFound_ShouldThrowException() {
-        when(userAccountRepository.findById(99L)).thenReturn(Optional.empty());
-        UpdateUserRequest request = new UpdateUserRequest();
-        request.setFullName("Hoang Thi Huyen Trang");
-        assertThrows(IllegalArgumentException.class,
-                () -> userAccountService.updateUser(99L, request));
+    void createUser_emailExists() {
+        CreateUserRequest req = new CreateUserRequest();
+        req.setEmail("dup@fpt.edu.vn");
+
+        when(userAccountRepository.existsByEmail("dup@fpt.edu.vn")).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class, () -> userAccountService.createUser(req));
     }
 
     @Test
-    void updateUser_WhenValidRequest_ShouldUpdateUser() {
+    void createUser_roleNotFound() {
+        CreateUserRequest req = new CreateUserRequest();
+        req.setEmail("new@fpt.edu.vn");
+        req.setPassword("123");
+        req.setRoleIds(Set.of(999L));
+        when(userAccountRepository.save(any(UserAccount.class)))
+                .thenAnswer(inv -> {
+                    UserAccount u = inv.getArgument(0);
+                    u.setId(100L); // fake ID
+                    return u;
+                });
 
-        UserAccount existingUser = new UserAccount();
-        existingUser.setId(1L);
-        existingUser.setEmail("huyentrang@gmail.com");
-        existingUser.setFullName("Huyen Trang");
-        when(userAccountRepository.findById(1L)).thenReturn(Optional.of(existingUser));
-        when(userAccountRepository.save(any(UserAccount.class))).thenReturn(existingUser);
-        UpdateUserRequest request = new UpdateUserRequest();
-        request.setFullName("New Name");
+        when(userAccountRepository.existsByEmail("new@fpt.edu.vn")).thenReturn(false);
+        when(passwordEncoder.encode("123")).thenReturn("hashed");
+        when(roleRepository.findById(999L)).thenReturn(Optional.empty());
 
-        UserResponse response = userAccountService.updateUser(1L, request);
-
-        verify(userAccountRepository).save(any(UserAccount.class));
-        assertEquals("New Name", existingUser.getFullName());
+        assertThrows(IllegalArgumentException.class, () -> userAccountService.createUser(req));
     }
 
     @Test
-    void deleteUser_WhenUserNotFound_ShouldThrowException() {
-        when(userAccountRepository.findById(99L)).thenReturn(Optional.empty());
+    void createUser_branchNotFound() {
+        CreateUserRequest req = new CreateUserRequest();
+        req.setEmail("new@fpt.edu.vn");
+        req.setPassword("123");
+        req.setRoleIds(Set.of(1L));
+        req.setBranchIds(Set.of(88L));
+        when(userAccountRepository.save(any(UserAccount.class)))
+                .thenAnswer(inv -> {
+                    UserAccount u = inv.getArgument(0);
+                    u.setId(100L);
+                    return u;
+                });
 
-        assertThrows(IllegalArgumentException.class,
-                () -> userAccountService.deleteUser(99L));
+        when(userAccountRepository.existsByEmail("new@fpt.edu.vn")).thenReturn(false);
+        when(passwordEncoder.encode("123")).thenReturn("hashed");
+
+        Role r = new Role();
+        r.setId(1L);
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(r));
+        when(branchRepository.findById(88L)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> userAccountService.createUser(req));
+    }
+
+    // ==========================================================
+    // UPDATE USER
+    // ==========================================================
+
+    @Test
+    void updateUser_success() {
+        UserAccount u = user(99L);
+        when(userAccountRepository.findById(99L)).thenReturn(Optional.of(u));
+
+        UpdateUserRequest req = new UpdateUserRequest();
+        req.setFullName("Updated");
+        req.setRoleIds(Set.of(1L));
+        req.setBranchIds(Set.of(11L));
+
+        Role r = new Role();
+        r.setId(1L);
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(r));
+
+        Branch b = new Branch();
+        b.setId(11L);
+        b.setName("Branch 11");
+        when(branchRepository.findById(11L)).thenReturn(Optional.of(b));
+
+        UserResponse res = userAccountService.updateUser(99L, req);
+        assertEquals("Updated", res.getFullName());
+        verify(userRoleRepository).deleteByUserAccount(u);
+        verify(userBranchesRepository).deleteByUserAccount(u);
     }
 
     @Test
-    void deleteUser_WhenUserExists_ShouldSetStatusInactive() {
+    void updateUser_notFound() {
+        when(userAccountRepository.findById(55L)).thenReturn(Optional.empty());
+        UpdateUserRequest req = new UpdateUserRequest();
+        assertThrows(IllegalArgumentException.class, () -> userAccountService.updateUser(55L, req));
+    }
 
-        UserAccount existingUser = new UserAccount();
-        existingUser.setId(1L);
-        existingUser.setStatus(UserStatus.ACTIVE);
+    @Test
+    void updateUser_roleNotFound() {
+        UserAccount u = user(88L);
+        when(userAccountRepository.findById(88L)).thenReturn(Optional.of(u));
 
-        when(userAccountRepository.findById(1L)).thenReturn(Optional.of(existingUser));
-        when(userAccountRepository.save(any(UserAccount.class))).thenReturn(existingUser);
+        UpdateUserRequest req = new UpdateUserRequest();
+        req.setRoleIds(Set.of(999L));
 
+        when(roleRepository.findById(999L)).thenReturn(Optional.empty());
 
-        userAccountService.deleteUser(1L);
+        assertThrows(IllegalArgumentException.class, () -> userAccountService.updateUser(88L, req));
+    }
 
+    @Test
+    void updateUser_branchNotFound() {
+        UserAccount u = user(88L);
+        when(userAccountRepository.findById(88L)).thenReturn(Optional.of(u));
 
-        assertEquals(UserStatus.INACTIVE, existingUser.getStatus());
-        verify(userAccountRepository).save(existingUser);
+        UpdateUserRequest req = new UpdateUserRequest();
+        req.setBranchIds(Set.of(999L));
+
+        when(branchRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> userAccountService.updateUser(88L, req));
+    }
+
+    // ==========================================================
+    // DELETE USER
+    // ==========================================================
+
+    @Test
+    void deleteUser_success() {
+        UserAccount u = user(11L);
+        when(userAccountRepository.findById(11L)).thenReturn(Optional.of(u));
+
+        userAccountService.deleteUser(11L);
+
+        assertEquals(UserStatus.INACTIVE, u.getStatus());
+        verify(userAccountRepository).save(u);
+    }
+
+    @Test
+    void deleteUser_notFound() {
+        when(userAccountRepository.findById(12L)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userAccountService.deleteUser(12L));
+    }
+
+    // ==========================================================
+    // GET USER BY ID
+    // ==========================================================
+
+    @Test
+    void getUserById_success() {
+        UserAccount u = user(5L);
+        when(userAccountRepository.findById(5L)).thenReturn(Optional.of(u));
+
+        UserResponse res = userAccountService.getUserById(5L);
+        assertEquals(5L, res.getId());
+    }
+
+    @Test
+    void getUserById_notFound() {
+        when(userAccountRepository.findById(9L)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userAccountService.getUserById(9L));
+    }
+
+    // ==========================================================
+    // GET USER BY EMAIL
+    // ==========================================================
+
+    @Test
+    void getUserByEmail_success() {
+        UserAccount u = user(1L);
+        when(userAccountRepository.findByEmail("test@fpt.edu.vn")).thenReturn(Optional.of(u));
+
+        UserResponse res = userAccountService.getUserByEmail("test@fpt.edu.vn");
+        assertEquals("test@fpt.edu.vn", res.getEmail());
+    }
+
+    @Test
+    void getUserByEmail_notFound() {
+        when(userAccountRepository.findByEmail("x@x.com")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userAccountService.getUserByEmail("x@x.com"));
+    }
+
+    // ==========================================================
+    // UPDATE USER STATUS
+    // ==========================================================
+
+    @Test
+    void updateUserStatus_success() {
+        UserAccount u = user(22L);
+        when(userAccountRepository.findById(22L)).thenReturn(Optional.of(u));
+
+        UserResponse res = userAccountService.updateUserStatus(22L, "INACTIVE");
+        assertEquals(UserStatus.INACTIVE, res.getStatus());
+    }
+
+    @Test
+    void updateUserStatus_notFound() {
+        when(userAccountRepository.findById(33L)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userAccountService.updateUserStatus(33L, "ACTIVE"));
+    }
+
+    // ==========================================================
+    // CHECK EMAIL EXISTS
+    // ==========================================================
+
+    @Test
+    void checkEmailExists_true() {
+        when(userAccountRepository.existsByEmail("abc@a.com")).thenReturn(true);
+        assertTrue(userAccountService.checkEmailExists("abc@a.com"));
+    }
+
+    @Test
+    void checkEmailExists_false() {
+        when(userAccountRepository.existsByEmail("abc@a.com")).thenReturn(false);
+        assertFalse(userAccountService.checkEmailExists("abc@a.com"));
     }
 }
