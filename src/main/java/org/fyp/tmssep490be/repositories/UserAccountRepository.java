@@ -62,4 +62,25 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
                 @Param("status") String status,
                 @Param("branchId") Long branchId,
                 Pageable pageable);
+
+        // Đếm user theo trạng thái
+        Long countByStatus(UserStatus status);
+
+        // Đếm user theo từng Role
+        @Query("SELECT r.name, COUNT(ur) FROM UserRole ur JOIN ur.role r GROUP BY r.name ORDER BY COUNT(ur) DESC")
+        List<Object[]> countUsersByRole();
+
+        // Đếm user theo từng Branch
+        @Query("SELECT b.name, COUNT(ub) FROM UserBranches ub JOIN ub.branch b GROUP BY b.name ORDER BY COUNT(ub) DESC")
+        List<Object[]> countUsersByBranch();
+
+        // Đếm user mới theo ngày (dùng cho biểu đồ)
+        @Query(value = "SELECT DATE(created_at) as date, COUNT(*) as count " +
+                "FROM user_account " +
+                "WHERE DATE(created_at) BETWEEN :startDate AND :endDate " +
+                "GROUP BY DATE(created_at) " +
+                "ORDER BY DATE(created_at)",
+                nativeQuery = true)
+        List<Object[]> countNewUsersByDay(@Param("startDate") java.time.LocalDate startDate,
+                                          @Param("endDate") java.time.LocalDate endDate);
 }
