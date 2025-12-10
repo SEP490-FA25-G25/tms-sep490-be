@@ -233,12 +233,8 @@ public class UserAccountService {
     @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status, Long branchId) {
         log.info("Getting all users with search: {}, role: {}, status: {}, branchId: {}", search, role, status, branchId);
-        UserStatus statusEnum = null;
-        if (status != null && !status.isEmpty()) {
-            statusEnum = UserStatus.valueOf(status);
-        }
 
-        Page<UserAccount> users = userAccountRepository.findAllWithFilters(search, role, statusEnum, branchId, pageable);
+        Page<UserAccount> users = userAccountRepository.findAllWithFilters(search, role, status, branchId, pageable);
         return users.map(this::mapToResponse);
     }
 
