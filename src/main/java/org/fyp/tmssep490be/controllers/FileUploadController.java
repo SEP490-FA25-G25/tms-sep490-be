@@ -27,23 +27,36 @@ public class FileUploadController {
 
     private final StorageService storageService;
 
-    // Allowed file types for S3 free tier
+    // Allowed file types: Images, PDF, Word, Excel, PowerPoint
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            // Images
             "image/jpeg",
             "image/png",
             "image/gif",
             "image/webp",
-            "application/pdf");
+            // PDF
+            "application/pdf",
+            // Word
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            // Excel
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            // PowerPoint
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation");
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf");
+            // Images
+            ".jpg", ".jpeg", ".png", ".gif", ".webp",
+            // Documents
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx");
 
-    // Max file size: 5MB for images, 10MB for PDF
-    private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
-    private static final long MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
+    // Max file size: 20MB for all files
+    private static final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Upload file", description = "Upload images (JPG, PNG, GIF, WebP) or PDF to S3. Max 5MB for images, 10MB for PDF.")
+    @Operation(summary = "Upload file", description = "Upload images (JPG, PNG, GIF, WebP) or documents (PDF, Word, Excel, PowerPoint) to S3. Max 20MB.")
     public ResponseEntity<ResponseObject<Map<String, String>>> uploadFile(
             @RequestParam("file") MultipartFile file) {
 
@@ -98,25 +111,21 @@ public class FileUploadController {
         boolean validExtension = ALLOWED_EXTENSIONS.stream().anyMatch(lowerFilename::endsWith);
         if (!validExtension) {
             throw new CustomException(ErrorCode.INVALID_INPUT,
-                    "Định dạng file không được hỗ trợ. Chỉ cho phép: JPG, PNG, GIF, WebP, PDF");
+                    "Định dạng file không được hỗ trợ. Chỉ cho phép: JPG, PNG, GIF, WebP, PDF, Word, Excel, PowerPoint");
         }
 
-        // Check content type
+        // Check content type (allow null for some browsers)
         String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+        if (contentType != null && !ALLOWED_CONTENT_TYPES.contains(contentType)) {
             throw new CustomException(ErrorCode.INVALID_INPUT,
-                    "Loại file không được hỗ trợ. Chỉ cho phép: JPG, PNG, GIF, WebP, PDF");
+                    "Loại file không được hỗ trợ. Chỉ cho phép: Hình ảnh, PDF, Word, Excel, PowerPoint");
         }
 
-        // Check file size based on type
+        // Check file size
         long fileSize = file.getSize();
-        boolean isPdf = contentType.equals("application/pdf");
-        long maxSize = isPdf ? MAX_PDF_SIZE : MAX_IMAGE_SIZE;
-        String maxSizeStr = isPdf ? "10MB" : "5MB";
-
-        if (fileSize > maxSize) {
+        if (fileSize > MAX_FILE_SIZE) {
             throw new CustomException(ErrorCode.INVALID_INPUT,
-                    String.format("Kích thước file vượt quá giới hạn cho phép (%s)", maxSizeStr));
+                    "Kích thước file vượt quá giới hạn cho phép (20MB)");
         }
 
         log.debug("File validation passed: {} ({} bytes, {})", filename, fileSize, contentType);

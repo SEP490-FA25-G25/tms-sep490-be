@@ -327,9 +327,9 @@ public class SubjectService {
                     SubjectMaterial material = SubjectMaterial.builder()
                             .subject(subject)
                             .phase(phase)
-                            .title(materialDTO.getTitle())
-                            .materialType(materialDTO.getMaterialType() != null
-                                    ? MaterialType.valueOf(materialDTO.getMaterialType())
+                            .title(materialDTO.getName())
+                            .materialType(materialDTO.getType() != null
+                                    ? MaterialType.valueOf(materialDTO.getType())
                                     : MaterialType.OTHER)
                             .url(materialDTO.getUrl() != null ? materialDTO.getUrl() : "")
                             .build();
@@ -373,9 +373,9 @@ public class SubjectService {
                             SubjectMaterial material = SubjectMaterial.builder()
                                     .subject(subject)
                                     .subjectSession(session)
-                                    .title(materialDTO.getTitle())
-                                    .materialType(materialDTO.getMaterialType() != null
-                                            ? MaterialType.valueOf(materialDTO.getMaterialType())
+                                    .title(materialDTO.getName())
+                                    .materialType(materialDTO.getType() != null
+                                            ? MaterialType.valueOf(materialDTO.getType())
                                             : MaterialType.OTHER)
                                     .url(materialDTO.getUrl() != null ? materialDTO.getUrl() : "")
                                     .build();
@@ -435,9 +435,9 @@ public class SubjectService {
         for (SubjectMaterialDTO dto : materialDTOs) {
             SubjectMaterial material = SubjectMaterial.builder()
                     .subject(subject)
-                    .title(dto.getTitle())
-                    .materialType(dto.getMaterialType() != null
-                            ? MaterialType.valueOf(dto.getMaterialType())
+                    .title(dto.getName()) // Frontend sends 'name', entity uses 'title'
+                    .materialType(dto.getType() != null
+                            ? MaterialType.valueOf(dto.getType())
                             : MaterialType.OTHER)
                     .url(dto.getUrl() != null ? dto.getUrl() : "")
                     .build();
@@ -498,8 +498,8 @@ public class SubjectService {
                                         .findBySubjectSessionId(session.getId()).stream()
                                         .map(material -> SubjectMaterialDTO.builder()
                                                 .id(material.getId())
-                                                .title(material.getTitle())
-                                                .materialType(material.getMaterialType() != null
+                                                .name(material.getTitle())
+                                                .type(material.getMaterialType() != null
                                                         ? material.getMaterialType().name()
                                                         : null)
                                                 .url(material.getUrl())
@@ -526,8 +526,8 @@ public class SubjectService {
                             .findByPhaseIdAndSubjectSessionIsNull(phase.getId()).stream()
                             .map(material -> SubjectMaterialDTO.builder()
                                     .id(material.getId())
-                                    .title(material.getTitle())
-                                    .materialType(material.getMaterialType() != null
+                                    .name(material.getTitle())
+                                    .type(material.getMaterialType() != null
                                             ? material.getMaterialType().name()
                                             : null)
                                     .url(material.getUrl())
@@ -579,11 +579,11 @@ public class SubjectService {
         List<SubjectMaterialDTO> materials = subject.getSubjectMaterials().stream()
                 .map(material -> SubjectMaterialDTO.builder()
                         .id(material.getId())
-                        .title(material.getTitle())
-                        .materialType(material.getMaterialType() != null ? material.getMaterialType().name() : null)
+                        .name(material.getTitle())
+                        .type(material.getMaterialType() != null ? material.getMaterialType().name() : null)
                         .url(material.getUrl())
                         .scope(material.getPhase() != null ? "PHASE"
-                                : (material.getSubjectSession() != null ? "SESSION" : "SUBJECT"))
+                                : (material.getSubjectSession() != null ? "SESSION" : "COURSE"))
                         .phaseId(material.getPhase() != null ? material.getPhase().getId() : null)
                         .sessionId(material.getSubjectSession() != null ? material.getSubjectSession().getId() : null)
                         .build())
@@ -722,8 +722,8 @@ public class SubjectService {
 
         return SubjectMaterialDTO.builder()
                 .id(material.getId())
-                .title(material.getTitle())
-                .materialType(material.getMaterialType() != null ? material.getMaterialType().name() : null)
+                .name(material.getTitle())
+                .type(material.getMaterialType() != null ? material.getMaterialType().name() : null)
                 .url(material.getUrl())
                 .scope(scope)
                 .phaseId(phaseId)
