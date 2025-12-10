@@ -16,4 +16,7 @@ public interface UserBranchesRepository extends JpaRepository<UserBranches, User
     List<Long> findBranchIdsByUserId(@Param("userId") Long userId);
 
     void deleteByUserAccount(UserAccount userAccount);
+
+    @Query("SELECT CASE WHEN COUNT(ub) > 0 THEN true ELSE false END FROM UserBranches ub WHERE ub.id.userId = :userId AND ub.id.branchId = :branchId")
+    boolean existsByUserAccountIdAndBranchId(@Param("userId") Long userId, @Param("branchId") Long branchId);
 }

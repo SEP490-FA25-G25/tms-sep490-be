@@ -44,4 +44,27 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
             @Param("modality") org.fyp.tmssep490be.entities.enums.Modality modality,
             @Param("search") String search,
             Pageable pageable);
+
+    List<ClassEntity> findBySubjectIdAndStatusIn(Long subjectId, List<ClassStatus> statuses);
+
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.classEntity.id = :classId AND e.status = 'ENROLLED'")
+    Integer countEnrolledStudents(@Param("classId") Long classId);
+
+    boolean existsByIdAndSubjectId(Long classId, Long subjectId);
+
+    @Query("""
+        SELECT c FROM ClassEntity c
+        WHERE c.subject.id = :subjectId
+        AND c.id <> :excludeClassId
+        AND c.status IN :statuses
+        AND (:branchId IS NULL OR c.branch.id = :branchId)
+        AND (:modality IS NULL OR c.modality = :modality)
+        """)
+    List<ClassEntity> findByFlexibleCriteria(
+            @Param("subjectId") Long subjectId,
+            @Param("excludeClassId") Long excludeClassId,
+            @Param("statuses") List<ClassStatus> statuses,
+            @Param("branchId") Long branchId,
+            @Param("modality") org.fyp.tmssep490be.entities.enums.Modality modality
+    );
 }

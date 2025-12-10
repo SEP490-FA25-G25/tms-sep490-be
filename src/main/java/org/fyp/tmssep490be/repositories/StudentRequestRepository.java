@@ -127,19 +127,24 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
 
     @Query("SELECT COUNT(sr) FROM StudentRequest sr " +
            "JOIN sr.targetClass tc " +
-           "JOIN tc.subject c " +
+           "JOIN tc.subject subj " +
            "WHERE sr.student.id = :studentId " +
            "AND sr.requestType = :requestType " +
            "AND sr.status = :status " +
-           "AND c.id = :courseId")
-    long countByStudentIdAndRequestTypeAndStatusAndTargetClassCourseId(
+           "AND subj.id = :subjectId")
+    long countByStudentIdAndRequestTypeAndStatusAndTargetClassSubjectId(
             @Param("studentId") Long studentId,
             @Param("requestType") StudentRequestType requestType,
             @Param("status") RequestStatus status,
-            @Param("courseId") Long courseId
+            @Param("subjectId") Long subjectId
     );
 
     long countByStudentIdAndRequestTypeAndStatus(Long studentId, StudentRequestType requestType, RequestStatus status);
+
+    boolean existsByStudentIdAndRequestTypeAndStatusIn(Long studentId, StudentRequestType requestType, List<RequestStatus> statuses);
+
+    boolean existsByStudentIdAndCurrentClassIdAndRequestTypeAndStatusIn(
+            Long studentId, Long currentClassId, StudentRequestType requestType, List<RequestStatus> statuses);
 
     @Query("SELECT COUNT(sr) > 0 FROM StudentRequest sr " +
            "WHERE sr.student.id = :studentId " +
