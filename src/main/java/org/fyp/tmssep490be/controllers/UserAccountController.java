@@ -91,8 +91,14 @@ public class UserAccountController {
     }
 
     @GetMapping("/check/email/{email}")
-    public ResponseEntity<Boolean> checkEmailExists(@PathVariable String email) {
+    public ResponseEntity<ResponseObject<Boolean>> checkEmailExists(@PathVariable String email) {
         boolean exists = userAccountService.checkEmailExists(email);
-        return ResponseEntity.ok(exists);
+        return ResponseEntity.ok(ResponseObject.success(exists));
+    }
+
+    @GetMapping("/check/phone/{phone}")
+    public ResponseEntity<ResponseObject<Boolean>> checkPhoneExists(@PathVariable String phone) {
+        boolean exists = userAccountService.checkPhoneExists(phone);
+        return ResponseEntity.ok(ResponseObject.success(exists));
     }
 }

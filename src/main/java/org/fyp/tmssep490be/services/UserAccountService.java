@@ -239,6 +239,10 @@ public class UserAccountService {
         return userAccountRepository.existsByEmail(email);
     }
 
+    public boolean checkPhoneExists(String phone) {
+        return userAccountRepository.existsByPhone(phone);
+    }
+
     private UserResponse mapToResponse(UserAccount user) {
         return UserResponse.builder()
                 .id(user.getId())

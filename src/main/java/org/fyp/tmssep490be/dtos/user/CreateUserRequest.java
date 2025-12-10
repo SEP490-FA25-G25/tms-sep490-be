@@ -25,10 +25,14 @@ public class CreateUserRequest {
     @NotBlank(message = "Full name is required")
     private String fullName;
 
+    // Phone - chỉ cho phép số, 10-11 ký tự
+    @Pattern(regexp = "^(0[3|5|7|8|9])[0-9]{8}$", message = "Phone is invalid")
     private String phone;
 
     private String facebookUrl;
 
+    // Date of birth - phải là ngày trong quá khứ
+    @Past(message = "Date of birth must be in the past")
     private LocalDate dob;
 
     @NotNull(message = "Gender is required")
