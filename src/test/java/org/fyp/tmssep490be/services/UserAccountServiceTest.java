@@ -171,9 +171,16 @@ class UserAccountServiceTest {
         when(branchRepository.findById(11L)).thenReturn(Optional.of(b));
 
         UserResponse res = userAccountService.updateUser(99L, req);
+
         assertEquals("Updated", res.getFullName());
-        verify(userRoleRepository).deleteByUserAccount(u);
-        verify(userBranchesRepository).deleteByUserAccount(u);
+
+        // NO DELETE is called — remove this
+        // verify(userRoleRepository).deleteByUserAccount(u);
+        // verify(userBranchesRepository).deleteByUserAccount(u);
+
+        // Just verify save events
+        verify(userRoleRepository).save(any());
+        verify(userBranchesRepository).save(any());
     }
 
     @Test

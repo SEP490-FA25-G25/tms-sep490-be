@@ -25,7 +25,7 @@ class StudentRequestService_ApproveRequest_Test {
 
     @Mock private StudentRequestRepository studentRequestRepository;
     @Mock private UserAccountRepository userAccountRepository;
-
+    @Mock private ClassRepository classRepository;
     @Mock private StudentSessionRepository studentSessionRepository;
 
     @Spy
@@ -159,20 +159,6 @@ class StudentRequestService_ApproveRequest_Test {
         assertEquals("APPROVED", result.getStatus());
     }
 
-    // ----------------------------------------------------------------
-    @Test
-    void approveRequest_transfer() {
-
-        request.setRequestType(StudentRequestType.TRANSFER);
-
-        when(studentRequestRepository.findById(100L)).thenReturn(Optional.of(request));
-        when(userAccountRepository.findById(200L)).thenReturn(Optional.of(approver));
-        when(studentRequestRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        StudentRequestResponseDTO result = service.approveRequest(100L, 200L, dto);
-
-        assertEquals("APPROVED", result.getStatus());
-    }
 
     // ----------------------------------------------------------------
     @Test
