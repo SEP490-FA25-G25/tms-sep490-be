@@ -83,16 +83,14 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     // Tìm tất cả buổi học của giáo viên trong tuần (tất cả status) cho schedule
     @Query("""
         SELECT DISTINCT s FROM Session s
-        JOIN s.teachingSlots ts
-        JOIN ts.teacher t
         LEFT JOIN FETCH s.timeSlotTemplate tst
         LEFT JOIN FETCH s.classEntity c
-        LEFT JOIN FETCH c.subject sub
-        LEFT JOIN FETCH c.branch b
         LEFT JOIN FETCH s.subjectSession ss
         LEFT JOIN FETCH s.sessionResources sr
         LEFT JOIN FETCH sr.resource r
-        WHERE t.id = :teacherId
+        LEFT JOIN s.teachingSlots ts
+        LEFT JOIN ts.teacher slotTeacher
+        WHERE slotTeacher.id = :teacherId
           AND s.date BETWEEN :fromDate AND :toDate
           AND (:classId IS NULL OR c.id = :classId)
         ORDER BY s.date ASC, tst.startTime ASC
@@ -192,5 +190,14 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     List<Session> findPreviousSessionsByClassIdAndDate(
             @Param("classId") Long classId,
             @Param("date") java.time.LocalDate date);
+
+    @Query("""
+        SELECT COALESCE(MAX(ss.sequenceNo), 0)
+        FROM Session s
+        JOIN s.subjectSession ss
+        WHERE s.classEntity.id = :classId
+          AND s.status = 'DONE'
+        """)
+    Integer findLastCompletedSessionNumber(@Param("classId") Long classId);
 }
 

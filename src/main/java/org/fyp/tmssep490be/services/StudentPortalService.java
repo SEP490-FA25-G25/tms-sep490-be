@@ -15,9 +15,18 @@ import org.fyp.tmssep490be.entities.Assessment;
 import org.fyp.tmssep490be.entities.Score;
 import org.fyp.tmssep490be.entities.Enrollment;
 import org.fyp.tmssep490be.entities.ClassEntity;
+import org.fyp.tmssep490be.entities.Teacher;
+import org.fyp.tmssep490be.entities.TeachingSlot;
+import org.fyp.tmssep490be.entities.Subject;
+import org.fyp.tmssep490be.entities.Level;
+import org.fyp.tmssep490be.entities.Curriculum;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
+
+import java.time.DayOfWeek;
+import java.util.HashMap;
+import java.util.Map;
 import org.fyp.tmssep490be.entities.enums.Modality;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.entities.enums.TeachingSlotStatus;
@@ -255,6 +264,29 @@ public class StudentPortalService {
                                 .toList();
         }
 
+        public org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO getClassDetail(Long classId) {
+                log.info("Getting class detail for class: {}", classId);
+
+                ClassEntity classEntity = classRepository.findById(classId)
+                                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+                return convertToClassDetailDTO(classEntity);
+        }
+
+        public List<org.fyp.tmssep490be.dtos.studentportal.ClassmateDTO> getClassmates(Long classId) {
+                log.info("Getting classmates for class: {}", classId);
+
+                if (!classRepository.existsById(classId)) {
+                        throw new CustomException(ErrorCode.CLASS_NOT_FOUND);
+                }
+
+                List<Enrollment> enrollments = enrollmentRepository.findByClassIdAndStatus(classId, EnrollmentStatus.ENROLLED);
+
+                return enrollments.stream()
+                                .map(this::convertToClassmateDTO)
+                                .collect(Collectors.toList());
+        }
+
         public List<AssessmentDTO> getClassAssessments(Long classId) {
                 log.info("Getting assessments for class: {}", classId);
 
@@ -458,16 +490,6 @@ public class StudentPortalService {
     private StudentClassDTO convertToStudentClassDTO(Enrollment enrollment) {
         ClassEntity classEntity = enrollment.getClassEntity();
 
-        // Get instructor names from teaching slots with SCHEDULED status
-        List<String> instructorNames = teachingSlotRepository
-                .findByClassEntityIdAndStatus(classEntity.getId(), TeachingSlotStatus.SCHEDULED)
-                .stream()
-                .filter(ts -> ts.getTeacher() != null && ts.getTeacher().getUserAccount() != null)
-                .map(teachingSlot -> teachingSlot.getTeacher().getUserAccount().getFullName())
-                .filter(name -> name != null && !name.trim().isEmpty())
-                .distinct()
-                .collect(Collectors.toList());
-
         // Calculate session progress
         LocalDate today = LocalDate.now();
         List<Session> allSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
@@ -492,7 +514,7 @@ public class StudentPortalService {
                 .subjectName(classEntity.getSubject() != null ? classEntity.getSubject().getName() : null)
                 .subjectCode(classEntity.getSubject() != null ? classEntity.getSubject().getCode() : null)
                 .branchId(classEntity.getBranch().getId())
-                .branchName(classEntity.getBranch().getName())
+                .branchAddress(classEntity.getBranch().getAddress())
                 .modality(classEntity.getModality() != null ? classEntity.getModality().name() : null)
                 .status(classEntity.getStatus() != null ? classEntity.getStatus().name() : null)
                 .startDate(classEntity.getStartDate())
@@ -503,9 +525,66 @@ public class StudentPortalService {
                 .enrollmentStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : null)
                 .totalSessions(totalSessions)
                 .completedSessions(completedSessions)
-                .instructorNames(instructorNames)
                 .scheduleSummary(generateScheduleSummary(classEntity))
+                .scheduleDetails(generateScheduleDetails(classEntity))
                 .build();
+    }
+
+    private List<StudentClassDTO.ScheduleDetailDTO> generateScheduleDetails(ClassEntity classEntity) {
+        if (classEntity.getScheduleDays() == null || classEntity.getScheduleDays().length == 0) {
+            return List.of();
+        }
+
+        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
+        if (sessions.isEmpty()) {
+            return List.of();
+        }
+
+        // Group sessions by day of week to get time slots
+        Map<Integer, String> dayTimeSlots = new HashMap<>();
+        for (Session session : sessions) {
+            if (session.getTimeSlotTemplate() != null) {
+                int dayOfWeek = session.getDate().getDayOfWeek().getValue();
+                String timeSlot = String.format("%s-%s", 
+                    session.getTimeSlotTemplate().getStartTime(), 
+                    session.getTimeSlotTemplate().getEndTime());
+                dayTimeSlots.putIfAbsent(dayOfWeek, timeSlot);
+            }
+        }
+
+        return Arrays.stream(classEntity.getScheduleDays())
+            .sorted()
+            .map(day -> {
+                DayOfWeek dayOfWeek = DayOfWeek.of(day);
+                String dayName = switch (dayOfWeek) {
+                    case MONDAY -> "Thứ 2";
+                    case TUESDAY -> "Thứ 3";
+                    case WEDNESDAY -> "Thứ 4";
+                    case THURSDAY -> "Thứ 5";
+                    case FRIDAY -> "Thứ 6";
+                    case SATURDAY -> "Thứ 7";
+                    case SUNDAY -> "Chủ nhật";
+                };
+
+                String[] times = dayTimeSlots.getOrDefault(day, "07:00-08:30").split("-");
+                return StudentClassDTO.ScheduleDetailDTO.builder()
+                    .day(dayName)
+                    .startTime(times.length > 0 ? times[0] : "07:00")
+                    .endTime(times.length > 1 ? times[1] : "08:30")
+                    .build();
+            })
+            .collect(Collectors.toList());
+    }
+
+    private List<org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.ScheduleDetailDTO> convertScheduleDetailsForClassDetail(
+            List<StudentClassDTO.ScheduleDetailDTO> studentClassSchedules) {
+        return studentClassSchedules.stream()
+            .map(schedule -> org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.ScheduleDetailDTO.builder()
+                .day(schedule.getDay())
+                .startTime(schedule.getStartTime())
+                .endTime(schedule.getEndTime())
+                .build())
+            .collect(Collectors.toList());
     }
 
     private String generateScheduleSummary(ClassEntity classEntity) {
@@ -547,8 +626,8 @@ public class StudentPortalService {
 
     private List<EnrollmentStatus> resolveEnrollmentStatuses(List<String> filters) {
         if (filters == null || filters.isEmpty()) {
-            // Default: only show active enrollments (not transferred, dropped, or cancelled)
-            return Arrays.asList(EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED);
+            // Default: show all relevant enrollments including transferred (UI will distinguish with badges)
+            return Arrays.asList(EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED, EnrollmentStatus.TRANSFERRED);
         }
 
         return filters.stream()
@@ -600,5 +679,174 @@ public class StudentPortalService {
                 })
                 .filter(modality -> modality != null)
                 .collect(Collectors.toSet());
+    }
+
+    private org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO convertToClassDetailDTO(ClassEntity classEntity) {
+        // Get teachers from teaching slots
+        List<TeachingSlot> teachingSlots = teachingSlotRepository.findByClassEntityIdAndStatus(
+                classEntity.getId(), TeachingSlotStatus.SCHEDULED);
+
+        Map<Long, List<TeachingSlot>> slotsByTeacher = teachingSlots.stream()
+                .filter(ts -> ts.getTeacher() != null)
+                .collect(Collectors.groupingBy(ts -> ts.getTeacher().getId()));
+
+        int maxSessionsPerTeacher = slotsByTeacher.values().stream()
+                .mapToInt(List::size)
+                .max()
+                .orElse(0);
+
+        List<org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.TeacherSummary> teachers = slotsByTeacher.values().stream()
+                .map(slotsForTeacher -> {
+                    Teacher teacher = slotsForTeacher.get(0).getTeacher();
+                    boolean isPrimary = maxSessionsPerTeacher > 0 &&
+                            slotsForTeacher.size() > maxSessionsPerTeacher / 2;
+
+                    String teacherName = "N/A";
+                    String teacherEmail = "N/A";
+                    if (teacher != null && teacher.getUserAccount() != null) {
+                        teacherName = teacher.getUserAccount().getFullName();
+                        teacherEmail = teacher.getUserAccount().getEmail();
+                        if (teacherName == null || teacherName.trim().isEmpty()) {
+                            teacherName = "N/A";
+                        }
+                        if (teacherEmail == null || teacherEmail.trim().isEmpty()) {
+                            teacherEmail = "N/A";
+                        }
+                    }
+
+                    return org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.TeacherSummary.builder()
+                            .teacherId(teacher.getId())
+                            .teacherName(teacherName)
+                            .teacherEmail(teacherEmail)
+                            .isPrimaryInstructor(isPrimary)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // Get enrollment summary
+        int totalEnrolled = enrollmentRepository.countByClassIdAndStatus(classEntity.getId(), EnrollmentStatus.ENROLLED);
+
+        org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.EnrollmentSummary enrollmentSummary = 
+                org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.EnrollmentSummary.builder()
+                .totalEnrolled(totalEnrolled)
+                .maxCapacity(classEntity.getMaxCapacity())
+                .build();
+
+        // Get next session
+        LocalDate today = LocalDate.now();
+        SessionDTO nextSession = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId())
+                .stream()
+                .filter(s -> s.getStatus() == SessionStatus.PLANNED && !s.getDate().isBefore(today))
+                .findFirst()
+                .map(this::convertToSessionDTO)
+                .orElse(null);
+
+        // Build subject info (new schema: Subject has Curriculum and Level)
+        Subject subject = classEntity.getSubject();
+        org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.CurriculumInfo curriculumInfo = null;
+        org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.LevelInfo levelInfo = null;
+
+        if (subject.getLevel() != null) {
+            Level level = subject.getLevel();
+            levelInfo = org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.LevelInfo.builder()
+                    .id(level.getId())
+                    .code(level.getCode())
+                    .name(level.getName())
+                    .build();
+        }
+
+        if (subject.getCurriculum() != null) {
+            Curriculum curriculum = subject.getCurriculum();
+            curriculumInfo = org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.CurriculumInfo.builder()
+                    .id(curriculum.getId())
+                    .code(curriculum.getCode())
+                    .name(curriculum.getName())
+                    .build();
+        }
+
+        org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.SubjectInfo subjectInfo = 
+                org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.SubjectInfo.builder()
+                .id(subject.getId())
+                .name(subject.getName())
+                .code(subject.getCode())
+                .description(subject.getDescription())
+                .totalHours(subject.getTotalHours())
+                .numberOfSessions(subject.getNumberOfSessions())
+                .hoursPerSession(subject.getHoursPerSession())
+                .prerequisites(subject.getPrerequisites())
+                .targetAudience(subject.getTargetAudience())
+                .curriculum(curriculumInfo)
+                .level(levelInfo)
+                .build();
+
+        // Convert scheduleDays from Short[] to List<Integer>
+        List<Integer> scheduleDays = classEntity.getScheduleDays() != null ?
+                Arrays.stream(classEntity.getScheduleDays())
+                        .map(Short::intValue)
+                        .collect(Collectors.toList()) : List.of();
+
+        return org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.builder()
+                .id(classEntity.getId())
+                .code(classEntity.getCode())
+                .name(classEntity.getName())
+                .subject(subjectInfo)
+                .branch(org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO.BranchInfo.builder()
+                        .id(classEntity.getBranch().getId())
+                        .name(classEntity.getBranch().getName())
+                        .address(classEntity.getBranch().getAddress())
+                        .build())
+                .modality(classEntity.getModality().toString())
+                .startDate(classEntity.getStartDate())
+                .plannedEndDate(classEntity.getPlannedEndDate())
+                .actualEndDate(classEntity.getActualEndDate())
+                .scheduleDays(scheduleDays)
+                .maxCapacity(classEntity.getMaxCapacity())
+                .status(classEntity.getStatus().toString())
+                .teachers(teachers)
+                .scheduleSummary(generateScheduleSummary(classEntity))
+                .scheduleDetails(convertScheduleDetailsForClassDetail(generateScheduleDetails(classEntity)))
+                .enrollmentSummary(enrollmentSummary)
+                .nextSession(nextSession)
+                .build();
+    }
+
+    private org.fyp.tmssep490be.dtos.studentportal.ClassmateDTO convertToClassmateDTO(Enrollment enrollment) {
+        var student = enrollment.getStudent();
+        var userAccount = student.getUserAccount();
+
+        // Calculate attendance rate
+        BigDecimal attendanceRate = calculateAttendanceRate(enrollment.getClassEntity().getId(), student.getId());
+
+        return org.fyp.tmssep490be.dtos.studentportal.ClassmateDTO.builder()
+                .studentId(student.getId())
+                .fullName(userAccount.getFullName())
+                .avatar(userAccount.getAvatarUrl())
+                .email(userAccount.getEmail())
+                .studentCode(student.getStudentCode())
+                .enrollmentId(enrollment.getId())
+                .enrollmentDate(enrollment.getEnrolledAt())
+                .enrollmentStatus(enrollment.getStatus().toString())
+                .attendanceRate(attendanceRate)
+                .build();
+    }
+
+    private BigDecimal calculateAttendanceRate(Long classId, Long studentId) {
+        List<Session> completedSessions = sessionRepository.findAllByClassIdOrderByDateAndTime(classId).stream()
+                .filter(session -> session.getStatus() == SessionStatus.DONE)
+                .toList();
+
+        if (completedSessions.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        long presentCount = studentSessionRepository.findAllByStudentId(studentId).stream()
+                .filter(ss -> ss.getSession().getClassEntity().getId().equals(classId))
+                .filter(ss -> ss.getSession().getStatus() == SessionStatus.DONE)
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                .count();
+
+        return BigDecimal.valueOf(presentCount)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(completedSessions.size()), 1, RoundingMode.HALF_UP);
     }
 }

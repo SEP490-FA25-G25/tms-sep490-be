@@ -366,7 +366,7 @@ public class TeacherScheduleService {
                 .sorted(Comparator.comparing(TimeSlotDTO::getStartTime))
                 .collect(Collectors.toList());
 
-        log.debug("Đã gộp {} khung giờ duy nhất cho giáo viên {}", mergedTimeSlots.size(), teacherId);
+        log.debug("Merged {} unique time slots for teacher {}", mergedTimeSlots.size(), teacherId);
         return mergedTimeSlots;
     }
 
@@ -377,6 +377,7 @@ public class TeacherScheduleService {
 
         // Lấy thông tin resource
         String resourceName = null;
+        String resourceCode = null;
         ResourceType resourceType = null;
         String onlineLink = null;
 
@@ -384,6 +385,7 @@ public class TeacherScheduleService {
             SessionResource sessionResource = session.getSessionResources().iterator().next();
             Resource resource = sessionResource.getResource();
             resourceName = resource.getName();
+            resourceCode = resource.getCode();
             resourceType = resource.getResourceType();
 
             // Nếu resource ảo, name thường là link/phòng online
@@ -417,6 +419,7 @@ public class TeacherScheduleService {
                 .isMakeup(false) // TODO: Kiểm tra buổi dạy bù
                 .makeupInfo(null) // TODO: Bổ sung thông tin dạy bù nếu có
                 .resourceName(resourceName)
+                .resourceCode(resourceCode)
                 .resourceType(resourceType)
                 .onlineLink(onlineLink)
                 .build();

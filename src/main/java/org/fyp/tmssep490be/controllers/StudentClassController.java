@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.studentportal.AssessmentDTO;
+import org.fyp.tmssep490be.dtos.studentportal.ClassDetailDTO;
 import org.fyp.tmssep490be.dtos.studentportal.ClassSessionsResponseDTO;
+import org.fyp.tmssep490be.dtos.studentportal.ClassmateDTO;
 import org.fyp.tmssep490be.dtos.studentportal.StudentAssessmentScoreDTO;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentPortalService;
@@ -24,6 +26,19 @@ public class StudentClassController {
 
     private final StudentPortalService studentPortalService;
     private final StudentContextHelper studentContextHelper;
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('STUDENT', 'ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<ClassDetailDTO>> getClassDetail(
+            @PathVariable Long classId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} retrieving details for class: {}", currentUser.getId(), classId);
+
+        ClassDetailDTO classDetail = studentPortalService.getClassDetail(classId);
+
+        return ResponseEntity.ok(ResponseObject.success(classDetail));
+    }
 
     @GetMapping("/sessions")
     @PreAuthorize("hasRole('STUDENT')")
@@ -72,5 +87,18 @@ public class StudentClassController {
         List<StudentAssessmentScoreDTO> scores = studentPortalService.getStudentAssessmentScores(classId, authStudentId);
 
         return ResponseEntity.ok(ResponseObject.success(scores));
+    }
+
+    @GetMapping("/classmates")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ResponseObject<List<ClassmateDTO>>> getClassmates(
+            @PathVariable Long classId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} retrieving classmates for class: {}", currentUser.getId(), classId);
+
+        List<ClassmateDTO> classmates = studentPortalService.getClassmates(classId);
+
+        return ResponseEntity.ok(ResponseObject.success(classmates));
     }
 }
