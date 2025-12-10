@@ -11,18 +11,18 @@ import java.util.List;
 @Repository
 public interface SubjectSessionRepository extends JpaRepository<SubjectSession, Long> {
 
-    // Tìm session theo phase, sắp xếp theo sequenceNumber - dùng cho Class workflow
-    List<SubjectSession> findByPhase_Subject_IdOrderByPhaseAscSequenceNumberAsc(Long subjectId);
+    // Tìm session theo phase, sắp xếp theo sequenceNo
+    List<SubjectSession> findByPhase_Subject_IdOrderByPhaseAscSequenceNoAsc(Long subjectId);
 
     // Đếm số session theo subject
     @Query("SELECT COUNT(ss) FROM SubjectSession ss WHERE ss.phase.subject.id = :subjectId")
     long countBySubjectId(@Param("subjectId") Long subjectId);
 
-    // Tìm session theo phase, sắp xếp theo sequenceNumber
-    @Query("SELECT ss FROM SubjectSession ss WHERE ss.phase.id = :phaseId ORDER BY ss.sequenceNumber")
-    List<SubjectSession> findByPhaseIdOrderBySequenceNumber(@Param("phaseId") Long phaseId);
+    // Tìm session theo phase, sắp xếp theo sequenceNo
+    @Query("SELECT ss FROM SubjectSession ss WHERE ss.phase.id = :phaseId ORDER BY ss.sequenceNo")
+    List<SubjectSession> findByPhaseIdOrderBySequenceNo(@Param("phaseId") Long phaseId);
 
-    // Tìm session theo subject, sắp xếp theo phase và sequenceNumber
-    @Query("SELECT ss FROM SubjectSession ss WHERE ss.phase.subject.id = :subjectId ORDER BY ss.phase.id, ss.sequenceNumber")
-    List<SubjectSession> findBySubjectIdOrderByPhaseIdAndSequenceNumber(@Param("subjectId") Long subjectId);
+    // Tìm session theo subject, sắp xếp theo phase và sequenceNo
+    @Query("SELECT ss FROM SubjectSession ss WHERE ss.phase.subject.id = :subjectId ORDER BY ss.phase.id, ss.sequenceNo")
+    List<SubjectSession> findBySubjectIdOrderByPhaseIdAndSequenceNo(@Param("subjectId") Long subjectId);
 }
