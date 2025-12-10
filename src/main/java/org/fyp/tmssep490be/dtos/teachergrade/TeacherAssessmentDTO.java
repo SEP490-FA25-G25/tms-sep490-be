@@ -10,7 +10,7 @@ import java.time.OffsetDateTime;
 public class TeacherAssessmentDTO {
     private Long id;
     private Long classId;
-    private Long courseAssessmentId;
+    private Long subjectAssessmentId;
     private String name;
     private String description;
     private String kind;

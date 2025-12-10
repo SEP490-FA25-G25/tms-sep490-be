@@ -140,19 +140,7 @@ public class TeacherRequestController {
     @GetMapping("/config")
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ResponseObject<TeacherRequestConfigDTO>> getTeacherRequestConfig() {
-        boolean requireResourceAtRescheduleCreate = true;
-        boolean requireResourceAtModalityChangeCreate = true;
-        int minDaysBeforeSession = 1;
-        int reasonMinLength = 10;
-        int timeWindowDays = 14;
-
-        TeacherRequestConfigDTO config = TeacherRequestConfigDTO.builder()
-                .requireResourceAtRescheduleCreate(requireResourceAtRescheduleCreate)
-                .requireResourceAtModalityChangeCreate(requireResourceAtModalityChangeCreate)
-                .minDaysBeforeSession(minDaysBeforeSession)
-                .reasonMinLength(reasonMinLength)
-                .timeWindowDays(timeWindowDays)
-                .build();
+        TeacherRequestConfigDTO config = teacherRequestService.getTeacherRequestConfig();
 
         return ResponseEntity.ok(ResponseObject.<TeacherRequestConfigDTO>builder()
                 .success(true)
