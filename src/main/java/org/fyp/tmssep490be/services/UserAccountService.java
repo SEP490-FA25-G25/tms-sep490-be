@@ -36,6 +36,7 @@ public class UserAccountService {
     private final BranchRepository branchRepository;
     private final UserRoleRepository userRoleRepository;
     private final UserBranchesRepository userBranchesRepository;
+    private final EmailService emailService;
 
     @Transactional
     public UserResponse createUser(CreateUserRequest request) {
@@ -86,6 +87,26 @@ public class UserAccountService {
                 userBranchesRepository.save(userBranch);
             }
         }
+
+        // Lấy danh sách tên chi nhánh
+        String branchNames = "";
+        if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
+            branchNames = request.getBranchIds().stream()
+                    .map(branchId -> branchRepository.findById(branchId)
+                            .map(Branch::getName)
+                            .orElse(""))
+                    .filter(name -> !name.isEmpty())
+                    .collect(Collectors.joining(", "));
+        }
+
+// Gửi email thông tin đăng nhập
+        emailService.sendNewUserCredentialsAsync(
+                user.getEmail(),
+                user.getFullName(),
+                user.getEmail(),
+                request.getPassword(),
+                branchNames
+        );
 
         // Chuyển entity -> response DTO và return
         return mapToResponse(user);
