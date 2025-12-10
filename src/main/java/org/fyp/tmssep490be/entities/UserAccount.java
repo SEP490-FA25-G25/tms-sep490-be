@@ -57,11 +57,11 @@ public class UserAccount {
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
 
-    @OneToMany(mappedBy = "userAccount", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "userAccount")
     @Builder.Default
     private Set<UserRole> userRoles = new HashSet<>();
 
-    @OneToMany(mappedBy = "userAccount", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "userAccount")
     @Builder.Default
     private Set<UserBranches> userBranches = new HashSet<>();
 
