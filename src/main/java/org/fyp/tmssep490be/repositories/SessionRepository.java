@@ -103,10 +103,10 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
                                                @Param("classId") Long classId);
 
     // Học viên chọn buổi học bù -> join với class để kiểm tra chi nhánh và hình thức điều kiện cùng  môn
-    // Kiểm tra date trong 2 tuần từ ngày hiện tại, trạng thái PLANNED, không phải buổi học bị bỏ
+    // Kiểm tra date trong vài tuần từ ngày hiện tại, trạng thái PLANNED, không phải buổi học bị bỏ
     // Loại trừ buổi học bị mà học viên đã bỏ qua (excludeSessionId) tức là học viên đang chọn buổi bị missed thì phỉa bỏ ra
-    // Cùng chi nhánh được học onl hoạc offline, khác chi nhánh thì chỉ được học online
-    // weeksLimit: số tuần tối đa để tìm buổi học bù (lấy từ policy)
+    // CHỈ cho phép cùng chi nhánh (same-branch only) - không cho phép khác branch dù là ONLINE
+    // weeksLimit: số tuần tối đa để tìm buổi học bù (hardcoded constant)
     @Query(value = """
         SELECT s.* FROM session s
         JOIN class c ON s.class_id = c.id
@@ -115,10 +115,7 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
           AND s.date <= CURRENT_DATE + CAST((:weeksLimit || ' weeks') AS INTERVAL)
           AND s.status = 'PLANNED'
           AND s.id != :excludeSessionId
-          AND (
-            c.branch_id = :targetBranchId
-            OR c.modality = 'ONLINE'
-          )
+          AND c.branch_id = :targetBranchId
         ORDER BY s.date ASC
         """, nativeQuery = true)
     List<Session> findMakeupSessionOptions(

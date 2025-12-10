@@ -39,7 +39,11 @@ public class StudentScheduleService {
     }
 
     public WeeklyScheduleResponseDTO getWeeklySchedule(Long studentId, LocalDate weekStart) {
-        log.info("Getting weekly schedule for student: {}, week: {}", studentId, weekStart);
+        return getWeeklySchedule(studentId, weekStart, null);
+    }
+
+    public WeeklyScheduleResponseDTO getWeeklySchedule(Long studentId, LocalDate weekStart, Long classId) {
+        log.info("Getting weekly schedule for student: {}, week: {}, class: {}", studentId, weekStart, classId);
 
         // 1. Validate weekStart is Monday
         if (weekStart.getDayOfWeek() != DayOfWeek.MONDAY) {
@@ -53,11 +57,12 @@ public class StudentScheduleService {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
 
-        // 4. Fetch all sessions for this week (with JOIN FETCH)
+        // 4. Fetch all sessions for this week (with JOIN FETCH), optionally filtered by classId
         List<StudentSession> studentSessions = studentSessionRepository
-                .findWeeklyScheduleByStudentId(studentId, weekStart, weekEnd);
+                .findWeeklyScheduleByStudentId(studentId, weekStart, weekEnd, classId);
 
-        log.debug("Found {} sessions for week {} to {}", studentSessions.size(), weekStart, weekEnd);
+        log.debug("Found {} sessions for week {} to {} (classId: {})", 
+                studentSessions.size(), weekStart, weekEnd, classId);
 
         // 5. Get all time slots from all branches with active enrollments (Union + Merge)
         List<TimeSlotDTO> timeSlots = getAllTimeSlotsForStudent(studentId);

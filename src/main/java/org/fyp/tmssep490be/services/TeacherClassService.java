@@ -16,11 +16,13 @@ import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
 import org.fyp.tmssep490be.entities.enums.HomeworkStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
+import org.fyp.tmssep490be.dtos.subject.SubjectDetailDTO;
 import org.fyp.tmssep490be.repositories.ClassRepository;
 import org.fyp.tmssep490be.repositories.EnrollmentRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.fyp.tmssep490be.repositories.TeachingSlotRepository;
+import org.fyp.tmssep490be.services.SubjectService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,7 @@ public class TeacherClassService {
     private final ClassRepository classRepository;
     private final SessionRepository sessionRepository;
     private final StudentSessionRepository studentSessionRepository;
+    private final SubjectService subjectService;
 
     // Lấy tất cả lớp học được phân công cho giáo viên theo teacherId
     public List<TeacherClassListItemDTO> getTeacherClasses(Long teacherId) {
@@ -268,5 +271,29 @@ public class TeacherClassService {
             case 7 -> "Chủ Nhật";     // Sunday
             default -> "Unknown";      // Trường hợp không hợp lệ
         };
+    }
+
+    // Lấy giáo trình (curriculum/syllabus) của lớp học
+    // Lấy subjectId từ classId rồi gọi SubjectService.getSubjectSyllabus
+    public SubjectDetailDTO getClassCurriculum(Long classId, Long teacherId) {
+        // Validate lớp học tồn tại và giáo viên có quyền truy cập
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+        // Kiểm tra giáo viên có được phân công vào lớp này không
+        boolean hasAccess = teachingSlotRepository.existsByTeacherIdAndClassEntityId(teacherId, classId);
+        if (!hasAccess) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "Teacher does not have access to this class");
+        }
+
+        // Lấy subjectId từ class
+        if (classEntity.getSubject() == null || classEntity.getSubject().getId() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Class does not have a subject assigned");
+        }
+
+        Long subjectId = classEntity.getSubject().getId();
+
+        // Lấy giáo trình từ SubjectService
+        return subjectService.getSubjectSyllabus(subjectId);
     }
 }

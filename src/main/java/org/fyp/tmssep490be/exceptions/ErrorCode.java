@@ -41,6 +41,7 @@ public enum ErrorCode {
     STUDENT_NOT_FOUND(1100, "Không tìm thấy học viên"),
     STUDENT_SESSION_NOT_FOUND(1106, "Không tìm thấy buổi học của học viên hoặc học viên chưa đăng ký buổi học này"),
     STUDENT_NOT_ENROLLED_IN_CLASS(1107, "Học viên chưa đăng ký lớp này"),
+    STUDENT_ACCESS_DENIED(1108, "Từ chối truy cập: Học viên không thuộc quyền quản lý của bạn"),
 
     // Enrollment errors (1200-1299)
     EXCEL_GENERATION_FAILED(1216, "Tạo tệp Excel thất bại"),

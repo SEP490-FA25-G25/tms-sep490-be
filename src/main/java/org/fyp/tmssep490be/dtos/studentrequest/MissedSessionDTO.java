@@ -61,6 +61,12 @@ public class MissedSessionDTO {
         private String branchAddress;
 
         private String modality;
+
+        private String resourceName;
+
+        private String resourceType;
+
+        private String onlineLink;
     }
 
     @Data

@@ -6,6 +6,7 @@ import org.fyp.tmssep490be.dtos.studentportal.AssessmentDTO;
 import org.fyp.tmssep490be.dtos.studentportal.ClassSessionsResponseDTO;
 import org.fyp.tmssep490be.dtos.studentportal.SessionDTO;
 import org.fyp.tmssep490be.dtos.studentportal.StudentAssessmentScoreDTO;
+import org.fyp.tmssep490be.dtos.studentportal.StudentClassDTO;
 import org.fyp.tmssep490be.dtos.studentportal.StudentSessionDTO;
 import org.fyp.tmssep490be.dtos.studentportal.StudentTranscriptDTO;
 import org.fyp.tmssep490be.entities.Session;
@@ -17,6 +18,7 @@ import org.fyp.tmssep490be.entities.ClassEntity;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
+import org.fyp.tmssep490be.entities.enums.Modality;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.entities.enums.TeachingSlotStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
@@ -29,16 +31,25 @@ import org.fyp.tmssep490be.repositories.SessionRepository;
 import org.fyp.tmssep490be.repositories.StudentRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.fyp.tmssep490be.repositories.TeachingSlotRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.format.TextStyle;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -50,10 +61,84 @@ public class StudentPortalService {
     private final SessionRepository sessionRepository;
     private final StudentSessionRepository studentSessionRepository;
     private final EnrollmentRepository enrollmentRepository;
-        private final StudentRepository studentRepository;
-        private final TeachingSlotRepository teachingSlotRepository;
-        private final AssessmentRepository assessmentRepository;
-        private final ScoreRepository scoreRepository;
+    private final StudentRepository studentRepository;
+    private final TeachingSlotRepository teachingSlotRepository;
+    private final AssessmentRepository assessmentRepository;
+    private final ScoreRepository scoreRepository;
+
+    public Page<StudentClassDTO> getStudentClasses(
+            Long studentId,
+            List<String> enrollmentStatusFilters,
+            List<String> classStatusFilters,
+            List<Long> branchFilters,
+            List<Long> subjectFilters, // Note: called courseId in API but refers to subject in new schema
+            List<String> modalityFilters,
+            Pageable pageable
+    ) {
+        log.info("Getting classes for student: {} with filters", studentId);
+
+        // Validate student exists
+        if (!studentRepository.existsById(studentId)) {
+            throw new CustomException(ErrorCode.STUDENT_NOT_FOUND);
+        }
+
+        List<EnrollmentStatus> enrollmentStatuses = resolveEnrollmentStatuses(enrollmentStatusFilters);
+        List<ClassStatus> classStatuses = resolveClassStatuses(classStatusFilters);
+        Set<Modality> modalities = resolveModalities(modalityFilters);
+
+        // Get all enrollments for the student with filtered enrollment statuses
+        List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatusIn(studentId, enrollmentStatuses);
+
+        // Apply filters
+        List<Enrollment> filteredEnrollments = enrollments.stream()
+                .filter(enrollment -> {
+                    ClassEntity classEntity = enrollment.getClassEntity();
+
+                    // Class status filter
+                    boolean classStatusMatch = classStatuses.isEmpty() || classStatuses.contains(classEntity.getStatus());
+                    if (!classStatusMatch) return false;
+
+                    // Branch filter
+                    if (branchFilters != null && !branchFilters.isEmpty()) {
+                        if (!branchFilters.contains(classEntity.getBranch().getId())) {
+                            return false;
+                        }
+                    }
+
+                    // Subject filter (frontend sends as courseId)
+                    if (subjectFilters != null && !subjectFilters.isEmpty()) {
+                        if (classEntity.getSubject() == null || !subjectFilters.contains(classEntity.getSubject().getId())) {
+                            return false;
+                        }
+                    }
+
+                    // Modality filter
+                    if (!modalities.isEmpty() && !modalities.contains(classEntity.getModality())) {
+                        return false;
+                    }
+
+                    return true;
+                })
+                .collect(Collectors.toList());
+
+        // Convert to DTOs
+        List<StudentClassDTO> studentClassDTOs = filteredEnrollments.stream()
+                .map(this::convertToStudentClassDTO)
+                .collect(Collectors.toList());
+
+        // Apply pagination manually (since we're filtering in memory)
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), studentClassDTOs.size());
+        
+        // Handle case where start is beyond list size
+        if (start >= studentClassDTOs.size()) {
+            return new PageImpl<>(new ArrayList<>(), pageable, studentClassDTOs.size());
+        }
+        
+        List<StudentClassDTO> pagedContent = studentClassDTOs.subList(start, end);
+
+        return new PageImpl<>(pagedContent, pageable, studentClassDTOs.size());
+    }
 
     public ClassSessionsResponseDTO getClassSessions(Long classId, Long studentId) {
         log.info("Getting sessions for class: {} and student: {}", classId, studentId);
@@ -329,5 +414,151 @@ public class StudentPortalService {
                 .scorePercentage(scorePercentage)
                 .createdAt(assessment.getCreatedAt())
                 .build();
+    }
+
+    private StudentClassDTO convertToStudentClassDTO(Enrollment enrollment) {
+        ClassEntity classEntity = enrollment.getClassEntity();
+
+        // Get instructor names from teaching slots with SCHEDULED status
+        List<String> instructorNames = teachingSlotRepository
+                .findByClassEntityIdAndStatus(classEntity.getId(), TeachingSlotStatus.SCHEDULED)
+                .stream()
+                .filter(ts -> ts.getTeacher() != null && ts.getTeacher().getUserAccount() != null)
+                .map(teachingSlot -> teachingSlot.getTeacher().getUserAccount().getFullName())
+                .filter(name -> name != null && !name.trim().isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+
+        // Calculate session progress
+        LocalDate today = LocalDate.now();
+        List<Session> allSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
+        
+        // Exclude cancelled sessions
+        List<Session> activeSessions = allSessions.stream()
+                .filter(session -> session.getStatus() != SessionStatus.CANCELLED)
+                .collect(Collectors.toList());
+
+        int totalSessions = activeSessions.size();
+        int completedSessions = (int) activeSessions.stream()
+                .filter(session -> 
+                    (session.getDate() != null && session.getDate().isBefore(today)) 
+                    || session.getStatus() == SessionStatus.DONE)
+                .count();
+
+        return StudentClassDTO.builder()
+                .classId(classEntity.getId())
+                .classCode(classEntity.getCode())
+                .className(classEntity.getName())
+                .subjectId(classEntity.getSubject() != null ? classEntity.getSubject().getId() : null)
+                .subjectName(classEntity.getSubject() != null ? classEntity.getSubject().getName() : null)
+                .subjectCode(classEntity.getSubject() != null ? classEntity.getSubject().getCode() : null)
+                .branchId(classEntity.getBranch().getId())
+                .branchName(classEntity.getBranch().getName())
+                .modality(classEntity.getModality() != null ? classEntity.getModality().name() : null)
+                .status(classEntity.getStatus() != null ? classEntity.getStatus().name() : null)
+                .startDate(classEntity.getStartDate())
+                .plannedEndDate(classEntity.getPlannedEndDate())
+                .actualEndDate(classEntity.getActualEndDate())
+                .enrollmentId(enrollment.getId())
+                .enrollmentDate(enrollment.getEnrolledAt())
+                .enrollmentStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : null)
+                .totalSessions(totalSessions)
+                .completedSessions(completedSessions)
+                .instructorNames(instructorNames)
+                .scheduleSummary(generateScheduleSummary(classEntity))
+                .build();
+    }
+
+    private String generateScheduleSummary(ClassEntity classEntity) {
+        if (classEntity.getScheduleDays() == null || classEntity.getScheduleDays().length == 0) {
+            return "Chưa có lịch";
+        }
+
+        // Convert schedule days (1-7) to Vietnamese day names
+        List<String> dayNames = Arrays.stream(classEntity.getScheduleDays())
+                .sorted()
+                .map(day -> {
+                    DayOfWeek dayOfWeek = DayOfWeek.of(day);
+                    return switch (dayOfWeek) {
+                        case MONDAY -> "Thứ 2";
+                        case TUESDAY -> "Thứ 3";
+                        case WEDNESDAY -> "Thứ 4";
+                        case THURSDAY -> "Thứ 5";
+                        case FRIDAY -> "Thứ 6";
+                        case SATURDAY -> "Thứ 7";
+                        case SUNDAY -> "Chủ nhật";
+                    };
+                })
+                .collect(Collectors.toList());
+
+        String daysString = String.join(", ", dayNames);
+
+        // Add time slot info if available (get from first session)
+        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
+        if (!sessions.isEmpty() && sessions.get(0).getTimeSlotTemplate() != null) {
+            var timeSlot = sessions.get(0).getTimeSlotTemplate();
+            String timeString = String.format("%s-%s", 
+                timeSlot.getStartTime(), 
+                timeSlot.getEndTime());
+            return String.format("%s | %s", daysString, timeString);
+        }
+
+        return daysString;
+    }
+
+    private List<EnrollmentStatus> resolveEnrollmentStatuses(List<String> filters) {
+        if (filters == null || filters.isEmpty()) {
+            return Arrays.asList(EnrollmentStatus.values());
+        }
+
+        return filters.stream()
+                .map(filter -> {
+                    try {
+                        return EnrollmentStatus.valueOf(filter.toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        log.warn("Invalid enrollment status filter: {}", filter);
+                        return null;
+                    }
+                })
+                .filter(status -> status != null)
+                .collect(Collectors.toList());
+    }
+
+    private List<ClassStatus> resolveClassStatuses(List<String> filters) {
+        if (filters == null || filters.isEmpty()) {
+            // Default: return all class statuses
+            return Arrays.asList(ClassStatus.values());
+        }
+
+        return filters.stream()
+                .map(filter -> {
+                    try {
+                        return ClassStatus.valueOf(filter.toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        log.warn("Invalid class status filter: {}", filter);
+                        return null;
+                    }
+                })
+                .filter(status -> status != null)
+                .collect(Collectors.toList());
+    }
+
+    private Set<Modality> resolveModalities(List<String> filters) {
+        if (filters == null || filters.isEmpty()) {
+            // Default: return empty set (no filter)
+            return new HashSet<>();
+        }
+
+        return filters.stream()
+                .map(filter -> {
+                    try {
+                        return Modality.valueOf(filter.toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        log.warn("Invalid modality filter: {}", filter);
+                        return null;
+                    }
+                })
+                .filter(modality -> modality != null)
+                .collect(Collectors.toSet());
     }
 }

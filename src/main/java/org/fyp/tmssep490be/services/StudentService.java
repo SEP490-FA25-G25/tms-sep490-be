@@ -313,6 +313,110 @@ public class StudentService {
         return userBranchesRepository.findBranchIdsByUserId(userId);
     }
 
+    public StudentDetailDTO getStudentDetail(Long studentId, Long userId) {
+        log.debug("Getting student detail for student {} by user {}", studentId, userId);
+
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+
+        // Validate student access
+        validateStudentAccess(student, userId);
+
+        return convertToStudentDetailDTO(student);
+    }
+
+    private void validateStudentAccess(Student student, Long userId) {
+        List<Long> accessibleBranches = getUserAccessibleBranches(userId);
+
+        // Check if student belongs to any accessible branch
+        boolean hasAccess = student.getUserAccount().getUserBranches().stream()
+                .anyMatch(ub -> accessibleBranches.contains(ub.getBranch().getId()));
+
+        if (!hasAccess) {
+            throw new CustomException(ErrorCode.STUDENT_ACCESS_DENIED);
+        }
+    }
+
+    private StudentDetailDTO convertToStudentDetailDTO(Student student) {
+        UserAccount user = student.getUserAccount();
+
+        // Get branch info
+        String branchName = null;
+        Long branchId = null;
+        if (!user.getUserBranches().isEmpty()) {
+            UserBranches firstBranch = user.getUserBranches().stream().findFirst().orElse(null);
+            if (firstBranch != null) {
+                branchId = firstBranch.getBranch().getId();
+                branchName = firstBranch.getBranch().getName();
+            }
+        }
+
+        java.util.List<StudentActiveClassDTO> currentClasses = student.getEnrollments().stream()
+                .map(this::convertToStudentActiveClassDTO)
+                .collect(Collectors.toList());
+
+        java.util.List<StudentDetailDTO.SkillAssessmentDetailDTO> skillAssessments = 
+                student.getReplacementSkillAssessments().stream()
+                .sorted((a, b) -> b.getAssessmentDate().compareTo(a.getAssessmentDate()))
+                .map(this::convertToSkillAssessmentDetailDTO)
+                .collect(Collectors.toList());
+
+        return StudentDetailDTO.builder()
+                .id(student.getId())
+                .studentCode(student.getStudentCode())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .address(user.getAddress())
+                .gender(user.getGender() != null ? user.getGender().name() : null)
+                .dateOfBirth(user.getDob())
+                .status(user.getStatus() != null ? user.getStatus().name() : null)
+                .facebookUrl(user.getFacebookUrl())
+                .avatarUrl(user.getAvatarUrl())
+                .createdAt(user.getCreatedAt())
+                .lastLoginAt(user.getLastLoginAt())
+                .branchName(branchName)
+                .branchId(branchId)
+                .currentClasses(currentClasses)
+                .skillAssessments(skillAssessments)
+                .build();
+    }
+
+    private StudentDetailDTO.SkillAssessmentDetailDTO convertToSkillAssessmentDetailDTO(ReplacementSkillAssessment assessment) {
+        return StudentDetailDTO.SkillAssessmentDetailDTO.builder()
+                .id(assessment.getId())
+                .skill(assessment.getSkill() != null ? assessment.getSkill().name() : null)
+                .levelCode(assessment.getLevel() != null ? assessment.getLevel().getCode() : null)
+                .levelName(assessment.getLevel() != null ? assessment.getLevel().getName() : null)
+                .score(assessment.getScore())
+                .assessmentDate(assessment.getAssessmentDate())
+                .assessmentType(assessment.getAssessmentType())
+                .note(assessment.getNote())
+                .assessedBy(assessment.getAssessedBy() != null ?
+                        StudentDetailDTO.AssessedByDTO.builder()
+                                .userId(assessment.getAssessedBy().getId())
+                                .fullName(assessment.getAssessedBy().getFullName())
+                                .build() : null)
+                .build();
+    }
+
+    private StudentActiveClassDTO convertToStudentActiveClassDTO(Enrollment enrollment) {
+        ClassEntity classEntity = enrollment.getClassEntity();
+
+        return StudentActiveClassDTO.builder()
+                .id(classEntity.getId())
+                .classCode(classEntity.getCode())
+                .className(classEntity.getName())
+                .courseName(classEntity.getSubject().getName())
+                .branchName(classEntity.getBranch().getName())
+                .startDate(classEntity.getStartDate())
+                .plannedEndDate(classEntity.getPlannedEndDate())
+                .status(classEntity.getStatus() != null ? classEntity.getStatus().name() : null)
+                .attendanceRate(null)
+                .averageScore(null)
+                .build();
+    }
+
     private String generateStudentCode(Long branchId, String fullName, String email) {
         String baseName;
 

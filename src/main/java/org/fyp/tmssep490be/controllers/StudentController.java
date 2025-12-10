@@ -84,6 +84,23 @@ public class StudentController {
                         .data(response)
                         .build());
     }
+    
+    @GetMapping("/{studentId}")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<StudentDetailDTO>> getStudentDetail(
+            @PathVariable Long studentId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} requesting details for student {}", currentUser.getId(), studentId);
+
+        StudentDetailDTO studentDetail = studentService.getStudentDetail(studentId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<StudentDetailDTO>builder()
+                .success(true)
+                .message("Student details retrieved successfully")
+                .data(studentDetail)
+                .build());
+    }
 
     // Template học viên của lớp khi đưa cho sale, sale lấy template và gửi lại giáo vụ những người đăng ký và add vào hệ thống
     @GetMapping("/import/template")

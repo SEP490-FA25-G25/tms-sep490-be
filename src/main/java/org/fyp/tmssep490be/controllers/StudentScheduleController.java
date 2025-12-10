@@ -68,7 +68,7 @@ public class StudentScheduleController {
             );
         }
 
-        WeeklyScheduleResponseDTO schedule = studentScheduleService.getWeeklySchedule(studentId, weekStart);
+        WeeklyScheduleResponseDTO schedule = studentScheduleService.getWeeklySchedule(studentId, weekStart, classId);
 
         return ResponseEntity.ok(
                 ResponseObject.<WeeklyScheduleResponseDTO>builder()

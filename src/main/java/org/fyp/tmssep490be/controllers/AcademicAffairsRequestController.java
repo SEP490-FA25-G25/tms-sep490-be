@@ -4,14 +4,19 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.dtos.schedule.WeeklyScheduleResponseDTO;
 import org.fyp.tmssep490be.dtos.studentrequest.*;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentRequestService;
+import org.fyp.tmssep490be.services.StudentScheduleService;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/v1/academic-requests")
@@ -20,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 public class AcademicAffairsRequestController {
 
     private final StudentRequestService studentRequestService;
+    private final StudentScheduleService studentScheduleService;
 
     @GetMapping("/pending")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
@@ -162,6 +168,18 @@ public class AcademicAffairsRequestController {
         return ResponseEntity.ok(ResponseObject.success("Retrieved makeup options successfully", response));
     }
 
+    @PostMapping("/absence/on-behalf")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> submitAbsenceOnBehalf(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody AbsenceRequestDTO dto) {
+
+        StudentRequestResponseDTO response = studentRequestService.submitAbsenceRequestOnBehalf(
+                currentUser.getId(), dto);
+
+        return ResponseEntity.ok(ResponseObject.success("Absence request created and auto-approved", response));
+    }
+
     @PostMapping("/makeup-requests/on-behalf")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentRequestResponseDTO>> submitMakeupOnBehalf(
@@ -210,5 +228,42 @@ public class AcademicAffairsRequestController {
                 currentUser.getId(), dto);
 
         return ResponseEntity.ok(ResponseObject.success("Transfer request created and auto-approved", response));
+    }
+
+    @GetMapping("/students/{studentId}/schedule")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<WeeklyScheduleResponseDTO>> getStudentSchedule(
+            @PathVariable Long studentId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam(required = false) Long classId) {
+
+        log.info("Academic Affairs requesting schedule for student: {}, week: {}, class: {}",
+                studentId, weekStart, classId);
+
+        if (weekStart == null) {
+            weekStart = studentScheduleService.getCurrentWeekStart();
+            log.debug("Using current week start: {}", weekStart);
+        }
+
+        // Validate weekStart is Monday
+        if (weekStart.getDayOfWeek() != java.time.DayOfWeek.MONDAY) {
+            log.warn("Invalid weekStart provided: {} (not a Monday)", weekStart);
+            return ResponseEntity.badRequest().body(
+                    ResponseObject.<WeeklyScheduleResponseDTO>builder()
+                            .success(false)
+                            .message("weekStart must be a Monday (ISO 8601 format: YYYY-MM-DD)")
+                            .build()
+            );
+        }
+
+        WeeklyScheduleResponseDTO schedule = studentScheduleService.getWeeklySchedule(studentId, weekStart, classId);
+
+        return ResponseEntity.ok(
+                ResponseObject.<WeeklyScheduleResponseDTO>builder()
+                        .success(true)
+                        .message("Student schedule retrieved successfully")
+                        .data(schedule)
+                        .build()
+        );
     }
 }

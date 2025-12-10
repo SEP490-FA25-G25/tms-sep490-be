@@ -39,8 +39,6 @@ public class TransferEligibilityDTO {
         private Boolean hasPendingTransfer;
         private Boolean canTransfer;
         private List<SessionInfo> allSessions; // All sessions for timeline view
-        private Long lastAttendedSessionId; // Last session student attended
-        private Long upcomingSessionId; // Next session to attend
     }
 
     @Data
@@ -54,9 +52,6 @@ public class TransferEligibilityDTO {
         private String subjectSessionTitle;
         private String timeSlot;
         private String status; // PLANNED, DONE, CANCELLED
-        private Boolean isPast;
-        private Boolean isUpcoming; // Next session to attend
-        private Boolean isLastAttended; // Last session student attended
     }
 
     @Data
@@ -75,8 +70,6 @@ public class TransferEligibilityDTO {
     @AllArgsConstructor
     public static class TransferPolicyInfo {
         private Integer maxTransfersPerSubject;
-        private Integer usedTransfers;
-        private Integer remainingTransfers;
         private Boolean requiresAAApproval;
         private String policyDescription;
     }

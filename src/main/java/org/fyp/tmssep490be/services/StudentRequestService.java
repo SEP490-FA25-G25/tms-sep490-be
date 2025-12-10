@@ -4,11 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.studentrequest.*;
 import org.fyp.tmssep490be.entities.*;
-import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
-import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
-import org.fyp.tmssep490be.entities.enums.RequestStatus;
-import org.fyp.tmssep490be.entities.enums.SessionStatus;
-import org.fyp.tmssep490be.entities.enums.StudentRequestType;
+import org.fyp.tmssep490be.entities.enums.*;
 import org.fyp.tmssep490be.exceptions.BusinessRuleException;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
@@ -38,6 +34,12 @@ public class StudentRequestService {
 
     private static final double ABSENCE_THRESHOLD_PERCENT = 20.0;
 
+    private static final int MAKEUP_LOOKBACK_WEEKS = 2;      // Số tuần nhìn lại để tìm buổi vắng
+    private static final int MAKEUP_WEEKS_LIMIT = 4;         // Giới hạn số tuần cho phép xin học bù
+    private static final int MAX_TRANSFERS_PER_COURSE = 1;   // Số lần transfer tối đa mỗi khóa học
+    private static final int ABSENCE_LEAD_TIME_DAYS = 1;     // Số ngày trước buổi học cần xin phép
+    private static final int REASON_MIN_LENGTH = 10;         // Độ dài tối thiểu của lý do
+
     private final StudentRequestRepository studentRequestRepository;
     private final StudentRepository studentRepository;
     private final UserBranchesRepository userBranchesRepository;
@@ -46,7 +48,6 @@ public class StudentRequestService {
     private final EnrollmentRepository enrollmentRepository;
     private final ClassRepository classRepository;
     private final UserAccountRepository userAccountRepository;
-    private final SystemPolicyRepository systemPolicyRepository;
 
     public Page<StudentRequestResponseDTO> getMyRequests(Long userId, RequestFilterDTO filter) {
         log.debug("Getting requests for student user {}", userId);
@@ -499,10 +500,10 @@ public class StudentRequestService {
             throw new BusinessRuleException("DUPLICATE_REQUEST", "Duplicate absence request for this session");
         }
 
-        int leadTimeDays = getPolicyIntValue("request.absence.lead_time_days", 1);
+        // Validate lead time using hardcoded constant
         long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), session.getDate());
-        if (daysUntil < leadTimeDays) {
-            log.warn("Absence request submitted with insufficient lead time: {} days (required: {})", daysUntil, leadTimeDays);
+        if (daysUntil < ABSENCE_LEAD_TIME_DAYS) {
+            log.warn("Absence request submitted with insufficient lead time: {} days (required: {})", daysUntil, ABSENCE_LEAD_TIME_DAYS);
         }
 
         double absenceRate = calculateAbsenceRate(student.getId(), dto.getCurrentClassId());
@@ -529,6 +530,85 @@ public class StudentRequestService {
 
         request = studentRequestRepository.save(request);
         log.info("Absence request created successfully with id: {}", request.getId());
+
+        return mapToStudentRequestResponseDTO(request);
+    }
+
+    @Transactional
+    public StudentRequestResponseDTO submitAbsenceRequestOnBehalf(Long decidedById, AbsenceRequestDTO dto) {
+        log.info("AA user {} submitting absence request on-behalf for student {} - session: {}",
+                decidedById, dto.getStudentId(), dto.getTargetSessionId());
+
+        if (dto.getStudentId() == null) {
+            throw new BusinessRuleException("MISSING_STUDENT_ID", "Student ID is required for on-behalf requests");
+        }
+
+        Student student = studentRepository.findById(dto.getStudentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found for ID: " + dto.getStudentId()));
+
+        Session session = sessionRepository.findById(dto.getTargetSessionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+
+        if (session.getClassEntity() == null || !session.getClassEntity().getId().equals(dto.getCurrentClassId())) {
+            throw new BusinessRuleException("SESSION_CLASS_MISMATCH", "Session does not belong to the selected class");
+        }
+
+        // AA can create absence requests for future sessions only
+        if (session.getDate().isBefore(LocalDate.now())) {
+            throw new BusinessRuleException("PAST_SESSION", "Cannot request absence for past sessions");
+        }
+
+        if (!session.getStatus().equals(SessionStatus.PLANNED)) {
+            throw new BusinessRuleException("INVALID_SESSION_STATUS", "Session must be in PLANNED status");
+        }
+
+        Enrollment enrollment = enrollmentRepository
+                .findByStudentIdAndClassIdAndStatus(student.getId(), dto.getCurrentClassId(), EnrollmentStatus.ENROLLED);
+
+        if (enrollment == null) {
+            throw new BusinessRuleException("NOT_ENROLLED", "Student is not enrolled in this class");
+        }
+
+        StudentSession.StudentSessionId studentSessionId = new StudentSession.StudentSessionId(student.getId(), dto.getTargetSessionId());
+        boolean hasStudentSession = studentSessionRepository.findById(studentSessionId).isPresent();
+        if (!hasStudentSession) {
+            throw new BusinessRuleException("SESSION_NOT_ASSIGNED", "Student is not assigned to this session");
+        }
+
+        if (hasDuplicateRequest(student.getId(), dto.getTargetSessionId(), StudentRequestType.ABSENCE)) {
+            throw new BusinessRuleException("DUPLICATE_REQUEST", "Duplicate absence request for this session");
+        }
+
+        ClassEntity classEntity = classRepository.findById(dto.getCurrentClassId())
+                .orElseThrow(() -> new ResourceNotFoundException("Class not found"));
+        UserAccount submittedBy = userAccountRepository.findById(decidedById)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Create request with auto-approved status
+        StudentRequest request = StudentRequest.builder()
+                .student(student)
+                .requestType(StudentRequestType.ABSENCE)
+                .currentClass(classEntity)
+                .targetSession(session)
+                .requestReason(dto.getRequestReason())
+                .note(dto.getNote())
+                .status(RequestStatus.APPROVED)  // Auto-approve for AA on-behalf
+                .submittedBy(submittedBy)
+                .submittedAt(OffsetDateTime.now())
+                .decidedBy(submittedBy)  // AA is both submitter and approver
+                .decidedAt(OffsetDateTime.now())
+                .build();
+
+        request = studentRequestRepository.save(request);
+        log.info("Absence request created and auto-approved with id: {}", request.getId());
+
+        // Mark the session as EXCUSED immediately since it's auto-approved
+        markSessionAsExcused(
+                student,
+                session,
+                String.format("Vắng có phép được tạo và duyệt bởi AA lúc %s. Request ID: %d",
+                        OffsetDateTime.now(), request.getId())
+        );
 
         return mapToStudentRequestResponseDTO(request);
     }
@@ -897,32 +977,21 @@ public class StudentRequestService {
                 .build();
     }
 
+    /**
+     * Returns student request configuration with hardcoded policy values.
+     * Previously these values were fetched from SystemPolicy table.
+     */
     public StudentRequestConfigDTO getStudentRequestConfig() {
         return StudentRequestConfigDTO.builder()
-                .makeupLookbackWeeks(getPolicyIntValue("student.makeup.lookback_weeks", 2))
-                .makeupWeeksLimit(getPolicyIntValue("student.makeup.weeks_limit", 4))
-                .maxTransfersPerCourse(getPolicyIntValue("request.transfer.max_per_course", 1))
-                .absenceLeadTimeDays(getPolicyIntValue("request.absence.lead_time_days", 1))
-                .reasonMinLength(getPolicyIntValue("request.absence.reason_min_length", 10))
+                .makeupLookbackWeeks(MAKEUP_LOOKBACK_WEEKS)
+                .makeupWeeksLimit(MAKEUP_WEEKS_LIMIT)
+                .maxTransfersPerCourse(MAX_TRANSFERS_PER_COURSE)
+                .absenceLeadTimeDays(ABSENCE_LEAD_TIME_DAYS)
+                .reasonMinLength(REASON_MIN_LENGTH)
                 .build();
     }
 
-    // Helper methods để lấy policy values từ DB
-    private Integer getPolicyIntValue(String policyKey, Integer defaultValue) {
-        return systemPolicyRepository.findFirstByPolicyKeyOrderByIdAsc(policyKey)
-                .map(policy -> {
-                    try {
-                        return Integer.parseInt(policy.getCurrentValue());
-                    } catch (NumberFormatException e) {
-                        log.warn("Invalid integer value for policy {}: {}", policyKey, policy.getCurrentValue());
-                        return defaultValue;
-                    }
-                })
-                .orElseGet(() -> {
-                    log.warn("Policy not found: {}, using default value: {}", policyKey, defaultValue);
-                    return defaultValue;
-                });
-    }
+    // Policy helper methods removed - using hardcoded constants instead
 
     @Transactional
     public StudentRequestResponseDTO cancelRequest(Long requestId, Long userId) {
@@ -955,8 +1024,8 @@ public class StudentRequestService {
     }
 
     public MissedSessionsResponseDTO getMissedSessionsForStudent(Long studentId, Integer weeksBack, Boolean excludeRequested) {
-        // Nếu client không truyền weeksBack, lấy từ policy
-        int lookbackWeeks = weeksBack != null ? weeksBack : getPolicyIntValue("student.makeup.lookback_weeks", 2);
+        // Nếu client không truyền weeksBack, sử dụng hardcoded constant
+        int lookbackWeeks = weeksBack != null ? weeksBack : MAKEUP_LOOKBACK_WEEKS;
 
         boolean excludeRequestedSessions = excludeRequested != null ? excludeRequested : true;
 
@@ -1002,11 +1071,10 @@ public class StudentRequestService {
             throw new BusinessRuleException("INVALID_SESSION", "Target session must have subject session defined");
         }
 
-        // Lấy policy: số tuần giới hạn tìm buổi học bù
-        int weeksLimit = getPolicyIntValue("student.makeup.weeks_limit", 4);
+        // Business Rule: SAME-BRANCH ONLY - không cho phép học bù ở branch khác
+        int weeksLimit = MAKEUP_WEEKS_LIMIT;
 
         // Find makeup options with same subject session (same content)
-        // Business Rule: Same branch → allow all modalities; Different branch → ONLINE only
         List<Session> makeupOptions = sessionRepository.findMakeupSessionOptions(
                 targetSession.getSubjectSession().getId(),
                 targetSessionId,
@@ -1076,6 +1144,20 @@ public class StudentRequestService {
 
         int daysAgo = (int) ChronoUnit.DAYS.between(session.getDate(), LocalDate.now());
 
+        String resourceName = null;
+        String resourceType = null;
+        String onlineLink = null;
+        
+        if (!session.getSessionResources().isEmpty()) {
+            Resource resource = session.getSessionResources().iterator().next().getResource();
+            resourceName = resource.getName();
+            resourceType = resource.getResourceType().name();
+            
+            if (resource.getResourceType() == ResourceType.VIRTUAL) {
+                onlineLink = resource.getMeetingUrl();
+            }
+        }
+
         return MissedSessionDTO.builder()
                 .sessionId(session.getId())
                 .date(session.getDate())
@@ -1089,7 +1171,11 @@ public class StudentRequestService {
                         .className(classEntity.getName())
                         .branchId(classEntity.getBranch().getId())
                         .branchName(classEntity.getBranch().getName())
+                        .branchAddress(classEntity.getBranch().getAddress())
                         .modality(classEntity.getModality().name())
+                        .resourceName(resourceName)
+                        .resourceType(resourceType)
+                        .onlineLink(onlineLink)
                         .build())
                 .timeSlotInfo(MissedSessionDTO.TimeSlotInfo.builder()
                         .startTime(timeSlot != null ? timeSlot.getStartTime().toString() : null)
@@ -1113,20 +1199,16 @@ public class StudentRequestService {
         }
 
         // Calculate match score
-        boolean branchMatch = session.getClassEntity().getBranch().getId()
-                .equals(targetSession.getClassEntity().getBranch().getId());
         boolean modalityMatch = session.getClassEntity().getModality()
                 .equals(targetSession.getClassEntity().getModality());
 
         int score = 0;
-        //Cùng chi nhánh thì + 10, khác thì không +
-        if (branchMatch) score += 10;
-        //Cùng hình thức học thì + 5, khác thì không cộng
+        // Cùng hình thức học thì + 5, khác thì không cộng
         if (modalityMatch) score += 5;
 
         long weeksUntil = ChronoUnit.WEEKS.between(LocalDate.now(), session.getDate());
         int dateProximityScore = (int) Math.max(0, 3 - weeksUntil); // +3 this week, +2 next, +1 in 2 weeks
-        //weeksUntil = 0 -> 3-0 =3 -> điểm cao
+        // weeksUntil = 0 -> 3-0 = 3 -> điểm cao
         // tương tự như vậy weeksUntil = 3 -> 3-3 = 0 điểm vì quá xa
         score += dateProximityScore;
 
@@ -1141,6 +1223,20 @@ public class StudentRequestService {
         SubjectSession subjectSession = session.getSubjectSession();
         TimeSlotTemplate timeSlot = session.getTimeSlotTemplate();
 
+        String resourceName = null;
+        String resourceType = null;
+        String onlineLink = null;
+        
+        if (!session.getSessionResources().isEmpty()) {
+            Resource resource = session.getSessionResources().iterator().next().getResource();
+            resourceName = resource.getName();
+            resourceType = resource.getResourceType().name();
+            
+            if (resource.getResourceType() == ResourceType.VIRTUAL) {
+                onlineLink = resource.getMeetingUrl();
+            }
+        }
+
         return MakeupOptionDTO.builder()
                 .sessionId(session.getId())
                 .date(session.getDate())
@@ -1154,9 +1250,13 @@ public class StudentRequestService {
                         .className(session.getClassEntity().getName())
                         .branchId(session.getClassEntity().getBranch().getId())
                         .branchName(session.getClassEntity().getBranch().getName())
+                        .branchAddress(session.getClassEntity().getBranch().getAddress())
                         .modality(session.getClassEntity().getModality().name())
                         .availableSlots(availableSlots)
                         .maxCapacity(session.getClassEntity().getMaxCapacity())
+                        .resourceName(resourceName)
+                        .resourceType(resourceType)
+                        .onlineLink(onlineLink)
                         .build())
                 .timeSlotInfo(MakeupOptionDTO.TimeSlotInfo.builder()
                         .startTime(timeSlot != null ? timeSlot.getStartTime().toString() : null)
@@ -1167,7 +1267,6 @@ public class StudentRequestService {
                 .availableSlots(availableSlots)
                 .maxCapacity(session.getClassEntity().getMaxCapacity())
                 .matchScore(MakeupOptionDTO.MatchScore.builder()
-                        .branchMatch(branchMatch)
                         .modalityMatch(modalityMatch)
                         .capacityOk(capacityOk)
                         .dateProximityScore(dateProximityScore)
@@ -1294,28 +1393,19 @@ public class StudentRequestService {
 
         // với từng enrollment -> lấy ra thông tin của lớp học đó và tính transfer quota
         // database sẽ đếm số lần student đã transfer approved cho subject này
-        // và so sánh với policy để tính remaining quota = max - used
+        // và so sánh với hardcoded constant để tính remaining quota = max - used
         List<TransferEligibilityDTO.CurrentClassInfo> currentClasses = enrollments.stream()
                 .map(enrollment -> mapToCurrentClassInfoWithQuota(enrollment, student.getId()))
                 .collect(Collectors.toList());
 
-
-        int totalUsedTransfers = calculateUsedTransfers(student.getId());
-        int totalRemainingTransfers = currentClasses.stream()
-                .mapToInt(c -> c.getTransferQuota().getRemaining())
-                .sum();
-
-        int maxPerSubject = getPolicyIntValue("request.transfer.max_per_subject", 1);
-
         TransferEligibilityDTO.TransferPolicyInfo policyInfo = TransferEligibilityDTO.TransferPolicyInfo.builder()
-                .maxTransfersPerSubject(maxPerSubject)
-                .usedTransfers(totalUsedTransfers)
-                .remainingTransfers(totalRemainingTransfers)
+                .maxTransfersPerSubject(MAX_TRANSFERS_PER_COURSE)
                 .requiresAAApproval(false)
                 .policyDescription("Maximum 1 transfer per subject. Same branch & modality changes are auto-approved.")
                 .build();
 
-        boolean eligible = !currentClasses.isEmpty() && totalRemainingTransfers > 0;
+        boolean eligible = !currentClasses.isEmpty() && 
+                currentClasses.stream().anyMatch(c -> c.getTransferQuota().getRemaining() > 0);
 
         return TransferEligibilityDTO.builder()
                 .eligibleForTransfer(eligible) // có đủ điều kiện transfer không
@@ -1625,11 +1715,8 @@ public class StudentRequestService {
         long approvedTransfers = studentRequestRepository.countByStudentIdAndRequestTypeAndStatusAndTargetClassSubjectId(
                 studentId, StudentRequestType.TRANSFER, RequestStatus.APPROVED, subjectId);
 
-        // lấy ra policy
-        int maxPerSubject = getPolicyIntValue("request.transfer.max_per_subject", 1);
-
         int used = (int) approvedTransfers;
-        int remaining = Math.max(0, maxPerSubject - used);
+        int remaining = Math.max(0, MAX_TRANSFERS_PER_COURSE - used);
 
         // Check for pending transfer request for this class
         boolean hasPending = studentRequestRepository.existsByStudentIdAndCurrentClassIdAndRequestTypeAndStatusIn(
@@ -1637,20 +1724,10 @@ public class StudentRequestService {
 
         String scheduleInfo = formatScheduleInfo(classEntity);
 
-        // Get all sessions for timeline view
+        // Get all sessions for timeline view - just raw data, frontend will compute UI logic
         List<Session> classSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
-        Long lastAttendedSessionId = getLastAttendedSessionId(studentId, classEntity.getId());
-        
-        // Find upcoming session
-        LocalDate today = LocalDate.now();
-        Long upcomingSessionId = classSessions.stream()
-                .filter(s -> s.getStatus() == SessionStatus.PLANNED && !s.getDate().isBefore(today))
-                .sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate()))
-                .findFirst()
-                .map(Session::getId)
-                .orElse(null);
 
-        // Map sessions to DTO
+        // Map sessions to DTO - only raw data
         List<TransferEligibilityDTO.SessionInfo> allSessions = classSessions.stream()
                 .map(session -> {
                     String timeSlot = "TBA";
@@ -1663,10 +1740,6 @@ public class StudentRequestService {
                             session.getSubjectSession().getSequenceNo() : null;
                     String topic = session.getSubjectSession() != null ? 
                             session.getSubjectSession().getTopic() : "TBA";
-                    
-                    boolean isPast = session.getDate().isBefore(today) || session.getStatus() == SessionStatus.DONE;
-                    boolean isUpcoming = session.getId().equals(upcomingSessionId);
-                    boolean isLastAttended = session.getId().equals(lastAttendedSessionId);
 
                     return TransferEligibilityDTO.SessionInfo.builder()
                             .sessionId(session.getId())
@@ -1675,9 +1748,6 @@ public class StudentRequestService {
                             .subjectSessionTitle(topic)
                             .timeSlot(timeSlot)
                             .status(session.getStatus().name())
-                            .isPast(isPast)
-                            .isUpcoming(isUpcoming)
-                            .isLastAttended(isLastAttended)
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -1696,11 +1766,9 @@ public class StudentRequestService {
                 .enrollmentDate(enrollment.getEnrolledAt() != null ? enrollment.getEnrolledAt().toLocalDate().toString() : null)
                 .scheduleInfo(scheduleInfo)
                 .allSessions(allSessions)
-                .lastAttendedSessionId(lastAttendedSessionId)
-                .upcomingSessionId(upcomingSessionId)
                 .transferQuota(TransferEligibilityDTO.TransferQuota.builder()
                         .used(used)
-                        .limit(maxPerSubject)
+                        .limit(MAX_TRANSFERS_PER_COURSE)
                         .remaining(remaining)
                         .build())
                 .hasPendingTransfer(hasPending)
@@ -1708,17 +1776,12 @@ public class StudentRequestService {
                 .build();
     }
 
-    private int calculateUsedTransfers(Long studentId) {
-        return (int) studentRequestRepository.countByStudentIdAndRequestTypeAndStatus(
-                studentId, StudentRequestType.TRANSFER, RequestStatus.APPROVED);
-    }
 
     private boolean hasExceededTransferLimit(Long studentId, Long subjectId) {
         long approvedTransfers = studentRequestRepository.countByStudentIdAndRequestTypeAndStatusAndTargetClassSubjectId(
                 studentId, StudentRequestType.TRANSFER, RequestStatus.APPROVED, subjectId);
 
-        int maxTransfers = getPolicyIntValue("request.transfer.max_per_subject", 1);
-        return approvedTransfers >= maxTransfers;
+        return approvedTransfers >= MAX_TRANSFERS_PER_COURSE;
     }
 
     private TransferOptionDTO mapToTransferOptionDTO(ClassEntity targetClass, ClassEntity currentClass) {
@@ -1842,23 +1905,6 @@ public class StudentRequestService {
                             .build();
                 })
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * Find the last attended session for a student in a class
-     */
-    private Long getLastAttendedSessionId(Long studentId, Long classId) {
-        List<Session> classSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
-        
-        return classSessions.stream()
-                .filter(session -> {
-                    // Check if student was present (attended) this session
-                    return studentSessionRepository.existsByStudentIdAndSessionIdAndStatus(
-                            studentId, session.getId(), AttendanceStatus.PRESENT);
-                })
-                .max((s1, s2) -> s1.getDate().compareTo(s2.getDate()))
-                .map(Session::getId)
-                .orElse(null);
     }
 
     private TransferOptionDTO mapToTransferOptionDTOWithChanges(ClassEntity targetClass, ClassEntity currentClass) {
