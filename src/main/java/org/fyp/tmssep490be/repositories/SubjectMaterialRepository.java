@@ -34,4 +34,10 @@ public interface SubjectMaterialRepository extends JpaRepository<SubjectMaterial
     // Đếm số material theo session
     @Query("SELECT COUNT(m) FROM SubjectMaterial m WHERE m.subjectSession.id = :subjectSessionId")
     long countBySubjectSessionId(@Param("subjectSessionId") Long subjectSessionId);
+
+    // Tìm material theo session id
+    List<SubjectMaterial> findBySubjectSessionId(Long subjectSessionId);
+
+    // Tìm material ở cấp phase (không thuộc session)
+    List<SubjectMaterial> findByPhaseIdAndSubjectSessionIsNull(Long phaseId);
 }

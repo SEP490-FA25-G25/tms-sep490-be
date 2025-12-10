@@ -20,39 +20,36 @@ public class SubjectDetailDTO {
     private String code;
     private String description;
     private String thumbnailUrl;
-
-    private SubjectBasicInfoDTO basicInfo;
-    private SubjectStructureDTO structure;
-
-    private Long subjectId;
-    private String subjectName;
+    private Long subjectId; // Curriculum ID
+    private String subjectName; // Curriculum Name
     private Long levelId;
     private String levelName;
-    private String logicalSubjectCode;
-    private Integer version;
+
+    // Basic Info DTO wrapper
+    private SubjectBasicInfoDTO basicInfo;
+
+    // Structure DTO wrapper
+    private SubjectStructureDTO structure;
+
+    private String status;
+    private String approvalStatus;
+    private String rejectionReason;
+    private OffsetDateTime submittedAt;
+    private OffsetDateTime decidedAt;
+    private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
+
     private Integer totalHours;
     private Integer numberOfSessions;
-    private Integer totalDurationWeeks;
-
     private BigDecimal hoursPerSession;
     private String scoreScale;
     private String prerequisites;
     private String targetAudience;
     private String teachingMethods;
     private LocalDate effectiveDate;
-    private String status;
-    private String approvalStatus;
-    private OffsetDateTime submittedAt;
-    private OffsetDateTime decidedAt;
-    private OffsetDateTime createdAt;
-    private Integer totalSessions;
-    private Integer totalMaterials;
 
-    private List<SubjectPhaseDTO> phases;
-    private List<SubjectMaterialDTO> materials;
     private List<SubjectCLODTO> clos;
+    private List<SubjectPhaseDTO> phases;
     private List<SubjectAssessmentDTO> assessments;
-
-    private Integer completedSessions;
-    private Double progressPercent;
+    private List<SubjectMaterialDTO> materials;
 }
