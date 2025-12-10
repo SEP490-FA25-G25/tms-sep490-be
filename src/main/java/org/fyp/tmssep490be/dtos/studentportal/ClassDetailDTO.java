@@ -1,13 +1,12 @@
-package org.fyp.tmssep490be.dtos.classmanagement;
+package org.fyp.tmssep490be.dtos.studentportal;
 
-import lombok.*;
-import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
-import org.fyp.tmssep490be.entities.enums.ClassStatus;
-import org.fyp.tmssep490be.entities.enums.Modality;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 @Data
@@ -15,39 +14,23 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ClassDetailDTO {
-
     private Long id;
     private String code;
     private String name;
-
-    private SubjectDTO subject;
-    private BranchDTO branch;
-
-    private Modality modality;
+    private SubjectInfo subject; 
+    private BranchInfo branch;
+    private String modality;
     private LocalDate startDate;
     private LocalDate plannedEndDate;
     private LocalDate actualEndDate;
-    private Short[] scheduleDays;
+    private List<Integer> scheduleDays;
     private Integer maxCapacity;
-
-    private ClassStatus status;
-    private ApprovalStatus approvalStatus;
-    private String rejectionReason;
-
-    private LocalDate submittedAt;
-    private LocalDate decidedAt;
-    private String decidedByName;
-
-    private String createdByName;
-    private OffsetDateTime createdAt;
-    private OffsetDateTime updatedAt;
-
-    private List<TeacherSummaryDTO> teachers;
-
+    private String status;
+    private List<TeacherSummary> teachers;
     private String scheduleSummary;
     private List<ScheduleDetailDTO> scheduleDetails;
-
     private EnrollmentSummary enrollmentSummary;
+    private SessionDTO nextSession;
 
     @Data
     @Builder
@@ -63,7 +46,7 @@ public class ClassDetailDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class CurriculumDTO {
+    public static class CurriculumInfo {  
         private Long id;
         private String code;
         private String name;
@@ -73,43 +56,49 @@ public class ClassDetailDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class LevelDTO {
+    public static class LevelInfo {
         private Long id;
         private String code;
         private String name;
-        private CurriculumDTO curriculum;
     }
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class SubjectDTO {
+    public static class SubjectInfo { 
         private Long id;
-        private String code;
         private String name;
+        private String code;
         private String description;
         private Integer totalHours;
         private Integer numberOfSessions;
         private BigDecimal hoursPerSession;
         private String prerequisites;
         private String targetAudience;
-        private String teachingMethods;
-        // Related level
-        private LevelDTO level;
+        private CurriculumInfo curriculum;  
+        private LevelInfo level;
     }
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class BranchDTO {
+    public static class BranchInfo {
         private Long id;
-        private String code;
         private String name;
         private String address;
-        private String phone;
-        private String email;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TeacherSummary {
+        private Long teacherId;
+        private String teacherName;
+        private String teacherEmail;
+        private Boolean isPrimaryInstructor;
     }
 
     @Data
@@ -117,11 +106,7 @@ public class ClassDetailDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class EnrollmentSummary {
-        private Integer currentEnrolled;
+        private Integer totalEnrolled;
         private Integer maxCapacity;
-        private Integer availableSlots;
-        private Double utilizationRate;
-        private Boolean canEnrollStudents;
-        private String enrollmentRestrictionReason;
     }
 }
