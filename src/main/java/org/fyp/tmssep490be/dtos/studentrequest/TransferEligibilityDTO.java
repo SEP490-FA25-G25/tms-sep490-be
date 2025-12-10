@@ -31,14 +31,17 @@ public class TransferEligibilityDTO {
         private String subjectName;
         private Long branchId;
         private String branchName;
+        private String branchAddress;       
         private String modality;
         private String enrollmentStatus;
         private String enrollmentDate;
-        private String scheduleInfo;
+        private String scheduleInfo;        // e.g. "Mon, Wed, Fri - 2025-01-01 to 2025-06-01"
+        private String scheduleTime;        // e.g. "T2 07:00-08:30, T4 07:00-08:30, T6 07:00-08:30"
+        
         private TransferQuota transferQuota;
         private Boolean hasPendingTransfer;
         private Boolean canTransfer;
-        private List<SessionInfo> allSessions; // All sessions for timeline view
+        private List<SessionInfo> allSessions; 
     }
 
     @Data
@@ -51,7 +54,7 @@ public class TransferEligibilityDTO {
         private Integer subjectSessionNumber;
         private String subjectSessionTitle;
         private String timeSlot;
-        private String status; // PLANNED, DONE, CANCELLED
+        private String status; 
     }
 
     @Data

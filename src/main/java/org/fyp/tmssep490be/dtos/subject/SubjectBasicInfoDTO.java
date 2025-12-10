@@ -1,12 +1,16 @@
 package org.fyp.tmssep490be.dtos.subject;
 
-import lombok.*;
-import java.math.BigDecimal;
-import java.time.LocalDate;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class SubjectBasicInfoDTO {
-    private Long curriculumId;
+    private Long subjectId;
     private Long levelId;
     private String name;
     private String code;
@@ -16,8 +20,8 @@ public class SubjectBasicInfoDTO {
     private String scoreScale;
     private String targetAudience;
     private String teachingMethods;
-    private LocalDate effectiveDate;
-    private Integer numberOfSessions;
-    private BigDecimal hoursPerSession;
     private String thumbnailUrl;
+    private java.time.LocalDate effectiveDate;
+    private Integer numberOfSessions;
+    private java.math.BigDecimal hoursPerSession;
 }
