@@ -38,13 +38,6 @@ public class UserAccountController {
         return ResponseEntity.ok(userResponse);
     }
 
-    @DeleteMapping("/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long userId) {
-        userAccountService.deleteUser(userId);
-        return ResponseEntity.noContent().build();
-    }
-
     @GetMapping("/{userId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long userId) {

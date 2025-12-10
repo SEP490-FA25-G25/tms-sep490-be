@@ -222,21 +222,6 @@ public class UserAccountService {
 
     }
 
-    @Transactional
-    public void deleteUser(Long userId) {
-
-        log.info("Deleting user with ID: {}", userId);
-
-        // tìm user theo userId
-        UserAccount user = userAccountRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
-
-        // xóa user
-        user.setStatus(UserStatus.INACTIVE);
-        userAccountRepository.save(user);
-
-        log.info("User set to inactive successfully with ID: {}", user.getId());
-    }
-
     @Transactional(readOnly = true)
     public UserResponse getUserById(Long userId) {
         log.info("Getting user with ID: {}", userId);
