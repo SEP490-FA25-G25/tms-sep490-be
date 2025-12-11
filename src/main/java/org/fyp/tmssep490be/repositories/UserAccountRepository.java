@@ -67,18 +67,13 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
                         @Param("branchId") Long branchId,
                         Pageable pageable);
 
+        /**
+         * Find all users with a specific role (for sending bulk notifications)
+         */
         @Query("SELECT DISTINCT u FROM UserAccount u " +
                         "JOIN u.userRoles ur " +
                         "WHERE ur.role.code = :roleCode")
         List<UserAccount> findUsersByRole(@Param("roleCode") String roleCode);
-
-        /**
-         * Find all users with a specific role (case-insensitive)
-         */
-        @Query("SELECT DISTINCT u FROM UserAccount u " +
-                        "JOIN u.userRoles ur " +
-                        "WHERE UPPER(ur.role.code) = UPPER(:roleCode)")
-        List<UserAccount> findUsersByRoleIgnoreCase(@Param("roleCode") String roleCode);
 
         // Đếm user theo trạng thái
         Long countByStatus(UserStatus status);

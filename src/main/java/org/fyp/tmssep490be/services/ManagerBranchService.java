@@ -85,26 +85,37 @@ public class ManagerBranchService {
         return mapToOverviewDTO(savedBranch);
     }
 
-    // Gửi thông báo cho Admin khi có chi nhánh mới
+    // Gửi thông báo cho Admin khi có chi nhánh mới (gọi từ Controller)
     public void sendNewBranchNotificationToAdmins(String branchName, String branchCode) {
-        String title = "Chi nhánh mới cần thiết lập";
-        String message = String.format(
-            "Chi nhánh '%s' (Mã: %s) vừa được tạo. Vui lòng thêm tài khoản nhân viên cho chi nhánh này.",
-            branchName,
-            branchCode
-        );
+        try {
+            // Thử tìm với 'ADMIN' trước, nếu không có thì thử 'admin'
+            List<UserAccount> admins = userAccountRepository.findUsersByRole("ADMIN");
+            
+            if (admins.isEmpty()) {
+                admins = userAccountRepository.findUsersByRole("admin");
+            }
+            
+            if (admins.isEmpty()) {
+                return;
+            }
 
-        // Tìm tất cả user có role ADMIN
-        List<UserAccount> admins = userAccountRepository.findUsersByRole("ADMIN");
-
-        // Gửi notification cho từng admin
-        for (UserAccount admin : admins) {
-            notificationService.createNotification(
-                admin.getId(),
-                NotificationType.SYSTEM,
-                title,
-                message
+            String title = "Chi nhánh mới cần thiết lập";
+            String message = String.format(
+                "Chi nhánh '%s' (Mã: %s) vừa được tạo. Vui lòng thêm tài khoản nhân viên cho chi nhánh này.",
+                branchName,
+                branchCode
             );
+
+            for (UserAccount admin : admins) {
+                notificationService.createNotification(
+                    admin.getId(),
+                    NotificationType.SYSTEM,
+                    title,
+                    message
+                );
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi thông báo chi nhánh mới: {}", e.getMessage());
         }
     }
 
@@ -187,40 +198,7 @@ public class ManagerBranchService {
         Branch savedBranch = branchRepository.save(branch);
         log.info("Đã ngưng hoạt động chi nhánh ID: {}", savedBranch.getId());
 
-        // Vô hiệu hóa tất cả user thuộc chi nhánh (ngoại trừ ADMIN và MANAGER)
-        deactivateUsersInBranch(savedBranch);
-
         return mapToOverviewDTO(savedBranch);
-    }
-
-    // Vô hiệu hóa tất cả user thuộc chi nhánh (ngoại trừ ADMIN và MANAGER)
-    private void deactivateUsersInBranch(Branch branch) {
-        if (branch.getUserBranches() == null) {
-            return;
-        }
-
-        List<String> excludedRoles = List.of("ADMIN", "MANAGER");
-        int deactivatedCount = 0;
-
-        for (UserBranches ub : branch.getUserBranches()) {
-            UserAccount user = ub.getUserAccount();
-            if (user == null || user.getStatus() == org.fyp.tmssep490be.entities.enums.UserStatus.INACTIVE) {
-                continue;
-            }
-
-            // Kiểm tra xem user có role ADMIN hoặc MANAGER không
-            boolean hasExcludedRole = user.getUserRoles() != null && user.getUserRoles().stream()
-                    .anyMatch(ur -> ur.getRole() != null && excludedRoles.contains(ur.getRole().getCode()));
-
-            if (!hasExcludedRole) {
-                user.setStatus(org.fyp.tmssep490be.entities.enums.UserStatus.INACTIVE);
-                user.setUpdatedAt(OffsetDateTime.now());
-                userAccountRepository.save(user);
-                deactivatedCount++;
-            }
-        }
-
-        log.info("Đã vô hiệu hóa {} user thuộc chi nhánh {}", deactivatedCount, branch.getName());
     }
 
     // Kích hoạt lại chi nhánh
