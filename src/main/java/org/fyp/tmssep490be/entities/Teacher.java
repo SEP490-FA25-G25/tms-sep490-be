@@ -43,10 +43,6 @@ public class Teacher {
 
     @OneToMany(mappedBy = "teacher", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private Set<TeacherAvailability> teacherAvailabilities = new HashSet<>();
-
-    @OneToMany(mappedBy = "teacher", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
     private Set<TeachingSlot> teachingSlots = new HashSet<>();
 
     @OneToMany(mappedBy = "teacher", cascade = CascadeType.ALL, orphanRemoval = true)
