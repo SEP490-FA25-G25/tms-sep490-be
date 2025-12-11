@@ -70,6 +70,18 @@ public class ManagerBranchService {
         return mapToOverviewDTO(savedBranch);
     }
 
+    // Check xem email đã tồn tại trong hệ thống chưa
+    @Transactional(readOnly = true)
+    public boolean checkEmailExists(String email, Long excludeBranchId) {
+        if (email == null || email.trim().isEmpty()) {
+            return false;
+        }
+        if (excludeBranchId != null) {
+            return branchRepository.existsByEmailAndIdNot(email.trim(), excludeBranchId);
+        }
+        return branchRepository.existsByEmail(email.trim());
+    }
+
     // Map Branch entity sang DTO
     private ManagerBranchOverviewDTO mapToOverviewDTO(Branch branch) {
         // Get Center Head từ userBranches với role CENTER_HEAD

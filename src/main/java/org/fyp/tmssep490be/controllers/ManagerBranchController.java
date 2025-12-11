@@ -41,4 +41,16 @@ public class ManagerBranchController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ResponseObject<>(true, "Tạo chi nhánh thành công", createdBranch));
     }
+
+    // Kiểm tra email đã tồn tại chưa
+    @GetMapping("/check-email")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ResponseObject<Boolean>> checkEmailExists(
+            @RequestParam String email,
+            @RequestParam(required = false) Long excludeId) {
+        log.info("API: Kiểm tra email chi nhánh: {}", email);
+        boolean exists = managerBranchService.checkEmailExists(email, excludeId);
+        return ResponseEntity.ok(new ResponseObject<>(true, 
+                exists ? "Email đã tồn tại" : "Email chưa tồn tại", exists));
+    }
 }
