@@ -69,8 +69,17 @@ public enum ErrorCode {
     CLASS_NO_BRANCH_ACCESS(4004, "Người dùng không có quyền truy cập vào bất kỳ chi nhánh nào"),
 
     // Create Class Workflow errors (4010-4099)
+    INVALID_SCHEDULE_DAYS(4010, "Lịch học không hợp lệ"),
+    START_DATE_NOT_IN_SCHEDULE_DAYS(4011, "Ngày bắt đầu không khớp với lịch học"),
+    CLASS_CODE_DUPLICATE(4012, "Mã lớp đã tồn tại trong chi nhánh"),
+    SUBJECT_NOT_APPROVED(4013, "Môn học chưa được phê duyệt"),
+    SUBJECT_NOT_FOUND(4014, "Không tìm thấy môn học"),
 
     // Class Code Generation errors (4032-4039)
+    CLASS_CODE_GENERATION_FAILED(4032, "Tạo mã lớp thất bại"),
+    CLASS_CODE_INVALID_FORMAT(4033, "Định dạng mã lớp không hợp lệ"),
+    CLASS_CODE_SEQUENCE_LIMIT_REACHED(4034, "Đã đạt giới hạn số thứ tự mã lớp"),
+    CLASS_CODE_PARSE_ERROR(4035, "Lỗi phân tích mã lớp"),
 
     // Teacher errors (3000-3099)
     TEACHER_NOT_FOUND(3000, "Không tìm thấy giáo viên"),
