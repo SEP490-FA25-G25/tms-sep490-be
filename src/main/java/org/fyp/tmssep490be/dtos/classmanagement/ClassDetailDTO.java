@@ -48,6 +48,8 @@ public class ClassDetailDTO {
     private List<ScheduleDetailDTO> scheduleDetails;
 
     private EnrollmentSummary enrollmentSummary;
+    private SessionSummary sessionSummary;
+    private PerformanceMetrics performanceMetrics;
 
     @Data
     @Builder
@@ -110,6 +112,8 @@ public class ClassDetailDTO {
         private String address;
         private String phone;
         private String email;
+        private String district;
+        private String city;
     }
 
     @Data
@@ -123,5 +127,25 @@ public class ClassDetailDTO {
         private Double utilizationRate;
         private Boolean canEnrollStudents;
         private String enrollmentRestrictionReason;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SessionSummary {
+        private Integer totalSessions;
+        private Integer completedSessions;
+        private Integer upcomingSessions;
+        private Integer cancelledSessions;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PerformanceMetrics {
+        private Double attendanceRate;
+        private Double homeworkCompletionRate;
     }
 }
