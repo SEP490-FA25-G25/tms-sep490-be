@@ -19,6 +19,7 @@ public class StudentImportResult {
     private int totalAttempted;
     private int successfulCreations;
     private int skippedExisting;    // Số student đã tồn tại (FOUND) - bỏ qua
+    private int syncedToBranch;     // Số student đã có nhưng được sync vào branch mới
     private int failedCreations;
 
     private List<CreatedStudentInfo> createdStudents;

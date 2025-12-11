@@ -28,6 +28,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalTime;
+import java.util.stream.Collectors;
+import java.util.List;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -167,30 +171,16 @@ public class TeacherClassService {
 
                     // Tổng số học sinh trong buổi học = tổng số StudentSession
                     long totalStudents = studentSessions.size();
-                    
-                    // Tính tỷ lệ điểm danh: (số có mặt / tổng số) * 100
-                    // Nếu không có học sinh nào thì tỷ lệ = 0
-                    double attendanceRate = totalStudents > 0 ? (presentCount * 100.0 / totalStudents) : 0.0;
 
-                    // Tính toán metrics hoàn thành bài tập về nhà
-                    // Đếm số học sinh đã hoàn thành bài tập (COMPLETED)
+                    // Calculate homework metrics
                     long homeworkCompletedCount = studentSessions.stream()
                             .filter(ss -> ss.getHomeworkStatus() == HomeworkStatus.COMPLETED)
                             .count();
 
-                    // Đếm tổng số học sinh có bài tập về nhà (loại trừ NO_HOMEWORK và null)
-                    // Logic: chỉ tính những học sinh có bài tập (COMPLETED hoặc INCOMPLETE)
-                    // Không tính những học sinh không có bài tập (NO_HOMEWORK)
-                    long homeworkTotalCount = studentSessions.stream()
-                            .filter(ss -> ss.getHomeworkStatus() != null
-                                    && ss.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK)
-                            .count();
-
-                    // Tính tỷ lệ hoàn thành: (số hoàn thành / tổng số có bài tập) * 100
-                    // Nếu không có học sinh nào có bài tập thì tỷ lệ = 0
-                    double homeworkCompletionRate = homeworkTotalCount > 0
-                            ? (homeworkCompletedCount * 100.0 / homeworkTotalCount)
-                            : 0.0;
+                    // Check if all students have NO_HOMEWORK
+                    boolean hasHomework = studentSessions.stream()
+                            .anyMatch(ss -> ss.getHomeworkStatus() != null
+                                    && ss.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK);
 
                     // Kiểm tra QA reports cho buổi học này
                     // Nếu Session có QA reports thì đếm số lượng, không thì = 0
@@ -205,6 +195,8 @@ public class TeacherClassService {
                     
                     // Time slot: khung giờ học (từ TimeSlotTemplate), nếu không có thì "TBA" (To Be Announced)
                     String timeSlot = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getName() : "TBA";
+                    LocalTime startTime = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getStartTime() : null;
+                    LocalTime endTime = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getEndTime() : null;
                     
                     // Topic: chủ đề buổi học (từ SubjectSession), nếu không có thì "N/A"
                     String topic = s.getSubjectSession() != null ? s.getSubjectSession().getTopic() : "N/A";
@@ -222,11 +214,6 @@ public class TeacherClassService {
                     // Lấy tên thứ trong tuần trong tiếng Việt
                     String dayOfWeek = s.getDate() != null ? getVietnameseDayName(s.getDate().getDayOfWeek().getValue()) : null;
 
-                    // Log metrics để debug (chỉ log khi ở chế độ debug)
-                    log.debug("Session {} - Students: {}, Present: {}, Absent: {}, Attendance: {}%, Homework: {}%",
-                            s.getId(), totalStudents, presentCount, absentCount,
-                            String.format("%.1f", attendanceRate), String.format("%.1f", homeworkCompletionRate));
-
                     // Build QASessionItemDTO với tất cả thông tin đã thu thập
                     // Chuyển đổi từ long sang int cho các trường count (vì DTO dùng Integer)
                     return QASessionListResponse.QASessionItemDTO.builder()
@@ -235,15 +222,16 @@ public class TeacherClassService {
                             .date(s.getDate())
                             .dayOfWeek(dayOfWeek)
                             .timeSlot(timeSlot)
+                            .startTime(startTime)
+                            .endTime(endTime)
                             .topic(topic)
                             .status(s.getStatus() != null ? s.getStatus().name() : null)
                             .teacherName(teacherName)
                             .totalStudents((int) totalStudents)
                             .presentCount((int) presentCount)
                             .absentCount((int) absentCount)
-                            .attendanceRate(attendanceRate)
                             .homeworkCompletedCount((int) homeworkCompletedCount)
-                            .homeworkCompletionRate(homeworkCompletionRate)
+                            .hasHomework(hasHomework)
                             .hasQAReport(qaReportCount > 0)
                             .qaReportCount((int) qaReportCount)
                             .build();

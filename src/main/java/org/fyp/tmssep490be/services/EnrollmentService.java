@@ -39,6 +39,7 @@ public class EnrollmentService {
     private final LevelRepository levelRepository;
     private final NotificationService notificationService;
     private final EmailService emailService;
+    private final StudentService studentService;
 
     public ClassEnrollmentImportPreview previewClassEnrollmentImport(
             Long classId,
@@ -59,7 +60,7 @@ public class EnrollmentService {
         log.info("Parsed {} students from Excel", parsedData.size());
 
         // 3. Resolve từng student (FOUND/CREATE/ERROR)
-        resolveStudents(parsedData);
+        resolveStudents(parsedData, classEntity);
 
         // 4. Calculate capacity
         int currentEnrolled = enrollmentRepository.countByClassIdAndStatus(
@@ -143,7 +144,7 @@ public class EnrollmentService {
         return classEntity;
     }
 
-    private void resolveStudents(List<StudentEnrollmentData> parsedData) {
+    private void resolveStudents(List<StudentEnrollmentData> parsedData, ClassEntity classEntity) {
         Set<String> seenEmails = new HashSet<>();
 
         for (StudentEnrollmentData data : parsedData) {
@@ -179,7 +180,20 @@ public class EnrollmentService {
                 if (student.isPresent()) {
                     data.setStatus(StudentResolutionStatus.FOUND);
                     data.setResolvedStudentId(student.get().getId());
-                    log.debug("Found student by email: {} -> ID: {}", data.getEmail(), student.get().getId());
+                    
+                    // Check if student is in the class's branch
+                    boolean inBranch = userBranchesRepository.existsByUserAccountIdAndBranchId(
+                            userByEmail.get().getId(), 
+                            classEntity.getBranch().getId()
+                    );
+                    
+                    data.setNeedsBranchSync(!inBranch);
+                    if (!inBranch) {
+                        data.setNote("Học viên từ chi nhánh khác, sẽ được tự động thêm vào chi nhánh này");
+                    }
+                    
+                    log.debug("Found student by email: {} -> ID: {}, needsSync: {}", 
+                            data.getEmail(), student.get().getId(), !inBranch);
                     continue;
                 }
             }
@@ -593,6 +607,7 @@ public class EnrollmentService {
         // 4. Create new students nếu cần
         List<Long> allStudentIds = new ArrayList<>();
         int studentsCreated = 0;
+        int studentsSynced = 0;
 
         for (StudentEnrollmentData data : studentsToEnroll) {
             if (data.getStatus() == StudentResolutionStatus.CREATE) {
@@ -601,11 +616,26 @@ public class EnrollmentService {
                 studentsCreated++;
                 log.info("Created new student: {} ({})", newStudent.getId(), data.getEmail());
             } else if (data.getStatus() == StudentResolutionStatus.FOUND) {
+                // Auto-sync to branch if needed
+                if (data.isNeedsBranchSync()) {
+                    Optional<Student> studentOpt = studentRepository.findById(data.getResolvedStudentId());
+                    if (studentOpt.isPresent()) {
+                        studentService.addStudentToBranch(
+                                studentOpt.get().getUserAccount().getId(),
+                                classEntity.getBranch().getId(),
+                                enrolledBy
+                        );
+                        studentsSynced++;
+                        log.info("Auto-synced existing student {} to branch {}",
+                                data.getResolvedStudentId(), classEntity.getBranch().getId());
+                    }
+                }
                 allStudentIds.add(data.getResolvedStudentId());
             }
         }
 
-        log.info("Created {} new students, total {} students to enroll", studentsCreated, allStudentIds.size());
+        log.info("Created {} new students, synced {} students to branch, total {} students to enroll",
+                studentsCreated, studentsSynced, allStudentIds.size());
 
         // 5. Determine if this is capacity override
         boolean isOverride = request.getStrategy() == EnrollmentStrategy.OVERRIDE;

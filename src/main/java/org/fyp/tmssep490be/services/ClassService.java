@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -211,16 +212,15 @@ public class ClassService {
 
     private List<TeacherSummaryDTO> getTeachersForClass(Long classId) {
         List<TeachingSlot> teachingSlots = teachingSlotRepository
-                .findByClassEntityIdAndStatus(classId, TeachingSlotStatus.SCHEDULED);
+                .findByClassEntityId(classId);
 
-        // Group by teacher and count sessions
         Map<Teacher, Long> teacherSessionCounts = teachingSlots.stream()
                 .filter(slot -> slot.getTeacher() != null)
+                .filter(slot -> slot.getStatus() != TeachingSlotStatus.SUBSTITUTED)
                 .collect(Collectors.groupingBy(
                         TeachingSlot::getTeacher,
                         Collectors.counting()));
 
-        // Convert to DTOs sorted by session count (descending)
         return teacherSessionCounts.entrySet().stream()
                 .map(entry -> {
                     Teacher teacher = entry.getKey();
@@ -724,21 +724,14 @@ public class ClassService {
                             .count();
 
                     long totalStudents = studentSessions.size();
-                    double attendanceRate = totalStudents > 0 ? (presentCount * 100.0 / totalStudents) : 0.0;
 
-                    // Calculate homework completion metrics (exclude NO_HOMEWORK)
                     long homeworkCompletedCount = studentSessions.stream()
                             .filter(ss -> ss.getHomeworkStatus() == HomeworkStatus.COMPLETED)
                             .count();
 
-                    long homeworkTotalCount = studentSessions.stream()
-                            .filter(ss -> ss.getHomeworkStatus() != null
-                                    && ss.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK)
-                            .count();
-
-                    double homeworkCompletionRate = homeworkTotalCount > 0
-                            ? (homeworkCompletedCount * 100.0 / homeworkTotalCount)
-                            : 0.0;
+                    boolean hasHomework = studentSessions.stream()
+                            .anyMatch(ss -> ss.getHomeworkStatus() != null
+                                    && ss.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK);
 
                     // Get QA report count
                     int qaReportCount = s.getQaReports() != null ? s.getQaReports().size() : 0;
@@ -746,6 +739,8 @@ public class ClassService {
                     // Get session info from related entities
                     Integer sequenceNumber = s.getSubjectSession() != null ? s.getSubjectSession().getSequenceNo() : null;
                     String timeSlot = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getName() : "TBA";
+                    LocalTime startTime = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getStartTime() : null;
+                    LocalTime endTime = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getEndTime() : null;
                     String topic = s.getSubjectSession() != null ? s.getSubjectSession().getTopic() : "N/A";
 
                     // Get teacher from teaching slots
@@ -765,15 +760,16 @@ public class ClassService {
                             .date(s.getDate())
                             .dayOfWeek(s.getDate() != null ? s.getDate().getDayOfWeek().name() : null)
                             .timeSlot(timeSlot)
+                            .startTime(startTime)
+                            .endTime(endTime)
                             .topic(topic)
                             .status(s.getStatus() != null ? s.getStatus().name() : null)
                             .teacherName(teacherName)
                             .totalStudents((int) totalStudents)
                             .presentCount((int) presentCount)
                             .absentCount((int) absentCount)
-                            .attendanceRate(attendanceRate)
                             .homeworkCompletedCount((int) homeworkCompletedCount)
-                            .homeworkCompletionRate(homeworkCompletionRate)
+                            .hasHomework(hasHomework)
                             .hasQAReport(qaReportCount > 0)
                             .qaReportCount(qaReportCount)
                             .build();

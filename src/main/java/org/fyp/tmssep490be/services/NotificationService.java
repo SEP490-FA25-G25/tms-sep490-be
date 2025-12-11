@@ -217,4 +217,15 @@ public class NotificationService {
 
         notificationRepository.saveAll(notifications);
     }
+
+    public void createFeedbackReminderNotification(Long studentId, String phaseName, String subjectName, String className) {
+        String title = "Nhắc nhở: Đánh giá sau phase " + phaseName;
+        String message = String.format(
+            "Vui lòng hoàn thành phản hồi cho môn %s - lớp %s. Phản hồi giúp cải thiện chất lượng đào tạo.",
+            subjectName,
+            className
+        );
+        
+        createNotification(studentId, NotificationType.FEEDBACK_REMINDER, title, message);
+    }
 }

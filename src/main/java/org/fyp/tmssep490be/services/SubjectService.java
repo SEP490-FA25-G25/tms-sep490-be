@@ -11,6 +11,7 @@ import org.fyp.tmssep490be.repositories.*;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ public class SubjectService {
     private final SubjectAssessmentCLOMappingRepository subjectAssessmentCLOMappingRepository;
     private final SubjectMaterialRepository subjectMaterialRepository;
     private final UserAccountRepository userAccountRepository;
+    private final NotificationService notificationService;
     private final EntityManager entityManager;
 
     // ========== GET ALL SUBJECTS ==========
@@ -169,6 +171,23 @@ public class SubjectService {
 
         Subject subject = subjectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        // Status validation: Block editing if ACTIVE
+        if (subject.getStatus() == SubjectStatus.ACTIVE) {
+            throw new IllegalStateException(
+                    "Không thể chỉnh sửa môn học đang ở trạng thái HOẠT ĐỘNG. Hãy tạo phiên bản mới.");
+        }
+
+        // If PENDING_ACTIVATION, reset to DRAFT and clear approval (requires
+        // re-approval)
+        if (subject.getStatus() == SubjectStatus.PENDING_ACTIVATION) {
+            log.info("Subject {} is PENDING_ACTIVATION, resetting to DRAFT for re-approval", id);
+            subject.setStatus(SubjectStatus.DRAFT);
+            subject.setApprovalStatus(null);
+            subject.setSubmittedAt(null);
+            subject.setDecidedAt(null);
+            subject.setDecidedByManager(null);
+        }
 
         // Update Basic Info
         SubjectBasicInfoDTO basicInfo = request.getBasicInfo();
@@ -327,9 +346,9 @@ public class SubjectService {
                     SubjectMaterial material = SubjectMaterial.builder()
                             .subject(subject)
                             .phase(phase)
-                            .title(materialDTO.getTitle())
-                            .materialType(materialDTO.getMaterialType() != null
-                                    ? MaterialType.valueOf(materialDTO.getMaterialType())
+                            .title(materialDTO.getName())
+                            .materialType(materialDTO.getType() != null
+                                    ? MaterialType.valueOf(materialDTO.getType())
                                     : MaterialType.OTHER)
                             .url(materialDTO.getUrl() != null ? materialDTO.getUrl() : "")
                             .build();
@@ -373,9 +392,9 @@ public class SubjectService {
                             SubjectMaterial material = SubjectMaterial.builder()
                                     .subject(subject)
                                     .subjectSession(session)
-                                    .title(materialDTO.getTitle())
-                                    .materialType(materialDTO.getMaterialType() != null
-                                            ? MaterialType.valueOf(materialDTO.getMaterialType())
+                                    .title(materialDTO.getName())
+                                    .materialType(materialDTO.getType() != null
+                                            ? MaterialType.valueOf(materialDTO.getType())
                                             : MaterialType.OTHER)
                                     .url(materialDTO.getUrl() != null ? materialDTO.getUrl() : "")
                                     .build();
@@ -435,9 +454,9 @@ public class SubjectService {
         for (SubjectMaterialDTO dto : materialDTOs) {
             SubjectMaterial material = SubjectMaterial.builder()
                     .subject(subject)
-                    .title(dto.getTitle())
-                    .materialType(dto.getMaterialType() != null
-                            ? MaterialType.valueOf(dto.getMaterialType())
+                    .title(dto.getName()) // Frontend sends 'name', entity uses 'title'
+                    .materialType(dto.getType() != null
+                            ? MaterialType.valueOf(dto.getType())
                             : MaterialType.OTHER)
                     .url(dto.getUrl() != null ? dto.getUrl() : "")
                     .build();
@@ -498,8 +517,8 @@ public class SubjectService {
                                         .findBySubjectSessionId(session.getId()).stream()
                                         .map(material -> SubjectMaterialDTO.builder()
                                                 .id(material.getId())
-                                                .title(material.getTitle())
-                                                .materialType(material.getMaterialType() != null
+                                                .name(material.getTitle())
+                                                .type(material.getMaterialType() != null
                                                         ? material.getMaterialType().name()
                                                         : null)
                                                 .url(material.getUrl())
@@ -526,8 +545,8 @@ public class SubjectService {
                             .findByPhaseIdAndSubjectSessionIsNull(phase.getId()).stream()
                             .map(material -> SubjectMaterialDTO.builder()
                                     .id(material.getId())
-                                    .title(material.getTitle())
-                                    .materialType(material.getMaterialType() != null
+                                    .name(material.getTitle())
+                                    .type(material.getMaterialType() != null
                                             ? material.getMaterialType().name()
                                             : null)
                                     .url(material.getUrl())
@@ -579,11 +598,11 @@ public class SubjectService {
         List<SubjectMaterialDTO> materials = subject.getSubjectMaterials().stream()
                 .map(material -> SubjectMaterialDTO.builder()
                         .id(material.getId())
-                        .title(material.getTitle())
-                        .materialType(material.getMaterialType() != null ? material.getMaterialType().name() : null)
+                        .name(material.getTitle())
+                        .type(material.getMaterialType() != null ? material.getMaterialType().name() : null)
                         .url(material.getUrl())
                         .scope(material.getPhase() != null ? "PHASE"
-                                : (material.getSubjectSession() != null ? "SESSION" : "SUBJECT"))
+                                : (material.getSubjectSession() != null ? "SESSION" : "COURSE"))
                         .phaseId(material.getPhase() != null ? material.getPhase().getId() : null)
                         .sessionId(material.getSubjectSession() != null ? material.getSubjectSession().getId() : null)
                         .build())
@@ -722,8 +741,8 @@ public class SubjectService {
 
         return SubjectMaterialDTO.builder()
                 .id(material.getId())
-                .title(material.getTitle())
-                .materialType(material.getMaterialType() != null ? material.getMaterialType().name() : null)
+                .name(material.getTitle())
+                .type(material.getMaterialType() != null ? material.getMaterialType().name() : null)
                 .url(material.getUrl())
                 .scope(scope)
                 .phaseId(phaseId)
@@ -746,5 +765,471 @@ public class SubjectService {
                 })
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    // ========== APPROVAL WORKFLOW ==========
+
+    /**
+     * Submit a subject for approval
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void submitSubject(Long id) {
+        log.info("Submitting subject for approval: {}", id);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        log.info("Current subject status: {}, approvalStatus: {}", subject.getStatus(), subject.getApprovalStatus());
+
+        // Only allow submission if status is DRAFT or REJECTED
+        if (subject.getStatus() != SubjectStatus.DRAFT && subject.getStatus() != SubjectStatus.REJECTED) {
+            throw new IllegalStateException("Chỉ có thể gửi môn học ở trạng thái NHÁP hoặc BỊ TỪ CHỐI");
+        }
+
+        // Set updatedAt only when re-submitting after rejection
+        if (subject.getApprovalStatus() == ApprovalStatus.REJECTED) {
+            subject.setUpdatedAt(OffsetDateTime.now());
+            log.info("Subject {} is being re-submitted after rejection", id);
+        }
+
+        subject.setStatus(SubjectStatus.SUBMITTED);
+        subject.setApprovalStatus(ApprovalStatus.PENDING);
+        subject.setSubmittedAt(OffsetDateTime.now());
+
+        log.info("About to save subject with status: {}", subject.getStatus());
+        subjectRepository.save(subject);
+        log.info("Subject saved successfully");
+
+        // Send notification to Managers - temporarily disabled for debugging
+        // TODO: Re-enable once issue is fixed
+        try {
+            sendNotificationToManagers(subject);
+        } catch (Exception e) {
+            log.error("Notification failed but continuing: {}", e.getMessage());
+            // Don't rethrow - let the submit succeed even if notification fails
+        }
+
+        log.info("Subject {} submitted successfully", id);
+    }
+
+    /**
+     * Approve a subject
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void approveSubject(Long id, Long managerId) {
+        log.info("Approving subject with ID: {} by manager: {}", id, managerId);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        if (subject.getStatus() != SubjectStatus.SUBMITTED) {
+            throw new IllegalStateException("Chỉ có thể phê duyệt môn học ở trạng thái ĐÃ GỬI");
+        }
+
+        // Set approval status
+        subject.setStatus(SubjectStatus.PENDING_ACTIVATION);
+        subject.setApprovalStatus(ApprovalStatus.APPROVED);
+        subject.setDecidedAt(OffsetDateTime.now());
+
+        // Set decided by manager
+        if (managerId != null) {
+            UserAccount manager = userAccountRepository.findById(managerId).orElse(null);
+            subject.setDecidedByManager(manager);
+        }
+
+        subjectRepository.save(subject);
+
+        // Send notification to Subject Leader (creator)
+        sendApprovalNotificationToCreator(subject, true, null);
+
+        log.info("Subject {} approved successfully. Will be activated on effective date: {}",
+                id, subject.getEffectiveDate());
+    }
+
+    /**
+     * Reject a subject
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void rejectSubject(Long id, Long managerId, String reason) {
+        log.info("Rejecting subject with ID: {}", id);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        if (subject.getStatus() != SubjectStatus.SUBMITTED) {
+            throw new IllegalStateException("Chỉ có thể từ chối môn học ở trạng thái ĐÃ GỬI");
+        }
+
+        subject.setStatus(SubjectStatus.DRAFT);
+        subject.setApprovalStatus(ApprovalStatus.REJECTED);
+        subject.setRejectionReason(reason);
+        subject.setDecidedAt(OffsetDateTime.now());
+
+        // Set decided by manager
+        if (managerId != null) {
+            UserAccount manager = userAccountRepository.findById(managerId).orElse(null);
+            subject.setDecidedByManager(manager);
+        }
+
+        subjectRepository.save(subject);
+
+        // Send notification to Subject Leader (creator) with rejection reason
+        sendApprovalNotificationToCreator(subject, false, reason);
+
+        log.info("Subject {} rejected. Reason: {}", id, reason);
+    }
+
+    /**
+     * Send notification to all Managers when a subject is submitted for approval
+     */
+    private void sendNotificationToManagers(Subject subject) {
+        try {
+            List<UserAccount> managers = userAccountRepository.findUsersByRole("MANAGER");
+
+            if (!managers.isEmpty()) {
+                String title = "Môn học mới cần phê duyệt";
+                String message = String.format(
+                        "Môn học '%s' (%s) cần được phê duyệt.",
+                        subject.getName(),
+                        subject.getCode());
+
+                List<Long> managerIds = managers.stream()
+                        .map(UserAccount::getId)
+                        .collect(Collectors.toList());
+
+                notificationService.sendBulkNotifications(
+                        managerIds,
+                        NotificationType.REQUEST,
+                        title,
+                        message);
+
+                log.info("Sent notification to {} managers about subject {} submission",
+                        managers.size(), subject.getId());
+            } else {
+                log.warn("No managers found to notify about subject {} submission", subject.getId());
+            }
+        } catch (Exception e) {
+            log.error("Error sending notification to managers for subject {}: {}",
+                    subject.getId(), e.getMessage(), e);
+            // Don't throw exception - notification failure shouldn't block submission
+        }
+    }
+
+    /**
+     * Send notification to Subject Leader (creator) when subject is approved or
+     * rejected
+     */
+    private void sendApprovalNotificationToCreator(Subject subject, boolean isApproved, String rejectionReason) {
+        try {
+            UserAccount creator = subject.getCreatedBy();
+            if (creator == null) {
+                log.warn("No creator found for subject {} - cannot send approval notification", subject.getId());
+                return;
+            }
+
+            String title;
+            String message;
+            NotificationType notificationType;
+
+            if (isApproved) {
+                title = "Môn học đã được phê duyệt";
+                message = String.format("Môn học '%s' (%s) của bạn đã được phê duyệt.",
+                        subject.getName(), subject.getCode());
+                notificationType = NotificationType.NOTIFICATION;
+            } else {
+                title = "Môn học bị từ chối";
+                message = String.format("Môn học '%s' (%s) của bạn bị từ chối. Lý do: %s",
+                        subject.getName(), subject.getCode(),
+                        rejectionReason != null ? rejectionReason : "Không có lý do cụ thể");
+                notificationType = NotificationType.NOTIFICATION;
+            }
+
+            notificationService.createNotification(
+                    creator.getId(),
+                    notificationType,
+                    title,
+                    message);
+
+            log.info("Sent {} notification to creator (user {}) for subject {}",
+                    isApproved ? "approval" : "rejection", creator.getId(), subject.getId());
+        } catch (Exception e) {
+            log.error("Error sending approval notification for subject {}: {}",
+                    subject.getId(), e.getMessage(), e);
+            // Don't throw exception - notification failure shouldn't block
+            // approval/rejection
+        }
+    }
+
+    // ========== DELETE SUBJECT ==========
+    @Transactional
+    public void deleteSubject(Long id) {
+        log.info("Deleting subject with ID: {}", id);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
+
+        // Validation: Only allow delete if status is DRAFT and never submitted
+        if (subject.getStatus() != SubjectStatus.DRAFT || subject.getApprovalStatus() != null) {
+            throw new IllegalStateException(
+                    "Không thể xóa môn học. Môn học phải ở trạng thái NHÁP và chưa được gửi phê duyệt.");
+        }
+
+        subjectRepository.delete(subject);
+        log.info("Subject deleted successfully: {}", id);
+    }
+
+    // ========== DEACTIVATE SUBJECT ==========
+    @Transactional
+    public void deactivateSubject(Long id) {
+        log.info("Deactivating subject with ID: {}", id);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
+
+        if (subject.getStatus() != SubjectStatus.ACTIVE && subject.getStatus() != SubjectStatus.PENDING_ACTIVATION) {
+            throw new IllegalStateException(
+                    "Chỉ có thể vô hiệu hóa môn học đang ở trạng thái HOẠT ĐỘNG hoặc CHỜ KÍCH HOẠT");
+        }
+
+        subject.setStatus(SubjectStatus.INACTIVE);
+        subjectRepository.save(subject);
+        log.info("Subject {} deactivated successfully", id);
+    }
+
+    // ========== REACTIVATE SUBJECT ==========
+    @Transactional
+    public void reactivateSubject(Long id) {
+        log.info("Reactivating subject with ID: {}", id);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
+
+        if (subject.getStatus() != SubjectStatus.INACTIVE) {
+            throw new IllegalStateException("Chỉ có thể kích hoạt lại môn học đang ở trạng thái KHÔNG HOẠT ĐỘNG");
+        }
+
+        // Check if subject has enough data to be active
+        boolean hasCLOs = subject.getClos() != null && !subject.getClos().isEmpty();
+        boolean hasPhases = subject.getSubjectPhases() != null && !subject.getSubjectPhases().isEmpty();
+
+        if (hasCLOs && hasPhases) {
+            subject.setStatus(SubjectStatus.ACTIVE);
+        } else {
+            subject.setStatus(SubjectStatus.DRAFT);
+            log.info("Subject {} reactivated as DRAFT because it lacks CLOs or Phases", id);
+        }
+        subjectRepository.save(subject);
+        log.info("Subject {} reactivated with status: {}", id, subject.getStatus());
+    }
+
+    // ========== CLONE SUBJECT ==========
+    @Transactional
+    public SubjectDTO cloneSubject(Long id, Long userId) {
+        log.info("Cloning subject with ID: {} by user: {}", id, userId);
+
+        Subject originalSubject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
+
+        // Get curriculum and level codes
+        String curriculumCode = originalSubject.getCurriculum() != null ? originalSubject.getCurriculum().getCode()
+                : "UNKNOWN";
+        String levelCode = originalSubject.getLevel() != null ? originalSubject.getLevel().getCode() : "UNKNOWN";
+        int year = originalSubject.getEffectiveDate() != null
+                ? originalSubject.getEffectiveDate().getYear()
+                : java.time.LocalDate.now().getYear();
+
+        // Calculate new version
+        Integer nextVersion = getNextVersionNumber(curriculumCode, levelCode, year);
+        String logicalCode = String.format("%s-%s-%d", curriculumCode, levelCode, year);
+        String newCode = String.format("%s-V%d", logicalCode, nextVersion);
+
+        // Ensure code uniqueness
+        while (subjectRepository.existsByCode(newCode)) {
+            nextVersion++;
+            newCode = String.format("%s-V%d", logicalCode, nextVersion);
+        }
+
+        // Get creator
+        UserAccount creator = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+
+        // Create new subject
+        Subject newSubject = new Subject();
+        newSubject.setCurriculum(originalSubject.getCurriculum());
+        newSubject.setLevel(originalSubject.getLevel());
+        newSubject.setLogicalSubjectCode(logicalCode);
+        newSubject.setVersion(nextVersion);
+        newSubject.setCode(newCode);
+        newSubject.setName(originalSubject.getName() + " (V" + nextVersion + ")");
+        newSubject.setDescription(originalSubject.getDescription());
+        newSubject.setScoreScale(originalSubject.getScoreScale());
+        newSubject.setTotalHours(originalSubject.getTotalHours());
+        newSubject.setNumberOfSessions(originalSubject.getNumberOfSessions());
+        newSubject.setHoursPerSession(originalSubject.getHoursPerSession());
+        newSubject.setPrerequisites(originalSubject.getPrerequisites());
+        newSubject.setTargetAudience(originalSubject.getTargetAudience());
+        newSubject.setTeachingMethods(originalSubject.getTeachingMethods());
+        newSubject.setEffectiveDate(originalSubject.getEffectiveDate());
+        newSubject.setThumbnailUrl(originalSubject.getThumbnailUrl());
+        newSubject.setStatus(SubjectStatus.DRAFT);
+        newSubject.setApprovalStatus(null);
+        newSubject.setCreatedBy(creator);
+        newSubject.setCreatedAt(OffsetDateTime.now());
+        newSubject.setUpdatedAt(OffsetDateTime.now());
+
+        // Save new subject first
+        newSubject = subjectRepository.save(newSubject);
+        final Subject savedNewSubject = newSubject;
+
+        // Clone CLOs and track mapping
+        java.util.Map<Long, CLO> oldToNewCloMap = new java.util.HashMap<>();
+        if (originalSubject.getClos() != null) {
+            for (CLO oldClo : originalSubject.getClos()) {
+                CLO newClo = new CLO();
+                newClo.setSubject(savedNewSubject);
+                newClo.setCode(oldClo.getCode());
+                newClo.setDescription(oldClo.getDescription());
+                newClo = subjectCLORepository.save(newClo);
+                oldToNewCloMap.put(oldClo.getId(), newClo);
+
+                // Clone PLO-CLO mappings
+                List<PLOCLOMapping> oldMappings = ploCloMappingRepository.findByCloId(oldClo.getId());
+                for (PLOCLOMapping oldMapping : oldMappings) {
+                    PLOCLOMapping newMapping = new PLOCLOMapping();
+                    newMapping.setClo(newClo);
+                    newMapping.setPlo(oldMapping.getPlo());
+                    ploCloMappingRepository.save(newMapping);
+                }
+            }
+        }
+
+        // Clone Phases and Sessions
+        if (originalSubject.getSubjectPhases() != null) {
+            for (SubjectPhase oldPhase : originalSubject.getSubjectPhases()) {
+                SubjectPhase newPhase = new SubjectPhase();
+                newPhase.setSubject(savedNewSubject);
+                newPhase.setName(oldPhase.getName());
+                newPhase.setDescription(oldPhase.getDescription());
+                newPhase.setPhaseNumber(oldPhase.getPhaseNumber());
+                newPhase = subjectPhaseRepository.save(newPhase);
+                final SubjectPhase savedNewPhase = newPhase;
+
+                // Clone Sessions
+                if (oldPhase.getSubjectSessions() != null) {
+                    for (SubjectSession oldSession : oldPhase.getSubjectSessions()) {
+                        SubjectSession newSession = new SubjectSession();
+                        newSession.setPhase(savedNewPhase);
+                        newSession.setTopic(oldSession.getTopic());
+                        newSession.setStudentTask(oldSession.getStudentTask());
+                        newSession.setSkills(oldSession.getSkills() != null
+                                ? new ArrayList<>(oldSession.getSkills())
+                                : new ArrayList<>());
+                        newSession.setSequenceNo(oldSession.getSequenceNo());
+                        newSession = subjectSessionRepository.save(newSession);
+                        final SubjectSession savedNewSession = newSession;
+
+                        // Clone Session-CLO mappings
+                        List<SubjectSessionCLOMapping> oldSessionMappings = subjectSessionCLOMappingRepository
+                                .findBySubjectSessionId(oldSession.getId());
+                        for (SubjectSessionCLOMapping oldMapping : oldSessionMappings) {
+                            CLO newClo = oldToNewCloMap.get(oldMapping.getClo().getId());
+                            if (newClo != null) {
+                                SubjectSessionCLOMapping newMapping = new SubjectSessionCLOMapping();
+                                newMapping.setSubjectSession(savedNewSession);
+                                newMapping.setClo(newClo);
+                                subjectSessionCLOMappingRepository.save(newMapping);
+                            }
+                        }
+
+                        // Clone Session Materials
+                        List<SubjectMaterial> oldSessionMaterials = subjectMaterialRepository
+                                .findBySubjectSessionId(oldSession.getId());
+                        for (SubjectMaterial oldMaterial : oldSessionMaterials) {
+                            SubjectMaterial newMaterial = new SubjectMaterial();
+                            newMaterial.setSubject(savedNewSubject);
+                            newMaterial.setPhase(savedNewPhase);
+                            newMaterial.setSubjectSession(savedNewSession);
+                            newMaterial.setTitle(oldMaterial.getTitle());
+                            newMaterial.setMaterialType(oldMaterial.getMaterialType());
+                            newMaterial.setUrl(oldMaterial.getUrl());
+                            subjectMaterialRepository.save(newMaterial);
+                        }
+                    }
+                }
+
+                // Clone Phase Materials
+                List<SubjectMaterial> oldPhaseMaterials = subjectMaterialRepository
+                        .findByPhaseIdAndSubjectSessionIsNull(oldPhase.getId());
+                for (SubjectMaterial oldMaterial : oldPhaseMaterials) {
+                    SubjectMaterial newMaterial = new SubjectMaterial();
+                    newMaterial.setSubject(savedNewSubject);
+                    newMaterial.setPhase(savedNewPhase);
+                    newMaterial.setSubjectSession(null);
+                    newMaterial.setTitle(oldMaterial.getTitle());
+                    newMaterial.setMaterialType(oldMaterial.getMaterialType());
+                    newMaterial.setUrl(oldMaterial.getUrl());
+                    subjectMaterialRepository.save(newMaterial);
+                }
+            }
+        }
+
+        // Clone Subject-level Materials
+        List<SubjectMaterial> oldSubjectMaterials = subjectMaterialRepository
+                .findBySubjectIdAndPhaseIsNullAndSubjectSessionIsNull(originalSubject.getId());
+        for (SubjectMaterial oldMaterial : oldSubjectMaterials) {
+            SubjectMaterial newMaterial = new SubjectMaterial();
+            newMaterial.setSubject(savedNewSubject);
+            newMaterial.setPhase(null);
+            newMaterial.setSubjectSession(null);
+            newMaterial.setTitle(oldMaterial.getTitle());
+            newMaterial.setMaterialType(oldMaterial.getMaterialType());
+            newMaterial.setUrl(oldMaterial.getUrl());
+            subjectMaterialRepository.save(newMaterial);
+        }
+
+        // Clone Assessments
+        if (originalSubject.getSubjectAssessments() != null) {
+            for (SubjectAssessment oldAssessment : originalSubject.getSubjectAssessments()) {
+                SubjectAssessment newAssessment = new SubjectAssessment();
+                newAssessment.setSubject(savedNewSubject);
+                newAssessment.setName(oldAssessment.getName());
+                newAssessment.setKind(oldAssessment.getKind());
+                newAssessment.setMaxScore(oldAssessment.getMaxScore());
+                newAssessment.setDurationMinutes(oldAssessment.getDurationMinutes());
+                newAssessment.setDescription(oldAssessment.getDescription());
+                newAssessment.setNote(oldAssessment.getNote());
+                newAssessment.setSkills(
+                        oldAssessment.getSkills() != null ? new java.util.ArrayList<>(oldAssessment.getSkills())
+                                : new java.util.ArrayList<>());
+                newAssessment = subjectAssessmentRepository.save(newAssessment);
+                final SubjectAssessment savedNewAssessment = newAssessment;
+
+                // Clone Assessment-CLO mappings
+                List<SubjectAssessmentCLOMapping> oldAssessmentMappings = subjectAssessmentCLOMappingRepository
+                        .findBySubjectAssessmentId(oldAssessment.getId());
+                for (SubjectAssessmentCLOMapping oldMapping : oldAssessmentMappings) {
+                    CLO newClo = oldToNewCloMap.get(oldMapping.getClo().getId());
+                    if (newClo != null) {
+                        SubjectAssessmentCLOMapping.SubjectAssessmentCLOMappingId newId = new SubjectAssessmentCLOMapping.SubjectAssessmentCLOMappingId(
+                                savedNewAssessment.getId(), newClo.getId());
+                        SubjectAssessmentCLOMapping newMapping = SubjectAssessmentCLOMapping.builder()
+                                .id(newId)
+                                .subjectAssessment(savedNewAssessment)
+                                .clo(newClo)
+                                .status(oldMapping.getStatus())
+                                .build();
+                        subjectAssessmentCLOMappingRepository.save(newMapping);
+                    }
+                }
+            }
+        }
+
+        log.info("Subject {} cloned successfully as {} with ID: {}", id, newCode, savedNewSubject.getId());
+
+        // Return simple DTO
+        return SubjectDTO.builder()
+                .id(savedNewSubject.getId())
+                .code(savedNewSubject.getCode())
+                .name(savedNewSubject.getName())
+                .subjectName(savedNewSubject.getName())
+                .levelName(savedNewSubject.getLevel() != null ? savedNewSubject.getLevel().getName() : null)
+                .status(savedNewSubject.getStatus().name())
+                .effectiveDate(savedNewSubject.getEffectiveDate())
+                .createdAt(savedNewSubject.getCreatedAt())
+                .build();
     }
 }
