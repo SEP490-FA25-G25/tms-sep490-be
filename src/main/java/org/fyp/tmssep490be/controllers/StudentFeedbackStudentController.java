@@ -31,15 +31,16 @@ public class StudentFeedbackStudentController {
     public ResponseEntity<ResponseObject<List<StudentFeedbackListItemDTO>>> getAllFeedbacks(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long classId,
+            @RequestParam(required = false) Long phaseId,
             @RequestParam(required = false) String search,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
         Long studentId = studentContextHelper.getStudentId(currentUser);
-        log.info("Student {} lấy danh sách feedback, status={}, classId={}, search={}",
-                studentId, status, classId, search);
+        log.info("Student {} lấy danh sách feedback, status={}, classId={}, phaseId={}, search={}",
+                studentId, status, classId, phaseId, search);
 
         List<StudentFeedbackListItemDTO> data = studentFeedbackService.getStudentFeedbacks(
-                studentId, status, classId, search);
+                studentId, status, classId, phaseId, search);
 
         return ResponseEntity.ok(ResponseObject.<List<StudentFeedbackListItemDTO>>builder()
                 .success(true)

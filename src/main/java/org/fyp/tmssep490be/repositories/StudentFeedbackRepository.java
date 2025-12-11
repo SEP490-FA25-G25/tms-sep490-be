@@ -95,6 +95,7 @@ public interface StudentFeedbackRepository extends JpaRepository<StudentFeedback
         WHERE sf.student.id = :studentId
           AND (:isFeedback IS NULL OR sf.isFeedback = :isFeedback)
           AND (:classId IS NULL OR c.id = :classId)
+          AND (:phaseId IS NULL OR sf.phase.id = :phaseId)
           AND (:search IS NULL OR :search = '' OR
                LOWER(c.code) LIKE LOWER(CONCAT('%', :search, '%')) OR
                LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR
@@ -105,6 +106,7 @@ public interface StudentFeedbackRepository extends JpaRepository<StudentFeedback
         @Param("studentId") Long studentId,
         @Param("isFeedback") Boolean isFeedback,
         @Param("classId") Long classId,
+        @Param("phaseId") Long phaseId,
         @Param("search") String search
     );
 

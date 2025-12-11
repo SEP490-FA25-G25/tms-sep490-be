@@ -499,7 +499,7 @@ public class StudentService {
                 .branchName(classEntity.getBranch().getName())
                 .startDate(classEntity.getStartDate())
                 .plannedEndDate(classEntity.getPlannedEndDate())
-                .status(classEntity.getStatus() != null ? classEntity.getStatus().name() : null)
+                .status(enrollment.getStatus() != null ? enrollment.getStatus().name() : null)
                 .attendanceRate(null)
                 .averageScore(null)
                 .build();

@@ -52,8 +52,8 @@ public class StudentFeedbackService {
     }
 
     @Transactional(readOnly = true)
-    public List<StudentFeedbackListItemDTO> getStudentFeedbacks(Long studentId, String status, Long classId, String search) {
-        log.info("Getting feedbacks for student={}, status={}, classId={}, search={}", studentId, status, classId, search);
+    public List<StudentFeedbackListItemDTO> getStudentFeedbacks(Long studentId, String status, Long classId, Long phaseId, String search) {
+        log.info("Getting feedbacks for student={}, status={}, classId={}, phaseId={}, search={}", studentId, status, classId, phaseId, search);
 
         Boolean isFeedback = null;
         if ("PENDING".equalsIgnoreCase(status)) {
@@ -63,7 +63,7 @@ public class StudentFeedbackService {
         }
 
         List<StudentFeedback> feedbacks = studentFeedbackRepository.findAllByStudentIdWithFilters(
-                studentId, isFeedback, classId, search);
+                studentId, isFeedback, classId, phaseId, search);
 
         return feedbacks.stream()
                 .map(this::mapToListItemDTO)

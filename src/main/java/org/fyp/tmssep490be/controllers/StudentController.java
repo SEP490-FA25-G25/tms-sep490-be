@@ -5,10 +5,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.studentmanagement.*;
+import org.fyp.tmssep490be.dtos.studentportal.StudentClassDTO;
 import org.fyp.tmssep490be.entities.enums.Gender;
 import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentService;
+import org.fyp.tmssep490be.services.StudentPortalService;
+import org.fyp.tmssep490be.utils.StudentContextHelper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +31,8 @@ import java.util.List;
 public class StudentController {
 
     private final StudentService studentService;
+    private final StudentPortalService studentPortalService;
+    private final StudentContextHelper studentContextHelper;
     private static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 
@@ -256,6 +261,38 @@ public class StudentController {
                 .success(true)
                 .message("Cập nhật profile thành công")
                 .data(profile)
+                .build());
+    }
+
+    // Student tự lấy danh sách lớp của mình
+    @GetMapping("/me/classes")
+    @PreAuthorize("hasRole('ROLE_STUDENT')")
+    public ResponseEntity<ResponseObject<Page<StudentClassDTO>>> getMyClasses(
+            @RequestParam(required = false) List<String> enrollmentStatus,
+            @RequestParam(required = false) List<String> classStatus,
+            @RequestParam(required = false) List<Long> branchId,
+            @RequestParam(required = false) List<Long> courseId,
+            @RequestParam(required = false) List<String> modality,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "enrollmentDate") String sort,
+            @RequestParam(defaultValue = "desc") String direction,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        Long studentId = studentContextHelper.getStudentId(currentUser);
+        log.info("Student {} retrieving own classes", studentId);
+
+        Sort.Direction sortDirection = direction.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
+
+        Page<StudentClassDTO> classes = studentPortalService.getStudentClasses(
+                studentId, enrollmentStatus, classStatus, branchId, courseId, modality, pageable
+        );
+
+        return ResponseEntity.ok(ResponseObject.<Page<StudentClassDTO>>builder()
+                .success(true)
+                .message("Lấy danh sách lớp thành công")
+                .data(classes)
                 .build());
     }
 

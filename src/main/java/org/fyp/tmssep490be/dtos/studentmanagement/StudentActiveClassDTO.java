@@ -17,7 +17,7 @@ public class StudentActiveClassDTO {
     private String branchName;
     private LocalDate startDate;
     private LocalDate plannedEndDate;
-    private String status;      // class status for display (IN_PROGRESS, COMPLETED, etc.)
-    private Double attendanceRate;  // student's attendance rate in this class
-    private Double averageScore;    // student's average score in this class
+    private String status;      
+    private Double attendanceRate; 
+    private Double averageScore;    
 }
