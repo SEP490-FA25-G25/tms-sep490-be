@@ -62,4 +62,15 @@ public class ManagerBranchController {
         return ResponseEntity.ok(new ResponseObject<>(true, 
                 exists ? "Email đã tồn tại" : "Email chưa tồn tại", exists));
     }
+
+    // Cập nhật chi nhánh
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ResponseObject<ManagerBranchOverviewDTO>> updateBranch(
+            @PathVariable Long id,
+            @Valid @RequestBody org.fyp.tmssep490be.dtos.branch.UpdateBranchRequest request) {
+        log.info("API: Manager cập nhật chi nhánh ID: {}", id);
+        ManagerBranchOverviewDTO updatedBranch = managerBranchService.updateBranch(id, request);
+        return ResponseEntity.ok(new ResponseObject<>(true, "Cập nhật chi nhánh thành công", updatedBranch));
+    }
 }

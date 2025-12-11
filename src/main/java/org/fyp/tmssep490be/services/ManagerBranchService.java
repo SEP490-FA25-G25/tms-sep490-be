@@ -93,6 +93,41 @@ public class ManagerBranchService {
         return branchRepository.existsByEmail(email.trim());
     }
 
+    // Cập nhật thông tin chi nhánh
+    @Transactional
+    public ManagerBranchOverviewDTO updateBranch(Long id, org.fyp.tmssep490be.dtos.branch.UpdateBranchRequest request) {
+        log.info("Manager đang cập nhật chi nhánh ID: {}", id);
+
+        Branch branch = branchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Chi nhánh không tồn tại với ID: " + id));
+
+        // Update fields
+        branch.setCode(request.getCode());
+        branch.setName(request.getName());
+        branch.setAddress(request.getAddress());
+        branch.setCity(request.getCity());
+        branch.setDistrict(request.getDistrict());
+        branch.setPhone(request.getPhone());
+        branch.setEmail(request.getEmail());
+        branch.setOpeningDate(request.getOpeningDate());
+
+        // Update status if provided
+        if (request.getStatus() != null) {
+            try {
+                branch.setStatus(BranchStatus.valueOf(request.getStatus()));
+            } catch (IllegalArgumentException e) {
+                log.warn("Trạng thái không hợp lệ: {}", request.getStatus());
+            }
+        }
+
+        branch.setUpdatedAt(OffsetDateTime.now());
+
+        Branch savedBranch = branchRepository.save(branch);
+        log.info("Đã cập nhật chi nhánh ID: {}", savedBranch.getId());
+
+        return mapToOverviewDTO(savedBranch);
+    }
+
     // Map Branch entity sang DTO
     private ManagerBranchOverviewDTO mapToOverviewDTO(Branch branch) {
         // Get Center Head từ userBranches với role CENTER_HEAD
