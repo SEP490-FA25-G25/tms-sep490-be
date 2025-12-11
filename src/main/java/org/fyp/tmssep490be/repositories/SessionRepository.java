@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface SessionRepository extends JpaRepository<Session, Long> {
@@ -199,5 +200,22 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
           AND s.status = 'DONE'
         """)
     Integer findLastCompletedSessionNumber(@Param("classId") Long classId);
+
+    /**
+     * Find session by ID with all related details (for QA Session Detail)
+     */
+    @Query("SELECT DISTINCT s FROM Session s " +
+           "LEFT JOIN FETCH s.classEntity c " +
+           "LEFT JOIN FETCH c.subject " +
+           "LEFT JOIN FETCH c.branch " +
+           "LEFT JOIN FETCH s.subjectSession ss " +
+           "LEFT JOIN FETCH ss.subjectSessionCLOMappings cloMapping " +
+           "LEFT JOIN FETCH cloMapping.clo " +
+           "LEFT JOIN FETCH s.timeSlotTemplate tst " +
+           "LEFT JOIN FETCH s.teachingSlots ts " +
+           "LEFT JOIN FETCH ts.teacher t " +
+           "LEFT JOIN FETCH t.userAccount " +
+           "WHERE s.id = :sessionId")
+    Optional<Session> findByIdWithDetails(@Param("sessionId") Long sessionId);
 }
 
