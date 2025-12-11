@@ -13,6 +13,8 @@ public enum ErrorCode {
     // Resource errors (2200-2299)
 
     // Subject errors (1200-1219)
+    SUBJECT_NOT_FOUND(1200, "Không tìm thấy môn học"),
+    SUBJECT_NOT_APPROVED(1201, "Môn học chưa được phê duyệt"),
 
     // Level errors (1220-1239)
     LEVEL_NOT_FOUND(1221, "Không tìm thấy cấp độ"),
@@ -69,6 +71,9 @@ public enum ErrorCode {
     CLASS_NO_BRANCH_ACCESS(4004, "Người dùng không có quyền truy cập vào bất kỳ chi nhánh nào"),
 
     // Create Class Workflow errors (4010-4099)
+    INVALID_SCHEDULE_DAYS(4010, "Lịch học không hợp lệ: Có ngày trùng lặp"),
+    START_DATE_NOT_IN_SCHEDULE_DAYS(4011, "Ngày bắt đầu phải rơi vào một trong các ngày học trong tuần"),
+    CLASS_CODE_DUPLICATE(4012, "Mã lớp đã tồn tại trong chi nhánh"),
 
     // Class Code Generation errors (4032-4039)
     CLASS_CODE_GENERATION_FAILED(4032, "Tạo mã lớp thất bại"),
