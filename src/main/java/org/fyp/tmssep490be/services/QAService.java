@@ -73,7 +73,7 @@ public class QAService {
 
         return classes.map(c -> {
             long totalSessions = sessionRepository.countByClassEntityId(c.getId());
-            long completedSessions = sessionRepository.countByClassEntityIdExcludingCancelled(c.getId());
+            long completedSessions = sessionRepository.countByClassEntityIdAndStatus(c.getId(), SessionStatus.DONE);
             long qaReportCount = qaReportRepository.countByClassEntityId(c.getId());
 
             double attendanceRate = attendanceRates.getOrDefault(c.getId(), 0.0);
@@ -83,8 +83,8 @@ public class QAService {
                     .classId(c.getId())
                     .classCode(c.getCode() != null ? c.getCode() : "N/A")
                     .className(c.getName() != null ? c.getName() : "N/A")
-                    .courseId(c.getSubject() != null ? c.getSubject().getId() : null)
-                    .courseName(c.getSubject() != null ? c.getSubject().getName() : "N/A")
+                    .subjectId(c.getSubject() != null ? c.getSubject().getId() : null)
+                    .subjectName(c.getSubject() != null ? c.getSubject().getName() : "N/A")
                     .branchName(c.getBranch() != null ? c.getBranch().getName() : "N/A")
                     .modality(c.getModality() != null ? c.getModality().name() : null)
                     .status(c.getStatus() != null ? c.getStatus().name() : null)
@@ -182,7 +182,7 @@ public class QAService {
         ensureUserHasAccessToClass(classEntity, userId);
 
         long totalSessions = sessionRepository.countByClassEntityId(classId);
-        long completedSessions = sessionRepository.countByClassEntityIdExcludingCancelled(classId);
+        long completedSessions = sessionRepository.countByClassEntityIdAndStatus(classId, SessionStatus.DONE);
         List<Session> classSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
         
         long cancelledSessions = classSessions.stream()
@@ -299,8 +299,8 @@ public class QAService {
                 .classId(classEntity.getId())
                 .classCode(classEntity.getCode() != null ? classEntity.getCode() : "N/A")
                 .className(classEntity.getName() != null ? classEntity.getName() : "N/A")
-                .courseId(classEntity.getSubject() != null ? classEntity.getSubject().getId() : null)
-                .courseName(classEntity.getSubject() != null ? classEntity.getSubject().getName() : "N/A")
+                .subjectId(classEntity.getSubject() != null ? classEntity.getSubject().getId() : null)
+                .subjectName(classEntity.getSubject() != null ? classEntity.getSubject().getName() : "N/A")
                 .branchId(classEntity.getBranch() != null ? classEntity.getBranch().getId() : null)
                 .branchName(classEntity.getBranch() != null ? classEntity.getBranch().getName() : "N/A")
                 .modality(classEntity.getModality() != null ? classEntity.getModality().name() : null)
@@ -354,6 +354,10 @@ public class QAService {
 
                     double homeworkCompletionRate = homeworkTotalCount > 0 ? (homeworkCompletedCount * 100.0 / homeworkTotalCount) : 0.0;
 
+                    // Check if session has homework (at least one student has homework status != NO_HOMEWORK)
+                    boolean hasHomework = studentSessions.stream()
+                            .anyMatch(ss -> ss.getHomeworkStatus() != null && ss.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK);
+
                     long qaReportCount = qaReportRepository.countBySessionId(s.getId());
 
                     Integer sequenceNumber = s.getSubjectSession() != null ? s.getSubjectSession().getSequenceNo() : null;
@@ -382,6 +386,7 @@ public class QAService {
                             .presentCount((int) presentCount)
                             .absentCount((int) absentCount)
                             .homeworkCompletedCount((int) homeworkCompletedCount)
+                            .hasHomework(hasHomework)
                             .hasQAReport(qaReportCount > 0)
                             .qaReportCount((int) qaReportCount)
                             .build();

@@ -15,8 +15,8 @@ public class QAClassListItemDTO {
     private Long classId;
     private String classCode;
     private String className;
-    private Long courseId;
-    private String courseName;
+    private Long subjectId;
+    private String subjectName;
     private String branchName;
     private String modality;
     private String status;

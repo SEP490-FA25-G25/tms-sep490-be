@@ -18,8 +18,8 @@ public class QAClassDetailDTO {
     private Long classId;
     private String classCode;
     private String className;
-    private String courseName;
-    private Long courseId;
+    private String subjectName;
+    private Long subjectId;
     private String branchName;
     private Long branchId;
     private String modality;

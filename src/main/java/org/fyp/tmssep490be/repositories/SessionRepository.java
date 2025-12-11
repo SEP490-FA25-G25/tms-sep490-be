@@ -225,5 +225,11 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
            "WHERE s.classEntity.id = :classId " +
            "AND s.status != org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED")
     Long countByClassEntityIdExcludingCancelled(@Param("classId") Long classId);
+
+    @Query("SELECT COUNT(s) FROM Session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status = :status")
+    Long countByClassEntityIdAndStatus(@Param("classId") Long classId, 
+                                        @Param("status") org.fyp.tmssep490be.entities.enums.SessionStatus status);
 }
 
