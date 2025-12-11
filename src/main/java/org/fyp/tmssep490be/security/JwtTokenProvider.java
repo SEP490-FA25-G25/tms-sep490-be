@@ -174,4 +174,45 @@ public class JwtTokenProvider {
     public long getAccessTokenExpirationInSeconds() {
         return accessTokenValidityInMs / 1000;
     }
+
+    // Tạo token đặt lại mật khẩu với thời hạn ngắn (dùng lại accessTokenValidityInMs ~ 15 phút)
+    public String generatePasswordResetToken(Long userId) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + accessTokenValidityInMs);
+
+        return Jwts.builder()
+                .setSubject("password-reset")
+                .claim("userId", userId)
+                .claim("type", "password-reset")
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(secretKey, SignatureAlgorithm.HS512)
+                .compact();
+    }
+
+    // Xác thực token đặt lại mật khẩu và trả về userId, null nếu không hợp lệ/hết hạn
+    public Long validatePasswordResetToken(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+            String tokenType = claims.get("type", String.class);
+            if (!"password-reset".equals(tokenType)) {
+                log.warn("Loại token không hợp lệ cho đặt lại mật khẩu: {}", tokenType);
+                return null;
+            }
+
+            return claims.get("userId", Long.class);
+
+        } catch (ExpiredJwtException ex) {
+            log.warn("Token đặt lại mật khẩu đã hết hạn");
+            return null;
+        } catch (Exception ex) {
+            log.error("Token đặt lại mật khẩu không hợp lệ", ex);
+            return null;
+        }
+    }
 }

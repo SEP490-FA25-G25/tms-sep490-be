@@ -5,10 +5,12 @@ import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -90,6 +92,15 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
         // Đếm user theo từng Branch
         @Query("SELECT b.name, COUNT(ub) FROM UserBranches ub JOIN ub.branch b GROUP BY b.name ORDER BY COUNT(ub) DESC")
         List<Object[]> countUsersByBranch();
+
+        // Tìm user đang hoạt động theo email để phục vụ đặt lại mật khẩu
+        Optional<UserAccount> findByEmailAndStatus(String email, UserStatus status);
+
+        // Cập nhật mật khẩu theo userId (trả về số bản ghi đã cập nhật)
+        @Modifying
+        @Transactional
+        @Query("UPDATE UserAccount u SET u.passwordHash = :passwordHash WHERE u.id = :userId")
+        int updatePasswordById(@Param("userId") Long userId, @Param("passwordHash") String passwordHash);
 
         // Đếm user mới theo ngày (dùng cho biểu đồ)
         @Query(value = "SELECT DATE(created_at) as date, COUNT(*) as count " +

@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.auth.*;
 import org.fyp.tmssep490be.security.UserPrincipal;
+import org.fyp.tmssep490be.services.ForgotPasswordService;
 import org.fyp.tmssep490be.services.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final ForgotPasswordService forgotPasswordService;
 
     @PostMapping("/login")
     public ResponseEntity<ResponseObject<AuthResponse>> login(
@@ -57,6 +59,51 @@ public class AuthController {
                 ResponseObject.<Void>builder()
                         .success(true)
                         .message("Logout successful - please discard your tokens")
+                        .build()
+        );
+    }
+
+    // Quên mật khẩu: nhận email và gửi liên kết đặt lại
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ResponseObject<ForgotPasswordResponse>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("Yêu cầu quên mật khẩu cho email: {}", request.getEmail());
+
+        ForgotPasswordResponse response = forgotPasswordService.requestPasswordReset(request.getEmail());
+
+        return ResponseEntity.ok(
+                ResponseObject.<ForgotPasswordResponse>builder()
+                        .success(true)
+                        .message(response.getMessage())
+                        .data(response)
+                        .build()
+        );
+    }
+
+    // Đặt lại mật khẩu bằng token
+    @PostMapping("/reset-password")
+    public ResponseEntity<ResponseObject<ResetPasswordResponse>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+        log.info("Yêu cầu đặt lại mật khẩu");
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            return ResponseEntity.badRequest()
+                    .body(ResponseObject.<ResetPasswordResponse>builder()
+                            .success(false)
+                            .message("Mật khẩu xác nhận không khớp")
+                            .build());
+        }
+
+        ResetPasswordResponse response = forgotPasswordService.resetPassword(
+                request.getToken(),
+                request.getNewPassword()
+        );
+
+        return ResponseEntity.ok(
+                ResponseObject.<ResetPasswordResponse>builder()
+                        .success(response.isSuccess())
+                        .message(response.getMessage())
+                        .data(response)
                         .build()
         );
     }

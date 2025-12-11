@@ -126,4 +126,18 @@ public class EmailService {
         sendEmailWithTemplateAsync(to, subject, "emails/feedback-reminder", templateData);
     }
 
+    public void sendPasswordResetEmailAsync(String to, String fullName, String resetLink) {
+        String subject = "Đặt lại mật khẩu TMS";
+        StringBuilder content = new StringBuilder();
+        content.append("<p>Chào ").append(fullName).append(",</p>");
+        content.append("<p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản TMS.</p>");
+        content.append("<p>Nhấn vào liên kết bên dưới để đặt lại mật khẩu (liên kết có hiệu lực trong thời gian ngắn):</p>");
+        content.append("<p><a href=\"").append(resetLink).append("\">Đặt lại mật khẩu</a></p>");
+        content.append("<p>Nếu bạn không yêu cầu hành động này, hãy bỏ qua email.</p>");
+        content.append("<p>Trân trọng,</p>");
+        content.append("<p>Hệ thống TMS</p>");
+
+        sendEmailAsync(to, subject, content.toString());
+    }
+
 }
