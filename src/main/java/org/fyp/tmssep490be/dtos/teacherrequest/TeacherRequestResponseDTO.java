@@ -31,6 +31,9 @@ public class TeacherRequestResponseDTO {
     private Long teacherId;
     private String teacherName;
     private String teacherEmail;
+    private String currentModality;
+    private String newModality;
+    private String currentResourceName;
     private Long replacementTeacherId;
     private String replacementTeacherName;
     private String replacementTeacherEmail;
@@ -40,6 +43,7 @@ public class TeacherRequestResponseDTO {
     private String newTimeSlotName;
     private Long newResourceId;
     private String newResourceName;
+    private String newResourceType;
     private String requestReason;
     private String note;
     private OffsetDateTime submittedAt;
