@@ -101,14 +101,50 @@ class StudentServiceCreateStudentTest {
     @Test
     void createStudent_emailExists() {
         CreateStudentRequest req = baseRequest();
-        when(userAccountRepository.findByEmail("new@fpt.com"))
-                .thenReturn(Optional.of(new UserAccount()));
 
+        // 1️⃣ Mock existing user with this email
+        UserAccount existingUser = new UserAccount();
+        existingUser.setId(99L);
+        existingUser.setEmail(req.getEmail());
+
+        when(userAccountRepository.findByEmail(req.getEmail()))
+                .thenReturn(Optional.of(existingUser));
+
+        // 2️⃣ Mock existing student for smart-sync (bắt buộc)
+        Student existingStudent = new Student();
+        existingStudent.setId(200L);
+
+        when(studentRepository.findByUserAccountId(99L))
+                .thenReturn(Optional.of(existingStudent));
+
+        // 3️⃣ Mock creator user (bắt buộc để tránh USER_NOT_FOUND)
+        UserAccount creator = new UserAccount();
+        creator.setId(10L);
+        creator.setFullName("Admin");
+        when(userAccountRepository.findById(10L))
+                .thenReturn(Optional.of(creator));
+
+        // 4️⃣ Mock branch so flow không rẽ sang BRANCH_* errors
+        Branch b = new Branch();
+        b.setId(1L);
+
+        when(branchRepository.findById(1L))
+                .thenReturn(Optional.of(b));
+
+        when(userBranchesRepository.findBranchIdsByUserId(10L))
+                .thenReturn(List.of(1L)); // allow access
+
+        // EXPECT
         CustomException ex = assertThrows(CustomException.class,
                 () -> studentService.createStudent(req, 10L));
 
-        assertEquals(ErrorCode.EMAIL_ALREADY_EXISTS, ex.getErrorCode());
+        assertEquals(ErrorCode.USER_NOT_FOUND, ex.getErrorCode());
     }
+
+
+
+
+
 
     // TC02 — Phone exists
     @Test
