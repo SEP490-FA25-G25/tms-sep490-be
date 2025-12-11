@@ -27,6 +27,13 @@ public class SessionDetailDTO {
     private AttendanceStats attendanceStats;
     private List<StudentAttendanceDTO> students;
     private List<CLOInfo> closCovered;
+    
+    // New fields
+    private Integer sequenceNo;
+    private List<String> skills;
+    private PhaseInfo phase;
+    private List<ResourceInfo> resources;
+    private List<MaterialInfo> materials;
 
     @Data
     @Builder
@@ -62,5 +69,51 @@ public class SessionDetailDTO {
         private Long cloId;
         private String cloCode;
         private String description;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ResourceInfo {
+        private Long resourceId;
+        private String resourceType; // "ROOM" | "VIRTUAL"
+        private String code;
+        private String name;
+        
+        // For ROOM
+        private String branchName;
+        private String branchAddress;
+        private Integer capacity;
+        private String equipment;
+        
+        // For VIRTUAL
+        private String meetingUrl;
+        private String meetingId;
+        private String meetingPasscode;
+        private String accountEmail;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PhaseInfo {
+        private Long phaseId;
+        private Integer phaseNumber;
+        private String phaseName;
+        private String learningFocus;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MaterialInfo {
+        private Long materialId;
+        private String title;
+        private String description;
+        private String materialType; // "DOCUMENT" | "MEDIA" | "ARCHIVE" | "LINK" | "OTHER"
+        private String url;
     }
 }

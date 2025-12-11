@@ -93,6 +93,86 @@ public class SessionService {
             }
         }
 
+        // Map new fields: sequenceNo, skills, phase
+        Integer sequenceNo = null;
+        List<String> skills = null;
+        SessionDetailDTO.PhaseInfo phaseInfo = null;
+        
+        if (session.getSubjectSession() != null) {
+            SubjectSession subjectSession = session.getSubjectSession();
+            sequenceNo = subjectSession.getSequenceNo();
+            
+            // Map skills enum to string list
+            if (subjectSession.getSkills() != null && !subjectSession.getSkills().isEmpty()) {
+                skills = subjectSession.getSkills().stream()
+                        .map(Enum::name)
+                        .collect(Collectors.toList());
+            }
+            
+            // Map phase info
+            if (subjectSession.getPhase() != null) {
+                SubjectPhase phase = subjectSession.getPhase();
+                phaseInfo = SessionDetailDTO.PhaseInfo.builder()
+                        .phaseId(phase.getId())
+                        .phaseNumber(phase.getPhaseNumber())
+                        .phaseName(phase.getName())
+                        .learningFocus(phase.getLearningFocus())
+                        .build();
+            }
+        }
+
+        // Map resources (ROOM or VIRTUAL)
+        List<SessionDetailDTO.ResourceInfo> resources = null;
+        if (session.getSessionResources() != null && !session.getSessionResources().isEmpty()) {
+            resources = session.getSessionResources().stream()
+                    .map(sr -> {
+                        Resource resource = sr.getResource();
+                        SessionDetailDTO.ResourceInfo.ResourceInfoBuilder builder = SessionDetailDTO.ResourceInfo.builder()
+                                .resourceId(resource.getId())
+                                .resourceType(resource.getResourceType().name())
+                                .code(resource.getCode())
+                                .name(resource.getName());
+                        
+                        // Add fields based on resource type
+                        if (resource.getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.ROOM) {
+                            // ROOM: branch info, capacity, equipment
+                            if (resource.getBranch() != null) {
+                                Branch branch = resource.getBranch();
+                                builder.branchName(branch.getName())
+                                       .branchAddress(branch.getAddress());
+                            }
+                            builder.capacity(resource.getCapacityOverride() != null ? 
+                                    resource.getCapacityOverride() : resource.getCapacity())
+                                   .equipment(resource.getEquipment());
+                        } else if (resource.getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL) {
+                            // VIRTUAL: meeting info
+                            builder.meetingUrl(resource.getMeetingUrl())
+                                   .meetingId(resource.getMeetingId())
+                                   .meetingPasscode(resource.getMeetingPasscode())
+                                   .accountEmail(resource.getAccountEmail());
+                        }
+                        
+                        return builder.build();
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        // Map materials (documents, media, links, etc.)
+        List<SessionDetailDTO.MaterialInfo> materials = null;
+        if (session.getSubjectSession() != null && 
+            session.getSubjectSession().getSubjectMaterials() != null && 
+            !session.getSubjectSession().getSubjectMaterials().isEmpty()) {
+            materials = session.getSubjectSession().getSubjectMaterials().stream()
+                    .map(material -> SessionDetailDTO.MaterialInfo.builder()
+                            .materialId(material.getId())
+                            .title(material.getTitle())
+                            .description(material.getDescription())
+                            .materialType(material.getMaterialType().name())
+                            .url(material.getUrl())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
         return SessionDetailDTO.builder()
                 .sessionId(session.getId())
                 .classId(session.getClassEntity().getId())
@@ -109,6 +189,12 @@ public class SessionService {
                 .attendanceStats(stats)
                 .students(students)
                 .closCovered(clos)
+                // New fields
+                .sequenceNo(sequenceNo)
+                .skills(skills)
+                .phase(phaseInfo)
+                .resources(resources)
+                .materials(materials)
                 .build();
     }
 }

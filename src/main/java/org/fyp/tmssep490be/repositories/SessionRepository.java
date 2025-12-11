@@ -209,12 +209,17 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
            "LEFT JOIN FETCH c.subject " +
            "LEFT JOIN FETCH c.branch " +
            "LEFT JOIN FETCH s.subjectSession ss " +
+           "LEFT JOIN FETCH ss.phase phase " +
            "LEFT JOIN FETCH ss.subjectSessionCLOMappings cloMapping " +
            "LEFT JOIN FETCH cloMapping.clo " +
+           "LEFT JOIN FETCH ss.subjectMaterials sm " +
            "LEFT JOIN FETCH s.timeSlotTemplate tst " +
            "LEFT JOIN FETCH s.teachingSlots ts " +
            "LEFT JOIN FETCH ts.teacher t " +
            "LEFT JOIN FETCH t.userAccount " +
+           "LEFT JOIN FETCH s.sessionResources sr " +
+           "LEFT JOIN FETCH sr.resource r " +
+           "LEFT JOIN FETCH r.branch rb " +
            "WHERE s.id = :sessionId")
     Optional<Session> findByIdWithDetails(@Param("sessionId") Long sessionId);
 
