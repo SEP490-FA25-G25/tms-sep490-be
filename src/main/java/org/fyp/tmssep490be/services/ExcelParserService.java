@@ -230,4 +230,98 @@ public class ExcelParserService {
     }
 
 
+    // --- Phân tích Import User ---
+
+    public List<org.fyp.tmssep490be.dtos.user.UserImportData> parseUserImport(MultipartFile file) {
+        List<org.fyp.tmssep490be.dtos.user.UserImportData> users = new ArrayList<>();
+
+        try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
+            Sheet sheet = workbook.getSheetAt(0);
+
+            // Bỏ qua dòng tiêu đề (dòng 0), bắt đầu từ dòng 1
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null || isRowEmpty(row)) {
+                    continue;
+                }
+
+                try {
+                    org.fyp.tmssep490be.dtos.user.UserImportData data = parseUserImportRow(row);
+                    users.add(data);
+                } catch (Exception e) {
+                    log.warn("Lỗi khi đọc dòng user {}: {}", i + 1, e.getMessage());
+                    org.fyp.tmssep490be.dtos.user.UserImportData errorData = org.fyp.tmssep490be.dtos.user.UserImportData.builder()
+                            .status("ERROR")
+                            .errorMessage("Hàng " + (i + 1) + ": " + e.getMessage())
+                            .build();
+                    users.add(errorData);
+                }
+            }
+
+            if (users.isEmpty()) {
+                throw new CustomException(ErrorCode.EXCEL_FILE_EMPTY);
+            }
+
+        } catch (IOException e) {
+            log.error("Thất bại khi đọc file Excel", e);
+            throw new CustomException(ErrorCode.EXCEL_PARSE_FAILED);
+        }
+
+        return users;
+    }
+
+    private org.fyp.tmssep490be.dtos.user.UserImportData parseUserImportRow(Row row) {
+        // Giả định: 
+        // 0: Họ và tên
+        // 1: Email
+        // 2: Số điện thoại
+        // 3: Vai trò (Code)
+        // 4: Mã chi nhánh (Tùy chọn)
+        
+        return org.fyp.tmssep490be.dtos.user.UserImportData.builder()
+                .fullName(getCellValueAsString(row.getCell(0)))
+                .email(getCellValueAsString(row.getCell(1)))
+                .phone(getCellValueAsString(row.getCell(2)))
+                .role(getCellValueAsString(row.getCell(3)))
+                .branchCode(getCellValueAsString(row.getCell(4)))
+                .status("CREATE") // Trạng thái mặc định
+                .valid(true)
+                .build();
+    }
+    public java.io.ByteArrayInputStream generateUserImportTemplate() {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Mẫu Import Người dùng");
+
+            // Tạo dòng tiêu đề
+            Row headerRow = sheet.createRow(0);
+            String[] columns = {"Họ và tên", "Email", "Số điện thoại", "Vai trò (Code)", "Mã chi nhánh (Cách nhau dấu , )"};
+            
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font font = workbook.createFont();
+            font.setBold(true);
+            headerStyle.setFont(font);
+
+            for (int i = 0; i < columns.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(columns[i]);
+                cell.setCellStyle(headerStyle);
+                sheet.autoSizeColumn(i);
+            }
+
+            // Tạo dữ liệu mẫu
+            Row sampleRow = sheet.createRow(1);
+            sampleRow.createCell(0).setCellValue("Nguyen Van A");
+            sampleRow.createCell(1).setCellValue("nguyenvana@example.com");
+            sampleRow.createCell(2).setCellValue("0901234567");
+            sampleRow.createCell(3).setCellValue("TEACHER");
+            sampleRow.createCell(4).setCellValue("BRANCH01, BRANCH02");
+
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            workbook.write(out);
+            return new java.io.ByteArrayInputStream(out.toByteArray());
+        } catch (IOException e) {
+            log.error("Lỗi khi tạo template", e);
+            throw new CustomException(ErrorCode.EXCEL_GENERATION_FAILED);
+        }
+    }
 }

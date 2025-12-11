@@ -240,7 +240,7 @@ public class UserAccountService {
         log.info("Getting all users with search: {}, role: {}, status: {}, branchId: {}", search, role, status,
                 branchId);
 
-        UserStatus userStatus = status != null && !status.isEmpty() ? UserStatus.valueOf(status) : null;
+        String userStatus = status != null && !status.isEmpty() ? status : null;
         Page<UserAccount> users = userAccountRepository.findAllWithFilters(search, role, userStatus, branchId,
                 pageable);
         return users.map(this::mapToResponse);
