@@ -31,6 +31,15 @@ public class ManagerBranchController {
         return ResponseEntity.ok(new ResponseObject<>(true, "Lấy danh sách chi nhánh thành công", branches));
     }
 
+    // Lấy chi tiết một chi nhánh theo ID
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ResponseObject<ManagerBranchOverviewDTO>> getBranchById(@PathVariable Long id) {
+        log.info("API: Manager lấy chi tiết chi nhánh ID: {}", id);
+        ManagerBranchOverviewDTO branch = managerBranchService.getBranchById(id);
+        return ResponseEntity.ok(new ResponseObject<>(true, "Lấy chi tiết chi nhánh thành công", branch));
+    }
+
     // Tạo chi nhánh mới
     @PostMapping
     @PreAuthorize("hasRole('MANAGER')")

@@ -38,6 +38,17 @@ public class ManagerBranchService {
                 .collect(Collectors.toList());
     }
 
+    // Lấy chi tiết một chi nhánh theo ID
+    @Transactional(readOnly = true)
+    public ManagerBranchOverviewDTO getBranchById(Long id) {
+        log.info("Manager đang lấy chi tiết chi nhánh ID: {}", id);
+        
+        Branch branch = branchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Chi nhánh không tồn tại với ID: " + id));
+        
+        return mapToOverviewDTO(branch);
+    }
+
     // Tạo chi nhánh mới
     @Transactional
     public ManagerBranchOverviewDTO createBranch(CreateBranchRequest request) {
