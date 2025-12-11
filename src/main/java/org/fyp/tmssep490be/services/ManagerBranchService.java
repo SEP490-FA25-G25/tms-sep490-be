@@ -85,37 +85,26 @@ public class ManagerBranchService {
         return mapToOverviewDTO(savedBranch);
     }
 
-    // Gửi thông báo cho Admin khi có chi nhánh mới (gọi từ Controller)
+    // Gửi thông báo cho Admin khi có chi nhánh mới
     public void sendNewBranchNotificationToAdmins(String branchName, String branchCode) {
-        try {
-            // Thử tìm với 'ADMIN' trước, nếu không có thì thử 'admin'
-            List<UserAccount> admins = userAccountRepository.findUsersByRole("ADMIN");
-            
-            if (admins.isEmpty()) {
-                admins = userAccountRepository.findUsersByRole("admin");
-            }
-            
-            if (admins.isEmpty()) {
-                return;
-            }
+        String title = "Chi nhánh mới cần thiết lập";
+        String message = String.format(
+            "Chi nhánh '%s' (Mã: %s) vừa được tạo. Vui lòng thêm tài khoản nhân viên cho chi nhánh này.",
+            branchName,
+            branchCode
+        );
 
-            String title = "Chi nhánh mới cần thiết lập";
-            String message = String.format(
-                "Chi nhánh '%s' (Mã: %s) vừa được tạo. Vui lòng thêm tài khoản nhân viên cho chi nhánh này.",
-                branchName,
-                branchCode
+        // Tìm tất cả user có role ADMIN
+        List<UserAccount> admins = userAccountRepository.findUsersByRole("ADMIN");
+
+        // Gửi notification cho từng admin
+        for (UserAccount admin : admins) {
+            notificationService.createNotification(
+                admin.getId(),
+                NotificationType.SYSTEM,
+                title,
+                message
             );
-
-            for (UserAccount admin : admins) {
-                notificationService.createNotification(
-                    admin.getId(),
-                    NotificationType.SYSTEM,
-                    title,
-                    message
-                );
-            }
-        } catch (Exception e) {
-            log.error("Lỗi khi gửi thông báo chi nhánh mới: {}", e.getMessage());
         }
     }
 
