@@ -154,9 +154,13 @@ public class TeacherRequestController {
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<List<TeacherRequestListDTO>>> getRequestsForStaff(
             @RequestParam(value = "status", required = false) RequestStatus status,
+            @RequestParam(value = "branchId", required = false) Long branchId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         
-        List<TeacherRequestListDTO> requests = teacherRequestService.getRequestsForStaff(status, userPrincipal.getId());
+        List<TeacherRequestListDTO> requests = teacherRequestService.getRequestsForStaff(
+                status,
+                userPrincipal.getId(),
+                branchId);
         
         return ResponseEntity.ok(
                 ResponseObject.<List<TeacherRequestListDTO>>builder()
@@ -170,9 +174,10 @@ public class TeacherRequestController {
     @GetMapping("/staff/teachers")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<List<TeacherListDTO>>> getTeachersForStaff(
+            @RequestParam(value = "branchId", required = false) Long branchId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-        List<TeacherListDTO> teachers = teacherRequestService.getTeachersForStaff(userPrincipal.getId());
+        List<TeacherListDTO> teachers = teacherRequestService.getTeachersForStaff(userPrincipal.getId(), branchId);
 
         return ResponseEntity.ok(ResponseObject.<List<TeacherListDTO>>builder()
                 .success(true)
@@ -188,10 +193,11 @@ public class TeacherRequestController {
             @PathVariable Long teacherId,
             @RequestParam(value = "days", required = false) Integer days,
             @RequestParam(value = "classId", required = false) Long classId,
+            @RequestParam(value = "branchId", required = false) Long branchId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         List<MySessionDTO> sessions = teacherRequestService.getSessionsForTeacherByStaff(
-                teacherId, days, classId, userPrincipal.getId());
+                teacherId, days, classId, userPrincipal.getId(), branchId);
 
         return ResponseEntity.ok(ResponseObject.<List<MySessionDTO>>builder()
                 .success(true)
@@ -228,6 +234,7 @@ public class TeacherRequestController {
     @PreAuthorize("hasRole('TEACHER') or hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> getRequestById(
             @PathVariable Long id,
+            @RequestParam(value = "branchId", required = false) Long branchId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         
         log.info("Get request {} for user {}", id, userPrincipal.getId());
@@ -237,7 +244,7 @@ public class TeacherRequestController {
                 .anyMatch(authority -> "ROLE_ACADEMIC_AFFAIR".equals(authority.getAuthority()));
 
         TeacherRequestResponseDTO response = isAcademicStaff
-                ? teacherRequestService.getRequestForStaff(id)
+                ? teacherRequestService.getRequestForStaff(id, userPrincipal.getId(), branchId)
                 : teacherRequestService.getRequestById(id, userPrincipal.getId());
 
         return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
