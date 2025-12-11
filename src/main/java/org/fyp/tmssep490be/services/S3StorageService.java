@@ -1,8 +1,7 @@
-package org.fyp.tmssep490be.services.impl;
+package org.fyp.tmssep490be.services;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.fyp.tmssep490be.services.StorageService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,7 +25,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class S3StorageServiceImpl implements StorageService {
+public class S3StorageService {
 
     @Value("${aws.s3.bucket}")
     private String bucketName;
@@ -69,7 +68,6 @@ public class S3StorageServiceImpl implements StorageService {
         }
     }
 
-    @Override
     public String uploadFile(MultipartFile file) {
         String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
         Path tempFile = null;
@@ -138,7 +136,6 @@ public class S3StorageServiceImpl implements StorageService {
         }
     }
 
-    @Override
     public void deleteFile(String fileUrl) {
         if (fileUrl == null || fileUrl.isEmpty()) {
             return;
@@ -170,7 +167,6 @@ public class S3StorageServiceImpl implements StorageService {
         }
     }
 
-    @Override
     public String generatePresignedUrl(String fileUrl) {
         if (fileUrl == null || fileUrl.isEmpty()) {
             return null;
@@ -221,7 +217,6 @@ public class S3StorageServiceImpl implements StorageService {
         }
     }
 
-    @Override
     public String extractKeyFromUrl(String fileUrl) {
         if (fileUrl == null || fileUrl.isEmpty()) {
             return null;

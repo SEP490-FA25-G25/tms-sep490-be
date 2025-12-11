@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
-import org.fyp.tmssep490be.services.StorageService;
+import org.fyp.tmssep490be.services.S3StorageService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +25,7 @@ import java.util.Set;
 @SecurityRequirement(name = "bearerAuth")
 public class FileUploadController {
 
-    private final StorageService storageService;
+    private final S3StorageService storageService;
 
     // Allowed file types: Images, PDF, Word, Excel, PowerPoint
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
