@@ -13,7 +13,7 @@ import java.util.Set;
 
 @Entity
 @Table(name = "class", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_class_branch_code", columnNames = {"branch_id", "code"})
+        @UniqueConstraint(name = "uq_class_branch_code", columnNames = { "branch_id", "code" })
 })
 @Getter
 @Setter
