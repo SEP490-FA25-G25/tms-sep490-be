@@ -39,9 +39,8 @@ public class QASessionListResponse {
         private Integer totalStudents;
         private Integer presentCount;
         private Integer absentCount;
-        private Double attendanceRate;
         private Integer homeworkCompletedCount;
-        private Double homeworkCompletionRate;
+        private Boolean hasHomework; 
 
         private Boolean hasQAReport;
         private Integer qaReportCount;

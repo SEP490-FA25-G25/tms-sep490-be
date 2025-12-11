@@ -212,16 +212,15 @@ public class ClassService {
 
     private List<TeacherSummaryDTO> getTeachersForClass(Long classId) {
         List<TeachingSlot> teachingSlots = teachingSlotRepository
-                .findByClassEntityIdAndStatus(classId, TeachingSlotStatus.SCHEDULED);
+                .findByClassEntityId(classId);
 
-        // Group by teacher and count sessions
         Map<Teacher, Long> teacherSessionCounts = teachingSlots.stream()
                 .filter(slot -> slot.getTeacher() != null)
+                .filter(slot -> slot.getStatus() != TeachingSlotStatus.SUBSTITUTED)
                 .collect(Collectors.groupingBy(
                         TeachingSlot::getTeacher,
                         Collectors.counting()));
 
-        // Convert to DTOs sorted by session count (descending)
         return teacherSessionCounts.entrySet().stream()
                 .map(entry -> {
                     Teacher teacher = entry.getKey();
@@ -725,21 +724,14 @@ public class ClassService {
                             .count();
 
                     long totalStudents = studentSessions.size();
-                    double attendanceRate = totalStudents > 0 ? (presentCount * 100.0 / totalStudents) : 0.0;
 
-                    // Calculate homework completion metrics (exclude NO_HOMEWORK)
                     long homeworkCompletedCount = studentSessions.stream()
                             .filter(ss -> ss.getHomeworkStatus() == HomeworkStatus.COMPLETED)
                             .count();
 
-                    long homeworkTotalCount = studentSessions.stream()
-                            .filter(ss -> ss.getHomeworkStatus() != null
-                                    && ss.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK)
-                            .count();
-
-                    double homeworkCompletionRate = homeworkTotalCount > 0
-                            ? (homeworkCompletedCount * 100.0 / homeworkTotalCount)
-                            : 0.0;
+                    boolean hasHomework = studentSessions.stream()
+                            .anyMatch(ss -> ss.getHomeworkStatus() != null
+                                    && ss.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK);
 
                     // Get QA report count
                     int qaReportCount = s.getQaReports() != null ? s.getQaReports().size() : 0;
@@ -776,9 +768,8 @@ public class ClassService {
                             .totalStudents((int) totalStudents)
                             .presentCount((int) presentCount)
                             .absentCount((int) absentCount)
-                            .attendanceRate(attendanceRate)
                             .homeworkCompletedCount((int) homeworkCompletedCount)
-                            .homeworkCompletionRate(homeworkCompletionRate)
+                            .hasHomework(hasHomework)
                             .hasQAReport(qaReportCount > 0)
                             .qaReportCount(qaReportCount)
                             .build();

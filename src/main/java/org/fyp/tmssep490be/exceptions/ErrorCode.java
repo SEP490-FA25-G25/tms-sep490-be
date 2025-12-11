@@ -74,6 +74,7 @@ public enum ErrorCode {
 
     // Teacher errors (3000-3099)
     TEACHER_NOT_FOUND(3000, "Không tìm thấy giáo viên"),
+    TEACHER_ACCESS_DENIED(3001, "Từ chối truy cập: Giáo viên không thuộc quyền quản lý của bạn"),
 
     // Teacher Request errors (5000-5099)
     TEACHER_REQUEST_NOT_FOUND(5000, "Không tìm thấy yêu cầu giáo viên"),

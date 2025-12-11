@@ -24,7 +24,6 @@ public class TimeSlotTemplateService {
     private final BranchRepository branchRepository;
     private final UserAccountRepository userAccountRepository;
     private final SessionRepository sessionRepository;
-    private final TeacherAvailabilityRepository teacherAvailabilityRepository;
 
     // Lấy danh sách khung giờ
     @Transactional(readOnly = true)
@@ -204,11 +203,6 @@ public class TimeSlotTemplateService {
             throw new BusinessRuleException("Không thể xóa vì đang được sử dụng");
         }
 
-        // Không thể xóa nếu giáo viên đăng ký rảnh
-        if (teacherAvailabilityRepository.existsById_TimeSlotTemplateId(id)) {
-            throw new BusinessRuleException("Không thể xóa vì đang trong lịch rảnh giáo viên");
-        }
-
         timeSlotTemplateRepository.deleteById(id);
     }
 
@@ -222,9 +216,11 @@ public class TimeSlotTemplateService {
 
         // Nếu ngưng hoạt động → check không có session tương lai
         if (status == ResourceStatus.INACTIVE) {
-            Long futureSessions = sessionRepository.countFutureSessionsByTimeSlotId(id, LocalDate.now(), LocalTime.now());
+            Long futureSessions = sessionRepository.countFutureSessionsByTimeSlotId(id, LocalDate.now(),
+                    LocalTime.now());
             if (futureSessions > 0) {
-                throw new BusinessRuleException("Không thể ngưng hoạt động vì có " + futureSessions + " lớp học sắp diễn ra");
+                throw new BusinessRuleException(
+                        "Không thể ngưng hoạt động vì có " + futureSessions + " lớp học sắp diễn ra");
             }
         }
 
@@ -306,17 +302,14 @@ public class TimeSlotTemplateService {
             Long totalSessions = sessionRepository.countSessionsByTimeSlotId(ts.getId());
             Long futureSessions = sessionRepository.countFutureSessionsByTimeSlotId(ts.getId(), LocalDate.now(),
                     LocalTime.now());
-            boolean hasTeacherAvailability = teacherAvailabilityRepository.existsById_TimeSlotTemplateId(ts.getId());
-
             builder.activeClassesCount(activeClasses)
                     .totalSessionsCount(totalSessions)
                     .hasAnySessions(totalSessions > 0)
-                    .hasFutureSessions(futureSessions > 0)
-                    .hasTeacherAvailability(hasTeacherAvailability);
+                    .hasFutureSessions(futureSessions > 0);
         } catch (Exception e) {
             log.error("Error calculating statistics: {}", e.getMessage());
             builder.activeClassesCount(0L).totalSessionsCount(0L)
-                    .hasAnySessions(false).hasFutureSessions(false).hasTeacherAvailability(false);
+                    .hasAnySessions(false).hasFutureSessions(false);
         }
         return builder.build();
     }
