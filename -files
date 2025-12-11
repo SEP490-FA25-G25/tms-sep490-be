@@ -1,0 +1,247 @@
+[33mcommit 6a4cae2e6aac3024f8015c8180ae548104f5d644[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32munit-test[m[33m)[m
+Merge: 62832c3 208ce67
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 21:16:19 2025 +0700
+
+    Merge branch 'main' of https://github.com/SEP490-FA25-G25/tms-sep490-be into unit-test
+
+[33mcommit 208ce67de95d6ea451ac573d724294a05ee547f8[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: NguyenVanDuy2301 <nduy012004@gmail.com>
+Date:   Wed Dec 10 20:43:18 2025 +0700
+
+    fix teacher schedule bug
+
+[33mcommit c9a0de566ce48620d4d7ac71a561ead8badffd74[m
+Author: mthangtr <cccccc9712@gmail.com>
+Date:   Wed Dec 10 19:58:23 2025 +0700
+
+    Fix endpoint to filter the transferout session and re caculate attendace report because of class transfer
+
+[33mcommit 62832c3ec97f20cc503618b23b0097ad596b847f[m
+Merge: 5b9714f 8be27ad
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 18:37:17 2025 +0700
+
+    Merge branch 'main' of https://github.com/SEP490-FA25-G25/tms-sep490-be into unit-test
+
+[33mcommit 5b9714f9238ecb4fa77c44df6b34eedf9cd607f3[m[33m ([m[1;31morigin/unit-test[m[33m)[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 18:36:59 2025 +0700
+
+    total 201 tc
+
+[33mcommit c4e34ef317d855e8570dd6a6ecd37fe74821b378[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 18:31:52 2025 +0700
+
+    push 6 tc for StudentRequestService_CancelRequest_Test
+
+[33mcommit 948022f594bbbec1ca68127f74826b729297276b[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 18:20:23 2025 +0700
+
+    push 5 tc for StudentRequestService_RejectRequest_Test
+
+[33mcommit 9f63e87d079ed458ac034db01af59b0430e2cd66[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 18:18:27 2025 +0700
+
+    push 10 tc for StudentRequestService_ApproveRequest_Test
+
+[33mcommit ca4d0b36d1bd5e1e09078607e33709ae7112d61b[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 17:53:01 2025 +0700
+
+    push 12 tc for StudentRequestService_SubmitAbsenceRequestOnBehalf_Test
+
+[33mcommit 0932894dafcd54d012b4d5086f60d167c4137dfa[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 17:49:30 2025 +0700
+
+    push 11 tc for StudentRequestService_SubmitAbsenceRequest_Test
+
+[33mcommit 4a8829181de5633258bca500b1a6391316f5fee4[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 17:37:53 2025 +0700
+
+    push 4 tc for StudentRequestService_GetRequestSummary_Test
+
+[33mcommit 940e2443c869f1ab4657ceeebce4c90de8a0293b[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 17:30:46 2025 +0700
+
+    push 10 tc for StudentRequestService_GetAllRequests_Test
+
+[33mcommit c37772f8a692724f28a81d86f9a37b1520061464[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 17:27:54 2025 +0700
+
+    push 8 tc for StudentRequestService_GetPendingRequests_Test
+
+[33mcommit 54671fc6c81fc917e52f57bf851840c833483d98[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 17:23:47 2025 +0700
+
+    push 6 tc for StudentRequestService_GetRequestDetailsForAA_Test
+
+[33mcommit 8be27adde7bdef5438ee9b730341fb31b7eb0801[m
+Merge: be866fa 2c1f937
+Author: huyentrangne <tranghthhe171368@fpt.edu.vn>
+Date:   Wed Dec 10 17:01:30 2025 +0700
+
+    Merge branch 'main' of https://github.com/SEP490-FA25-G25/tms-sep490-be
+
+[33mcommit be866fafa4a711fdda29c1b8dab83ef61c6420e0[m
+Author: huyentrangne <tranghthhe171368@fpt.edu.vn>
+Date:   Wed Dec 10 17:01:25 2025 +0700
+
+    add validation for edit user feature
+
+[33mcommit 2c1f9373e053020c4b3de258dd911385e2db1574[m
+Author: TatAnh <daoa9596@gmail.com>
+Date:   Wed Dec 10 16:50:03 2025 +0700
+
+    Add create subject, clo, ploclo mapping, subject session, subject material, subject assessment, approval
+
+[33mcommit e8cb21faf52572d8dd842f0ed4907653f28a3508[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 16:51:49 2025 +0700
+
+    push 6 tc for StudentRequestService_GetRequestById_Test
+
+[33mcommit aa518eba9688bfad5cc8c894efae00731c507a95[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 16:43:42 2025 +0700
+
+    push 6 tc for StudentRequestService_GetMyRequests_Test
+
+[33mcommit 6fdf75fef28f4000d80cf14e53cdac8854494b02[m
+Merge: 3b8b9dc 8a84c90
+Author: mthangtr <cccccc9712@gmail.com>
+Date:   Wed Dec 10 16:28:38 2025 +0700
+
+    Merge remote-tracking branch 'origin/main'
+
+[33mcommit 3b8b9dcdf3cf4311f89683c2454ca2c449e26fc7[m
+Author: mthangtr <cccccc9712@gmail.com>
+Date:   Wed Dec 10 16:28:28 2025 +0700
+
+    Update fix transfer request
+
+[33mcommit 8a84c90891cc5435c1cc31cfeedcaa294f04fbe9[m
+Merge: 1beb9ff 012c67d
+Author: NguyenVanDuy2301 <164139933+NguyenVanDuy2301@users.noreply.github.com>
+Date:   Wed Dec 10 16:19:20 2025 +0700
+
+    Merge pull request #15 from SEP490-FA25-G25/teacher
+    
+    add gradebook and attendance metrics
+
+[33mcommit 012c67dbe241c174b46f7bbf70275952d38de5ad[m
+Author: NguyenVanDuy2301 <nduy012004@gmail.com>
+Date:   Wed Dec 10 16:18:29 2025 +0700
+
+    add gradebook and attendance metrics
+
+[33mcommit 1beb9ff460c0021ec2ee31b440c1414be9f7d2a9[m
+Merge: 8ca4340 fa055e1
+Author: Truong Manh Thang <126144891+mthangtr@users.noreply.github.com>
+Date:   Wed Dec 10 15:28:36 2025 +0700
+
+    Merge pull request #14 from SEP490-FA25-G25/unit-test
+    
+    Unit test
+
+[33mcommit 8ca434054765f80d8647a8e41725f9a4901f7b20[m
+Author: TatAnh <daoa9596@gmail.com>
+Date:   Wed Dec 10 15:26:46 2025 +0700
+
+    add list subject and modified parameter
+
+[33mcommit f75d480d4d2ea454aeb6e726730013c7ce378da9[m
+Author: TatAnh <daoa9596@gmail.com>
+Date:   Wed Dec 10 13:28:42 2025 +0700
+
+    update subject DTOs part 2
+
+[33mcommit 70b62a6abaa919229c9251b818475eeca1b0e97f[m
+Author: TatAnh <daoa9596@gmail.com>
+Date:   Wed Dec 10 14:28:27 2025 +0700
+
+    update subject DTOs
+
+[33mcommit fa055e1e2b5549088e924cee22e8a01842ac6078[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 15:14:36 2025 +0700
+
+    push test case after merge
+
+[33mcommit df694da870a078f9af6ae381ad52b77f23a224ce[m
+Merge: afb0c2d b81fd1c
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 15:01:27 2025 +0700
+
+    Merge branch 'main' of https://github.com/SEP490-FA25-G25/tms-sep490-be into unit-test
+
+[33mcommit b81fd1c9121c55e762d5ae7841f43db4f0cba788[m
+Merge: 3b5cd10 52e6739
+Author: huyentrangne <tranghthhe171368@fpt.edu.vn>
+Date:   Wed Dec 10 14:55:10 2025 +0700
+
+    Merge branch 'main' of https://github.com/SEP490-FA25-G25/tms-sep490-be
+
+[33mcommit 3b5cd10e83891d87990ba1cb9f14af4e06b44043[m
+Author: huyentrangne <tranghthhe171368@fpt.edu.vn>
+Date:   Wed Dec 10 14:54:10 2025 +0700
+
+    Add branch filter to user list
+
+[33mcommit 52e6739ade7c4ed8ed898f59f9ff101efce748fe[m
+Author: NguyenVanDuy2301 <nduy012004@gmail.com>
+Date:   Wed Dec 10 14:41:19 2025 +0700
+
+    add teacher grade endpoints
+
+[33mcommit eb26aacef8dd3abe5807946c8c91f038f6e83e4a[m
+Author: NguyenVanDuy2301 <nduy012004@gmail.com>
+Date:   Wed Dec 10 13:36:16 2025 +0700
+
+    add more timeslot to seed-data
+
+[33mcommit afb0c2d470b91a1b1c00a3f13aca86c49d774cd4[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 14:34:54 2025 +0700
+
+    push 110 tc
+
+[33mcommit 03a7bbcdf28daf40db788f5e4994a196a15e3df9[m
+Author: huyentrangne <tranghthhe171368@fpt.edu.vn>
+Date:   Wed Dec 10 13:34:49 2025 +0700
+
+    add email notification for create user feature
+
+[33mcommit c396b55ee7e017024efb3587d9ff2d8cdf64d89e[m
+Author: sonpn <sonpnhe172747@fpt.edu.vn>
+Date:   Wed Dec 10 13:07:45 2025 +0700
+
+    push 104 test cases for auth, email, useraccount and studentservice
+
+[33mcommit 238da9d9fabfd28f32435859f1fa0d97c21de8ea[m
+Merge: 0111f9b 3ded609
+Author: huyentrangne <tranghthhe171368@fpt.edu.vn>
+Date:   Wed Dec 10 12:54:56 2025 +0700
+
+    Merge branch 'main' of https://github.com/SEP490-FA25-G25/tms-sep490-be
+
+[33mcommit 0111f9b099163dae8582a52eea3eb567dbe6d7b2[m
+Author: huyentrangne <tranghthhe171368@fpt.edu.vn>
+Date:   Wed Dec 10 12:54:51 2025 +0700
+
+    add validation for create user feature
+
+[33mcommit 3ded609694ce2d5d6ead77d4eecfe46d1a1dcdb4[m
+Merge: f8677ac dd82206
+Author: mthangtr <cccccc9712@gmail.com>
+Date:   Wed Dec 10 12:52:18 2025 +0700
+
+    Merge branch 'main' of https://github.
