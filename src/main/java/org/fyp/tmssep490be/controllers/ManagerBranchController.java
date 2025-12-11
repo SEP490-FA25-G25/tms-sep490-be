@@ -47,6 +47,15 @@ public class ManagerBranchController {
             @Valid @RequestBody CreateBranchRequest request) {
         log.info("API: Manager tạo chi nhánh mới: {}", request.getName());
         ManagerBranchOverviewDTO createdBranch = managerBranchService.createBranch(request);
+        log.info("=== BRANCH ĐÃ TẠO THÀNH CÔNG: {} ({}) ===", createdBranch.getName(), createdBranch.getCode());
+        
+        // Gửi thông báo đến Admin (ngoài transaction)
+        try {
+            managerBranchService.sendNewBranchNotificationToAdmins(createdBranch.getName(), createdBranch.getCode());
+        } catch (Exception e) {
+            log.error("Lỗi gửi thông báo (branch đã tạo thành công): {}", e.getMessage());
+        }
+        
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ResponseObject<>(true, "Tạo chi nhánh thành công", createdBranch));
     }

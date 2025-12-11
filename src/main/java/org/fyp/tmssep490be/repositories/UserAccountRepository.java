@@ -49,7 +49,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
                         "WHERE (:search IS NULL OR u.full_name ILIKE CONCAT('%', :search, '%') OR u.email ILIKE CONCAT('%', :search, '%') OR u.phone ILIKE CONCAT('%', :search, '%')) "
                         +
                         "AND (:role IS NULL OR r.code = :role) " +
-                        "AND (:status IS NULL OR u.status = :status) " +
+                        "AND (CAST(:status AS VARCHAR) IS NULL OR u.status = :status) " +
                         "AND (:branchId IS NULL OR ub.branch_id = :branchId)", countQuery = "SELECT COUNT(DISTINCT u.id) FROM user_account u "
                                         +
                                         "LEFT JOIN user_role ur ON u.id = ur.user_id " +
@@ -58,12 +58,12 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
                                         "WHERE (:search IS NULL OR u.full_name ILIKE CONCAT('%', :search, '%') OR u.email ILIKE CONCAT('%', :search, '%') OR u.phone ILIKE CONCAT('%', :search, '%')) "
                                         +
                                         "AND (:role IS NULL OR r.code = :role) " +
-                                        "AND (:status IS NULL OR u.status = :status) " +
+                                        "AND (CAST(:status AS VARCHAR) IS NULL OR u.status = :status) " +
                                         "AND (:branchId IS NULL OR ub.branch_id = :branchId)", nativeQuery = true)
         Page<UserAccount> findAllWithFilters(
                         @Param("search") String search,
                         @Param("role") String role,
-                        @Param("status") UserStatus status,
+                        @Param("status") String status,
                         @Param("branchId") Long branchId,
                         Pageable pageable);
 

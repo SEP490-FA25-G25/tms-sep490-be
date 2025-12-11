@@ -9,9 +9,11 @@ import org.fyp.tmssep490be.entities.Center;
 import org.fyp.tmssep490be.entities.UserAccount;
 import org.fyp.tmssep490be.entities.UserBranches;
 import org.fyp.tmssep490be.entities.enums.BranchStatus;
+import org.fyp.tmssep490be.entities.enums.NotificationType;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
 import org.fyp.tmssep490be.repositories.BranchRepository;
 import org.fyp.tmssep490be.repositories.CenterRepository;
+import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,8 @@ public class ManagerBranchService {
 
     private final BranchRepository branchRepository;
     private final CenterRepository centerRepository;
+    private final NotificationService notificationService;
+    private final UserAccountRepository userAccountRepository;
 
     // Lấy danh sách tất cả chi nhánh với thông tin tổng quan
     @Transactional(readOnly = true)
@@ -79,6 +83,40 @@ public class ManagerBranchService {
         log.info("Đã tạo chi nhánh mới với ID: {}", savedBranch.getId());
 
         return mapToOverviewDTO(savedBranch);
+    }
+
+    // Gửi thông báo cho Admin khi có chi nhánh mới (gọi từ Controller)
+    public void sendNewBranchNotificationToAdmins(String branchName, String branchCode) {
+        try {
+            // Thử tìm với 'ADMIN' trước, nếu không có thì thử 'admin'
+            List<UserAccount> admins = userAccountRepository.findUsersByRole("ADMIN");
+            
+            if (admins.isEmpty()) {
+                admins = userAccountRepository.findUsersByRole("admin");
+            }
+            
+            if (admins.isEmpty()) {
+                return;
+            }
+
+            String title = "Chi nhánh mới cần thiết lập";
+            String message = String.format(
+                "Chi nhánh '%s' (Mã: %s) vừa được tạo. Vui lòng thêm tài khoản nhân viên cho chi nhánh này.",
+                branchName,
+                branchCode
+            );
+
+            for (UserAccount admin : admins) {
+                notificationService.createNotification(
+                    admin.getId(),
+                    NotificationType.SYSTEM,
+                    title,
+                    message
+                );
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi thông báo chi nhánh mới: {}", e.getMessage());
+        }
     }
 
     // Check xem email đã tồn tại trong hệ thống chưa

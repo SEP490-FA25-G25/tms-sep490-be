@@ -93,4 +93,25 @@ public class UserAccountController {
         boolean exists = userAccountService.checkPhoneExists(phone);
         return ResponseEntity.ok(new ResponseObject<>(true, "Success", exists));
     }
+
+    // Lấy profile của user hiện tại
+    @GetMapping("/me/profile")
+    public ResponseEntity<ResponseObject<org.fyp.tmssep490be.dtos.user.UserProfileDTO>> getMyProfile(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal 
+            org.fyp.tmssep490be.security.UserPrincipal userPrincipal) {
+        log.info("User {} đang lấy thông tin profile", userPrincipal.getId());
+        org.fyp.tmssep490be.dtos.user.UserProfileDTO profile = userAccountService.getMyProfile(userPrincipal.getId());
+        return ResponseEntity.ok(new ResponseObject<>(true, "Lấy thông tin profile thành công", profile));
+    }
+
+    // Cập nhật profile của user hiện tại
+    @PutMapping("/me/profile")
+    public ResponseEntity<ResponseObject<org.fyp.tmssep490be.dtos.user.UserProfileDTO>> updateMyProfile(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal 
+            org.fyp.tmssep490be.security.UserPrincipal userPrincipal,
+            @Valid @RequestBody org.fyp.tmssep490be.dtos.user.UpdateProfileRequest request) {
+        log.info("User {} đang cập nhật profile", userPrincipal.getId());
+        org.fyp.tmssep490be.dtos.user.UserProfileDTO profile = userAccountService.updateMyProfile(userPrincipal.getId(), request);
+        return ResponseEntity.ok(new ResponseObject<>(true, "Cập nhật profile thành công", profile));
+    }
 }

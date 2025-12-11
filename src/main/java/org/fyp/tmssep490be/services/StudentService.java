@@ -1185,5 +1185,60 @@ public class StudentService {
         log.info("Added user {} to branch {}", userId, branchId);
     }
 
+    // Student tự lấy profile của mình
+    public StudentDetailDTO getStudentProfileByUserId(Long userId) {
+        log.debug("Getting student profile for user {}", userId);
+        
+        Student student = studentRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+
+        return convertToStudentDetailDTO(student);
+    }
+
+    // Student tự cập nhật profile của mình
+    @Transactional
+    public StudentDetailDTO updateStudentProfileByUserId(Long userId, org.fyp.tmssep490be.dtos.user.UpdateProfileRequest request) {
+        log.debug("Updating student profile for user {}", userId);
+        
+        Student student = studentRepository.findByUserAccountId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+        
+        UserAccount user = student.getUserAccount();
+        
+        // Update phone if provided
+        if (request.getPhone() != null) {
+            if (!request.getPhone().isEmpty()) {
+                // Check phone not taken by another user
+                Optional<UserAccount> existingUserWithPhone = userAccountRepository.findByPhone(request.getPhone());
+                if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(userId)) {
+                    throw new CustomException(ErrorCode.USER_PHONE_ALREADY_EXISTS);
+                }
+            }
+            user.setPhone(request.getPhone().isEmpty() ? null : request.getPhone());
+        }
+        
+        // Update other fields
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress().isEmpty() ? null : request.getAddress());
+        }
+        if (request.getFacebookUrl() != null) {
+            user.setFacebookUrl(request.getFacebookUrl().isEmpty() ? null : request.getFacebookUrl());
+        }
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl().isEmpty() ? null : request.getAvatarUrl());
+        }
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+        if (request.getDob() != null) {
+            user.setDob(request.getDob());
+        }
+        
+        userAccountRepository.save(user);
+        log.info("Updated student profile for user {}", userId);
+        
+        return convertToStudentDetailDTO(student);
+    }
+
 }
 

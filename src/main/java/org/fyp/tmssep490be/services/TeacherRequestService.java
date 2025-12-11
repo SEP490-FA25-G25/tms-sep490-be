@@ -836,8 +836,8 @@ public class TeacherRequestService {
     //Lấy danh sách yêu cầu giáo viên cho Academic Staff với optional status filter
     //Chỉ trả về requests của giáo viên trong cùng branch với academic staff
     @Transactional(readOnly = true)
-    public List<TeacherRequestListDTO> getRequestsForStaff(RequestStatus status, Long academicStaffUserId) {
-        log.info("Getting teacher requests for staff {} with status {}", academicStaffUserId, status);
+    public List<TeacherRequestListDTO> getRequestsForStaff(RequestStatus status, Long academicStaffUserId, Long branchId) {
+        log.info("Getting teacher requests for staff {} with status {} and branch {}", academicStaffUserId, status, branchId);
         
         // Lấy branch IDs của academic staff
         List<Long> academicBranchIds = getBranchIdsForUser(academicStaffUserId);
@@ -860,7 +860,15 @@ public class TeacherRequestService {
                     }
                     Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
                     List<Long> teacherBranchIds = getBranchIdsForUser(teacherUserAccountId);
-                    return teacherBranchIds.stream().anyMatch(academicBranchIds::contains);
+                    boolean sameBranch = teacherBranchIds.stream().anyMatch(academicBranchIds::contains);
+                    if (!sameBranch) {
+                        return false;
+                    }
+                    // Nếu client truyền branchId (chi nhánh đang chọn) thì request phải thuộc chi nhánh đó
+                    if (branchId != null) {
+                        return teacherBranchIds.contains(branchId) && academicBranchIds.contains(branchId);
+                    }
+                    return true;
                 })
                 .collect(Collectors.toList());
         
@@ -880,8 +888,8 @@ public class TeacherRequestService {
 
     //Lấy danh sách teachers cho academic staff (filter theo branch)
     @Transactional(readOnly = true)
-    public List<TeacherListDTO> getTeachersForStaff(Long academicStaffUserId) {
-        log.info("Getting teachers list for academic staff {}", academicStaffUserId);
+    public List<TeacherListDTO> getTeachersForStaff(Long academicStaffUserId, Long branchId) {
+        log.info("Getting teachers list for academic staff {} with branch {}", academicStaffUserId, branchId);
 
         // Lấy branch IDs của academic staff
         List<Long> academicBranchIds = getBranchIdsForUser(academicStaffUserId);
@@ -894,7 +902,7 @@ public class TeacherRequestService {
         // Lấy tất cả teachers
         List<Teacher> allTeachers = teacherRepository.findAll();
 
-        // Filter teachers: chỉ lấy teachers trong cùng branch với academic staff
+        // Filter teachers: chỉ lấy teachers trong cùng branch với academic staff (và branch đang chọn nếu có)
         return allTeachers.stream()
                 .filter(teacher -> {
                     if (teacher.getUserAccount() == null) {
@@ -902,7 +910,15 @@ public class TeacherRequestService {
                     }
                     Long teacherUserAccountId = teacher.getUserAccount().getId();
                     List<Long> teacherBranchIds = getBranchIdsForUser(teacherUserAccountId);
-                    return teacherBranchIds.stream().anyMatch(academicBranchIds::contains);
+                    boolean sameBranch = teacherBranchIds.stream().anyMatch(academicBranchIds::contains);
+                    if (!sameBranch) {
+                        return false;
+                    }
+                    // Nếu có branchId đang chọn, teacher phải thuộc branch đó và academic cũng phải có branch đó
+                    if (branchId != null) {
+                        return teacherBranchIds.contains(branchId) && academicBranchIds.contains(branchId);
+                    }
+                    return true;
                 })
                 .map(teacher -> {
                     UserAccount userAccount = teacher.getUserAccount();
@@ -925,8 +941,8 @@ public class TeacherRequestService {
 
     //Lấy danh sách sessions của teacher cho academic staff (filter theo branch)
     @Transactional(readOnly = true)
-    public List<MySessionDTO> getSessionsForTeacherByStaff(Long teacherId, Integer days, Long classId, Long academicStaffUserId) {
-        log.info("Getting sessions for teacher {} by academic staff {}", teacherId, academicStaffUserId);
+    public List<MySessionDTO> getSessionsForTeacherByStaff(Long teacherId, Integer days, Long classId, Long academicStaffUserId, Long branchId) {
+        log.info("Getting sessions for teacher {} by academic staff {} with branch {}", teacherId, academicStaffUserId, branchId);
 
         // Kiểm tra quyền: academic staff phải có branch trùng với teacher
         List<Long> academicBranchIds = getBranchIdsForUser(academicStaffUserId);
@@ -944,6 +960,9 @@ public class TeacherRequestService {
         Long teacherUserAccountId = teacher.getUserAccount().getId();
         List<Long> teacherBranchIds = getBranchIdsForUser(teacherUserAccountId);
         boolean hasAccess = teacherBranchIds.stream().anyMatch(academicBranchIds::contains);
+        if (branchId != null) {
+            hasAccess = hasAccess && teacherBranchIds.contains(branchId) && academicBranchIds.contains(branchId);
+        }
         if (!hasAccess) {
             throw new CustomException(ErrorCode.FORBIDDEN, "You don't have permission to view sessions for this teacher");
         }
@@ -1114,8 +1133,8 @@ public class TeacherRequestService {
 
     //Lấy chi tiết request theo ID cho academic staff (không cần kiểm tra authorization, đã filter theo branch ở list)
     @Transactional(readOnly = true)
-    public TeacherRequestResponseDTO getRequestForStaff(Long requestId) {
-        log.info("Getting request {} for staff", requestId);
+    public TeacherRequestResponseDTO getRequestForStaff(Long requestId, Long academicStaffUserId, Long branchId) {
+        log.info("Getting request {} for staff {} with branch {}", requestId, academicStaffUserId, branchId);
 
         TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
@@ -1126,6 +1145,24 @@ public class TeacherRequestService {
         }
         if (request.getNewTimeSlot() != null) {
             request.getNewTimeSlot().getName();
+        }
+
+        // Ensure academic staff only sees requests of teachers in the same branch
+        Long teacherUserAccountId = request.getTeacher() != null && request.getTeacher().getUserAccount() != null
+                ? request.getTeacher().getUserAccount().getId()
+                : null;
+        if (teacherUserAccountId != null) {
+            List<Long> teacherBranches = getBranchIdsForUser(teacherUserAccountId);
+            List<Long> academicBranches = getBranchIdsForUser(academicStaffUserId);
+            boolean allowed = teacherBranches.isEmpty()
+                    || academicBranches.isEmpty()
+                    || teacherBranches.stream().anyMatch(academicBranches::contains);
+            if (branchId != null) {
+                allowed = allowed && teacherBranches.contains(branchId) && academicBranches.contains(branchId);
+            }
+            if (!allowed) {
+                throw new CustomException(ErrorCode.TEACHER_ACCESS_DENIED, "You don't have permission to view this request");
+            }
         }
 
         return mapToResponseDTO(request);
@@ -1148,6 +1185,22 @@ public class TeacherRequestService {
         Resource newResource = request.getNewResource();
         TimeSlotTemplate newTimeSlot = request.getNewTimeSlot();
 
+        // Current modality/resource
+        String currentModality = classEntity != null && classEntity.getModality() != null
+                ? classEntity.getModality().name()
+                : null;
+        String currentResourceName = session != null && session.getSessionResources() != null && !session.getSessionResources().isEmpty()
+                ? session.getSessionResources().iterator().next().getResource().getName()
+                : null;
+
+        // New modality/resource
+        String newModality = newResource != null && newResource.getResourceType() != null
+                ? newResource.getResourceType().name()
+                : null;
+        String newResourceType = newResource != null && newResource.getResourceType() != null
+                ? newResource.getResourceType().name()
+                : null;
+
         TeacherRequestResponseDTO.TeacherRequestResponseDTOBuilder builder = TeacherRequestResponseDTO.builder()
                 .id(request.getId())
                 .requestType(request.getRequestType())
@@ -1161,6 +1214,10 @@ public class TeacherRequestService {
                 .teacherId(teacher != null ? teacher.getId() : null)
                 .teacherName(teacherAccount != null ? teacherAccount.getFullName() : null)
                 .teacherEmail(teacherAccount != null ? teacherAccount.getEmail() : null)
+                .currentModality(currentModality)
+                .currentResourceName(currentResourceName)
+                .newModality(newModality)
+                .newResourceType(newResourceType)
                 .requestReason(request.getRequestReason())
                 .note(request.getNote())
                 .submittedAt(request.getSubmittedAt())
@@ -1185,6 +1242,10 @@ public class TeacherRequestService {
             case MODALITY_CHANGE:
                 builder.newResourceId(newResource != null ? newResource.getId() : null)
                         .newResourceName(newResource != null ? newResource.getName() : null)
+                        .newResourceType(newResourceType)
+                        .newModality(newModality)
+                        .currentModality(currentModality)
+                        .currentResourceName(currentResourceName)
                         .newDate(null)
                         .newTimeSlotStartTime(null)
                         .newTimeSlotEndTime(null)

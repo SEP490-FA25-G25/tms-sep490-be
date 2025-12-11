@@ -240,7 +240,7 @@ public class UserAccountService {
         log.info("Getting all users with search: {}, role: {}, status: {}, branchId: {}", search, role, status,
                 branchId);
 
-        UserStatus userStatus = status != null && !status.isEmpty() ? UserStatus.valueOf(status) : null;
+        String userStatus = status != null && !status.isEmpty() ? status : null;
         Page<UserAccount> users = userAccountRepository.findAllWithFilters(search, role, userStatus, branchId,
                 pageable);
         return users.map(this::mapToResponse);
@@ -293,6 +293,69 @@ public class UserAccountService {
                         .collect(Collectors.toSet()))
                 .branches(user.getUserBranches().stream().map(userBranch -> userBranch.getBranch().getName())
                         .collect(Collectors.toSet()))
+                .build();
+    }
+
+    // Lấy profile của user hiện tại
+    @Transactional(readOnly = true)
+    public org.fyp.tmssep490be.dtos.user.UserProfileDTO getMyProfile(Long userId) {
+        log.info("Lấy profile cho user ID: {}", userId);
+        UserAccount user = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
+        return mapToProfileDTO(user);
+    }
+
+    // Cập nhật profile của user hiện tại
+    @Transactional
+    public org.fyp.tmssep490be.dtos.user.UserProfileDTO updateMyProfile(Long userId, org.fyp.tmssep490be.dtos.user.UpdateProfileRequest request) {
+        log.info("Cập nhật profile cho user ID: {}", userId);
+        UserAccount user = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
+
+        // Cập nhật các trường cho phép
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getFacebookUrl() != null) {
+            user.setFacebookUrl(request.getFacebookUrl());
+        }
+        if (request.getDob() != null) {
+            user.setDob(request.getDob());
+        }
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress());
+        }
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
+
+        user = userAccountRepository.save(user);
+        log.info("Đã cập nhật profile cho user ID: {}", userId);
+
+        return mapToProfileDTO(user);
+    }
+
+    private org.fyp.tmssep490be.dtos.user.UserProfileDTO mapToProfileDTO(UserAccount user) {
+        return org.fyp.tmssep490be.dtos.user.UserProfileDTO.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .facebookUrl(user.getFacebookUrl())
+                .dob(user.getDob())
+                .gender(user.getGender())
+                .address(user.getAddress())
+                .avatarUrl(user.getAvatarUrl())
+                .status(user.getStatus())
+                .roles(user.getUserRoles() != null ? 
+                    user.getUserRoles().stream().map(ur -> ur.getRole().getCode()).collect(Collectors.toSet()) :
+                    java.util.Collections.emptySet())
+                .branches(user.getUserBranches() != null ? 
+                    user.getUserBranches().stream().map(ub -> ub.getBranch().getName()).collect(Collectors.toSet()) :
+                    java.util.Collections.emptySet())
                 .build();
     }
 

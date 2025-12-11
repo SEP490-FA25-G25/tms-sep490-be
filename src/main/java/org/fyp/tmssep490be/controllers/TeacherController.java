@@ -170,4 +170,19 @@ public class TeacherController {
                         .data(profile)
                         .build());
     }
+
+    // Endpoint để cập nhật thông tin profile của giáo viên hiện tại
+    @org.springframework.web.bind.annotation.PutMapping("/me/profile")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<TeacherProfileDTO>> updateMyProfile(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @org.springframework.web.bind.annotation.RequestBody org.fyp.tmssep490be.dtos.user.UpdateProfileRequest request) {
+        TeacherProfileDTO profile = teacherService.updateMyProfile(userPrincipal.getId(), request);
+        return ResponseEntity.ok(
+                ResponseObject.<TeacherProfileDTO>builder()
+                        .success(true)
+                        .message("Teacher profile updated successfully")
+                        .data(profile)
+                        .build());
+    }
 }

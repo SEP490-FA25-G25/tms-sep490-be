@@ -79,4 +79,11 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
     boolean existsByTeacherIdAndClassEntityId(
         @Param("teacherId") Long teacherId,
         @Param("classId") Long classId);
+
+    @Query("SELECT ts FROM TeachingSlot ts " +
+           "JOIN FETCH ts.teacher t " +
+           "JOIN FETCH t.userAccount ua " +
+           "JOIN FETCH ts.session s " +
+           "WHERE s.classEntity.id = :classId")
+    List<TeachingSlot> findBySessionClassEntityId(@Param("classId") Long classId);
 }
