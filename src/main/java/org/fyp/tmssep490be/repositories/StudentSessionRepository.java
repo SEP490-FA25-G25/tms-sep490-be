@@ -176,4 +176,10 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
            "GROUP BY s.classEntity.id, ss.homeworkStatus")
     List<Object[]> getHomeworkSummaryByClassIds(@Param("classIds") List<Long> classIds);
 
+    @Query("SELECT ss FROM StudentSession ss " +
+           "JOIN FETCH ss.session s " +
+           "JOIN FETCH ss.student st " +
+           "WHERE s.classEntity.id = :classId")
+    List<StudentSession> findByClassIdWithSessionAndStudent(@Param("classId") Long classId);
+
 }
