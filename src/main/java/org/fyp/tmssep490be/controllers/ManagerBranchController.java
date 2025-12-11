@@ -73,4 +73,22 @@ public class ManagerBranchController {
         ManagerBranchOverviewDTO updatedBranch = managerBranchService.updateBranch(id, request);
         return ResponseEntity.ok(new ResponseObject<>(true, "Cập nhật chi nhánh thành công", updatedBranch));
     }
+
+    // Ngưng hoạt động chi nhánh
+    @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ResponseObject<ManagerBranchOverviewDTO>> deactivateBranch(@PathVariable Long id) {
+        log.info("API: Manager ngưng hoạt động chi nhánh ID: {}", id);
+        ManagerBranchOverviewDTO deactivatedBranch = managerBranchService.deactivateBranch(id);
+        return ResponseEntity.ok(new ResponseObject<>(true, "Đã ngưng hoạt động chi nhánh", deactivatedBranch));
+    }
+
+    // Kích hoạt lại chi nhánh
+    @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ResponseObject<ManagerBranchOverviewDTO>> activateBranch(@PathVariable Long id) {
+        log.info("API: Manager kích hoạt lại chi nhánh ID: {}", id);
+        ManagerBranchOverviewDTO activatedBranch = managerBranchService.activateBranch(id);
+        return ResponseEntity.ok(new ResponseObject<>(true, "Đã kích hoạt lại chi nhánh", activatedBranch));
+    }
 }

@@ -128,6 +128,62 @@ public class ManagerBranchService {
         return mapToOverviewDTO(savedBranch);
     }
 
+    // Ngưng hoạt động chi nhánh (soft delete)
+    @Transactional
+    public ManagerBranchOverviewDTO deactivateBranch(Long id) {
+        log.info("Manager đang ngưng hoạt động chi nhánh ID: {}", id);
+
+        Branch branch = branchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Chi nhánh không tồn tại với ID: " + id));
+
+        if (branch.getStatus() == BranchStatus.INACTIVE) {
+            log.warn("Chi nhánh ID: {} đã ở trạng thái không hoạt động", id);
+            return mapToOverviewDTO(branch);
+        }
+
+        // Kiểm tra xem có lớp học đang hoạt động không
+        if (branch.getClasses() != null) {
+            long activeClassCount = branch.getClasses().stream()
+                    .filter(c -> c.getStatus() == org.fyp.tmssep490be.entities.enums.ClassStatus.ONGOING 
+                              || c.getStatus() == org.fyp.tmssep490be.entities.enums.ClassStatus.SCHEDULED)
+                    .count();
+            
+            if (activeClassCount > 0) {
+                throw new IllegalStateException("Không thể ngưng hoạt động chi nhánh vì vẫn còn " 
+                        + activeClassCount + " lớp học đang hoạt động hoặc đã lên lịch");
+            }
+        }
+
+        branch.setStatus(BranchStatus.INACTIVE);
+        branch.setUpdatedAt(OffsetDateTime.now());
+
+        Branch savedBranch = branchRepository.save(branch);
+        log.info("Đã ngưng hoạt động chi nhánh ID: {}", savedBranch.getId());
+
+        return mapToOverviewDTO(savedBranch);
+    }
+
+    // Kích hoạt lại chi nhánh
+    @Transactional
+    public ManagerBranchOverviewDTO activateBranch(Long id) {
+        log.info("Manager đang kích hoạt lại chi nhánh ID: {}", id);
+
+        Branch branch = branchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Chi nhánh không tồn tại với ID: " + id));
+
+        if (branch.getStatus() == BranchStatus.ACTIVE) {
+            log.warn("Chi nhánh ID: {} đã ở trạng thái hoạt động", id);
+        }
+
+        branch.setStatus(BranchStatus.ACTIVE);
+        branch.setUpdatedAt(OffsetDateTime.now());
+
+        Branch savedBranch = branchRepository.save(branch);
+        log.info("Đã kích hoạt lại chi nhánh ID: {}", savedBranch.getId());
+
+        return mapToOverviewDTO(savedBranch);
+    }
+
     // Map Branch entity sang DTO
     private ManagerBranchOverviewDTO mapToOverviewDTO(Branch branch) {
         // Get Center Head từ userBranches với role CENTER_HEAD
