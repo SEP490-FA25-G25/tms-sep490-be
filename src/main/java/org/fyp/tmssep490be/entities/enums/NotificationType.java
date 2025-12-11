@@ -5,5 +5,5 @@ public enum NotificationType {
     REQUEST,
     REMINDER,
     NOTIFICATION,
-    FEEDBACK_REMINDER  
+    FEEDBACK_REMINDER
 }
