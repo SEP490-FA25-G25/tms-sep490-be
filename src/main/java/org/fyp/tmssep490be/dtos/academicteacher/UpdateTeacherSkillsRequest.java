@@ -9,8 +9,6 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-// Request DTO để cập nhật skills của giáo viên
-// Thay thế toàn bộ skills hiện tại bằng danh sách mới (full replacement strategy)
 @Data
 @Builder
 @NoArgsConstructor

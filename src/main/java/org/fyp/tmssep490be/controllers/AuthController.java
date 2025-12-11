@@ -101,4 +101,50 @@ public class AuthController {
         );
     }
 
+    // Endpoint quên mật khẩu
+    // POST /api/v1/auth/forgot-password
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ResponseObject<ForgotPasswordResponse>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("Yêu cầu quên mật khẩu cho email: {}", request.getEmail());
+
+        ForgotPasswordResponse response = authService.requestPasswordReset(request);
+
+        return ResponseEntity.ok(
+                ResponseObject.<ForgotPasswordResponse>builder()
+                        .success(true)
+                        .message(response.getMessage())
+                        .data(response)
+                        .build()
+        );
+    }
+
+    // Endpoint đặt lại mật khẩu
+    // POST /api/v1/auth/reset-password
+    @PostMapping("/reset-password")
+    public ResponseEntity<ResponseObject<ResetPasswordResponse>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+        log.info("Yêu cầu đặt lại mật khẩu");
+
+        ResetPasswordResponse response = authService.resetPassword(request);
+
+        if (!response.isSuccess()) {
+            return ResponseEntity.badRequest()
+                    .body(ResponseObject.<ResetPasswordResponse>builder()
+                            .success(false)
+                            .message(response.getMessage())
+                            .data(response)
+                            .build()
+                    );
+        }
+
+        return ResponseEntity.ok(
+                ResponseObject.<ResetPasswordResponse>builder()
+                        .success(true)
+                        .message(response.getMessage())
+                        .data(response)
+                        .build()
+        );
+    }
+
 }

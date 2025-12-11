@@ -16,6 +16,7 @@ import org.fyp.tmssep490be.dtos.schedule.TimeSlotDTO;
 import org.fyp.tmssep490be.entities.Resource;
 import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.SessionResource;
+import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.Teacher;
 import org.fyp.tmssep490be.entities.TeacherRequest;
 import org.fyp.tmssep490be.entities.TeachingSlot;
@@ -32,6 +33,7 @@ import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.ResourceRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
 import org.fyp.tmssep490be.repositories.SessionResourceRepository;
+import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.fyp.tmssep490be.repositories.TeacherRepository;
 import org.fyp.tmssep490be.repositories.TeacherRequestRepository;
 import org.fyp.tmssep490be.repositories.TeachingSlotRepository;
@@ -42,6 +44,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -57,6 +60,7 @@ public class TeacherRequestService {
     private final TeacherRepository teacherRepository;
     private final SessionRepository sessionRepository;
     private final SessionResourceRepository sessionResourceRepository;
+    private final StudentSessionRepository studentSessionRepository;
     private final TeachingSlotRepository teachingSlotRepository;
     private final UserBranchesRepository userBranchesRepository;
     private final UserAccountRepository userAccountRepository;
@@ -1184,6 +1188,25 @@ public class TeacherRequestService {
         OffsetDateTime decidedAt = request.getDecidedAt() != null ? request.getDecidedAt() : request.getSubmittedAt();
         Resource newResource = request.getNewResource();
         TimeSlotTemplate newTimeSlot = request.getNewTimeSlot();
+        Session newSession = request.getNewSession();
+
+        // Lấy thông tin buổi mới (nếu có)
+        LocalDate newSessionDate = newSession != null ? newSession.getDate() : request.getNewDate();
+        LocalTime newSessionStart = newSession != null && newSession.getTimeSlotTemplate() != null
+                ? newSession.getTimeSlotTemplate().getStartTime()
+                : (newTimeSlot != null ? newTimeSlot.getStartTime() : null);
+        LocalTime newSessionEnd = newSession != null && newSession.getTimeSlotTemplate() != null
+                ? newSession.getTimeSlotTemplate().getEndTime()
+                : (newTimeSlot != null ? newTimeSlot.getEndTime() : null);
+        String newSessionResourceName = null;
+        if (newSession != null && newSession.getSessionResources() != null && !newSession.getSessionResources().isEmpty()) {
+            newSessionResourceName = newSession.getSessionResources().iterator().next().getResource().getName();
+        } else if (newResource != null) {
+            newSessionResourceName = newResource.getName();
+        }
+        String newSessionClassCode = newSession != null && newSession.getClassEntity() != null
+                ? newSession.getClassEntity().getCode()
+                : null;
 
         // Current modality/resource
         String currentModality = classEntity != null && classEntity.getModality() != null
@@ -1224,7 +1247,13 @@ public class TeacherRequestService {
                 .decidedAt(decidedAt)
                 .decidedById(handler != null ? handler.getId() : null)
                 .decidedByName(handler != null ? handler.getFullName() : null)
-                .decidedByEmail(handler != null ? handler.getEmail() : null);
+                .decidedByEmail(handler != null ? handler.getEmail() : null)
+                .newSessionId(newSession != null ? newSession.getId() : null)
+                .newSessionDate(newSessionDate)
+                .newSessionStartTime(newSessionStart)
+                .newSessionEndTime(newSessionEnd)
+                .newSessionResourceName(newSessionResourceName)
+                .newSessionClassCode(newSessionClassCode);
 
         // Debug log to trace who is shown as handler in responses
         log.debug(
@@ -1663,85 +1692,103 @@ public class TeacherRequestService {
 
     //Validate và approve RESCHEDULE request
     private void validateAndApproveReschedule(TeacherRequest request, TeacherRequestApproveDTO approveDTO) {
-        // RESCHEDULE: Ưu tiên newResourceId do academic staff chọn trong approveDTO
-        // Nếu academic staff không chọn, dùng newResource mà teacher đã đề xuất khi tạo request
+        // Lấy các giá trị mới (ưu tiên approveDTO)
         Long chosenResourceId = approveDTO.getNewResourceId() != null
                 ? approveDTO.getNewResourceId()
                 : (request.getNewResource() != null ? request.getNewResource().getId() : null);
+        LocalDate newDate = approveDTO.getNewDate() != null ? approveDTO.getNewDate() : request.getNewDate();
+        Long newTimeSlotId = approveDTO.getNewTimeSlotId() != null ? approveDTO.getNewTimeSlotId()
+                : (request.getNewTimeSlot() != null ? request.getNewTimeSlot().getId() : null);
 
-        // Nếu cả academic staff và teacher đều không chọn, bắt buộc academic staff phải chọn
+        // Validate tối thiểu
         if (chosenResourceId == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Resource ID is required for RESCHEDULE requests");
         }
-
-        // Xác định newDate và newTimeSlotId
-        // Priority: approveDTO > request (nếu teacher đã điền)
-        LocalDate newDate = approveDTO.getNewDate() != null ? approveDTO.getNewDate() : request.getNewDate();
-        Long newTimeSlotId = approveDTO.getNewTimeSlotId() != null ? approveDTO.getNewTimeSlotId() :
-                (request.getNewTimeSlot() != null ? request.getNewTimeSlot().getId() : null);
-
-        // Validate: nếu teacher chưa điền newDate hoặc newTimeSlotId, staff phải điền
-        if (newDate == null) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "New date is required for RESCHEDULE requests");
+        if (newDate == null || newTimeSlotId == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "New date and time slot are required for RESCHEDULE requests");
         }
-        if (newTimeSlotId == null) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "New time slot ID is required for RESCHEDULE requests");
-        }
-
-        // Validate newDate không được trong quá khứ
         if (newDate.isBefore(LocalDate.now())) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "New date cannot be in the past");
         }
 
-        // Kiểm tra resource tồn tại
         Resource newResource = resourceRepository.findById(chosenResourceId)
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Resource not found"));
-
-        // Kiểm tra time slot tồn tại
         TimeSlotTemplate newTimeSlot = timeSlotTemplateRepository.findById(newTimeSlotId)
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Time slot not found"));
 
-        // Cập nhật thông tin vào request
+        // Cập nhật thông tin mới vào request
         request.setNewDate(newDate);
         request.setNewTimeSlot(newTimeSlot);
         request.setNewResource(newResource);
 
-        // Cập nhật session với thông tin mới
-        Session session = request.getSession();
-        if (session == null) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no associated session");
+        // Reschedule theo cách của bản deprecated: tạo session mới, copy, cancel session cũ
+        Session oldSession = sessionRepository.findById(request.getSession().getId())
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT, "Session not found"));
+
+        // Tạo session mới
+        OffsetDateTime now = OffsetDateTime.now();
+        Session newSession = Session.builder()
+                .classEntity(oldSession.getClassEntity())
+                .subjectSession(oldSession.getSubjectSession())
+                .timeSlotTemplate(newTimeSlot)
+                .date(newDate)
+                .type(oldSession.getType())
+                .status(SessionStatus.PLANNED)
+                .teacherNote(null)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+        newSession = sessionRepository.save(newSession);
+
+        // Copy teaching slot của giáo viên
+        TeachingSlot newTeachingSlot = TeachingSlot.builder()
+                .id(new TeachingSlot.TeachingSlotId(newSession.getId(), request.getTeacher().getId()))
+                .session(newSession)
+                .teacher(request.getTeacher())
+                .status(TeachingSlotStatus.SCHEDULED)
+                .build();
+        teachingSlotRepository.save(newTeachingSlot);
+
+        // Copy student sessions (chỉ những bản ghi PLANNED)
+        List<StudentSession> oldStudentSessions = studentSessionRepository.findAll().stream()
+                .filter(ss -> ss.getSession().getId().equals(oldSession.getId()))
+                .filter(ss -> ss.getAttendanceStatus() == null ||
+                        ss.getAttendanceStatus() == org.fyp.tmssep490be.entities.enums.AttendanceStatus.PLANNED)
+                .collect(Collectors.toList());
+        for (StudentSession oldSs : oldStudentSessions) {
+            StudentSession.StudentSessionId newSsId = new StudentSession.StudentSessionId();
+            newSsId.setStudentId(oldSs.getStudent().getId());
+            newSsId.setSessionId(newSession.getId());
+
+            StudentSession newSs = StudentSession.builder()
+                    .id(newSsId)
+                    .student(oldSs.getStudent())
+                    .session(newSession)
+                    .attendanceStatus(org.fyp.tmssep490be.entities.enums.AttendanceStatus.PLANNED)
+                    .isMakeup(false)
+                    .homeworkStatus(null)
+                    .note(null)
+                    .build();
+            studentSessionRepository.save(newSs);
         }
 
-        // Update session date
-        session.setDate(newDate);
+        // Tạo session resource cho session mới
+        SessionResource newSessionResource = SessionResource.builder()
+                .id(new SessionResource.SessionResourceId(newSession.getId(), newResource.getId()))
+                .session(newSession)
+                .resource(newResource)
+                .build();
+        sessionResourceRepository.save(newSessionResource);
 
-        // Update session time slot
-        session.setTimeSlotTemplate(newTimeSlot);
+        // Hủy session cũ
+        oldSession.setStatus(SessionStatus.CANCELLED);
+        sessionRepository.save(oldSession);
 
-        // Update session resources: xóa resources cũ và thêm resource mới
-        // Xóa tất cả session resources hiện tại
-        if (!session.getSessionResources().isEmpty()) {
-            sessionResourceRepository.deleteAll(session.getSessionResources());
-            session.getSessionResources().clear();
-        }
+        // Lưu lại session mới vào request (để tracking)
+        request.setNewSession(newSession);
 
-        // Tạo session resource mới
-        SessionResource newSessionResource = new SessionResource();
-        SessionResource.SessionResourceId sessionResourceId = new SessionResource.SessionResourceId();
-        sessionResourceId.setSessionId(session.getId());
-        sessionResourceId.setResourceId(newResource.getId());
-        newSessionResource.setId(sessionResourceId);
-        newSessionResource.setSession(session);
-        newSessionResource.setResource(newResource);
-
-        // Thêm vào session
-        session.getSessionResources().add(newSessionResource);
-
-        // Lưu session (cascade sẽ lưu SessionResource)
-        sessionRepository.save(session);
-
-        log.info("Session {} updated: date={}, timeSlot={}, resource={}", 
-                session.getId(), newDate, newTimeSlotId, newResource.getId());
+        log.info("Reschedule: oldSession={} cancelled, newSession={} created date={} slot={} resource={}",
+                oldSession.getId(), newSession.getId(), newDate, newTimeSlotId, newResource.getId());
     }
 
     //Từ chối yêu cầu giáo viên

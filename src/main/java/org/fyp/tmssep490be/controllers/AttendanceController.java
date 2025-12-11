@@ -1,11 +1,5 @@
 package org.fyp.tmssep490be.controllers;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.fyp.tmssep490be.dtos.attendance.*;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
@@ -25,8 +19,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/attendance")
 @RequiredArgsConstructor
-@Tag(name = "Teacher Attendance", description = "APIs for teachers to manage session attendance")
-@SecurityRequirement(name = "bearerAuth")
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
@@ -35,9 +27,6 @@ public class AttendanceController {
 
     @GetMapping("/sessions/today")
     @PreAuthorize("hasRole('TEACHER')")
-    @Operation(summary = "Get today's sessions for teacher")
-    @ApiResponse(responseCode = "200", description = "OK",
-            content = @Content(schema = @Schema(implementation = SessionTodayDTO.class)))
     public ResponseEntity<ResponseObject<List<SessionTodayDTO>>> getTodaySessions(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam(required = false)
@@ -57,9 +46,6 @@ public class AttendanceController {
 
     @GetMapping("/sessions/{sessionId}/students")
     @PreAuthorize("hasRole('TEACHER')")
-    @Operation(summary = "Get attendance data for students in a session")
-    @ApiResponse(responseCode = "200", description = "OK",
-            content = @Content(schema = @Schema(implementation = StudentsAttendanceResponseDTO.class)))
     public ResponseEntity<ResponseObject<StudentsAttendanceResponseDTO>> getSessionStudents(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long sessionId
@@ -77,9 +63,6 @@ public class AttendanceController {
 
     @PostMapping("/sessions/{sessionId}/mark-all-present")
     @PreAuthorize("hasRole('TEACHER')")
-    @Operation(summary = "Mark all students in the session as present")
-    @ApiResponse(responseCode = "200", description = "OK",
-            content = @Content(schema = @Schema(implementation = MarkAllResponseDTO.class)))
     public ResponseEntity<ResponseObject<MarkAllResponseDTO>> markAllPresent(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long sessionId
@@ -97,9 +80,6 @@ public class AttendanceController {
 
     @PostMapping("/sessions/{sessionId}/mark-all-absent")
     @PreAuthorize("hasRole('TEACHER')")
-    @Operation(summary = "Mark all students in the session as absent")
-    @ApiResponse(responseCode = "200", description = "OK",
-            content = @Content(schema = @Schema(implementation = MarkAllResponseDTO.class)))
     public ResponseEntity<ResponseObject<MarkAllResponseDTO>> markAllAbsent(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long sessionId
@@ -117,9 +97,6 @@ public class AttendanceController {
 
     @PostMapping("/sessions/{sessionId}/save")
     @PreAuthorize("hasRole('TEACHER')")
-    @Operation(summary = "Save attendance records for a session")
-    @ApiResponse(responseCode = "200", description = "OK",
-            content = @Content(schema = @Schema(implementation = AttendanceSaveResponseDTO.class)))
     public ResponseEntity<ResponseObject<AttendanceSaveResponseDTO>> saveAttendance(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long sessionId,
@@ -138,9 +115,6 @@ public class AttendanceController {
 
     @GetMapping("/sessions/{sessionId}/report")
     @PreAuthorize("hasRole('TEACHER')")
-    @Operation(summary = "Get session report details")
-    @ApiResponse(responseCode = "200", description = "OK",
-            content = @Content(schema = @Schema(implementation = SessionReportResponseDTO.class)))
     public ResponseEntity<ResponseObject<SessionReportResponseDTO>> getSessionReport(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long sessionId
@@ -158,9 +132,6 @@ public class AttendanceController {
 
     @PostMapping("/sessions/{sessionId}/report")
     @PreAuthorize("hasRole('TEACHER')")
-    @Operation(summary = "Submit teacher session report")
-    @ApiResponse(responseCode = "200", description = "OK",
-            content = @Content(schema = @Schema(implementation = SessionReportResponseDTO.class)))
     public ResponseEntity<ResponseObject<SessionReportResponseDTO>> submitSessionReport(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long sessionId,
@@ -179,8 +150,6 @@ public class AttendanceController {
 
     @PostMapping("/admin/update-past-sessions")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CENTER_HEAD')")
-    @Operation(summary = "Manually trigger update of past sessions to DONE status")
-    @ApiResponse(responseCode = "200", description = "OK")
     public ResponseEntity<ResponseObject<String>> updatePastSessions() {
         sessionAutoUpdateService.updatePastSessionsToDoneNow();
         return ResponseEntity.ok(

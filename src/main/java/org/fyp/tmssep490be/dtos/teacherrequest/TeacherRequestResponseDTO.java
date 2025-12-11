@@ -44,6 +44,12 @@ public class TeacherRequestResponseDTO {
     private Long newResourceId;
     private String newResourceName;
     private String newResourceType;
+    private Long newSessionId;
+    private LocalDate newSessionDate;
+    private LocalTime newSessionStartTime;
+    private LocalTime newSessionEndTime;
+    private String newSessionResourceName;
+    private String newSessionClassCode;
     private String requestReason;
     private String note;
     private OffsetDateTime submittedAt;
@@ -51,6 +57,5 @@ public class TeacherRequestResponseDTO {
     private Long decidedById;
     private String decidedByName;
     private String decidedByEmail;
-    private Long newSessionId;
 }
 

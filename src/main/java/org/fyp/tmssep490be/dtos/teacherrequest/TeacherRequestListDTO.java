@@ -22,7 +22,6 @@ public class TeacherRequestListDTO {
     private TeacherRequestType requestType;
     private RequestStatus status;
 
-    // Thông tin session gốc
     private Long sessionId;
     private LocalDate sessionDate;
     private LocalTime sessionStartTime;
@@ -31,15 +30,12 @@ public class TeacherRequestListDTO {
     private String classCode;
     private String sessionTopic;
 
-    // Thông tin giáo viên tạo yêu cầu
     private Long teacherId;
     private String teacherName;
     private String teacherEmail;
 
-    // Giáo viên thay thế phù hợp với yêu cầu dạy thay
     private String replacementTeacherName;
 
-    // Lịch học phù hợp với yêu cầu rời lịch 1 buổi học
     private LocalDate newSessionDate;
     private LocalTime newSessionStartTime;
     private LocalTime newSessionEndTime;
@@ -51,7 +47,6 @@ public class TeacherRequestListDTO {
     private String decidedByName;
     private String decidedByEmail;
 
-    // Phòng học/link zoom phù hợp với yêu cầu đổi hình thức học
     private Modality currentModality;
     private Modality newModality;
 }

@@ -7,8 +7,6 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-// DTO cho danh sách giáo viên trong quản lý Academic Teacher
-// Hiển thị thông tin cơ bản của giáo viên kèm tóm tắt về skills
 @Data
 @Builder
 @NoArgsConstructor
@@ -22,9 +20,7 @@ public class AcademicTeacherListItemDTO {
     private String avatarUrl;
     private String status;
     
-    // Tóm tắt về skills
-    private Boolean hasSkills; // Có skills hay không
-    private Integer totalSkills; // Tổng số skills
-    private List<String> specializations; // Danh sách các specialization (ví dụ: ["IELTS", "TOEIC"])
+    private Boolean hasSkills;
+    private Integer totalSkills;
+    private List<String> specializations;
 }
-
