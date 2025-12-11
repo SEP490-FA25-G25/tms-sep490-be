@@ -97,4 +97,46 @@ public class SubjectController {
                                 .build());
         }
 
+        // ========== APPROVAL WORKFLOW ==========
+
+        @PostMapping("/{id}/submit")
+        @Operation(summary = "Submit subject for approval", description = "Gửi môn học để phê duyệt")
+        public ResponseEntity<ResponseObject<Void>> submitSubject(@PathVariable Long id) {
+                log.info("Submitting subject with ID: {}", id);
+                subjectService.submitSubject(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Đã gửi môn học để phê duyệt thành công")
+                                .build());
+        }
+
+        @PostMapping("/{id}/approve")
+        @Operation(summary = "Approve subject", description = "Phê duyệt môn học")
+        public ResponseEntity<ResponseObject<Void>> approveSubject(
+                        @PathVariable Long id,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                log.info("Approving subject with ID: {}", id);
+                Long managerId = currentUser != null ? currentUser.getId() : null;
+                subjectService.approveSubject(id, managerId);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Đã phê duyệt môn học thành công")
+                                .build());
+        }
+
+        @PostMapping("/{id}/reject")
+        @Operation(summary = "Reject subject", description = "Từ chối môn học")
+        public ResponseEntity<ResponseObject<Void>> rejectSubject(
+                        @PathVariable Long id,
+                        @RequestBody(required = false) String reason,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                log.info("Rejecting subject with ID: {}", id);
+                Long managerId = currentUser != null ? currentUser.getId() : null;
+                subjectService.rejectSubject(id, managerId, reason);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Đã từ chối môn học")
+                                .build());
+        }
+
 }

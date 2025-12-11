@@ -11,6 +11,7 @@ import org.fyp.tmssep490be.repositories.*;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ public class SubjectService {
     private final SubjectAssessmentCLOMappingRepository subjectAssessmentCLOMappingRepository;
     private final SubjectMaterialRepository subjectMaterialRepository;
     private final UserAccountRepository userAccountRepository;
+    private final NotificationService notificationService;
     private final EntityManager entityManager;
 
     // ========== GET ALL SUBJECTS ==========
@@ -746,5 +748,195 @@ public class SubjectService {
                 })
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    // ========== APPROVAL WORKFLOW ==========
+
+    /**
+     * Submit a subject for approval
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void submitSubject(Long id) {
+        log.info("Submitting subject for approval: {}", id);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        log.info("Current subject status: {}, approvalStatus: {}", subject.getStatus(), subject.getApprovalStatus());
+
+        // Only allow submission if status is DRAFT or REJECTED
+        if (subject.getStatus() != SubjectStatus.DRAFT && subject.getStatus() != SubjectStatus.REJECTED) {
+            throw new IllegalStateException("Chỉ có thể gửi môn học ở trạng thái NHÁP hoặc BỊ TỪ CHỐI");
+        }
+
+        // Set updatedAt only when re-submitting after rejection
+        if (subject.getApprovalStatus() == ApprovalStatus.REJECTED) {
+            subject.setUpdatedAt(OffsetDateTime.now());
+            log.info("Subject {} is being re-submitted after rejection", id);
+        }
+
+        subject.setStatus(SubjectStatus.SUBMITTED);
+        subject.setApprovalStatus(ApprovalStatus.PENDING);
+        subject.setSubmittedAt(OffsetDateTime.now());
+
+        log.info("About to save subject with status: {}", subject.getStatus());
+        subjectRepository.save(subject);
+        log.info("Subject saved successfully");
+
+        // Send notification to Managers - temporarily disabled for debugging
+        // TODO: Re-enable once issue is fixed
+        try {
+            sendNotificationToManagers(subject);
+        } catch (Exception e) {
+            log.error("Notification failed but continuing: {}", e.getMessage());
+            // Don't rethrow - let the submit succeed even if notification fails
+        }
+
+        log.info("Subject {} submitted successfully", id);
+    }
+
+    /**
+     * Approve a subject
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void approveSubject(Long id, Long managerId) {
+        log.info("Approving subject with ID: {} by manager: {}", id, managerId);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        if (subject.getStatus() != SubjectStatus.SUBMITTED) {
+            throw new IllegalStateException("Chỉ có thể phê duyệt môn học ở trạng thái ĐÃ GỬI");
+        }
+
+        // Set approval status
+        subject.setStatus(SubjectStatus.PENDING_ACTIVATION);
+        subject.setApprovalStatus(ApprovalStatus.APPROVED);
+        subject.setDecidedAt(OffsetDateTime.now());
+
+        // Set decided by manager
+        if (managerId != null) {
+            UserAccount manager = userAccountRepository.findById(managerId).orElse(null);
+            subject.setDecidedByManager(manager);
+        }
+
+        subjectRepository.save(subject);
+
+        // Send notification to Subject Leader (creator)
+        sendApprovalNotificationToCreator(subject, true, null);
+
+        log.info("Subject {} approved successfully. Will be activated on effective date: {}",
+                id, subject.getEffectiveDate());
+    }
+
+    /**
+     * Reject a subject
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void rejectSubject(Long id, Long managerId, String reason) {
+        log.info("Rejecting subject with ID: {}", id);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
+
+        if (subject.getStatus() != SubjectStatus.SUBMITTED) {
+            throw new IllegalStateException("Chỉ có thể từ chối môn học ở trạng thái ĐÃ GỬI");
+        }
+
+        subject.setStatus(SubjectStatus.DRAFT);
+        subject.setApprovalStatus(ApprovalStatus.REJECTED);
+        subject.setRejectionReason(reason);
+        subject.setDecidedAt(OffsetDateTime.now());
+
+        // Set decided by manager
+        if (managerId != null) {
+            UserAccount manager = userAccountRepository.findById(managerId).orElse(null);
+            subject.setDecidedByManager(manager);
+        }
+
+        subjectRepository.save(subject);
+
+        // Send notification to Subject Leader (creator) with rejection reason
+        sendApprovalNotificationToCreator(subject, false, reason);
+
+        log.info("Subject {} rejected. Reason: {}", id, reason);
+    }
+
+    /**
+     * Send notification to all Managers when a subject is submitted for approval
+     */
+    private void sendNotificationToManagers(Subject subject) {
+        try {
+            List<UserAccount> managers = userAccountRepository.findUsersByRole("MANAGER");
+
+            if (!managers.isEmpty()) {
+                String title = "Môn học mới cần phê duyệt";
+                String message = String.format(
+                        "Môn học '%s' (%s) cần được phê duyệt.",
+                        subject.getName(),
+                        subject.getCode());
+
+                List<Long> managerIds = managers.stream()
+                        .map(UserAccount::getId)
+                        .collect(Collectors.toList());
+
+                notificationService.sendBulkNotifications(
+                        managerIds,
+                        NotificationType.REQUEST,
+                        title,
+                        message);
+
+                log.info("Sent notification to {} managers about subject {} submission",
+                        managers.size(), subject.getId());
+            } else {
+                log.warn("No managers found to notify about subject {} submission", subject.getId());
+            }
+        } catch (Exception e) {
+            log.error("Error sending notification to managers for subject {}: {}",
+                    subject.getId(), e.getMessage(), e);
+            // Don't throw exception - notification failure shouldn't block submission
+        }
+    }
+
+    /**
+     * Send notification to Subject Leader (creator) when subject is approved or
+     * rejected
+     */
+    private void sendApprovalNotificationToCreator(Subject subject, boolean isApproved, String rejectionReason) {
+        try {
+            UserAccount creator = subject.getCreatedBy();
+            if (creator == null) {
+                log.warn("No creator found for subject {} - cannot send approval notification", subject.getId());
+                return;
+            }
+
+            String title;
+            String message;
+            NotificationType notificationType;
+
+            if (isApproved) {
+                title = "Môn học đã được phê duyệt";
+                message = String.format("Môn học '%s' (%s) của bạn đã được phê duyệt.",
+                        subject.getName(), subject.getCode());
+                notificationType = NotificationType.NOTIFICATION;
+            } else {
+                title = "Môn học bị từ chối";
+                message = String.format("Môn học '%s' (%s) của bạn bị từ chối. Lý do: %s",
+                        subject.getName(), subject.getCode(),
+                        rejectionReason != null ? rejectionReason : "Không có lý do cụ thể");
+                notificationType = NotificationType.NOTIFICATION;
+            }
+
+            notificationService.createNotification(
+                    creator.getId(),
+                    notificationType,
+                    title,
+                    message);
+
+            log.info("Sent {} notification to creator (user {}) for subject {}",
+                    isApproved ? "approval" : "rejection", creator.getId(), subject.getId());
+        } catch (Exception e) {
+            log.error("Error sending approval notification for subject {}: {}",
+                    subject.getId(), e.getMessage(), e);
+            // Don't throw exception - notification failure shouldn't block
+            // approval/rejection
+        }
     }
 }

@@ -69,7 +69,8 @@ public class UserAccountService {
 
         // Gán role cho user
         for (Long roleId : request.getRoleIds()) {
-            Role role = roleRepository.findById(roleId).orElseThrow(() -> new IllegalArgumentException("Role không tồn tại: " + roleId));
+            Role role = roleRepository.findById(roleId)
+                    .orElseThrow(() -> new IllegalArgumentException("Role không tồn tại: " + roleId));
             UserRole userRole = new UserRole();
             userRole.setId(new UserRole.UserRoleId(user.getId(), roleId));
             userRole.setUserAccount(user);
@@ -80,7 +81,8 @@ public class UserAccountService {
         // Gán branch cho user
         if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
             for (Long branchId : request.getBranchIds()) {
-                Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new IllegalArgumentException("Branch không tồn tại: " + branchId));
+                Branch branch = branchRepository.findById(branchId)
+                        .orElseThrow(() -> new IllegalArgumentException("Branch không tồn tại: " + branchId));
                 UserBranches userBranch = new UserBranches();
                 userBranch.setUserAccount(user);
                 userBranch.setBranch(branch);
@@ -99,14 +101,13 @@ public class UserAccountService {
                     .collect(Collectors.joining(", "));
         }
 
-// Gửi email thông tin đăng nhập
+        // Gửi email thông tin đăng nhập
         emailService.sendNewUserCredentialsAsync(
                 user.getEmail(),
                 user.getFullName(),
                 user.getEmail(),
                 request.getPassword(),
-                branchNames
-        );
+                branchNames);
 
         // Chuyển entity -> response DTO và return
         return mapToResponse(user);
@@ -119,7 +120,8 @@ public class UserAccountService {
         log.info("Request data - roleIds: {}, branchIds: {}", request.getRoleIds(), request.getBranchIds());
 
         // Tìm user theo userId
-        UserAccount user = userAccountRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
+        UserAccount user = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
 
         // Cập nhật thông tin user
         if (request.getFullName() != null) {
@@ -159,22 +161,22 @@ public class UserAccountService {
                 userRoleRepository.deleteAll(user.getUserRoles());
                 userRoleRepository.flush();
             }
-            
-           
+
             user.getUserRoles().clear();
 
             // Thêm role mới
             for (Long roleId : request.getRoleIds()) {
-                Role role = roleRepository.findById(roleId).orElseThrow(() -> new IllegalArgumentException("Role không tồn tại: " + roleId));
+                Role role = roleRepository.findById(roleId)
+                        .orElseThrow(() -> new IllegalArgumentException("Role không tồn tại: " + roleId));
                 UserRole userRole = new UserRole();
                 // Khởi tạo composite key cho UserRole
                 userRole.setId(new UserRole.UserRoleId(user.getId(), roleId));
                 userRole.setUserAccount(user);
                 userRole.setRole(role);
                 userRoleRepository.save(userRole);
-                
+
                 user.getUserRoles().add(userRole);
-                
+
                 log.info("Added role {} for user {}", roleId, user.getId());
             }
         } else {
@@ -191,21 +193,22 @@ public class UserAccountService {
                 userBranchesRepository.flush();
             }
             // userBranchesRepository.deleteByUserAccount(user); // KO DÙNG JPQL DELETE NỮA
-            
+
             // Đồng bộ collection trong memory
             user.getUserBranches().clear();
 
             // Thêm branch mới
             for (Long branchId : request.getBranchIds()) {
-                Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new IllegalArgumentException("Branch không tồn tại: " + branchId));
+                Branch branch = branchRepository.findById(branchId)
+                        .orElseThrow(() -> new IllegalArgumentException("Branch không tồn tại: " + branchId));
                 UserBranches userBranch = new UserBranches();
                 userBranch.setUserAccount(user);
                 userBranch.setBranch(branch);
                 userBranchesRepository.save(userBranch);
-                
+
                 // Add vào memory
                 user.getUserBranches().add(userBranch);
-                
+
                 log.info("Added branch {} for user {}", branchId, user.getId());
             }
         } else {
@@ -216,7 +219,8 @@ public class UserAccountService {
 
         // Không cần refresh entity nữa vì đã sync memory
         // UserAccount refreshedUser = userAccountRepository.findById(user.getId())
-        //         .orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + user.getId()));
+        // .orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " +
+        // user.getId()));
 
         return mapToResponse(user);
 
@@ -226,15 +230,19 @@ public class UserAccountService {
     public UserResponse getUserById(Long userId) {
         log.info("Getting user with ID: {}", userId);
 
-        UserAccount user = userAccountRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
+        UserAccount user = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
         return mapToResponse(user);
     }
 
     @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status, Long branchId) {
-        log.info("Getting all users with search: {}, role: {}, status: {}, branchId: {}", search, role, status, branchId);
+        log.info("Getting all users with search: {}, role: {}, status: {}, branchId: {}", search, role, status,
+                branchId);
 
-        Page<UserAccount> users = userAccountRepository.findAllWithFilters(search, role, status, branchId, pageable);
+        UserStatus userStatus = status != null && !status.isEmpty() ? UserStatus.valueOf(status) : null;
+        Page<UserAccount> users = userAccountRepository.findAllWithFilters(search, role, userStatus, branchId,
+                pageable);
         return users.map(this::mapToResponse);
     }
 
@@ -281,10 +289,11 @@ public class UserAccountService {
                 .address(user.getAddress())
                 .avatarUrl(user.getAvatarUrl())
                 .status(user.getStatus())
-                .roles(user.getUserRoles().stream().map(userRole -> userRole.getRole().getCode()).collect(Collectors.toSet()))
-                .branches(user.getUserBranches().stream().map(userBranch -> userBranch.getBranch().getName()).collect(Collectors.toSet()))
+                .roles(user.getUserRoles().stream().map(userRole -> userRole.getRole().getCode())
+                        .collect(Collectors.toSet()))
+                .branches(user.getUserBranches().stream().map(userBranch -> userBranch.getBranch().getName())
+                        .collect(Collectors.toSet()))
                 .build();
     }
-
 
 }
