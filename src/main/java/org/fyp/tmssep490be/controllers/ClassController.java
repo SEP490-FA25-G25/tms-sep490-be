@@ -32,9 +32,9 @@ public class ClassController {
 
     private final ClassService classService;
 
-    //Endpoint để lấy thông tin lớp học theo ID(cho TEACHER, STUDENT, ACADEMIC_AFFAIR, etc.)
+    //Endpoint để lấy thông tin lớp học theo ID(cho TEACHER, STUDENT, ACADEMIC_AFFAIR, QA, etc.)
     @GetMapping("/{classId}")
-    @PreAuthorize("hasRole('TEACHER') or hasRole('STUDENT') or hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER')")
+    @PreAuthorize("hasRole('TEACHER') or hasRole('STUDENT') or hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER') or hasRole('QA')")
     public ResponseEntity<ResponseObject<ClassDetailDTO>> getClassDetail(
             @PathVariable Long classId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -133,7 +133,7 @@ public class ClassController {
     }
 
     @GetMapping("/{classId}/sessions/metrics")
-    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER') or hasRole('QA')")
     public ResponseEntity<ResponseObject<QASessionListResponse>> getSessionsWithMetrics(
             @PathVariable Long classId,
             @AuthenticationPrincipal UserPrincipal currentUser) {

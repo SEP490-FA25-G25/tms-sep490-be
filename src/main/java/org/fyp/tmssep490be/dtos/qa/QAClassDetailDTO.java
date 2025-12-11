@@ -22,6 +22,10 @@ public class QAClassDetailDTO {
     private Long subjectId;
     private String branchName;
     private Long branchId;
+    private String branchAddress;
+    private String branchPhone;
+    private String branchDistrict;
+    private String branchCity;
     private String modality;
     private String status;
     private LocalDate startDate;

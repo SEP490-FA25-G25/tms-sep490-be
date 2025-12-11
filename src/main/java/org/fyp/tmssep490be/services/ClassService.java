@@ -259,6 +259,12 @@ public class ClassService {
         // Get all teachers teaching this class
         List<TeacherSummaryDTO> teachers = getTeachersForClass(classId);
 
+        // Get session summary
+        ClassDetailDTO.SessionSummary sessionSummary = calculateSessionSummary(classId);
+
+        // Get performance metrics
+        ClassDetailDTO.PerformanceMetrics performanceMetrics = calculatePerformanceMetrics(classId);
+
         return ClassDetailDTO.builder()
                 .id(classEntity.getId())
                 .code(classEntity.getCode())
@@ -284,6 +290,8 @@ public class ClassService {
                 .scheduleSummary(formatScheduleSummary(classEntity.getScheduleDays()))
                 .scheduleDetails(generateScheduleDetailsForClass(classEntity.getId(), classEntity.getScheduleDays()))
                 .enrollmentSummary(enrollmentSummary)
+                .sessionSummary(sessionSummary)
+                .performanceMetrics(performanceMetrics)
                 .build();
     }
 
@@ -380,6 +388,78 @@ public class ClassService {
                 .address(branch.getAddress())
                 .phone(branch.getPhone())
                 .email(branch.getEmail())
+                .district(branch.getDistrict())
+                .city(branch.getCity())
+                .build();
+    }
+
+    private ClassDetailDTO.SessionSummary calculateSessionSummary(Long classId) {
+        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
+        
+        int totalSessions = sessions.size();
+        int completedSessions = (int) sessions.stream()
+                .filter(s -> s.getStatus() == SessionStatus.DONE)
+                .count();
+        int cancelledSessions = (int) sessions.stream()
+                .filter(s -> s.getStatus() == SessionStatus.CANCELLED)
+                .count();
+        int upcomingSessions = (int) sessions.stream()
+                .filter(s -> s.getStatus() == SessionStatus.PLANNED)
+                .count();
+
+        return ClassDetailDTO.SessionSummary.builder()
+                .totalSessions(totalSessions)
+                .completedSessions(completedSessions)
+                .upcomingSessions(upcomingSessions)
+                .cancelledSessions(cancelledSessions)
+                .build();
+    }
+
+    private ClassDetailDTO.PerformanceMetrics calculatePerformanceMetrics(Long classId) {
+        // Get all student sessions for this class
+        List<StudentSession> studentSessions = studentSessionRepository.findByClassIdWithSessionAndStudent(classId);
+
+        if (studentSessions.isEmpty()) {
+            return ClassDetailDTO.PerformanceMetrics.builder()
+                    .attendanceRate(0.0)
+                    .homeworkCompletionRate(0.0)
+                    .build();
+        }
+
+        // Only count sessions that are DONE (completed)
+        List<StudentSession> completedStudentSessions = studentSessions.stream()
+                .filter(ss -> ss.getSession().getStatus() == SessionStatus.DONE)
+                .toList();
+
+        if (completedStudentSessions.isEmpty()) {
+            return ClassDetailDTO.PerformanceMetrics.builder()
+                    .attendanceRate(0.0)
+                    .homeworkCompletionRate(0.0)
+                    .build();
+        }
+
+        // Calculate attendance rate (PRESENT or EXCUSED / total completed sessions)
+        long totalRecorded = completedStudentSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() != AttendanceStatus.PLANNED)
+                .count();
+        long presentCount = completedStudentSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT || 
+                              ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
+                .count();
+        double attendanceRate = totalRecorded > 0 ? (double) presentCount / totalRecorded * 100 : 0.0;
+
+        // Calculate homework completion rate
+        long totalWithHomework = completedStudentSessions.stream()
+                .filter(ss -> ss.getHomeworkStatus() != null)
+                .count();
+        long completedHomework = completedStudentSessions.stream()
+                .filter(ss -> ss.getHomeworkStatus() == HomeworkStatus.COMPLETED)
+                .count();
+        double homeworkRate = totalWithHomework > 0 ? (double) completedHomework / totalWithHomework * 100 : 0.0;
+
+        return ClassDetailDTO.PerformanceMetrics.builder()
+                .attendanceRate(Math.round(attendanceRate * 10.0) / 10.0)
+                .homeworkCompletionRate(Math.round(homeworkRate * 10.0) / 10.0)
                 .build();
     }
 

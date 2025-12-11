@@ -15,4 +15,12 @@ public interface ScoreRepository extends JpaRepository<Score, Long> {
 
     @Query("SELECT sc FROM Score sc JOIN sc.assessment a WHERE sc.student.id = :studentId AND a.classEntity.id = :classId")
     List<Score> findByStudentIdAndClassId(@Param("studentId") Long studentId, @Param("classId") Long classId);
+
+    @Query("SELECT sc FROM Score sc JOIN sc.assessment a WHERE sc.student.id = :studentId AND a.classEntity.id = :classId")
+    List<Score> findByStudentIdAndAssessmentClassEntityId(@Param("studentId") Long studentId, @Param("classId") Long classId);
+
+    List<Score> findByAssessmentId(Long assessmentId);
+
+    @Query("SELECT sc FROM Score sc JOIN sc.assessment a WHERE a.classEntity.id = :classId")
+    List<Score> findByAssessmentClassEntityId(@Param("classId") Long classId);
 }

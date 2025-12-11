@@ -16,6 +16,7 @@ public class AssessmentDTO {
     private Long id;
     private String name;
     private String kind;
+    private String skill;
     private Integer durationMinutes;
     private String description;
     private OffsetDateTime scheduledDate;

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.qa.QAClassDetailDTO;
 import org.fyp.tmssep490be.dtos.qa.QAClassListItemDTO;
+import org.fyp.tmssep490be.dtos.qa.QAClassScoresDTO;
 import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
 import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
@@ -33,6 +34,8 @@ public class QAService {
     private final StudentSessionRepository studentSessionRepository;
     private final UserBranchesRepository userBranchesRepository;
     private final TeachingSlotRepository teachingSlotRepository;
+    private final AssessmentRepository assessmentRepository;
+    private final ScoreRepository scoreRepository;
 
     @Transactional(readOnly = true)
     public Page<QAClassListItemDTO> getQAClasses(
@@ -303,6 +306,10 @@ public class QAService {
                 .subjectName(classEntity.getSubject() != null ? classEntity.getSubject().getName() : "N/A")
                 .branchId(classEntity.getBranch() != null ? classEntity.getBranch().getId() : null)
                 .branchName(classEntity.getBranch() != null ? classEntity.getBranch().getName() : "N/A")
+                .branchAddress(classEntity.getBranch() != null ? classEntity.getBranch().getAddress() : null)
+                .branchPhone(classEntity.getBranch() != null ? classEntity.getBranch().getPhone() : null)
+                .branchDistrict(classEntity.getBranch() != null ? classEntity.getBranch().getDistrict() : null)
+                .branchCity(classEntity.getBranch() != null ? classEntity.getBranch().getCity() : null)
                 .modality(classEntity.getModality() != null ? classEntity.getModality().name() : null)
                 .status(classEntity.getStatus() != null ? classEntity.getStatus().name() : null)
                 .startDate(classEntity.getStartDate())
@@ -398,6 +405,137 @@ public class QAService {
                 .classCode(classEntity.getCode())
                 .totalSessions(sessions.size())
                 .sessions(sessionItems)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public QAClassScoresDTO getQAClassScores(Long classId, Long userId) {
+        log.info("Getting QA class scores for classId={}", classId);
+
+        ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học với ID: " + classId));
+
+        ensureUserHasAccessToClass(classEntity, userId);
+
+        // Get all assessments for this class
+        List<Assessment> assessments = assessmentRepository.findByClassEntityId(classId);
+        int totalAssessments = assessments.size();
+
+        // Get all enrolled students with their enrollment info
+        List<Enrollment> enrolledEnrollments = classEntity.getEnrollments().stream()
+                .filter(e -> e.getStatus() == org.fyp.tmssep490be.entities.enums.EnrollmentStatus.ENROLLED)
+                .collect(Collectors.toList());
+
+        int totalStudents = enrolledEnrollments.size();
+
+        // Build student-centric scores
+        List<QAClassScoresDTO.StudentScoresSummary> studentScoresList = enrolledEnrollments.stream()
+                .map(enrollment -> {
+                    Student student = enrollment.getStudent();
+                    // Get all scores for this student in this class
+                    List<Score> studentScores = scoreRepository.findByStudentIdAndAssessmentClassEntityId(
+                            student.getId(), classId);
+
+                    // Map to assessment scores
+                    List<QAClassScoresDTO.AssessmentScore> assessmentScores = assessments.stream()
+                            .map(assessment -> {
+                                Score score = studentScores.stream()
+                                        .filter(s -> s.getAssessment().getId().equals(assessment.getId()))
+                                        .findFirst()
+                                        .orElse(null);
+
+                                Double maxScore = assessment.getSubjectAssessment() != null 
+                                        ? assessment.getSubjectAssessment().getMaxScore().doubleValue() 
+                                        : null;
+
+                                return QAClassScoresDTO.AssessmentScore.builder()
+                                        .assessmentId(assessment.getId())
+                                        .assessmentName(assessment.getSubjectAssessment() != null 
+                                                ? assessment.getSubjectAssessment().getName() 
+                                                : "N/A")
+                                        .assessmentKind(assessment.getSubjectAssessment() != null && 
+                                                assessment.getSubjectAssessment().getKind() != null
+                                                ? assessment.getSubjectAssessment().getKind().name()
+                                                : null)
+                                        .skill(assessment.getSubjectAssessment() != null && 
+                                                assessment.getSubjectAssessment().getSkills() != null &&
+                                                !assessment.getSubjectAssessment().getSkills().isEmpty()
+                                                ? assessment.getSubjectAssessment().getSkills().get(0).name()
+                                                : null)
+                                        .maxScore(maxScore)
+                                        .durationMinutes(assessment.getSubjectAssessment() != null
+                                                ? assessment.getSubjectAssessment().getDurationMinutes()
+                                                : null)
+                                        .scheduledDate(assessment.getScheduledDate())
+                                        .actualDate(assessment.getActualDate())
+                                        .scoreId(score != null ? score.getId() : null)
+                                        .score(score != null && score.getScore() != null 
+                                                ? score.getScore().doubleValue() 
+                                                : null)
+                                        .scorePercentage(score != null && score.getScore() != null && maxScore != null
+                                                ? (score.getScore().doubleValue() / maxScore * 100)
+                                                : null)
+                                        .feedback(score != null ? score.getFeedback() : null)
+                                        .gradedByName(score != null && score.getGradedBy() != null && 
+                                                score.getGradedBy().getUserAccount() != null
+                                                ? score.getGradedBy().getUserAccount().getFullName()
+                                                : null)
+                                        .gradedAt(score != null ? score.getGradedAt() : null)
+                                        .build();
+                            })
+                            .collect(Collectors.toList());
+
+                    // Calculate student average
+                    double studentAverage = assessmentScores.stream()
+                            .filter(as -> as.getScore() != null)
+                            .mapToDouble(QAClassScoresDTO.AssessmentScore::getScore)
+                            .average()
+                            .orElse(0.0);
+
+                    int completedCount = (int) assessmentScores.stream()
+                            .filter(as -> as.getScore() != null)
+                            .count();
+
+                    return QAClassScoresDTO.StudentScoresSummary.builder()
+                            .studentId(student.getId())
+                            .studentCode(student.getStudentCode())
+                            .studentName(student.getUserAccount() != null ? student.getUserAccount().getFullName() : "N/A")
+                            .email(student.getUserAccount() != null ? student.getUserAccount().getEmail() : null)
+                            .phone(student.getUserAccount() != null ? student.getUserAccount().getPhone() : null)
+                            .address(student.getUserAccount() != null ? student.getUserAccount().getAddress() : null)
+                            .avatarUrl(student.getUserAccount() != null ? student.getUserAccount().getAvatarUrl() : null)
+                            .enrolledAt(enrollment.getCreatedAt())
+                            .averageScore(studentAverage)
+                            .totalAssessments(totalAssessments)
+                            .completedAssessments(completedCount)
+                            .scores(assessmentScores)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // Calculate overall class average
+        double classAverage = studentScoresList.stream()
+                .filter(s -> s.getAverageScore() != null && s.getAverageScore() > 0)
+                .mapToDouble(QAClassScoresDTO.StudentScoresSummary::getAverageScore)
+                .average()
+                .orElse(0.0);
+
+        long studentsWithScores = studentScoresList.stream()
+                .filter(s -> s.getCompletedAssessments() > 0)
+                .count();
+
+        QAClassScoresDTO.ScoreSummary scoreSummary = QAClassScoresDTO.ScoreSummary.builder()
+                .classAverage(classAverage)
+                .totalStudents(totalStudents)
+                .studentsWithScores((int) studentsWithScores)
+                .totalAssessments(totalAssessments)
+                .build();
+
+        return QAClassScoresDTO.builder()
+                .classId(classId)
+                .classCode(classEntity.getCode())
+                .scoreSummary(scoreSummary)
+                .students(studentScoresList)
                 .build();
     }
 
