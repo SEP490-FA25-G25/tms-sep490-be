@@ -71,6 +71,14 @@ public enum ErrorCode {
     // Create Class Workflow errors (4010-4099)
 
     // Class Code Generation errors (4032-4039)
+    CLASS_CODE_GENERATION_FAILED(4032, "Tạo mã lớp thất bại"),
+    CLASS_CODE_INVALID_FORMAT(4033, "Định dạng mã lớp không hợp lệ"),
+    CLASS_CODE_SEQUENCE_LIMIT_REACHED(4034, "Đã đạt giới hạn số thứ tự mã lớp"),
+    CLASS_CODE_PARSE_ERROR(4035, "Lỗi phân tích mã lớp"),
+    INVALID_CLASS_STATUS(4036, "Trạng thái lớp không hợp lệ để thực hiện thao tác này"),
+    CLASS_NAME_DUPLICATE(4037, "Tên lớp đã tồn tại trong chi nhánh"),
+    START_DATE_BEFORE_EFFECTIVE_DATE(4038, "Ngày bắt đầu lớp phải sau ngày hiệu lực của môn học"),
+    SCHEDULE_DAYS_EXCEEDS_SESSIONS(4039, "Số ngày học trong tuần vượt quá tổng số buổi học của môn học"),
 
     // Teacher errors (3000-3099)
     TEACHER_NOT_FOUND(3000, "Không tìm thấy giáo viên"),

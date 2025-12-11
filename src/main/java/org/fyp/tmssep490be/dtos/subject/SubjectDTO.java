@@ -23,6 +23,7 @@ public class SubjectDTO {
     private OffsetDateTime submittedAt;
     private OffsetDateTime decidedAt;
     private LocalDate effectiveDate;
+    private Integer numberOfSessions; // Tổng số buổi học
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private String subjectName;

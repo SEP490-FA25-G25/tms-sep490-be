@@ -27,45 +27,44 @@ import org.springframework.web.bind.annotation.RestController;
 @SecurityRequirement(name = "bearerAuth")
 public class CourseController {
 
-    private final SubjectService subjectService;
+        private final SubjectService subjectService;
 
-    // Endpoint để lấy giáo trình của course
-    @GetMapping("/{courseId}/syllabus")
-    @PreAuthorize("hasRole('TEACHER') or hasRole('STUDENT') or hasRole('ACADEMIC_AFFAIR')")
-    @Operation(summary = "Get course syllabus", description = "Lấy giáo trình của course (courseId = subjectId trong DB mới)")
-    public ResponseEntity<ResponseObject<SubjectDetailDTO>> getCourseSyllabus(
-            @PathVariable Long courseId,
-            @AuthenticationPrincipal UserPrincipal currentUser) {
-        log.info("User {} requesting syllabus for course (subjectId) {}", 
-                currentUser != null ? currentUser.getId() : null, courseId);
+        // Endpoint để lấy giáo trình của course
+        @GetMapping("/{courseId}/syllabus")
+        @PreAuthorize("hasRole('TEACHER') or hasRole('STUDENT') or hasRole('ACADEMIC_AFFAIR')")
+        @Operation(summary = "Get course syllabus", description = "Lấy giáo trình của course (courseId = subjectId trong DB mới)")
+        public ResponseEntity<ResponseObject<SubjectDetailDTO>> getCourseSyllabus(
+                        @PathVariable Long courseId,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                log.info("User {} requesting syllabus for course (subjectId) {}",
+                                currentUser != null ? currentUser.getId() : null, courseId);
 
-        SubjectDetailDTO syllabus = subjectService.getSubjectSyllabus(courseId);
+                SubjectDetailDTO syllabus = subjectService.getSubjectSyllabus(courseId);
 
-        return ResponseEntity.ok(ResponseObject.<SubjectDetailDTO>builder()
-                .success(true)
-                .message("Course syllabus retrieved successfully")
-                .data(syllabus)
-                .build());
-    }
+                return ResponseEntity.ok(ResponseObject.<SubjectDetailDTO>builder()
+                                .success(true)
+                                .message("Course syllabus retrieved successfully")
+                                .data(syllabus)
+                                .build());
+        }
 
-    // Endpoint để lấy materials hierarchy của course
-    @GetMapping("/{courseId}/materials")
-    @PreAuthorize("hasRole('TEACHER') or hasRole('STUDENT') or hasRole('ACADEMIC_AFFAIR')")
-    @Operation(summary = "Get course materials hierarchy", description = "Lấy danh sách materials của course theo hierarchy (courseId = subjectId trong DB mới)")
-    public ResponseEntity<ResponseObject<MaterialHierarchyDTO>> getCourseMaterials(
-            @PathVariable Long courseId,
-            @RequestParam(required = false) Long studentId,
-            @AuthenticationPrincipal UserPrincipal currentUser) {
-        log.info("User {} requesting materials for course (subjectId) {}, studentId: {}", 
-                currentUser != null ? currentUser.getId() : null, courseId, studentId);
+        // Endpoint để lấy materials hierarchy của course
+        @GetMapping("/{courseId}/materials")
+        @PreAuthorize("hasRole('TEACHER') or hasRole('STUDENT') or hasRole('ACADEMIC_AFFAIR')")
+        @Operation(summary = "Get course materials hierarchy", description = "Lấy danh sách materials của course theo hierarchy (courseId = subjectId trong DB mới)")
+        public ResponseEntity<ResponseObject<MaterialHierarchyDTO>> getCourseMaterials(
+                        @PathVariable Long courseId,
+                        @RequestParam(required = false) Long studentId,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                log.info("User {} requesting materials for course (subjectId) {}, studentId: {}",
+                                currentUser != null ? currentUser.getId() : null, courseId, studentId);
 
-        MaterialHierarchyDTO materials = subjectService.getSubjectMaterials(courseId, studentId);
+                MaterialHierarchyDTO materials = subjectService.getSubjectMaterials(courseId, studentId);
 
-        return ResponseEntity.ok(ResponseObject.<MaterialHierarchyDTO>builder()
-                .success(true)
-                .message("Course materials retrieved successfully")
-                .data(materials)
-                .build());
-    }
+                return ResponseEntity.ok(ResponseObject.<MaterialHierarchyDTO>builder()
+                                .success(true)
+                                .message("Course materials retrieved successfully")
+                                .data(materials)
+                                .build());
+        }
 }
-

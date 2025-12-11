@@ -72,8 +72,29 @@ public class SubjectService {
                         .submittedAt(subject.getSubmittedAt())
                         .decidedAt(subject.getDecidedAt())
                         .effectiveDate(subject.getEffectiveDate())
+                        .numberOfSessions(subject.getNumberOfSessions())
                         .createdAt(subject.getCreatedAt())
                         .updatedAt(subject.getUpdatedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    // ========== GET SUBJECTS FOR CLASS CREATION DROPDOWN ==========
+    // Chỉ lấy subjects với status ACTIVE hoặc PENDING_ACTIVATION
+    public List<SubjectDTO> getSubjectsForClassCreation() {
+        log.debug("Getting subjects for class creation dropdown (ACTIVE or PENDING_ACTIVATION)");
+
+        List<Subject> subjects = subjectRepository.findByStatusInOrderByNameAsc(
+                List.of(SubjectStatus.ACTIVE, SubjectStatus.PENDING_ACTIVATION));
+
+        return subjects.stream()
+                .map(subject -> SubjectDTO.builder()
+                        .id(subject.getId())
+                        .code(subject.getCode())
+                        .name(subject.getName())
+                        .status(subject.getStatus() != null ? subject.getStatus().name() : null)
+                        .effectiveDate(subject.getEffectiveDate())
+                        .numberOfSessions(subject.getNumberOfSessions())
                         .build())
                 .collect(Collectors.toList());
     }
