@@ -3,6 +3,8 @@ package org.fyp.tmssep490be.services;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.auth.AuthResponse;
+import org.fyp.tmssep490be.dtos.auth.ChangePasswordRequest;
+import org.fyp.tmssep490be.dtos.auth.ChangePasswordResponse;
 import org.fyp.tmssep490be.dtos.auth.LoginRequest;
 import org.fyp.tmssep490be.dtos.auth.RefreshTokenRequest;
 import org.fyp.tmssep490be.entities.UserAccount;
@@ -134,6 +136,53 @@ public class AuthService {
                 .avatarUrl(user.getAvatarUrl())
                 .roles(roleNames)
                 .branches(branches)
+                .build();
+    }
+
+    // Đổi mật khẩu cho người dùng đã đăng nhập
+    // @return Response cho biết thành công hay thất bại
+    @Transactional
+    public ChangePasswordResponse changePassword(Long userId, ChangePasswordRequest request) {
+        log.info("Yêu cầu đổi mật khẩu cho user: {}", userId);
+
+        // Tìm user
+        UserAccount user = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng"));
+
+        // Xác minh mật khẩu hiện tại
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            log.warn("Mật khẩu hiện tại không đúng cho user: {}", userId);
+            return ChangePasswordResponse.builder()
+                    .success(false)
+                    .message("Mật khẩu hiện tại không đúng")
+                    .build();
+        }
+
+        // Xác minh mật khẩu mới khớp với xác nhận
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            return ChangePasswordResponse.builder()
+                    .success(false)
+                    .message("Mật khẩu xác nhận không khớp")
+                    .build();
+        }
+
+        // Kiểm tra mật khẩu mới phải khác mật khẩu hiện tại
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+            return ChangePasswordResponse.builder()
+                    .success(false)
+                    .message("Mật khẩu mới phải khác mật khẩu hiện tại")
+                    .build();
+        }
+
+        // Cập nhật mật khẩu
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userAccountRepository.save(user);
+
+        log.info("Đổi mật khẩu thành công cho user: {}", userId);
+
+        return ChangePasswordResponse.builder()
+                .success(true)
+                .message("Đổi mật khẩu thành công")
                 .build();
     }
 }

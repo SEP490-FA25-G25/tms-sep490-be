@@ -222,21 +222,6 @@ public class UserAccountService {
 
     }
 
-    @Transactional
-    public void deleteUser(Long userId) {
-
-        log.info("Deleting user with ID: {}", userId);
-
-        // tìm user theo userId
-        UserAccount user = userAccountRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
-
-        // xóa user
-        user.setStatus(UserStatus.INACTIVE);
-        userAccountRepository.save(user);
-
-        log.info("User set to inactive successfully with ID: {}", user.getId());
-    }
-
     @Transactional(readOnly = true)
     public UserResponse getUserById(Long userId) {
         log.info("Getting user with ID: {}", userId);
@@ -248,12 +233,8 @@ public class UserAccountService {
     @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(Pageable pageable, String search, String role, String status, Long branchId) {
         log.info("Getting all users with search: {}, role: {}, status: {}, branchId: {}", search, role, status, branchId);
-        UserStatus statusEnum = null;
-        if (status != null && !status.isEmpty()) {
-            statusEnum = UserStatus.valueOf(status);
-        }
 
-        Page<UserAccount> users = userAccountRepository.findAllWithFilters(search, role, statusEnum, branchId, pageable);
+        Page<UserAccount> users = userAccountRepository.findAllWithFilters(search, role, status, branchId, pageable);
         return users.map(this::mapToResponse);
     }
 

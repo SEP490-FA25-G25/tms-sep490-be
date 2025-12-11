@@ -210,27 +210,6 @@ class UserAccountServiceTest {
     }
 
     // ==========================================================
-    // DELETE USER
-    // ==========================================================
-
-    @Test
-    void deleteUser_success() {
-        UserAccount u = user(11L);
-        when(userAccountRepository.findById(11L)).thenReturn(Optional.of(u));
-
-        userAccountService.deleteUser(11L);
-
-        assertEquals(UserStatus.INACTIVE, u.getStatus());
-        verify(userAccountRepository).save(u);
-    }
-
-    @Test
-    void deleteUser_notFound() {
-        when(userAccountRepository.findById(12L)).thenReturn(Optional.empty());
-        assertThrows(IllegalArgumentException.class, () -> userAccountService.deleteUser(12L));
-    }
-
-    // ==========================================================
     // GET USER BY ID
     // ==========================================================
 
