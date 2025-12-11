@@ -228,4 +228,35 @@ public class StudentController {
                 .build());
     }
 
+    // Student tự xem profile của mình
+    @GetMapping("/me/profile")
+    @PreAuthorize("hasRole('ROLE_STUDENT')")
+    public ResponseEntity<ResponseObject<StudentDetailDTO>> getMyProfile(
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("Student {} đang lấy thông tin profile", currentUser.getId());
+        StudentDetailDTO profile = studentService.getStudentProfileByUserId(currentUser.getId());
+        return ResponseEntity.ok(ResponseObject.<StudentDetailDTO>builder()
+                .success(true)
+                .message("Lấy thông tin profile thành công")
+                .data(profile)
+                .build());
+    }
+
+    // Student tự cập nhật profile của mình
+    @PutMapping("/me/profile")
+    @PreAuthorize("hasRole('ROLE_STUDENT')")
+    public ResponseEntity<ResponseObject<StudentDetailDTO>> updateMyProfile(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody org.fyp.tmssep490be.dtos.user.UpdateProfileRequest request
+    ) {
+        log.info("Student {} đang cập nhật profile", currentUser.getId());
+        StudentDetailDTO profile = studentService.updateStudentProfileByUserId(currentUser.getId(), request);
+        return ResponseEntity.ok(ResponseObject.<StudentDetailDTO>builder()
+                .success(true)
+                .message("Cập nhật profile thành công")
+                .data(profile)
+                .build());
+    }
+
 }

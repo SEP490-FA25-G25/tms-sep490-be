@@ -25,6 +25,7 @@ public class TeacherProfileDTO {
     private String gender;
     private LocalDate dateOfBirth;
     private String facebookUrl;
+    private String avatarUrl;
     private String status;
     private OffsetDateTime lastLoginAt;
     private String branchName;

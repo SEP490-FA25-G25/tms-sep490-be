@@ -41,6 +41,43 @@ public class TeacherService {
         return convertToTeacherProfileDTO(teacher);
     }
 
+    // Cập nhật thông tin profile của giáo viên hiện tại
+    @Transactional
+    public TeacherProfileDTO updateMyProfile(Long userAccountId, org.fyp.tmssep490be.dtos.user.UpdateProfileRequest request) {
+        log.debug("Updating teacher profile for user account {}", userAccountId);
+
+        // Tìm giáo viên theo user account ID
+        Teacher teacher = teacherRepository.findByUserAccountId(userAccountId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND));
+
+        var user = teacher.getUserAccount();
+
+        // Cập nhật thông tin
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress());
+        }
+        if (request.getFacebookUrl() != null) {
+            user.setFacebookUrl(request.getFacebookUrl());
+        }
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+        if (request.getDob() != null) {
+            user.setDob(request.getDob());
+        }
+
+        // Lưu lại
+        teacherRepository.save(teacher);
+
+        return convertToTeacherProfileDTO(teacher);
+    }
+
     // Chuyển đổi Teacher entity sang TeacherProfileDTO
     private TeacherProfileDTO convertToTeacherProfileDTO(Teacher teacher) {
         var user = teacher.getUserAccount();
@@ -118,6 +155,7 @@ public class TeacherService {
                 .gender(user.getGender() != null ? user.getGender().name() : null)
                 .dateOfBirth(user.getDob())
                 .facebookUrl(user.getFacebookUrl())
+                .avatarUrl(user.getAvatarUrl())
                 .status(user.getStatus().name())
                 .lastLoginAt(user.getLastLoginAt())
                 .branchName(branchName)
