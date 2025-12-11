@@ -174,4 +174,36 @@ public class JwtTokenProvider {
     public long getAccessTokenExpirationInSeconds() {
         return accessTokenValidityInMs / 1000;
     }
+
+    // Generate password reset token (valid for 1 hour)
+    public String generatePasswordResetToken(Long userId) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + 3600000); // 1 hour
+
+        return Jwts.builder()
+                .setSubject(String.valueOf(userId))
+                .claim("userId", userId)
+                .claim("type", "password-reset")
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(secretKey, SignatureAlgorithm.HS512)
+                .compact();
+    }
+
+    // Validate password reset token and return userId
+    public Long validatePasswordResetToken(String token) {
+        try {
+            if (!validateToken(token)) {
+                return null;
+            }
+            String tokenType = getTokenType(token);
+            if (!"password-reset".equals(tokenType)) {
+                return null;
+            }
+            return getUserIdFromJwt(token);
+        } catch (Exception e) {
+            log.error("Error validating password reset token", e);
+            return null;
+        }
+    }
 }

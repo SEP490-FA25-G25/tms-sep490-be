@@ -126,4 +126,14 @@ public class EmailService {
         sendEmailWithTemplateAsync(to, subject, "emails/feedback-reminder", templateData);
     }
 
+    public void sendPasswordResetEmailAsync(String to, String fullName, String resetLink) {
+        String subject = "Đặt lại mật khẩu - Hệ thống TMS";
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("fullName", fullName);
+        templateData.put("resetLink", resetLink);
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/password-reset", templateData);
+    }
+
 }

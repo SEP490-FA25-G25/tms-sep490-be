@@ -1,8 +1,5 @@
 package org.fyp.tmssep490be.controllers;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
@@ -19,15 +16,12 @@ import java.util.List;
 @RequestMapping("/api/v1/curriculum")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Quản lý Chương trình đào tạo", description = "APIs cho Curriculum và Level")
-@SecurityRequirement(name = "bearerAuth")
 public class CurriculumController {
 
         private final CurriculumService curriculumService;
 
         // Lấy tất cả curriculum với levels
         @GetMapping("/curriculums-with-levels")
-        @Operation(summary = "Get all curriculums with their levels", description = "Retrieve list of curriculums with their levels. Used for dropdowns.")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<List<CurriculumWithLevelsDTO>>> getAllCurriculumsWithLevels() {
                 log.info("Fetching all curriculums with their levels");
@@ -44,7 +38,6 @@ public class CurriculumController {
 
         // Tạo curriculum mới
         @PostMapping("/curriculums")
-        @Operation(summary = "Create a new curriculum")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<CurriculumResponseDTO>> createCurriculum(
                         @RequestBody CreateCurriculumDTO request) {
@@ -59,7 +52,6 @@ public class CurriculumController {
 
         // Lấy chi tiết curriculum
         @GetMapping("/curriculums/{id}")
-        @Operation(summary = "Get curriculum details")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<CurriculumResponseDTO>> getCurriculum(@PathVariable Long id) {
                 log.info("Fetching curriculum details for ID: {}", id);
@@ -73,7 +65,6 @@ public class CurriculumController {
 
         // Cập nhật curriculum
         @PutMapping("/curriculums/{id}")
-        @Operation(summary = "Update curriculum")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<CurriculumResponseDTO>> updateCurriculum(
                         @PathVariable Long id,
@@ -89,7 +80,6 @@ public class CurriculumController {
 
         // Deactivate curriculum
         @PatchMapping("/curriculums/{id}/deactivate")
-        @Operation(summary = "Deactivate curriculum")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<Void>> deactivateCurriculum(@PathVariable Long id) {
                 log.info("Deactivating curriculum with ID: {}", id);
@@ -102,7 +92,6 @@ public class CurriculumController {
 
         // Reactivate curriculum
         @PatchMapping("/curriculums/{id}/reactivate")
-        @Operation(summary = "Reactivate curriculum")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<Void>> reactivateCurriculum(@PathVariable Long id) {
                 log.info("Reactivating curriculum with ID: {}", id);
@@ -115,7 +104,6 @@ public class CurriculumController {
 
         // Delete curriculum
         @DeleteMapping("/curriculums/{id}")
-        @Operation(summary = "Delete curriculum")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<Void>> deleteCurriculum(@PathVariable Long id) {
                 log.info("Deleting curriculum with ID: {}", id);
@@ -128,7 +116,6 @@ public class CurriculumController {
 
         // Get Subject-PLO Matrix
         @GetMapping("/curriculums/{id}/subject-plo-matrix")
-        @Operation(summary = "Get Subject-PLO Matrix", description = "Get matrix showing which PLOs each Subject in the curriculum addresses through CLO mappings")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<SubjectPLOMatrixDTO>> getSubjectPLOMatrix(@PathVariable Long id) {
                 log.info("Fetching Subject-PLO matrix for curriculum ID: {}", id);
@@ -142,7 +129,6 @@ public class CurriculumController {
 
         // Tạo level mới
         @PostMapping("/levels")
-        @Operation(summary = "Create a new level")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<LevelResponseDTO>> createLevel(@RequestBody CreateLevelDTO request) {
                 log.info("Creating new level for curriculum ID: {}", request.getCurriculumId());
@@ -156,7 +142,6 @@ public class CurriculumController {
 
         // Lấy danh sách levels
         @GetMapping("/levels")
-        @Operation(summary = "Get all levels", description = "Retrieve all levels, optionally filtered by curriculum.")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<List<LevelResponseDTO>>> getLevels(
                         @RequestParam(required = false) Long curriculumId) {
@@ -171,7 +156,6 @@ public class CurriculumController {
 
         // Lấy chi tiết level
         @GetMapping("/levels/{id}")
-        @Operation(summary = "Get level details")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<LevelResponseDTO>> getLevel(@PathVariable Long id) {
                 log.info("Fetching level details for ID: {}", id);
@@ -185,7 +169,6 @@ public class CurriculumController {
 
         // Cập nhật level
         @PutMapping("/levels/{id}")
-        @Operation(summary = "Update level")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<LevelResponseDTO>> updateLevel(
                         @PathVariable Long id,
@@ -201,7 +184,6 @@ public class CurriculumController {
 
         // Deactivate level
         @PatchMapping("/levels/{id}/deactivate")
-        @Operation(summary = "Deactivate level")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<Void>> deactivateLevel(@PathVariable Long id) {
                 log.info("Deactivating level with ID: {}", id);
@@ -214,7 +196,6 @@ public class CurriculumController {
 
         // Reactivate level
         @PatchMapping("/levels/{id}/reactivate")
-        @Operation(summary = "Reactivate level")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<Void>> reactivateLevel(@PathVariable Long id) {
                 log.info("Reactivating level with ID: {}", id);
@@ -227,7 +208,6 @@ public class CurriculumController {
 
         // Update level sort order
         @PutMapping("/curriculums/{id}/levels/sort-order")
-        @Operation(summary = "Update level sort order for a curriculum")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<Void>> updateLevelSortOrder(
                         @PathVariable Long id,
@@ -242,7 +222,6 @@ public class CurriculumController {
 
         // Delete level
         @DeleteMapping("/levels/{id}")
-        @Operation(summary = "Delete level")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<Void>> deleteLevel(@PathVariable Long id) {
                 log.info("Deleting level with ID: {}", id);
@@ -255,7 +234,6 @@ public class CurriculumController {
 
         // Get standard timeslot duration
         @GetMapping("/timeslot-duration")
-        @Operation(summary = "Get standard timeslot duration", description = "Retrieve standard timeslot duration in hours.")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<BigDecimal>> getStandardTimeslotDuration() {
                 log.info("Fetching standard timeslot duration");
@@ -269,7 +247,6 @@ public class CurriculumController {
 
         // Get all timeslot durations
         @GetMapping("/timeslot-durations")
-        @Operation(summary = "Get all unique timeslot durations")
         @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER', 'ADMIN', 'SUBJECT_LEADER')")
         public ResponseEntity<ResponseObject<List<BigDecimal>>> getAllTimeslotDurations() {
                 log.info("Fetching all unique timeslot durations");

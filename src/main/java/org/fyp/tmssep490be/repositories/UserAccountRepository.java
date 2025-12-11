@@ -19,6 +19,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
         @EntityGraph(attributePaths = { "userRoles", "userRoles.role" })
         Optional<UserAccount> findByEmail(String email);
 
+        Optional<UserAccount> findByEmailAndStatus(String email, UserStatus status);
+
         Optional<UserAccount> findByPhone(String phone);
 
         @EntityGraph(attributePaths = { "userRoles", "userRoles.role", "userBranches", "userBranches.branch" })
