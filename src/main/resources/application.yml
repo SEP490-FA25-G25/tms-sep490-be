@@ -105,6 +105,9 @@ tms:
         enabled: true
         cron: "0 0 3 * * ?"  # Daily at 3:00 AM
         expiry-days: 7
+      student-feedback-creation:
+        enabled: true
+        cron: "0 0 1 * * ?"  # Daily at 1:00 AM - Create feedback for completed phases
 
 # AWS S3 Configuration (Set these as environment variables)
 aws:

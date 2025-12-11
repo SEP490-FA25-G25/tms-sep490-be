@@ -114,4 +114,16 @@ public class EmailService {
         sendEmailWithTemplateAsync(to, subject, "emails/class-enrollment", templateData);
     }
 
+
+    public void sendFeedbackReminderAsync(String to, String studentName, String className) {
+        String subject = "Nhắc nhở: Đánh giá khóa học";
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("className", className);
+        templateData.put("feedbackUrl", frontendUrl + "/student/feedbacks");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/feedback-reminder", templateData);
+    }
+
 }

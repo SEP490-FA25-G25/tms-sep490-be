@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nhắc nhở: Đánh giá khóa học</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            color: #4CAF50;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .icon {
+            font-size: 48px;
+            margin: 20px 0;
+        }
+        .title {
+            font-size: 24px;
+            color: #2196F3;
+            margin-bottom: 20px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .class-info {
+            background-color: #e8f5e9;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .class-info p {
+            margin: 8px 0;
+        }
+        .class-info .class-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2e7d32;
+        }
+        .btn {
+            display: inline-block;
+            padding: 14px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 600;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .btn:hover {
+            box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+        .info-box {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-left: 4px solid #2196F3;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .info-box ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .info-box li {
+            margin: 5px 0;
+        }
+        .footer {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .footer a {
+            color: #2196F3;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Hệ thống TMS</div>
+            <div class="icon">💬</div>
+            <div class="title">Nhắc nhở: Đánh giá khóa học</div>
+        </div>
+
+        <div class="content">
+            <p>Xin chào <strong th:text="${studentName}">Học viên</strong>,</p>
+
+            <p>Bạn vừa hoàn thành một phase học tập quan trọng. Để giúp chúng tôi cải thiện chất lượng đào tạo, vui lòng dành vài phút đánh giá khóa học.</p>
+
+            <div class="class-info">
+                <p class="class-name" th:text="${className}">Lớp IELTS Advanced</p>
+                <p style="color: #666;">Ý kiến của bạn rất quan trọng với chúng tôi!</p>
+            </div>
+
+            <div style="text-align: center;">
+                <a th:href="${feedbackUrl}" class="btn">
+                    Đánh giá ngay
+                </a>
+            </div>
+
+            <div class="info-box">
+                <strong>💡 Tại sao nên đánh giá?</strong>
+                <ul>
+                    <li>Giúp giảng viên và trung tâm cải thiện chất lượng giảng dạy</li>
+                    <li>Chia sẻ kinh nghiệm học tập với các học viên khác</li>
+                    <li>Đóng góp vào việc hoàn thiện chương trình đào tạo</li>
+                    <li>Chỉ mất 2-3 phút để hoàn thành</li>
+                </ul>
+            </div>
+
+            <p style="margin-top: 20px;">Cảm ơn bạn đã tin tưởng và học tập cùng TMS!</p>
+        </div>
+
+        <div class="footer">
+            <p>Đây là email tự động, vui lòng không trả lời trực tiếp.</p>
+            <p>Nếu cần hỗ trợ, vui lòng liên hệ: <a href="mailto:support@tms-edu.vn">support@tms-edu.vn</a></p>
+            <p style="margin-top: 15px;">
+                <a th:href="${frontendUrl}">Truy cập Hệ thống TMS</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
