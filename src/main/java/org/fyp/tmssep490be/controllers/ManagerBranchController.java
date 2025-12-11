@@ -1,0 +1,44 @@
+package org.fyp.tmssep490be.controllers;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.fyp.tmssep490be.dtos.branch.CreateBranchRequest;
+import org.fyp.tmssep490be.dtos.branch.ManagerBranchOverviewDTO;
+import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.services.ManagerBranchService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Slf4j
+@RestController
+@RequestMapping("/api/v1/manager/branches")
+@RequiredArgsConstructor
+public class ManagerBranchController {
+
+    private final ManagerBranchService managerBranchService;
+
+    // Lấy danh sách tất cả chi nhánh
+    @GetMapping
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ResponseObject<List<ManagerBranchOverviewDTO>>> getAllBranches() {
+        log.info("API: Manager lấy danh sách tất cả chi nhánh");
+        List<ManagerBranchOverviewDTO> branches = managerBranchService.getAllBranches();
+        return ResponseEntity.ok(new ResponseObject<>(true, "Lấy danh sách chi nhánh thành công", branches));
+    }
+
+    // Tạo chi nhánh mới
+    @PostMapping
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ResponseObject<ManagerBranchOverviewDTO>> createBranch(
+            @Valid @RequestBody CreateBranchRequest request) {
+        log.info("API: Manager tạo chi nhánh mới: {}", request.getName());
+        ManagerBranchOverviewDTO createdBranch = managerBranchService.createBranch(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ResponseObject<>(true, "Tạo chi nhánh thành công", createdBranch));
+    }
+}

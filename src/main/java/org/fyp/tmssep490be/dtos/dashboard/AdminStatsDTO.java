@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * DTO chứa thống kê tổng quan cho Admin Dashboard
+ * DTO thống kê tổng quan cho Admin Dashboard
  */
 @Data
 @Builder
