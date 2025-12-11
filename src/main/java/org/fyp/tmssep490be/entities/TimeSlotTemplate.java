@@ -44,10 +44,6 @@ public class TimeSlotTemplate {
     @Builder.Default
     private Set<Session> sessions = new HashSet<>();
 
-    @OneToMany(mappedBy = "timeSlotTemplate", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private Set<TeacherAvailability> teacherAvailabilities = new HashSet<>();
-
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 

@@ -6,8 +6,6 @@ DROP TABLE IF EXISTS score CASCADE;
 DROP TABLE IF EXISTS assessment CASCADE;
 DROP TABLE IF EXISTS subject_assessment_clo_mapping CASCADE;
 DROP TABLE IF EXISTS subject_assessment CASCADE;
-DROP TABLE IF EXISTS teacher_availability CASCADE;
-DROP TABLE IF EXISTS availability_campaign CASCADE;
 DROP TABLE IF EXISTS student_session CASCADE;
 DROP TABLE IF EXISTS enrollment CASCADE;
 DROP TABLE IF EXISTS teaching_slot CASCADE;
@@ -516,28 +514,7 @@ CREATE TABLE teacher_skill (
   CONSTRAINT chk_teacher_skill CHECK (skill IN ('GENERAL', 'READING', 'WRITING', 'SPEAKING', 'LISTENING', 'VOCABULARY', 'GRAMMAR', 'KANJI'))
 );
 
-CREATE TABLE teacher_availability (
-  teacher_id BIGINT NOT NULL,
-  time_slot_template_id BIGINT NOT NULL, -- time slot trong tuần mà teacher có thể dạy
-  day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
-  effective_date DATE,
-  note TEXT,
-  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  PRIMARY KEY(teacher_id,time_slot_template_id,day_of_week),
-  CONSTRAINT fk_teacher_availability_teacher FOREIGN KEY(teacher_id) REFERENCES teacher(id) ON DELETE CASCADE,
-  CONSTRAINT fk_teacher_availability_timeslot FOREIGN KEY(time_slot_template_id) REFERENCES time_slot_template(id) ON DELETE CASCADE
-);
 
-CREATE TABLE availability_campaign (
-  id BIGSERIAL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  deadline TIMESTAMPTZ NOT NULL,
-  target_audience VARCHAR(50), -- ALL, FULL_TIME, PART_TIME
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
 
 CREATE TABLE session_resource (
   session_id BIGINT NOT NULL,
@@ -806,7 +783,6 @@ CREATE INDEX idx_session_subject_session ON session(subject_session_id);
 CREATE INDEX idx_session_time_slot ON session(time_slot_template_id);
 CREATE INDEX idx_session_resource_resource ON session_resource(resource_id);
 CREATE INDEX idx_teaching_slot_teacher ON teaching_slot(teacher_id);
-CREATE INDEX idx_teacher_availability_timeslot ON teacher_availability(time_slot_template_id);
 CREATE INDEX idx_enrollment_student ON enrollment(student_id);
 CREATE INDEX idx_enrollment_class ON enrollment(class_id);
 CREATE INDEX idx_enrollment_join_session ON enrollment(join_session_id);
@@ -871,7 +847,6 @@ CREATE INDEX idx_notification_status_unread ON notification(status) WHERE status
 -- Date range queries (frequent in reports and scheduling)
 CREATE INDEX idx_session_date ON session(date);
 CREATE INDEX idx_class_start_date ON "class"(start_date);
-CREATE INDEX idx_teacher_availability_effective_date ON teacher_availability(effective_date);
 CREATE INDEX idx_subject_effective_date ON subject(effective_date);
 
 -- Indexes cho các query tìm kiếm theo code, email, phone
@@ -921,9 +896,6 @@ CREATE INDEX idx_subject_curriculum_approval ON subject(curriculum_id, approval_
 
 -- Assessment grading: "Điểm của học sinh X trong assessment Y"
 CREATE INDEX idx_score_student_assessment ON score(student_id, assessment_id);
-
--- Teacher availability lookup: "Teacher có rảnh vào thứ X slot Y không?"
-CREATE INDEX idx_teacher_availability_day_slot ON teacher_availability(day_of_week, time_slot_template_id);
 
 -- Indexes cho sorting và filtering theo thời gian
 CREATE INDEX idx_user_account_created_at ON user_account(created_at);

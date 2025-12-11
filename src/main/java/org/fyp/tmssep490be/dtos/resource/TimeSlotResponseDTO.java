@@ -2,7 +2,10 @@ package org.fyp.tmssep490be.dtos.resource;
 
 import lombok.*;
 
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class TimeSlotResponseDTO {
     private Long id;
     private Long branchId;
@@ -17,5 +20,4 @@ public class TimeSlotResponseDTO {
     private Long totalSessionsCount;
     private Boolean hasAnySessions;
     private Boolean hasFutureSessions;
-    private Boolean hasTeacherAvailability;
 }
