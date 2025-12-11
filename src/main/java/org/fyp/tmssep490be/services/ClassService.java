@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -746,6 +747,8 @@ public class ClassService {
                     // Get session info from related entities
                     Integer sequenceNumber = s.getSubjectSession() != null ? s.getSubjectSession().getSequenceNo() : null;
                     String timeSlot = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getName() : "TBA";
+                    LocalTime startTime = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getStartTime() : null;
+                    LocalTime endTime = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getEndTime() : null;
                     String topic = s.getSubjectSession() != null ? s.getSubjectSession().getTopic() : "N/A";
 
                     // Get teacher from teaching slots
@@ -765,6 +768,8 @@ public class ClassService {
                             .date(s.getDate())
                             .dayOfWeek(s.getDate() != null ? s.getDate().getDayOfWeek().name() : null)
                             .timeSlot(timeSlot)
+                            .startTime(startTime)
+                            .endTime(endTime)
                             .topic(topic)
                             .status(s.getStatus() != null ? s.getStatus().name() : null)
                             .teacherName(teacherName)
