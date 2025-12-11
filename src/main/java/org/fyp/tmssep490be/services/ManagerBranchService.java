@@ -187,7 +187,40 @@ public class ManagerBranchService {
         Branch savedBranch = branchRepository.save(branch);
         log.info("Đã ngưng hoạt động chi nhánh ID: {}", savedBranch.getId());
 
+        // Vô hiệu hóa tất cả user thuộc chi nhánh (ngoại trừ ADMIN và MANAGER)
+        deactivateUsersInBranch(savedBranch);
+
         return mapToOverviewDTO(savedBranch);
+    }
+
+    // Vô hiệu hóa tất cả user thuộc chi nhánh (ngoại trừ ADMIN và MANAGER)
+    private void deactivateUsersInBranch(Branch branch) {
+        if (branch.getUserBranches() == null) {
+            return;
+        }
+
+        List<String> excludedRoles = List.of("ADMIN", "MANAGER");
+        int deactivatedCount = 0;
+
+        for (UserBranches ub : branch.getUserBranches()) {
+            UserAccount user = ub.getUserAccount();
+            if (user == null || user.getStatus() == org.fyp.tmssep490be.entities.enums.UserStatus.INACTIVE) {
+                continue;
+            }
+
+            // Kiểm tra xem user có role ADMIN hoặc MANAGER không
+            boolean hasExcludedRole = user.getUserRoles() != null && user.getUserRoles().stream()
+                    .anyMatch(ur -> ur.getRole() != null && excludedRoles.contains(ur.getRole().getCode()));
+
+            if (!hasExcludedRole) {
+                user.setStatus(org.fyp.tmssep490be.entities.enums.UserStatus.INACTIVE);
+                user.setUpdatedAt(OffsetDateTime.now());
+                userAccountRepository.save(user);
+                deactivatedCount++;
+            }
+        }
+
+        log.info("Đã vô hiệu hóa {} user thuộc chi nhánh {}", deactivatedCount, branch.getName());
     }
 
     // Kích hoạt lại chi nhánh
