@@ -85,6 +85,51 @@ public class StudentController {
                         .build());
     }
     
+    @GetMapping("/check-existence")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<CheckStudentExistenceResponse>> checkStudentExistence(
+            @RequestParam String type, // EMAIL or PHONE
+            @RequestParam String value,
+            @RequestParam Long currentBranchId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} checking student existence: type={}, value={}, branchId={}",
+                currentUser.getId(), type, value, currentBranchId);
+
+        CheckStudentExistenceResponse response = studentService.checkStudentExistence(
+                type, value, currentBranchId, currentUser.getId()
+        );
+
+        return ResponseEntity.ok(ResponseObject.<CheckStudentExistenceResponse>builder()
+                .success(true)
+                .message("Check completed")
+                .data(response)
+                .build());
+    }
+
+    @PostMapping("/{studentId}/sync-to-branch")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<SyncToBranchResponse>> syncStudentToBranch(
+            @PathVariable Long studentId,
+            @Valid @RequestBody SyncToBranchRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} syncing student {} to branch {}",
+                currentUser.getId(), studentId, request.getTargetBranchId());
+
+        SyncToBranchResponse response = studentService.syncStudentToBranch(
+                studentId, request, currentUser.getId()
+        );
+
+        log.info("Successfully synced student {} to branch {}", studentId, request.getTargetBranchId());
+
+        return ResponseEntity.ok(ResponseObject.<SyncToBranchResponse>builder()
+                .success(true)
+                .message("Student synced to branch successfully")
+                .data(response)
+                .build());
+    }
+
     @GetMapping("/{studentId}")
     @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentDetailDTO>> getStudentDetail(
@@ -156,17 +201,29 @@ public class StudentController {
             @Valid @RequestBody StudentImportExecuteRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        log.info("User {} executing student import for branch {} with {} students",
-                currentUser.getId(), request.getBranchId(), request.getStudents().size());
+        log.info("=== EXECUTE IMPORT STARTED ===");
+        log.info("User {} executing student import for branch {} with {} students, selectedIndices: {}",
+                currentUser.getId(), request.getBranchId(), request.getStudents().size(), request.getSelectedIndices());
 
         StudentImportResult result = studentService.executeStudentImport(request, currentUser.getId());
 
-        log.info("Student import completed. Created: {}, Failed: {}",
-                result.getSuccessfulCreations(), result.getFailedCreations());
+        log.info("Student import completed. Created: {}, Synced: {}, Failed: {}",
+                result.getSuccessfulCreations(), result.getSyncedToBranch(), result.getFailedCreations());
+
+        int totalProcessed = result.getSuccessfulCreations() + result.getSyncedToBranch();
+        String message;
+        if (result.getSuccessfulCreations() > 0 && result.getSyncedToBranch() > 0) {
+            message = String.format("Đã nhập thành công %d học viên (%d tạo mới, %d đồng bộ)", 
+                    totalProcessed, result.getSuccessfulCreations(), result.getSyncedToBranch());
+        } else if (result.getSyncedToBranch() > 0) {
+            message = String.format("Đã đồng bộ thành công %d học viên vào chi nhánh", result.getSyncedToBranch());
+        } else {
+            message = String.format("Đã tạo mới thành công %d học viên", result.getSuccessfulCreations());
+        }
 
         return ResponseEntity.ok(ResponseObject.<StudentImportResult>builder()
                 .success(true)
-                .message(String.format("Successfully imported %d students", result.getSuccessfulCreations()))
+                .message(message)
                 .data(result)
                 .build());
     }

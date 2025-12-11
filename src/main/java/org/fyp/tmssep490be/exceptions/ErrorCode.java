@@ -42,6 +42,8 @@ public enum ErrorCode {
     STUDENT_SESSION_NOT_FOUND(1106, "Không tìm thấy buổi học của học viên hoặc học viên chưa đăng ký buổi học này"),
     STUDENT_NOT_ENROLLED_IN_CLASS(1107, "Học viên chưa đăng ký lớp này"),
     STUDENT_ACCESS_DENIED(1108, "Từ chối truy cập: Học viên không thuộc quyền quản lý của bạn"),
+    STUDENT_ALREADY_IN_BRANCH(1109, "Học viên đã thuộc chi nhánh này"),
+    INVALID_EXISTENCE_CHECK_TYPE(1110, "Loại kiểm tra không hợp lệ, chỉ chấp nhận EMAIL hoặc PHONE"),
 
     // Enrollment errors (1200-1299)
     EXCEL_GENERATION_FAILED(1216, "Tạo tệp Excel thất bại"),

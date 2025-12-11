@@ -9,12 +9,13 @@ import org.fyp.tmssep490be.entities.enums.UserStatus;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateStudentResponse {
+public class SyncToBranchResponse {
 
     private Long studentId;
     private String studentCode;
@@ -24,22 +25,28 @@ public class CreateStudentResponse {
     private String phone;
     private Gender gender;
     private LocalDate dob;
-    private Long branchId;
-    private String branchName;
     private UserStatus status;
-    private String defaultPassword; 
-    private Integer skillAssessmentsCreated;
-    private OffsetDateTime createdAt;
-    private CreatedByInfo createdBy;
-    
-    @Builder.Default
-    private boolean isExistingStudent = false;
+    private List<BranchInfo> allBranches; 
+    private BranchInfo newlyAddedBranch; 
+    private Integer newSkillAssessmentsCreated; 
+    private OffsetDateTime syncedAt;
+    private SyncedByInfo syncedBy;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class CreatedByInfo {
+    public static class BranchInfo {
+        private Long id;
+        private String name;
+        private String code;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SyncedByInfo {
         private Long userId;
         private String fullName;
     }

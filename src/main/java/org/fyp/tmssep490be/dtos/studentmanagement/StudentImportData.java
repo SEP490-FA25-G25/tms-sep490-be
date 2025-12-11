@@ -22,15 +22,13 @@ public class StudentImportData {
     private Gender gender;
     private LocalDate dob;
 
-    // Resolution result (sau khi system xử lý)
-    private StudentImportStatus status;  // FOUND/CREATE/ERROR
+    private StudentImportStatus status;  
     private Long existingStudentId;      // Nếu FOUND - student đã tồn tại
     private String existingStudentCode;  // Nếu FOUND - mã sinh viên đã có
     private String errorMessage;         // Nếu ERROR
+    private boolean needsBranchSync;    
+    private String note;               
 
-    /**
-     * Status của student khi import (không gắn với lớp nên không có DUPLICATE)
-     */
     public enum StudentImportStatus {
         FOUND,   // Student đã tồn tại trong hệ thống (tìm theo email)
         CREATE,  // Student mới, sẽ tạo mới

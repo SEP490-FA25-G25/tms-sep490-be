@@ -48,8 +48,10 @@ public class StudentService {
     public CreateStudentResponse createStudent(CreateStudentRequest request, Long currentUserId) {
         log.info("Creating new student with email: {} by user: {}", request.getEmail(), currentUserId);
 
-        if (userAccountRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        Optional<UserAccount> existingUserOpt = userAccountRepository.findByEmail(request.getEmail());
+        if (existingUserOpt.isPresent()) {
+            log.info("User with email {} already exists, attempting smart sync to branch", request.getEmail());
+            return handleExistingStudentSync(existingUserOpt.get(), request, currentUserId);
         }
 
         if (request.getPhone() != null && !request.getPhone().isBlank()
@@ -203,9 +205,98 @@ public class StudentService {
         return response;
     }
 
+    @Transactional
+    private CreateStudentResponse handleExistingStudentSync(
+            UserAccount existingUser, CreateStudentRequest request, Long currentUserId
+    ) {
+        log.info("Handling existing user {} for branch sync", existingUser.getEmail());
+
+        // Find the student entity
+        Student student = studentRepository.findByUserAccountId(existingUser.getId())
+                .orElseThrow(() -> {
+                    log.error("User {} exists but no student record found", existingUser.getEmail());
+                    return new CustomException(ErrorCode.STUDENT_NOT_FOUND);
+                });
+
+        // Validate branch access
+        Branch branch = branchRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
+
+        List<Long> userBranches = getUserAccessibleBranches(currentUserId);
+        if (!userBranches.contains(request.getBranchId())) {
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
+        }
+
+        // Check if already in this branch
+        boolean alreadyInBranch = userBranchesRepository.existsByUserAccountIdAndBranchId(
+                existingUser.getId(), request.getBranchId()
+        );
+
+        if (alreadyInBranch) {
+            log.warn("Student {} already in branch {}", student.getStudentCode(), request.getBranchId());
+            throw new CustomException(ErrorCode.STUDENT_ALREADY_IN_BRANCH);
+        }
+
+        // Add to new branch
+        addStudentToBranch(existingUser.getId(), request.getBranchId(), currentUserId);
+        log.info("Added existing student {} to branch {}", student.getStudentCode(), request.getBranchId());
+
+        // Add new skill assessments if provided
+        int assessmentsCreated = 0;
+        if (request.getSkillAssessments() != null && !request.getSkillAssessments().isEmpty()) {
+            for (SkillAssessmentInput input : request.getSkillAssessments()) {
+                Level level = levelRepository.findById(input.getLevelId())
+                        .orElseThrow(() -> new CustomException(ErrorCode.LEVEL_NOT_FOUND));
+
+                ReplacementSkillAssessment assessment = new ReplacementSkillAssessment();
+                assessment.setStudent(student);
+                assessment.setSkill(input.getSkill());
+                assessment.setLevel(level);
+                assessment.setScore(input.getScore());
+                assessment.setAssessmentDate(LocalDate.now());
+                assessment.setAssessmentType("existing_student_sync");
+                assessment.setNote(input.getNote());
+
+                Long assessorId = input.getAssessedByUserId() != null ? input.getAssessedByUserId() : currentUserId;
+                UserAccount assessedBy = userAccountRepository.findById(assessorId)
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                assessment.setAssessedBy(assessedBy);
+
+                replacementSkillAssessmentRepository.save(assessment);
+                assessmentsCreated++;
+            }
+        }
+
+        UserAccount syncer = userAccountRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // Return response with isExistingStudent = true
+        return CreateStudentResponse.builder()
+                .studentId(student.getId())
+                .studentCode(student.getStudentCode())
+                .userAccountId(existingUser.getId())
+                .email(existingUser.getEmail())
+                .fullName(existingUser.getFullName())
+                .phone(existingUser.getPhone())
+                .gender(existingUser.getGender())
+                .dob(existingUser.getDob())
+                .branchId(branch.getId())
+                .branchName(branch.getName())
+                .status(existingUser.getStatus())
+                .defaultPassword(null) // Don't return password for existing students
+                .skillAssessmentsCreated(assessmentsCreated)
+                .createdAt(existingUser.getCreatedAt())
+                .createdBy(CreateStudentResponse.CreatedByInfo.builder()
+                        .userId(syncer.getId())
+                        .fullName(syncer.getFullName())
+                        .build())
+                .isExistingStudent(true) // Flag to indicate this was a sync, not a new creation
+                .build();
+    }
+
     /**
      * Get students list with filters for AA operations (search, on-behalf requests)
-     */
+```     */
     public Page<StudentListItemDTO> getStudents(
             List<Long> branchIds,
             String search,
@@ -318,9 +409,6 @@ public class StudentService {
 
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
-
-        // Validate student access
-        validateStudentAccess(student, userId);
 
         return convertToStudentDetailDTO(student);
     }
@@ -527,7 +615,7 @@ public class StudentService {
         log.info("Parsed {} students from Excel", parsedData.size());
 
         // 3. Resolve each student (FOUND/CREATE/ERROR)
-        resolveStudentsForImport(parsedData);
+        resolveStudentsForImport(parsedData, branchId);
 
         // 4. Calculate counts
         int foundCount = (int) parsedData.stream()
@@ -568,7 +656,10 @@ public class StudentService {
 
     @Transactional
     public StudentImportResult executeStudentImport(StudentImportExecuteRequest request, Long currentUserId) {
+        log.info("=== executeStudentImport STARTED ===");
         log.info("Executing student import for branch {} by user {}", request.getBranchId(), currentUserId);
+        log.info("Total students in request: {}, selectedIndices: {}", 
+                request.getStudents().size(), request.getSelectedIndices());
 
         Branch branch = branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
@@ -579,29 +670,86 @@ public class StudentService {
 
         // Filter students to create (only CREATE status)
         List<StudentImportData> studentsToCreate;
+        List<StudentImportData> studentsToSync; // FOUND students with needsBranchSync
+        
         if (request.getSelectedIndices() != null && !request.getSelectedIndices().isEmpty()) {
-            // Only create selected students
+            // Only process selected students
             studentsToCreate = new java.util.ArrayList<>();
+            studentsToSync = new java.util.ArrayList<>();
             for (Integer index : request.getSelectedIndices()) {
                 if (index >= 0 && index < request.getStudents().size()) {
                     StudentImportData student = request.getStudents().get(index);
+                    log.debug("Student at index {}: status={}, needsBranchSync={}, existingId={}", 
+                            index, student.getStatus(), student.isNeedsBranchSync(), student.getExistingStudentId());
                     if (student.getStatus() == StudentImportData.StudentImportStatus.CREATE) {
                         studentsToCreate.add(student);
+                    } else if (student.getStatus() == StudentImportData.StudentImportStatus.FOUND && student.isNeedsBranchSync()) {
+                        studentsToSync.add(student);
+                        log.info("Added student {} to sync list", student.getExistingStudentCode());
                     }
                 }
             }
         } else {
-            // Create all CREATE status students
+            // Process all CREATE status students
             studentsToCreate = request.getStudents().stream()
                     .filter(s -> s.getStatus() == StudentImportData.StudentImportStatus.CREATE)
                     .collect(Collectors.toList());
+            // Process all FOUND students with needsBranchSync
+            studentsToSync = request.getStudents().stream()
+                    .filter(s -> s.getStatus() == StudentImportData.StudentImportStatus.FOUND && s.isNeedsBranchSync())
+                    .collect(Collectors.toList());
         }
 
-        if (studentsToCreate.isEmpty()) {
+        // Validate: must have at least one student to process (create or sync)
+        if (studentsToCreate.isEmpty() && studentsToSync.isEmpty()) {
             throw new CustomException(ErrorCode.NO_STUDENTS_TO_IMPORT);
         }
 
-        log.info("Creating {} new students", studentsToCreate.size());
+        log.info("Processing {} students: {} to create, {} to sync", 
+                studentsToCreate.size() + studentsToSync.size(), 
+                studentsToCreate.size(), 
+                studentsToSync.size());
+        
+        // Sync FOUND students who need branch sync
+        int syncedCount = 0;
+        for (StudentImportData data : studentsToSync) {
+            try {
+                // Get UserAccount ID from Student ID
+                Student student = studentRepository.findById(data.getExistingStudentId())
+                        .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+                
+                addStudentToBranch(student.getUserAccount().getId(), request.getBranchId(), currentUserId);
+                syncedCount++;
+                log.debug("Synced student {} to branch {}", data.getExistingStudentCode(), request.getBranchId());
+            } catch (Exception e) {
+                log.error("Failed to sync student {}: {}", data.getExistingStudentCode(), e.getMessage());
+            }
+        }
+        
+        if (syncedCount > 0) {
+            log.info("Synced {} existing students to branch {}", syncedCount, request.getBranchId());
+        }
+
+        // If no students to create, skip creation logic
+        if (studentsToCreate.isEmpty()) {
+            log.info("No new students to create, only synced existing students");
+            int skippedExisting = (int) request.getStudents().stream()
+                    .filter(s -> s.getStatus() == StudentImportData.StudentImportStatus.FOUND && !s.isNeedsBranchSync())
+                    .count();
+
+            return StudentImportResult.builder()
+                    .branchId(request.getBranchId())
+                    .branchName(branch.getName())
+                    .totalAttempted(studentsToSync.size())
+                    .successfulCreations(0)
+                    .skippedExisting(skippedExisting)
+                    .syncedToBranch(syncedCount)
+                    .failedCreations(0)
+                    .createdStudents(new java.util.ArrayList<>())
+                    .importedBy(currentUserId)
+                    .importedAt(OffsetDateTime.now())
+                    .build();
+        }
 
         // Get default password from policy
         String defaultPassword = policyService.getGlobalString("student.default_password", "12345678");
@@ -698,10 +846,10 @@ public class StudentService {
             }
         }
 
-        log.info("Student import completed: {} created, {} failed", successCount, failedCount);
+        log.info("Student import completed: {} created, {} synced, {} failed", successCount, syncedCount, failedCount);
 
         int skippedExisting = (int) request.getStudents().stream()
-                .filter(s -> s.getStatus() == StudentImportData.StudentImportStatus.FOUND)
+                .filter(s -> s.getStatus() == StudentImportData.StudentImportStatus.FOUND && !s.isNeedsBranchSync())
                 .count();
 
         return StudentImportResult.builder()
@@ -710,6 +858,7 @@ public class StudentService {
                 .totalAttempted(studentsToCreate.size())
                 .successfulCreations(successCount)
                 .skippedExisting(skippedExisting)
+                .syncedToBranch(syncedCount)
                 .failedCreations(failedCount)
                 .createdStudents(createdStudents)
                 .importedBy(currentUserId)
@@ -717,7 +866,7 @@ public class StudentService {
                 .build();
     }
 
-    private void resolveStudentsForImport(List<StudentImportData> parsedData) {
+    private void resolveStudentsForImport(List<StudentImportData> parsedData, Long branchId) {
         java.util.Set<String> seenEmails = new java.util.HashSet<>();
 
         for (StudentImportData data : parsedData) {
@@ -767,7 +916,18 @@ public class StudentService {
                     data.setStatus(StudentImportData.StudentImportStatus.FOUND);
                     data.setExistingStudentId(existingStudent.get().getId());
                     data.setExistingStudentCode(existingStudent.get().getStudentCode());
-                    log.debug("Found existing student by email: {} -> {}", data.getEmail(), existingStudent.get().getStudentCode());
+                    
+                    // Check if student is in target branch
+                    boolean inBranch = userBranchesRepository.existsByUserAccountIdAndBranchId(
+                            existingUser.get().getId(), branchId);
+                    
+                    data.setNeedsBranchSync(!inBranch);
+                    if (!inBranch) {
+                        data.setNote("Học viên từ chi nhánh khác, sẽ được tự động thêm vào chi nhánh này");
+                    }
+                    
+                    log.debug("Found existing student by email: {} -> {}, needsSync: {}", 
+                            data.getEmail(), existingStudent.get().getStudentCode(), !inBranch);
                     continue;
                 }
             }
@@ -783,4 +943,247 @@ public class StudentService {
         return email.matches(emailRegex);
     }
 
+    public CheckStudentExistenceResponse checkStudentExistence(
+            String type, String value, Long currentBranchId, Long currentUserId
+    ) {
+        log.debug("Checking student existence: type={}, value={}, branchId={}", type, value, currentBranchId);
+
+        // Validate type
+        if (!type.equalsIgnoreCase("EMAIL") && !type.equalsIgnoreCase("PHONE")) {
+            throw new CustomException(ErrorCode.INVALID_EXISTENCE_CHECK_TYPE);
+        }
+
+        // Validate branch access
+        List<Long> userBranches = getUserAccessibleBranches(currentUserId);
+        if (!userBranches.contains(currentBranchId)) {
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
+        }
+
+        Optional<UserAccount> userOpt;
+        if (type.equalsIgnoreCase("EMAIL")) {
+            userOpt = userAccountRepository.findByEmail(value);
+        } else {
+            userOpt = userAccountRepository.findByPhone(value);
+        }
+
+        if (userOpt.isEmpty()) {
+            return CheckStudentExistenceResponse.builder()
+                    .exists(false)
+                    .canAddToCurrentBranch(true)
+                    .build();
+        }
+
+        UserAccount user = userOpt.get();
+        Optional<Student> studentOpt = studentRepository.findByUserAccountId(user.getId());
+
+        if (studentOpt.isEmpty()) {
+            // User exists but not a student (maybe teacher, AA, etc.)
+            return CheckStudentExistenceResponse.builder()
+                    .exists(false)
+                    .canAddToCurrentBranch(true)
+                    .build();
+        }
+
+        Student student = studentOpt.get();
+
+        // Get all branches this student belongs to
+        List<Long> studentBranchIds = userBranchesRepository.findBranchIdsByUserId(user.getId());
+        List<Branch> studentBranches = branchRepository.findAllById(studentBranchIds);
+
+        List<CheckStudentExistenceResponse.BranchInfo> branchInfos = studentBranches.stream()
+                .map(branch -> CheckStudentExistenceResponse.BranchInfo.builder()
+                        .id(branch.getId())
+                        .name(branch.getName())
+                        .code(branch.getCode())
+                        .build())
+                .collect(Collectors.toList());
+
+        boolean canAdd = !studentBranchIds.contains(currentBranchId);
+
+        return CheckStudentExistenceResponse.builder()
+                .exists(true)
+                .studentId(student.getId())
+                .studentCode(student.getStudentCode())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .currentBranches(branchInfos)
+                .canAddToCurrentBranch(canAdd)
+                .build();
+    }
+
+    @Transactional
+    public SyncToBranchResponse syncStudentToBranch(
+            Long studentId, SyncToBranchRequest request, Long currentUserId
+    ) {
+        log.info("Syncing student {} to branch {} by user {}",
+                studentId, request.getTargetBranchId(), currentUserId);
+
+        // Validate student exists
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+
+        UserAccount user = student.getUserAccount();
+
+        // Validate branch exists and user has access
+        Branch targetBranch = branchRepository.findById(request.getTargetBranchId())
+                .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
+
+        List<Long> userBranches = getUserAccessibleBranches(currentUserId);
+        if (!userBranches.contains(request.getTargetBranchId())) {
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
+        }
+
+        // Check if student already in this branch
+        boolean alreadyInBranch = userBranchesRepository.existsByUserAccountIdAndBranchId(
+                user.getId(), request.getTargetBranchId()
+        );
+
+        if (alreadyInBranch) {
+            throw new CustomException(ErrorCode.STUDENT_ALREADY_IN_BRANCH);
+        }
+
+        // Update user info if provided
+        boolean userUpdated = false;
+        if (request.getPhone() != null && !request.getPhone().isBlank()
+                && !request.getPhone().equals(user.getPhone())) {
+            // Check phone not taken by another user
+            if (userAccountRepository.existsByPhone(request.getPhone())) {
+                Optional<UserAccount> existingUserWithPhone = userAccountRepository.findByPhone(request.getPhone());
+                if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(user.getId())) {
+                    throw new CustomException(ErrorCode.USER_PHONE_ALREADY_EXISTS);
+                }
+            }
+            user.setPhone(request.getPhone());
+            userUpdated = true;
+        }
+
+        if (request.getAddress() != null && !request.getAddress().isBlank()
+                && !request.getAddress().equals(user.getAddress())) {
+            user.setAddress(request.getAddress());
+            userUpdated = true;
+        }
+
+        if (userUpdated) {
+            userAccountRepository.save(user);
+            log.debug("Updated user info for student {}", studentId);
+        }
+
+        // Add to new branch
+        UserBranches.UserBranchesId userBranchId = new UserBranches.UserBranchesId();
+        userBranchId.setUserId(user.getId());
+        userBranchId.setBranchId(request.getTargetBranchId());
+
+        UserBranches userBranch = new UserBranches();
+        userBranch.setId(userBranchId);
+        userBranch.setUserAccount(user);
+        userBranch.setBranch(targetBranch);
+
+        UserAccount assignedBy = userAccountRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        userBranch.setAssignedBy(assignedBy);
+        userBranchesRepository.save(userBranch);
+
+        log.info("Added student {} to branch {}", studentId, request.getTargetBranchId());
+
+        // Add new skill assessments if provided
+        int assessmentsCreated = 0;
+        if (request.getNewSkillAssessments() != null && !request.getNewSkillAssessments().isEmpty()) {
+            for (SkillAssessmentInput input : request.getNewSkillAssessments()) {
+                Level level = levelRepository.findById(input.getLevelId())
+                        .orElseThrow(() -> new CustomException(ErrorCode.LEVEL_NOT_FOUND));
+
+                ReplacementSkillAssessment assessment = new ReplacementSkillAssessment();
+                assessment.setStudent(student);
+                assessment.setSkill(input.getSkill());
+                assessment.setLevel(level);
+                assessment.setScore(input.getScore());
+                assessment.setAssessmentDate(LocalDate.now());
+                assessment.setAssessmentType("branch_sync");
+                assessment.setNote(input.getNote());
+
+                Long assessorId = input.getAssessedByUserId() != null ? input.getAssessedByUserId() : currentUserId;
+                UserAccount assessedBy = userAccountRepository.findById(assessorId)
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                assessment.setAssessedBy(assessedBy);
+
+                replacementSkillAssessmentRepository.save(assessment);
+                assessmentsCreated++;
+                log.debug("Created {} assessment for student {} at level {}",
+                        input.getSkill(), studentId, level.getCode());
+            }
+        }
+
+        // Get all branches student now belongs to
+        List<Long> allBranchIds = userBranchesRepository.findBranchIdsByUserId(user.getId());
+        List<Branch> allBranches = branchRepository.findAllById(allBranchIds);
+
+        List<SyncToBranchResponse.BranchInfo> allBranchInfos = allBranches.stream()
+                .map(branch -> SyncToBranchResponse.BranchInfo.builder()
+                        .id(branch.getId())
+                        .name(branch.getName())
+                        .code(branch.getCode())
+                        .build())
+                .collect(Collectors.toList());
+
+        return SyncToBranchResponse.builder()
+                .studentId(student.getId())
+                .studentCode(student.getStudentCode())
+                .userAccountId(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .gender(user.getGender())
+                .dob(user.getDob())
+                .status(user.getStatus())
+                .allBranches(allBranchInfos)
+                .newlyAddedBranch(SyncToBranchResponse.BranchInfo.builder()
+                        .id(targetBranch.getId())
+                        .name(targetBranch.getName())
+                        .code(targetBranch.getCode())
+                        .build())
+                .newSkillAssessmentsCreated(assessmentsCreated)
+                .syncedAt(OffsetDateTime.now())
+                .syncedBy(SyncToBranchResponse.SyncedByInfo.builder()
+                        .userId(assignedBy.getId())
+                        .fullName(assignedBy.getFullName())
+                        .build())
+                .build();
+    }
+
+    @Transactional
+    public void addStudentToBranch(Long userId, Long branchId, Long assignedByUserId) {
+        log.debug("Adding user {} to branch {} by user {}", userId, branchId, assignedByUserId);
+
+        // Check if already in branch
+        boolean alreadyInBranch = userBranchesRepository.existsByUserAccountIdAndBranchId(userId, branchId);
+        if (alreadyInBranch) {
+            log.debug("User {} already in branch {}, skipping", userId, branchId);
+            return;
+        }
+
+        UserAccount user = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
+
+        UserBranches.UserBranchesId userBranchId = new UserBranches.UserBranchesId();
+        userBranchId.setUserId(userId);
+        userBranchId.setBranchId(branchId);
+
+        UserBranches userBranch = new UserBranches();
+        userBranch.setId(userBranchId);
+        userBranch.setUserAccount(user);
+        userBranch.setBranch(branch);
+
+        UserAccount assignedBy = userAccountRepository.findById(assignedByUserId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        userBranch.setAssignedBy(assignedBy);
+
+        userBranchesRepository.save(userBranch);
+        log.info("Added user {} to branch {}", userId, branchId);
+    }
+
 }
+

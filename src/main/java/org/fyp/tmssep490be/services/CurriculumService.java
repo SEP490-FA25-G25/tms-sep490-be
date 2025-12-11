@@ -195,7 +195,8 @@ public class CurriculumService {
         public void deactivateCurriculum(Long id) {
                 log.info("Deactivating curriculum with ID: {}", id);
                 Curriculum curriculum = curriculumRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chương trình với ID: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Không tìm thấy chương trình với ID: " + id));
 
                 curriculum.setStatus(CurriculumStatus.INACTIVE);
                 curriculumRepository.save(curriculum);
@@ -205,11 +206,13 @@ public class CurriculumService {
         public void reactivateCurriculum(Long id) {
                 log.info("Reactivating curriculum with ID: {}", id);
                 Curriculum curriculum = curriculumRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chương trình với ID: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Không tìm thấy chương trình với ID: " + id));
 
                 // Kiểm tra có Subject nào đang ACTIVE không (thông qua Levels)
                 boolean hasActiveSubject = curriculum.getLevels().stream()
-                        .anyMatch(level -> subjectRepository.existsByLevelIdAndStatus(level.getId(), SubjectStatus.ACTIVE));
+                                .anyMatch(level -> subjectRepository.existsByLevelIdAndStatus(level.getId(),
+                                                SubjectStatus.ACTIVE));
 
                 if (hasActiveSubject) {
                         curriculum.setStatus(CurriculumStatus.ACTIVE);
@@ -223,7 +226,8 @@ public class CurriculumService {
         public void deleteCurriculum(Long id) {
                 log.info("Deleting curriculum with ID: {}", id);
                 Curriculum curriculum = curriculumRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chương trình với ID: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Không tìm thấy chương trình với ID: " + id));
 
                 // Kiểm tra có level nào phụ thuộc không
                 long levelCount = levelRepository.countByCurriculumId(id);
@@ -235,6 +239,69 @@ public class CurriculumService {
                 log.info("Curriculum deleted successfully: {}", id);
         }
 
+        /**
+         * Get Subject-PLO Matrix for a curriculum.
+         * Shows which PLOs each Subject addresses through its CLO mappings.
+         */
+        public SubjectPLOMatrixDTO getSubjectPLOMatrix(Long curriculumId) {
+                log.info("Getting Subject-PLO matrix for curriculum ID: {}", curriculumId);
+
+                Curriculum curriculum = curriculumRepository.findById(curriculumId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Không tìm thấy chương trình với ID: " + curriculumId));
+
+                // Get all PLOs for this curriculum, sorted by code
+                List<PLO> plos = ploRepository.findByCurriculumIdOrderByCodeAsc(curriculumId);
+
+                // Build PLO info list (column headers)
+                List<SubjectPLOMatrixDTO.PLOInfo> ploInfoList = plos.stream()
+                                .map(plo -> SubjectPLOMatrixDTO.PLOInfo.builder()
+                                                .id(plo.getId())
+                                                .code(plo.getCode())
+                                                .description(plo.getDescription())
+                                                .build())
+                                .collect(Collectors.toList());
+
+                // Get all subjects for this curriculum (any status)
+                List<org.fyp.tmssep490be.entities.Subject> subjects = subjectRepository
+                                .findByCurriculumIdOrderByUpdatedAtDesc(curriculumId);
+
+                // Build subject rows with PLO mappings
+                List<SubjectPLOMatrixDTO.SubjectPLORow> subjectRows = subjects.stream()
+                                .map(subject -> {
+                                        // Get all CLO IDs for this subject that have PLO mappings
+                                        Set<Long> mappedPloIds = subject.getClos().stream()
+                                                        .flatMap(clo -> clo.getPloCloMappings().stream())
+                                                        .map(mapping -> mapping.getPlo().getId())
+                                                        .collect(Collectors.toSet());
+
+                                        // Create boolean array for each PLO
+                                        List<Boolean> ploMappings = plos.stream()
+                                                        .map(plo -> mappedPloIds.contains(plo.getId()))
+                                                        .collect(Collectors.toList());
+
+                                        return SubjectPLOMatrixDTO.SubjectPLORow.builder()
+                                                        .subjectId(subject.getId())
+                                                        .subjectCode(subject.getCode())
+                                                        .subjectName(subject.getName())
+                                                        .levelName(subject.getLevel() != null
+                                                                        ? subject.getLevel().getName()
+                                                                        : null)
+                                                        .status(subject.getStatus().name())
+                                                        .ploMappings(ploMappings)
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
+
+                return SubjectPLOMatrixDTO.builder()
+                                .curriculumId(curriculumId)
+                                .curriculumCode(curriculum.getCode())
+                                .curriculumName(curriculum.getName())
+                                .plos(ploInfoList)
+                                .subjects(subjectRows)
+                                .build();
+        }
+
         // ==================== CURRICULUM METHODS ====================
 
         @Transactional
@@ -242,8 +309,8 @@ public class CurriculumService {
                 log.info("Creating new level for curriculum ID: {}", request.getCurriculumId());
 
                 Curriculum curriculum = curriculumRepository.findById(request.getCurriculumId())
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "Không tìm thấy chương trình với ID: " + request.getCurriculumId()));
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Không tìm thấy chương trình với ID: " + request.getCurriculumId()));
 
                 Level level = new Level();
                 level.setCurriculum(curriculum);
@@ -259,13 +326,13 @@ public class CurriculumService {
                 log.info("Level created with ID: {}", level.getId());
 
                 return LevelResponseDTO.builder()
-                        .id(level.getId().toString())
-                        .code(level.getCode())
-                        .name(level.getName())
-                        .description(level.getDescription())
-                        .curriculumName(curriculum.getName())
-                        .curriculumCode(curriculum.getCode())
-                        .build();
+                                .id(level.getId().toString())
+                                .code(level.getCode())
+                                .name(level.getName())
+                                .description(level.getDescription())
+                                .curriculumName(curriculum.getName())
+                                .curriculumCode(curriculum.getCode())
+                                .build();
         }
 
         public List<LevelResponseDTO> getLevels(Long curriculumId) {
@@ -279,14 +346,15 @@ public class CurriculumService {
                 }
 
                 return levels.stream()
-                        .map(this::toLevelResponseDTO)
-                        .collect(Collectors.toList());
+                                .map(this::toLevelResponseDTO)
+                                .collect(Collectors.toList());
         }
 
         public LevelResponseDTO getLevel(Long id) {
                 log.debug("Fetching level with ID: {}", id);
                 Level level = levelRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ với ID: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Không tìm thấy cấp độ với ID: " + id));
                 return toLevelResponseDTO(level);
         }
 
@@ -294,7 +362,8 @@ public class CurriculumService {
         public LevelResponseDTO updateLevel(Long id, CreateLevelDTO request) {
                 log.info("Updating level with ID: {}", id);
                 Level level = levelRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ với ID: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Không tìm thấy cấp độ với ID: " + id));
 
                 level.setCode(request.getCode());
                 level.setName(request.getName());
@@ -311,7 +380,8 @@ public class CurriculumService {
         public void deactivateLevel(Long id) {
                 log.info("Deactivating level with ID: {}", id);
                 Level level = levelRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ với ID: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Không tìm thấy cấp độ với ID: " + id));
 
                 level.setStatus(LevelStatus.INACTIVE);
                 levelRepository.save(level);
@@ -321,7 +391,8 @@ public class CurriculumService {
         public void reactivateLevel(Long id) {
                 log.info("Reactivating level with ID: {}", id);
                 Level level = levelRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ với ID: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Không tìm thấy cấp độ với ID: " + id));
 
                 // Kiểm tra có Subject nào đang ACTIVE không
                 boolean hasActiveSubject = subjectRepository.existsByLevelIdAndStatus(id, SubjectStatus.ACTIVE);
@@ -341,7 +412,7 @@ public class CurriculumService {
                 List<Level> levels = levelRepository.findByCurriculumIdOrderBySortOrderAsc(curriculumId);
 
                 Map<Long, Level> levelMap = levels.stream()
-                        .collect(Collectors.toMap(Level::getId, level -> level));
+                                .collect(Collectors.toMap(Level::getId, level -> level));
 
                 for (int i = 0; i < levelIds.size(); i++) {
                         Long levelId = levelIds.get(i);
@@ -361,7 +432,8 @@ public class CurriculumService {
         public void deleteLevel(Long id) {
                 log.info("Deleting level with ID: {}", id);
                 Level level = levelRepository.findById(id)
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấp độ với ID: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Không tìm thấy cấp độ với ID: " + id));
 
                 long subjectCount = subjectRepository.countByLevelId(id);
                 if (subjectCount > 0) {
@@ -392,13 +464,15 @@ public class CurriculumService {
                 }
 
                 return templates.stream()
-                        .map(template -> {
-                                long minutes = Duration.between(template.getStartTime(), template.getEndTime()).toMinutes();
-                                return BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 1, RoundingMode.HALF_UP);
-                        })
-                        .distinct()
-                        .sorted()
-                        .collect(Collectors.toList());
+                                .map(template -> {
+                                        long minutes = Duration.between(template.getStartTime(), template.getEndTime())
+                                                        .toMinutes();
+                                        return BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 1,
+                                                        RoundingMode.HALF_UP);
+                                })
+                                .distinct()
+                                .sorted()
+                                .collect(Collectors.toList());
         }
 
         // ==================== HELPER METHODS ====================

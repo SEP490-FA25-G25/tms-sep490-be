@@ -28,6 +28,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalTime;
+import java.util.stream.Collectors;
+import java.util.List;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -205,6 +209,8 @@ public class TeacherClassService {
                     
                     // Time slot: khung giờ học (từ TimeSlotTemplate), nếu không có thì "TBA" (To Be Announced)
                     String timeSlot = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getName() : "TBA";
+                    LocalTime startTime = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getStartTime() : null;
+                    LocalTime endTime = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getEndTime() : null;
                     
                     // Topic: chủ đề buổi học (từ SubjectSession), nếu không có thì "N/A"
                     String topic = s.getSubjectSession() != null ? s.getSubjectSession().getTopic() : "N/A";
@@ -235,6 +241,8 @@ public class TeacherClassService {
                             .date(s.getDate())
                             .dayOfWeek(dayOfWeek)
                             .timeSlot(timeSlot)
+                            .startTime(startTime)
+                            .endTime(endTime)
                             .topic(topic)
                             .status(s.getStatus() != null ? s.getStatus().name() : null)
                             .teacherName(teacherName)

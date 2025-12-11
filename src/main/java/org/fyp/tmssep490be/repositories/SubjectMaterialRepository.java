@@ -42,8 +42,11 @@ public interface SubjectMaterialRepository extends JpaRepository<SubjectMaterial
     // Tìm material ở cấp phase (không thuộc session)
     List<SubjectMaterial> findByPhaseIdAndSubjectSessionIsNull(Long phaseId);
 
-    // Xóa material ở cấp subject (không thuộc phase hay session)
+    // Xóa material ở subject (không thuộc phase hay session)
     @Modifying
     @Query("DELETE FROM SubjectMaterial m WHERE m.subject.id = :subjectId AND m.phase IS NULL AND m.subjectSession IS NULL")
     void deleteBySubjectIdAndPhaseIsNullAndSubjectSessionIsNull(@Param("subjectId") Long subjectId);
+
+    // Tìm material ở subject (không thuộc phase hay session) - dùng cho clone
+    List<SubjectMaterial> findBySubjectIdAndPhaseIsNullAndSubjectSessionIsNull(Long subjectId);
 }
