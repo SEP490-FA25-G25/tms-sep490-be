@@ -97,6 +97,17 @@ public class SubjectController {
                                 .build());
         }
 
+        @DeleteMapping("/{id}")
+        @Operation(summary = "Delete subject", description = "Xóa môn học (chỉ cho phép khi status=DRAFT và chưa từng submit)")
+        public ResponseEntity<ResponseObject<Void>> deleteSubject(@PathVariable Long id) {
+                log.info("Deleting subject with ID: {}", id);
+                subjectService.deleteSubject(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Đã xóa môn học thành công")
+                                .build());
+        }
+
         // ========== APPROVAL WORKFLOW ==========
 
         @PostMapping("/{id}/submit")
@@ -136,6 +147,45 @@ public class SubjectController {
                 return ResponseEntity.ok(ResponseObject.<Void>builder()
                                 .success(true)
                                 .message("Đã từ chối môn học")
+                                .build());
+        }
+
+        // ========== LIFECYCLE MANAGEMENT ==========
+
+        @PostMapping("/{id}/deactivate")
+        @Operation(summary = "Deactivate subject", description = "Vô hiệu hóa môn học")
+        public ResponseEntity<ResponseObject<Void>> deactivateSubject(@PathVariable Long id) {
+                log.info("Deactivating subject with ID: {}", id);
+                subjectService.deactivateSubject(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Đã vô hiệu hóa môn học thành công")
+                                .build());
+        }
+
+        @PostMapping("/{id}/reactivate")
+        @Operation(summary = "Reactivate subject", description = "Kích hoạt lại môn học")
+        public ResponseEntity<ResponseObject<Void>> reactivateSubject(@PathVariable Long id) {
+                log.info("Reactivating subject with ID: {}", id);
+                subjectService.reactivateSubject(id);
+                return ResponseEntity.ok(ResponseObject.<Void>builder()
+                                .success(true)
+                                .message("Đã kích hoạt lại môn học thành công")
+                                .build());
+        }
+
+        @PostMapping("/{id}/clone")
+        @Operation(summary = "Clone subject", description = "Tạo bản sao môn học với version mới")
+        public ResponseEntity<ResponseObject<SubjectDTO>> cloneSubject(
+                        @PathVariable Long id,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                log.info("Cloning subject with ID: {}", id);
+                Long userId = currentUser != null ? currentUser.getId() : null;
+                SubjectDTO result = subjectService.cloneSubject(id, userId);
+                return ResponseEntity.ok(ResponseObject.<SubjectDTO>builder()
+                                .success(true)
+                                .message("Đã tạo bản sao môn học thành công")
+                                .data(result)
                                 .build());
         }
 

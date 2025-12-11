@@ -172,6 +172,23 @@ public class SubjectService {
         Subject subject = subjectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
 
+        // Status validation: Block editing if ACTIVE
+        if (subject.getStatus() == SubjectStatus.ACTIVE) {
+            throw new IllegalStateException(
+                    "Không thể chỉnh sửa môn học đang ở trạng thái HOẠT ĐỘNG. Hãy tạo phiên bản mới.");
+        }
+
+        // If PENDING_ACTIVATION, reset to DRAFT and clear approval (requires
+        // re-approval)
+        if (subject.getStatus() == SubjectStatus.PENDING_ACTIVATION) {
+            log.info("Subject {} is PENDING_ACTIVATION, resetting to DRAFT for re-approval", id);
+            subject.setStatus(SubjectStatus.DRAFT);
+            subject.setApprovalStatus(null);
+            subject.setSubmittedAt(null);
+            subject.setDecidedAt(null);
+            subject.setDecidedByManager(null);
+        }
+
         // Update Basic Info
         SubjectBasicInfoDTO basicInfo = request.getBasicInfo();
         subject.setName(basicInfo.getName());
@@ -938,5 +955,281 @@ public class SubjectService {
             // Don't throw exception - notification failure shouldn't block
             // approval/rejection
         }
+    }
+
+    // ========== DELETE SUBJECT ==========
+    @Transactional
+    public void deleteSubject(Long id) {
+        log.info("Deleting subject with ID: {}", id);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
+
+        // Validation: Only allow delete if status is DRAFT and never submitted
+        if (subject.getStatus() != SubjectStatus.DRAFT || subject.getApprovalStatus() != null) {
+            throw new IllegalStateException(
+                    "Không thể xóa môn học. Môn học phải ở trạng thái NHÁP và chưa được gửi phê duyệt.");
+        }
+
+        subjectRepository.delete(subject);
+        log.info("Subject deleted successfully: {}", id);
+    }
+
+    // ========== DEACTIVATE SUBJECT ==========
+    @Transactional
+    public void deactivateSubject(Long id) {
+        log.info("Deactivating subject with ID: {}", id);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
+
+        if (subject.getStatus() != SubjectStatus.ACTIVE && subject.getStatus() != SubjectStatus.PENDING_ACTIVATION) {
+            throw new IllegalStateException(
+                    "Chỉ có thể vô hiệu hóa môn học đang ở trạng thái HOẠT ĐỘNG hoặc CHỜ KÍCH HOẠT");
+        }
+
+        subject.setStatus(SubjectStatus.INACTIVE);
+        subjectRepository.save(subject);
+        log.info("Subject {} deactivated successfully", id);
+    }
+
+    // ========== REACTIVATE SUBJECT ==========
+    @Transactional
+    public void reactivateSubject(Long id) {
+        log.info("Reactivating subject with ID: {}", id);
+        Subject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
+
+        if (subject.getStatus() != SubjectStatus.INACTIVE) {
+            throw new IllegalStateException("Chỉ có thể kích hoạt lại môn học đang ở trạng thái KHÔNG HOẠT ĐỘNG");
+        }
+
+        // Check if subject has enough data to be active
+        boolean hasCLOs = subject.getClos() != null && !subject.getClos().isEmpty();
+        boolean hasPhases = subject.getSubjectPhases() != null && !subject.getSubjectPhases().isEmpty();
+
+        if (hasCLOs && hasPhases) {
+            subject.setStatus(SubjectStatus.ACTIVE);
+        } else {
+            subject.setStatus(SubjectStatus.DRAFT);
+            log.info("Subject {} reactivated as DRAFT because it lacks CLOs or Phases", id);
+        }
+        subjectRepository.save(subject);
+        log.info("Subject {} reactivated with status: {}", id, subject.getStatus());
+    }
+
+    // ========== CLONE SUBJECT ==========
+    @Transactional
+    public SubjectDTO cloneSubject(Long id, Long userId) {
+        log.info("Cloning subject with ID: {} by user: {}", id, userId);
+
+        Subject originalSubject = subjectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
+
+        // Get curriculum and level codes
+        String curriculumCode = originalSubject.getCurriculum() != null ? originalSubject.getCurriculum().getCode()
+                : "UNKNOWN";
+        String levelCode = originalSubject.getLevel() != null ? originalSubject.getLevel().getCode() : "UNKNOWN";
+        int year = originalSubject.getEffectiveDate() != null
+                ? originalSubject.getEffectiveDate().getYear()
+                : java.time.LocalDate.now().getYear();
+
+        // Calculate new version
+        Integer nextVersion = getNextVersionNumber(curriculumCode, levelCode, year);
+        String logicalCode = String.format("%s-%s-%d", curriculumCode, levelCode, year);
+        String newCode = String.format("%s-V%d", logicalCode, nextVersion);
+
+        // Ensure code uniqueness
+        while (subjectRepository.existsByCode(newCode)) {
+            nextVersion++;
+            newCode = String.format("%s-V%d", logicalCode, nextVersion);
+        }
+
+        // Get creator
+        UserAccount creator = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+
+        // Create new subject
+        Subject newSubject = new Subject();
+        newSubject.setCurriculum(originalSubject.getCurriculum());
+        newSubject.setLevel(originalSubject.getLevel());
+        newSubject.setLogicalSubjectCode(logicalCode);
+        newSubject.setVersion(nextVersion);
+        newSubject.setCode(newCode);
+        newSubject.setName(originalSubject.getName() + " (V" + nextVersion + ")");
+        newSubject.setDescription(originalSubject.getDescription());
+        newSubject.setScoreScale(originalSubject.getScoreScale());
+        newSubject.setTotalHours(originalSubject.getTotalHours());
+        newSubject.setNumberOfSessions(originalSubject.getNumberOfSessions());
+        newSubject.setHoursPerSession(originalSubject.getHoursPerSession());
+        newSubject.setPrerequisites(originalSubject.getPrerequisites());
+        newSubject.setTargetAudience(originalSubject.getTargetAudience());
+        newSubject.setTeachingMethods(originalSubject.getTeachingMethods());
+        newSubject.setEffectiveDate(originalSubject.getEffectiveDate());
+        newSubject.setThumbnailUrl(originalSubject.getThumbnailUrl());
+        newSubject.setStatus(SubjectStatus.DRAFT);
+        newSubject.setApprovalStatus(null);
+        newSubject.setCreatedBy(creator);
+        newSubject.setCreatedAt(OffsetDateTime.now());
+        newSubject.setUpdatedAt(OffsetDateTime.now());
+
+        // Save new subject first
+        newSubject = subjectRepository.save(newSubject);
+        final Subject savedNewSubject = newSubject;
+
+        // Clone CLOs and track mapping
+        java.util.Map<Long, CLO> oldToNewCloMap = new java.util.HashMap<>();
+        if (originalSubject.getClos() != null) {
+            for (CLO oldClo : originalSubject.getClos()) {
+                CLO newClo = new CLO();
+                newClo.setSubject(savedNewSubject);
+                newClo.setCode(oldClo.getCode());
+                newClo.setDescription(oldClo.getDescription());
+                newClo = subjectCLORepository.save(newClo);
+                oldToNewCloMap.put(oldClo.getId(), newClo);
+
+                // Clone PLO-CLO mappings
+                List<PLOCLOMapping> oldMappings = ploCloMappingRepository.findByCloId(oldClo.getId());
+                for (PLOCLOMapping oldMapping : oldMappings) {
+                    PLOCLOMapping newMapping = new PLOCLOMapping();
+                    newMapping.setClo(newClo);
+                    newMapping.setPlo(oldMapping.getPlo());
+                    ploCloMappingRepository.save(newMapping);
+                }
+            }
+        }
+
+        // Clone Phases and Sessions
+        if (originalSubject.getSubjectPhases() != null) {
+            for (SubjectPhase oldPhase : originalSubject.getSubjectPhases()) {
+                SubjectPhase newPhase = new SubjectPhase();
+                newPhase.setSubject(savedNewSubject);
+                newPhase.setName(oldPhase.getName());
+                newPhase.setDescription(oldPhase.getDescription());
+                newPhase.setPhaseNumber(oldPhase.getPhaseNumber());
+                newPhase = subjectPhaseRepository.save(newPhase);
+                final SubjectPhase savedNewPhase = newPhase;
+
+                // Clone Sessions
+                if (oldPhase.getSubjectSessions() != null) {
+                    for (SubjectSession oldSession : oldPhase.getSubjectSessions()) {
+                        SubjectSession newSession = new SubjectSession();
+                        newSession.setPhase(savedNewPhase);
+                        newSession.setTopic(oldSession.getTopic());
+                        newSession.setStudentTask(oldSession.getStudentTask());
+                        newSession.setSkills(oldSession.getSkills() != null
+                                ? new ArrayList<>(oldSession.getSkills())
+                                : new ArrayList<>());
+                        newSession.setSequenceNo(oldSession.getSequenceNo());
+                        newSession = subjectSessionRepository.save(newSession);
+                        final SubjectSession savedNewSession = newSession;
+
+                        // Clone Session-CLO mappings
+                        List<SubjectSessionCLOMapping> oldSessionMappings = subjectSessionCLOMappingRepository
+                                .findBySubjectSessionId(oldSession.getId());
+                        for (SubjectSessionCLOMapping oldMapping : oldSessionMappings) {
+                            CLO newClo = oldToNewCloMap.get(oldMapping.getClo().getId());
+                            if (newClo != null) {
+                                SubjectSessionCLOMapping newMapping = new SubjectSessionCLOMapping();
+                                newMapping.setSubjectSession(savedNewSession);
+                                newMapping.setClo(newClo);
+                                subjectSessionCLOMappingRepository.save(newMapping);
+                            }
+                        }
+
+                        // Clone Session Materials
+                        List<SubjectMaterial> oldSessionMaterials = subjectMaterialRepository
+                                .findBySubjectSessionId(oldSession.getId());
+                        for (SubjectMaterial oldMaterial : oldSessionMaterials) {
+                            SubjectMaterial newMaterial = new SubjectMaterial();
+                            newMaterial.setSubject(savedNewSubject);
+                            newMaterial.setPhase(savedNewPhase);
+                            newMaterial.setSubjectSession(savedNewSession);
+                            newMaterial.setTitle(oldMaterial.getTitle());
+                            newMaterial.setMaterialType(oldMaterial.getMaterialType());
+                            newMaterial.setUrl(oldMaterial.getUrl());
+                            subjectMaterialRepository.save(newMaterial);
+                        }
+                    }
+                }
+
+                // Clone Phase Materials
+                List<SubjectMaterial> oldPhaseMaterials = subjectMaterialRepository
+                        .findByPhaseIdAndSubjectSessionIsNull(oldPhase.getId());
+                for (SubjectMaterial oldMaterial : oldPhaseMaterials) {
+                    SubjectMaterial newMaterial = new SubjectMaterial();
+                    newMaterial.setSubject(savedNewSubject);
+                    newMaterial.setPhase(savedNewPhase);
+                    newMaterial.setSubjectSession(null);
+                    newMaterial.setTitle(oldMaterial.getTitle());
+                    newMaterial.setMaterialType(oldMaterial.getMaterialType());
+                    newMaterial.setUrl(oldMaterial.getUrl());
+                    subjectMaterialRepository.save(newMaterial);
+                }
+            }
+        }
+
+        // Clone Subject-level Materials
+        List<SubjectMaterial> oldSubjectMaterials = subjectMaterialRepository
+                .findBySubjectIdAndPhaseIsNullAndSubjectSessionIsNull(originalSubject.getId());
+        for (SubjectMaterial oldMaterial : oldSubjectMaterials) {
+            SubjectMaterial newMaterial = new SubjectMaterial();
+            newMaterial.setSubject(savedNewSubject);
+            newMaterial.setPhase(null);
+            newMaterial.setSubjectSession(null);
+            newMaterial.setTitle(oldMaterial.getTitle());
+            newMaterial.setMaterialType(oldMaterial.getMaterialType());
+            newMaterial.setUrl(oldMaterial.getUrl());
+            subjectMaterialRepository.save(newMaterial);
+        }
+
+        // Clone Assessments
+        if (originalSubject.getSubjectAssessments() != null) {
+            for (SubjectAssessment oldAssessment : originalSubject.getSubjectAssessments()) {
+                SubjectAssessment newAssessment = new SubjectAssessment();
+                newAssessment.setSubject(savedNewSubject);
+                newAssessment.setName(oldAssessment.getName());
+                newAssessment.setKind(oldAssessment.getKind());
+                newAssessment.setMaxScore(oldAssessment.getMaxScore());
+                newAssessment.setDurationMinutes(oldAssessment.getDurationMinutes());
+                newAssessment.setDescription(oldAssessment.getDescription());
+                newAssessment.setNote(oldAssessment.getNote());
+                newAssessment.setSkills(
+                        oldAssessment.getSkills() != null ? new java.util.ArrayList<>(oldAssessment.getSkills())
+                                : new java.util.ArrayList<>());
+                newAssessment = subjectAssessmentRepository.save(newAssessment);
+                final SubjectAssessment savedNewAssessment = newAssessment;
+
+                // Clone Assessment-CLO mappings
+                List<SubjectAssessmentCLOMapping> oldAssessmentMappings = subjectAssessmentCLOMappingRepository
+                        .findBySubjectAssessmentId(oldAssessment.getId());
+                for (SubjectAssessmentCLOMapping oldMapping : oldAssessmentMappings) {
+                    CLO newClo = oldToNewCloMap.get(oldMapping.getClo().getId());
+                    if (newClo != null) {
+                        SubjectAssessmentCLOMapping.SubjectAssessmentCLOMappingId newId = new SubjectAssessmentCLOMapping.SubjectAssessmentCLOMappingId(
+                                savedNewAssessment.getId(), newClo.getId());
+                        SubjectAssessmentCLOMapping newMapping = SubjectAssessmentCLOMapping.builder()
+                                .id(newId)
+                                .subjectAssessment(savedNewAssessment)
+                                .clo(newClo)
+                                .status(oldMapping.getStatus())
+                                .build();
+                        subjectAssessmentCLOMappingRepository.save(newMapping);
+                    }
+                }
+            }
+        }
+
+        log.info("Subject {} cloned successfully as {} with ID: {}", id, newCode, savedNewSubject.getId());
+
+        // Return simple DTO
+        return SubjectDTO.builder()
+                .id(savedNewSubject.getId())
+                .code(savedNewSubject.getCode())
+                .name(savedNewSubject.getName())
+                .subjectName(savedNewSubject.getName())
+                .levelName(savedNewSubject.getLevel() != null ? savedNewSubject.getLevel().getName() : null)
+                .status(savedNewSubject.getStatus().name())
+                .effectiveDate(savedNewSubject.getEffectiveDate())
+                .createdAt(savedNewSubject.getCreatedAt())
+                .build();
     }
 }

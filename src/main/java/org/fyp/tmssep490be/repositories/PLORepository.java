@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface PLORepository extends JpaRepository<PLO, Long> {
     List<PLO> findByCodeIn(List<String> codes);
+
+    List<PLO> findByCurriculumIdOrderByCodeAsc(Long curriculumId);
 }
