@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.qa.QAClassDetailDTO;
 import org.fyp.tmssep490be.dtos.qa.QAClassListItemDTO;
+import org.fyp.tmssep490be.dtos.qa.QAClassScoresDTO;
 import org.fyp.tmssep490be.dtos.qa.QASessionListResponse;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.QAService;
@@ -101,6 +102,23 @@ public class QAController {
             .success(true)
             .message("Lấy danh sách buổi học thành công")
             .data(sessions)
+            .build());
+    }
+
+    @GetMapping("/classes/{classId}/scores")
+    @PreAuthorize("hasRole('QA')")
+    public ResponseEntity<ResponseObject<QAClassScoresDTO>> getQAClassScores(
+        @Parameter(description = "Class ID") @PathVariable Long classId,
+        @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} requesting QA class scores for classId={}", currentUser.getId(), classId);
+
+        QAClassScoresDTO classScores = qaService.getQAClassScores(classId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<QAClassScoresDTO>builder()
+            .success(true)
+            .message("Lấy điểm số lớp học thành công")
+            .data(classScores)
             .build());
     }
 }
