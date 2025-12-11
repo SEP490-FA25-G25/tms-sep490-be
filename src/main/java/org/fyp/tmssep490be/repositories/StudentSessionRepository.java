@@ -142,4 +142,38 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             @Param("date") LocalDate date
     );
 
+    @Query("SELECT ss.attendanceStatus, COUNT(ss) " +
+           "FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status != org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED " +
+           "GROUP BY ss.attendanceStatus")
+    List<Object[]> getAttendanceSummaryByClassId(@Param("classId") Long classId);
+
+    @Query("SELECT ss.homeworkStatus, COUNT(ss) " +
+           "FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status != org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED " +
+           "AND ss.homeworkStatus IS NOT NULL " +
+           "GROUP BY ss.homeworkStatus")
+    List<Object[]> getHomeworkSummaryByClassId(@Param("classId") Long classId);
+
+    @Query("SELECT s.classEntity.id, ss.attendanceStatus, COUNT(ss) " +
+           "FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE s.classEntity.id IN :classIds " +
+           "AND s.status != org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED " +
+           "GROUP BY s.classEntity.id, ss.attendanceStatus")
+    List<Object[]> getAttendanceSummaryByClassIds(@Param("classIds") List<Long> classIds);
+
+    @Query("SELECT s.classEntity.id, ss.homeworkStatus, COUNT(ss) " +
+           "FROM StudentSession ss " +
+           "JOIN ss.session s " +
+           "WHERE s.classEntity.id IN :classIds " +
+           "AND s.status != org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED " +
+           "AND ss.homeworkStatus IS NOT NULL " +
+           "GROUP BY s.classEntity.id, ss.homeworkStatus")
+    List<Object[]> getHomeworkSummaryByClassIds(@Param("classIds") List<Long> classIds);
+
 }

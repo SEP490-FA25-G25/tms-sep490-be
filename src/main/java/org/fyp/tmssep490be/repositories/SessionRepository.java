@@ -217,5 +217,13 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
            "LEFT JOIN FETCH t.userAccount " +
            "WHERE s.id = :sessionId")
     Optional<Session> findByIdWithDetails(@Param("sessionId") Long sessionId);
+
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.classEntity.id = :classId")
+    Long countByClassEntityId(@Param("classId") Long classId);
+
+    @Query("SELECT COUNT(s) FROM Session s " +
+           "WHERE s.classEntity.id = :classId " +
+           "AND s.status != org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED")
+    Long countByClassEntityIdExcludingCancelled(@Param("classId") Long classId);
 }
 
