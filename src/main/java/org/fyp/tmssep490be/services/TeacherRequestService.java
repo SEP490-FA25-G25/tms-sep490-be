@@ -28,6 +28,7 @@ import org.fyp.tmssep490be.entities.enums.Modality;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.entities.enums.TeacherRequestType;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
+import org.fyp.tmssep490be.entities.enums.NotificationType;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.ResourceRepository;
@@ -66,6 +67,7 @@ public class TeacherRequestService {
     private final UserAccountRepository userAccountRepository;
     private final ResourceRepository resourceRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
+    private final NotificationService notificationService;
 
     private static final int MIN_REASON_LENGTH = 10;
     private static final boolean REQUIRE_RESOURCE_FOR_MODALITY_CHANGE = true;
@@ -134,6 +136,14 @@ public class TeacherRequestService {
 
         request = teacherRequestRepository.save(request);
         log.info("Created teacher request {} type {} for user {}", request.getId(), requestType, userId);
+
+        // Gửi thông báo cho giáo vụ
+        try {
+            sendNotificationToAcademicStaffForNewRequest(request);
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho giáo vụ về request {}: {}", request.getId(), e.getMessage());
+            // Không throw exception - notification failure không nên block việc tạo request
+        }
 
         return mapToResponseDTO(request);
     }
@@ -1101,7 +1111,314 @@ public class TeacherRequestService {
         approveDTO.setReplacementTeacherId(createDTO.getReplacementTeacherId());
 
         // Gọi logic approve để update session (sẽ set status = APPROVED và update session)
-        return approveRequest(request.getId(), approveDTO, academicStaffUserId);
+        TeacherRequestResponseDTO response = approveRequest(request.getId(), approveDTO, academicStaffUserId);
+        
+        // Gửi thông báo cho teacher (sau khi approve thành công)
+        try {
+            // Lấy lại request đã được approve để gửi notification
+            TeacherRequest approvedRequest = teacherRequestRepository.findByIdWithTeacherAndSession(request.getId())
+                    .orElse(null);
+            if (approvedRequest != null) {
+                sendNotificationToTeacherForStaffCreatedRequest(approvedRequest);
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho teacher về staff-created request {}: {}", request.getId(), e.getMessage());
+            // Không throw exception - notification failure không nên block việc tạo request
+        }
+        
+        return response;
+    }
+
+     // Gửi thông báo cho giáo vụ khi teacher tạo request mới
+    private void sendNotificationToAcademicStaffForNewRequest(TeacherRequest request) {
+        try {
+            // Lấy branch của teacher
+            Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
+            List<Long> teacherBranchIds = getBranchIdsForUser(teacherUserAccountId);
+
+            if (teacherBranchIds.isEmpty()) {
+                log.warn("Không tìm thấy branch cho teacher {} - không thể gửi notification", teacherUserAccountId);
+                return;
+            }
+
+            // Lấy tất cả academic staff của các branch này
+            List<UserAccount> academicStaffUsers = userAccountRepository.findByRoleCodeAndBranches(
+                    "ACADEMIC_AFFAIRS", teacherBranchIds);
+
+            if (academicStaffUsers.isEmpty()) {
+                log.warn("Không tìm thấy academic staff nào cho branch {} - không thể gửi notification", teacherBranchIds);
+                return;
+            }
+
+            // Tạo title và message
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+            Session session = request.getSession();
+            String sessionInfo = session != null 
+                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                : "";
+
+            String title = String.format("Yêu cầu mới: %s", requestTypeName);
+            String message = String.format(
+                "Giáo viên %s đã tạo yêu cầu %s cho buổi học %s. Vui lòng xem xét và xử lý.",
+                request.getTeacher().getUserAccount().getFullName(),
+                requestTypeName.toLowerCase(),
+                sessionInfo
+            );
+
+            List<Long> recipientIds = academicStaffUsers.stream()
+                    .map(UserAccount::getId)
+                    .collect(Collectors.toList());
+
+            notificationService.sendBulkNotifications(
+                    recipientIds,
+                    NotificationType.REQUEST,
+                    title,
+                    message
+            );
+
+            log.info("Đã gửi notification cho {} academic staff về request {} (type: {})",
+                    recipientIds.size(), request.getId(), request.getRequestType());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho academic staff về request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
+    }
+
+    // Gửi thông báo cho teacher khi request được approve
+    private void sendNotificationToTeacherForApproval(TeacherRequest request) {
+        try {
+            Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+            Session session = request.getSession();
+            String sessionInfo = session != null 
+                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                : "";
+
+            String title = String.format("Yêu cầu %s đã được duyệt", requestTypeName);
+            String message = String.format(
+                "Yêu cầu %s của bạn cho buổi học %s đã được giáo vụ duyệt.",
+                requestTypeName.toLowerCase(),
+                sessionInfo
+            );
+
+            notificationService.createNotification(
+                    teacherUserAccountId,
+                    NotificationType.NOTIFICATION,
+                    title,
+                    message
+            );
+
+            log.info("Đã gửi notification cho teacher {} về approval của request {}",
+                    teacherUserAccountId, request.getId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho teacher về approval của request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
+    }
+
+    // Gửi thông báo cho replacement teacher khi request được approve và chờ confirm
+    private void sendNotificationToReplacementTeacher(TeacherRequest request) {
+        try {
+            if (request.getReplacementTeacher() == null || request.getReplacementTeacher().getUserAccount() == null) {
+                log.warn("Replacement teacher không có user account - không thể gửi notification cho request {}", request.getId());
+                return;
+            }
+
+            Long replacementTeacherUserAccountId = request.getReplacementTeacher().getUserAccount().getId();
+            Session session = request.getSession();
+            String sessionInfo = session != null 
+                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                : "";
+            String originalTeacherName = request.getTeacher().getUserAccount().getFullName();
+
+            String title = "Yêu cầu dạy thay";
+            String message = String.format(
+                "Bạn được mời dạy thay cho giáo viên %s tại buổi học %s. Vui lòng xác nhận.",
+                originalTeacherName,
+                sessionInfo
+            );
+
+            notificationService.createNotification(
+                    replacementTeacherUserAccountId,
+                    NotificationType.REQUEST,
+                    title,
+                    message
+            );
+
+            log.info("Đã gửi notification cho replacement teacher {} về request {}",
+                    replacementTeacherUserAccountId, request.getId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho replacement teacher về request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
+    }
+
+    // Gửi thông báo cho teacher khi request bị reject
+    private void sendNotificationToTeacherForRejection(TeacherRequest request, String reason) {
+        try {
+            Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+            Session session = request.getSession();
+            String sessionInfo = session != null 
+                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                : "";
+
+            String title = String.format("Yêu cầu %s đã bị từ chối", requestTypeName);
+            String message = String.format(
+                "Yêu cầu %s của bạn cho buổi học %s đã bị giáo vụ từ chối. Lý do: %s",
+                requestTypeName.toLowerCase(),
+                sessionInfo,
+                reason
+            );
+
+            notificationService.createNotification(
+                    teacherUserAccountId,
+                    NotificationType.NOTIFICATION,
+                    title,
+                    message
+            );
+
+            log.info("Đã gửi notification cho teacher {} về rejection của request {}",
+                    teacherUserAccountId, request.getId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho teacher về rejection của request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
+    }
+
+    // Gửi thông báo cho giáo vụ khi replacement teacher confirm
+    private void sendNotificationToAcademicStaffForReplacementConfirmation(TeacherRequest request) {
+        try {
+            // Lấy branch của teacher
+            Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
+            List<Long> teacherBranchIds = getBranchIdsForUser(teacherUserAccountId);
+
+            if (teacherBranchIds.isEmpty()) {
+                log.warn("Không tìm thấy branch cho teacher {} - không thể gửi notification", teacherUserAccountId);
+                return;
+            }
+
+            // Lấy tất cả academic staff của các branch này
+            List<UserAccount> academicStaffUsers = userAccountRepository.findByRoleCodeAndBranches(
+                    "ACADEMIC_AFFAIRS", teacherBranchIds);
+
+            if (academicStaffUsers.isEmpty()) {
+                log.warn("Không tìm thấy academic staff nào cho branch {} - không thể gửi notification", teacherBranchIds);
+                return;
+            }
+
+            Session session = request.getSession();
+            String sessionInfo = session != null 
+                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                : "";
+            String replacementTeacherName = request.getReplacementTeacher() != null && request.getReplacementTeacher().getUserAccount() != null
+                ? request.getReplacementTeacher().getUserAccount().getFullName()
+                : "";
+
+            String title = "Giáo viên dạy thay đã xác nhận";
+            String message = String.format(
+                "Giáo viên %s đã xác nhận đồng ý dạy thay cho buổi học %s.",
+                replacementTeacherName,
+                sessionInfo
+            );
+
+            List<Long> recipientIds = academicStaffUsers.stream()
+                    .map(UserAccount::getId)
+                    .collect(Collectors.toList());
+
+            notificationService.sendBulkNotifications(
+                    recipientIds,
+                    NotificationType.NOTIFICATION,
+                    title,
+                    message
+            );
+
+            log.info("Đã gửi notification cho {} academic staff về replacement confirmation của request {}",
+                    recipientIds.size(), request.getId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho academic staff về replacement confirmation của request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
+    }
+
+    // Gửi thông báo cho teacher gốc khi replacement teacher confirm
+    private void sendNotificationToOriginalTeacherForReplacementConfirmation(TeacherRequest request) {
+        try {
+            Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
+            Session session = request.getSession();
+            String sessionInfo = session != null 
+                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                : "";
+            String replacementTeacherName = request.getReplacementTeacher() != null && request.getReplacementTeacher().getUserAccount() != null
+                ? request.getReplacementTeacher().getUserAccount().getFullName()
+                : "";
+
+            String title = "Yêu cầu dạy thay đã được xác nhận";
+            String message = String.format(
+                "Giáo viên %s đã xác nhận đồng ý dạy thay cho buổi học %s của bạn.",
+                replacementTeacherName,
+                sessionInfo
+            );
+
+            notificationService.createNotification(
+                    teacherUserAccountId,
+                    NotificationType.NOTIFICATION,
+                    title,
+                    message
+            );
+
+            log.info("Đã gửi notification cho teacher {} về replacement confirmation của request {}",
+                    teacherUserAccountId, request.getId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho teacher về replacement confirmation của request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
+    }
+
+    // Gửi thông báo cho teacher khi giáo vụ tạo request hộ
+    private void sendNotificationToTeacherForStaffCreatedRequest(TeacherRequest request) {
+        try {
+            Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+            Session session = request.getSession();
+            String sessionInfo = session != null 
+                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                : "";
+
+            String title = String.format("Yêu cầu %s đã được tạo", requestTypeName);
+            String message = String.format(
+                "Giáo vụ đã tạo yêu cầu %s cho buổi học %s của bạn. Yêu cầu đã được tự động duyệt.",
+                requestTypeName.toLowerCase(),
+                sessionInfo
+            );
+
+            notificationService.createNotification(
+                    teacherUserAccountId,
+                    NotificationType.NOTIFICATION,
+                    title,
+                    message
+            );
+
+            log.info("Đã gửi notification cho teacher {} về staff-created request {}",
+                    teacherUserAccountId, request.getId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho teacher về staff-created request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
+    }
+
+    // Lấy tên tiếng Việt của request type
+    private String getRequestTypeName(TeacherRequestType requestType) {
+        switch (requestType) {
+            case MODALITY_CHANGE:
+                return "Đổi phương tiện";
+            case RESCHEDULE:
+                return "Đổi lịch";
+            case REPLACEMENT:
+                return "Dạy thay";
+            default:
+                return "Yêu cầu";
+        }
     }
 
     //Lấy chi tiết request theo ID cho teacher
@@ -1613,6 +1930,20 @@ public class TeacherRequestService {
         request = teacherRequestRepository.save(request);
         log.info("Request {} approved successfully by academic staff {}", requestId, academicStaffUserId);
 
+        // Gửi thông báo cho teacher
+        try {
+            if (request.getRequestType() == TeacherRequestType.REPLACEMENT && request.getStatus() == RequestStatus.WAITING_CONFIRM) {
+                // REPLACEMENT: gửi thông báo cho replacement teacher
+                sendNotificationToReplacementTeacher(request);
+            } else {
+                // MODALITY_CHANGE và RESCHEDULE: gửi thông báo cho teacher gốc
+                sendNotificationToTeacherForApproval(request);
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho teacher về request {}: {}", requestId, e.getMessage());
+            // Không throw exception - notification failure không nên block việc approve
+        }
+
         return mapToResponseDTO(request);
     }
 
@@ -1636,6 +1967,63 @@ public class TeacherRequestService {
         // Không được chọn chính giáo viên tạo request
         if (replacementTeacher.getId().equals(request.getTeacher().getId())) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Replacement teacher cannot be the same as the requesting teacher");
+        }
+
+        // Validate conflict thời gian: kiểm tra overlap với các session đã được assign và các request đang pending
+        Session session = request.getSession();
+        if (session != null) {
+            LocalDate sessionDate = session.getDate();
+            TimeSlotTemplate sessionTimeSlot = session.getTimeSlotTemplate();
+            
+            if (sessionDate != null && sessionTimeSlot != null) {
+                // Kiểm tra conflict với các session đã được assign (có TeachingSlot trong DB)
+                boolean hasConflictWithAssignedSessions = hasTeacherTimeConflict(
+                        chosenReplacementTeacherId, 
+                        sessionDate, 
+                        sessionTimeSlot, 
+                        session.getId());
+                
+                if (hasConflictWithAssignedSessions) {
+                    throw new CustomException(ErrorCode.INVALID_INPUT, 
+                            "Replacement teacher already has another assigned session at overlapping time");
+                }
+                
+                // Kiểm tra conflict với các pending replacement requests khác
+                List<TeacherRequest> pendingRequests = teacherRequestRepository
+                        .findByStatusOrderBySubmittedAtDesc(RequestStatus.PENDING);
+                
+                boolean hasConflictWithPendingRequests = pendingRequests.stream()
+                        .filter(tr -> tr.getId() != null && !tr.getId().equals(request.getId())) // Loại trừ request hiện tại
+                        .filter(tr -> tr.getRequestType() == TeacherRequestType.REPLACEMENT)
+                        .anyMatch(tr -> {
+                            // Kiểm tra xem pending request có cùng replacement teacher không
+                            Teacher pendingReplacementTeacher = tr.getReplacementTeacher();
+                            if (pendingReplacementTeacher == null 
+                                    || !pendingReplacementTeacher.getId().equals(chosenReplacementTeacherId)) {
+                                return false;
+                            }
+                            
+                            // Kiểm tra xem session của pending request có cùng ngày và overlap thời gian không
+                            Session pendingSession = tr.getSession();
+                            if (pendingSession == null || pendingSession.getDate() == null 
+                                    || !pendingSession.getDate().equals(sessionDate)) {
+                                return false;
+                            }
+                            
+                            TimeSlotTemplate pendingTimeSlot = pendingSession.getTimeSlotTemplate();
+                            if (pendingTimeSlot == null) {
+                                return false;
+                            }
+                            
+                            // Kiểm tra overlap thời gian
+                            return hasTimeOverlap(pendingTimeSlot, sessionTimeSlot);
+                        });
+                
+                if (hasConflictWithPendingRequests) {
+                    throw new CustomException(ErrorCode.INVALID_INPUT, 
+                            "Replacement teacher is already selected by another pending replacement request at overlapping time");
+                }
+            }
         }
 
         // Cập nhật replacement teacher (ưu tiên lựa chọn của academic staff)
@@ -1662,6 +2050,70 @@ public class TeacherRequestService {
         Session session = request.getSession();
         if (session == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no associated session");
+        }
+
+        // Validate conflict resource: kiểm tra overlap với các session đã được approve và các request đang pending
+        LocalDate sessionDate = session.getDate();
+        TimeSlotTemplate sessionTimeSlot = session.getTimeSlotTemplate();
+        
+        if (sessionDate != null && sessionTimeSlot != null) {
+            // Kiểm tra conflict với các session đã được approve (đã có SessionResource trong DB)
+            List<SessionResource> existingSessionResources = sessionResourceRepository
+                    .findByResourceIdAndSessionDate(chosenResourceId, sessionDate);
+            
+            boolean hasConflictWithApprovedSessions = existingSessionResources.stream()
+                    .anyMatch(sr -> {
+                        Session existingSession = sr.getSession();
+                        // Bỏ qua các session đã bị hủy và session hiện tại
+                        if (existingSession.getStatus() == SessionStatus.CANCELLED 
+                                || existingSession.getId().equals(session.getId())) {
+                            return false;
+                        }
+                        // Kiểm tra overlap thời gian
+                        TimeSlotTemplate existingTimeSlot = existingSession.getTimeSlotTemplate();
+                        return existingTimeSlot != null && hasTimeOverlap(existingTimeSlot, sessionTimeSlot);
+                    });
+            
+            if (hasConflictWithApprovedSessions) {
+                throw new CustomException(ErrorCode.INVALID_INPUT, 
+                        "Resource is already booked by another approved session at overlapping time");
+            }
+            
+            // Kiểm tra conflict với các request đang pending (MODALITY_CHANGE hoặc RESCHEDULE)
+            List<TeacherRequest> pendingRequests = teacherRequestRepository
+                    .findByStatusOrderBySubmittedAtDesc(RequestStatus.PENDING);
+            
+            boolean hasConflictWithPendingRequests = pendingRequests.stream()
+                    .filter(tr -> tr.getId() != null && !tr.getId().equals(request.getId())) // Loại trừ request hiện tại
+                    .filter(tr -> tr.getRequestType() == TeacherRequestType.MODALITY_CHANGE 
+                            || tr.getRequestType() == TeacherRequestType.RESCHEDULE)
+                    .anyMatch(tr -> {
+                        // Kiểm tra xem pending request có cùng resource không
+                        Resource pendingResource = tr.getNewResource();
+                        if (pendingResource == null || !pendingResource.getId().equals(chosenResourceId)) {
+                            return false;
+                        }
+                        
+                        // Kiểm tra xem session của pending request có cùng ngày và overlap thời gian không
+                        Session pendingSession = tr.getSession();
+                        if (pendingSession == null || pendingSession.getDate() == null 
+                                || !pendingSession.getDate().equals(sessionDate)) {
+                            return false;
+                        }
+                        
+                        TimeSlotTemplate pendingTimeSlot = pendingSession.getTimeSlotTemplate();
+                        if (pendingTimeSlot == null) {
+                            return false;
+                        }
+                        
+                        // Kiểm tra overlap thời gian
+                        return hasTimeOverlap(pendingTimeSlot, sessionTimeSlot);
+                    });
+            
+            if (hasConflictWithPendingRequests) {
+                throw new CustomException(ErrorCode.INVALID_INPUT, 
+                        "Resource is already selected by another pending request at overlapping time");
+            }
         }
 
         // Update session resources: xóa resources cũ và thêm resource mới
@@ -1838,6 +2290,14 @@ public class TeacherRequestService {
         request = teacherRequestRepository.save(request);
         log.info("Request {} rejected successfully by academic staff {}", requestId, academicStaffUserId);
 
+        // Gửi thông báo cho teacher
+        try {
+            sendNotificationToTeacherForRejection(request, reason.trim());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification cho teacher về request {}: {}", requestId, e.getMessage());
+            // Không throw exception - notification failure không nên block việc reject
+        }
+
         return mapToResponseDTO(request);
     }
 
@@ -1912,6 +2372,15 @@ public class TeacherRequestService {
         request = teacherRequestRepository.save(request);
         log.info("Replacement request {} confirmed successfully by teacher {}. Session {} updated: teacher {} -> {}", 
                 requestId, userId, session.getId(), originalTeacher.getId(), request.getReplacementTeacher().getId());
+
+        // Gửi thông báo cho giáo vụ và teacher gốc
+        try {
+            sendNotificationToAcademicStaffForReplacementConfirmation(request);
+            sendNotificationToOriginalTeacherForReplacementConfirmation(request);
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi notification về replacement confirmation cho request {}: {}", requestId, e.getMessage());
+            // Không throw exception - notification failure không nên block việc confirm
+        }
 
         return mapToResponseDTO(request);
     }

@@ -109,4 +109,7 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
                         "AND c.assignedTeacher IS NULL " +
                         "ORDER BY c.startDate ASC")
         List<ClassEntity> findClassesNeedingTeacher(@Param("branchIds") List<Long> branchIds);
+
+        // Find classes by status (for cronjob)
+        List<ClassEntity> findByStatus(ClassStatus status);
 }
