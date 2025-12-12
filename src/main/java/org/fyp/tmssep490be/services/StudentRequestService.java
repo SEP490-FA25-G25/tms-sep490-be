@@ -35,7 +35,7 @@ public class StudentRequestService {
     private static final double ABSENCE_THRESHOLD_PERCENT = 20.0;
 
     private static final int MAKEUP_LOOKBACK_WEEKS = 2;      // Số tuần nhìn lại để tìm buổi vắng
-    private static final int MAKEUP_WEEKS_LIMIT = 4;         // Giới hạn số tuần cho phép xin học bù
+    private static final int MAKEUP_WEEKS_LIMIT = 2;         // Giới hạn số tuần cho phép xin học bù
     private static final int MAX_TRANSFERS_PER_COURSE = 1;   // Số lần transfer tối đa mỗi khóa học
     private static final int ABSENCE_LEAD_TIME_DAYS = 1;     // Số ngày trước buổi học cần xin phép
     private static final int REASON_MIN_LENGTH = 10;         // Độ dài tối thiểu của lý do
@@ -980,10 +980,6 @@ public class StudentRequestService {
                 .build();
     }
 
-    /**
-     * Returns student request configuration with hardcoded policy values.
-     * Previously these values were fetched from SystemPolicy table.
-     */
     public StudentRequestConfigDTO getStudentRequestConfig() {
         return StudentRequestConfigDTO.builder()
                 .makeupLookbackWeeks(MAKEUP_LOOKBACK_WEEKS)

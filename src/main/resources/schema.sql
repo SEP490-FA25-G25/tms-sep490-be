@@ -450,51 +450,6 @@ CREATE TABLE "class" (
   CONSTRAINT chk_class_approval_status CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED'))
 );
 
-CREATE TABLE system_policy (
-  id BIGSERIAL PRIMARY KEY,
-  policy_key VARCHAR(100) NOT NULL,
-  policy_category VARCHAR(50) NOT NULL,
-  policy_name VARCHAR(200) NOT NULL,
-  description TEXT,
-  value_type VARCHAR(20) NOT NULL,
-  default_value TEXT NOT NULL,
-  current_value TEXT NOT NULL,
-  min_value TEXT,
-  max_value TEXT,
-  unit VARCHAR(20),
-  branch_id BIGINT,
-  subject_id BIGINT,
-  class_id BIGINT,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  version INTEGER NOT NULL DEFAULT 1,
-  created_by BIGINT,
-  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  updated_by BIGINT,
-  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  CONSTRAINT fk_policy_branch FOREIGN KEY(branch_id) REFERENCES branch(id) ON DELETE CASCADE,
-  CONSTRAINT fk_policy_subject FOREIGN KEY(subject_id) REFERENCES subject(id) ON DELETE CASCADE,
-  CONSTRAINT fk_policy_class FOREIGN KEY(class_id) REFERENCES "class"(id) ON DELETE CASCADE,
-  CONSTRAINT fk_policy_created_by FOREIGN KEY(created_by) REFERENCES user_account(id) ON DELETE SET NULL,
-  CONSTRAINT fk_policy_updated_by FOREIGN KEY(updated_by) REFERENCES user_account(id) ON DELETE SET NULL,
-  CONSTRAINT chk_policy_value_type CHECK (value_type IN ('INTEGER', 'DOUBLE', 'BOOLEAN', 'STRING', 'JSON')),
-  CONSTRAINT uq_policy_key_scope UNIQUE (policy_key, branch_id, subject_id, class_id)
-);
-
-CREATE TABLE policy_history (
-  id BIGSERIAL PRIMARY KEY,
-  policy_id BIGINT NOT NULL,
-  old_value TEXT,
-  new_value TEXT NOT NULL,
-  changed_by BIGINT,
-  changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  reason TEXT,
-  version INTEGER NOT NULL,
-  change_type VARCHAR(20) DEFAULT 'UPDATE',
-  CONSTRAINT fk_history_policy FOREIGN KEY(policy_id) REFERENCES system_policy(id) ON DELETE CASCADE,
-  CONSTRAINT fk_history_changed_by FOREIGN KEY(changed_by) REFERENCES user_account(id) ON DELETE SET NULL,
-  CONSTRAINT chk_history_change_type CHECK (change_type IN ('CREATE', 'UPDATE', 'DELETE', 'ENABLE', 'DISABLE'))
-);
-
 CREATE TABLE session (
   id BIGSERIAL PRIMARY KEY,
   class_id BIGINT,
@@ -951,17 +906,3 @@ CREATE INDEX idx_class_name_gin ON "class" USING gin(to_tsvector('english', name
 
 -- User account name search
 CREATE INDEX idx_user_account_fullname_gin ON user_account USING gin(to_tsvector('english', full_name));
-
--- Policy lookup indexes
-CREATE INDEX idx_policy_key ON system_policy(policy_key);
-CREATE INDEX idx_policy_category ON system_policy(policy_category);
-CREATE INDEX idx_policy_branch ON system_policy(branch_id) WHERE branch_id IS NOT NULL;
-CREATE INDEX idx_policy_subject ON system_policy(subject_id) WHERE subject_id IS NOT NULL;
-CREATE INDEX idx_policy_class ON system_policy(class_id) WHERE class_id IS NOT NULL;
-CREATE INDEX idx_policy_active ON system_policy(is_active) WHERE is_active = true;
-
--- Policy history indexes
-CREATE INDEX idx_history_policy ON policy_history(policy_id, changed_at DESC);
-CREATE INDEX idx_history_user ON policy_history(changed_by, changed_at DESC) WHERE changed_by IS NOT NULL;
-CREATE INDEX idx_history_date ON policy_history(changed_at DESC);
-CREATE INDEX idx_history_policy_date ON policy_history(policy_id, changed_at DESC);

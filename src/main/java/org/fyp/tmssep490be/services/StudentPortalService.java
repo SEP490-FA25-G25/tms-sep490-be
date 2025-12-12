@@ -517,6 +517,7 @@ public class StudentPortalService {
                 .subjectName(classEntity.getSubject() != null ? classEntity.getSubject().getName() : null)
                 .subjectCode(classEntity.getSubject() != null ? classEntity.getSubject().getCode() : null)
                 .branchId(classEntity.getBranch().getId())
+                .branchName(classEntity.getBranch().getName())
                 .branchAddress(classEntity.getBranch().getAddress())
                 .modality(classEntity.getModality() != null ? classEntity.getModality().name() : null)
                 .status(classEntity.getStatus() != null ? classEntity.getStatus().name() : null)
