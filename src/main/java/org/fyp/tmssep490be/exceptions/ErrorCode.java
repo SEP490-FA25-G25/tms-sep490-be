@@ -13,6 +13,8 @@ public enum ErrorCode {
     // Resource errors (2200-2299)
 
     // Subject errors (1200-1219)
+    SUBJECT_NOT_FOUND(1200, "Không tìm thấy môn học"),
+    INVALID_REQUEST(1201, "Yêu cầu không hợp lệ"),
 
     // Level errors (1220-1239)
     LEVEL_NOT_FOUND(1221, "Không tìm thấy cấp độ"),
@@ -67,8 +69,21 @@ public enum ErrorCode {
     // Class errors (4000-4099)
     CLASS_NOT_FOUND(4000, "Không tìm thấy lớp học"),
     CLASS_NO_BRANCH_ACCESS(4004, "Người dùng không có quyền truy cập vào bất kỳ chi nhánh nào"),
+    CLASS_ALREADY_SUBMITTED(4005, "Lớp học đã được gửi duyệt"),
+    CLASS_INCOMPLETE_CANNOT_SUBMIT(4006, "Lớp học chưa hoàn tất, không thể gửi duyệt"),
+    CLASS_NOT_SUBMITTED(4007, "Lớp học chưa được gửi duyệt"),
+    CLASS_ALREADY_APPROVED(4008, "Lớp học đã được phê duyệt"),
+    INVALID_APPROVAL_STATUS(4009, "Trạng thái phê duyệt không hợp lệ"),
+    CLASS_REJECTION_REASON_REQUIRED(4020, "Vui lòng nhập lý do từ chối"),
 
     // Create Class Workflow errors (4010-4099)
+    CLASS_NAME_DUPLICATE(4010, "Tên lớp học đã tồn tại trong chi nhánh này"),
+    INVALID_SCHEDULE_DAYS(4011, "Số ngày học trong tuần không được lớn hơn tổng số buổi học của môn"),
+    NO_SESSIONS_FOUND_FOR_CLASS(4012, "Không tìm thấy buổi học nào cho lớp này"),
+    TIME_SLOT_NOT_FOUND(4013, "Không tìm thấy khung giờ"),
+    TIME_SLOT_NOT_IN_BRANCH(4014, "Khung giờ không thuộc chi nhánh của lớp học"),
+    CLASS_NOT_EDITABLE(4015, "Lớp học không thể chỉnh sửa (không phải DRAFT hoặc REJECTED)"),
+    START_DATE_NOT_IN_SCHEDULE_DAYS(4016, "Ngày bắt đầu phải rơi vào một trong các ngày học trong tuần đã chọn"),
 
     // Class Code Generation errors (4032-4039)
 
@@ -80,7 +95,8 @@ public enum ErrorCode {
     TEACHER_REQUEST_NOT_FOUND(5000, "Không tìm thấy yêu cầu giáo viên"),
     TEACHER_REQUEST_NOT_PENDING(5001, "Yêu cầu không ở trạng thái chờ duyệt"),
     RESOURCE_NOT_FOUND(5002, "Không tìm thấy tài nguyên"),
-    TIMESLOT_NOT_FOUND(5003, "Không tìm thấy khung giờ"),
+    RESOURCE_NOT_IN_BRANCH(5003, "Tài nguyên không thuộc chi nhánh của lớp học"),
+    TIMESLOT_NOT_FOUND(5004, "Không tìm thấy khung giờ"),
     ASSESSMENT_NOT_FOUND(5004, "Không tìm thấy bài kiểm tra"),
 
     // Student Request errors (4100-4199)

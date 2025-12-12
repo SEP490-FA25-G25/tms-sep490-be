@@ -53,6 +53,16 @@ public class Teacher {
     @Builder.Default
     private Set<TeacherRequest> replacementRequests = new HashSet<>();
 
+    // Đăng ký dạy lớp của giáo viên
+    @OneToMany(mappedBy = "teacher", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<TeacherClassRegistration> classRegistrations = new HashSet<>();
+
+    // Các lớp được gán dạy
+    @OneToMany(mappedBy = "assignedTeacher")
+    @Builder.Default
+    private Set<ClassEntity> assignedClasses = new HashSet<>();
+
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 

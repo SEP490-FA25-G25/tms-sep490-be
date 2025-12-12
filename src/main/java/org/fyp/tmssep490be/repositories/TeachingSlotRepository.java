@@ -86,4 +86,8 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
            "JOIN FETCH ts.session s " +
            "WHERE s.classEntity.id = :classId")
     List<TeachingSlot> findBySessionClassEntityId(@Param("classId") Long classId);
+
+    // Kiểm tra session đã có teaching slot chưa
+    @Query("SELECT COUNT(ts) > 0 FROM TeachingSlot ts WHERE ts.session.id = :sessionId")
+    boolean existsBySessionId(@Param("sessionId") Long sessionId);
 }

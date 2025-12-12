@@ -29,9 +29,11 @@ public class SubjectController {
         @Operation(summary = "Get all subjects", description = "Lấy danh sách môn học")
         public ResponseEntity<ResponseObject<List<SubjectDTO>>> getAllSubjects(
                         @RequestParam(required = false) Long curriculumId,
-                        @RequestParam(required = false) Long levelId) {
-                log.info("Getting all subjects - curriculumId: {}, levelId: {}", curriculumId, levelId);
-                List<SubjectDTO> subjects = subjectService.getAllSubjects(curriculumId, levelId);
+                        @RequestParam(required = false) Long levelId,
+                        @RequestParam(required = false) Boolean forClassCreation) {
+                log.info("Getting all subjects - curriculumId: {}, levelId: {}, forClassCreation: {}",
+                                curriculumId, levelId, forClassCreation);
+                List<SubjectDTO> subjects = subjectService.getAllSubjects(curriculumId, levelId, forClassCreation);
                 return ResponseEntity.ok(ResponseObject.<List<SubjectDTO>>builder()
                                 .success(true)
                                 .message("Subjects retrieved successfully")

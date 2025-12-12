@@ -85,6 +85,32 @@ public class ClassEntity {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
+    // ========== TEACHER REGISTRATION ==========
+
+    @Column(name = "registration_open_date")
+    private OffsetDateTime registrationOpenDate; // Ngày mở đăng ký
+
+    @Column(name = "registration_close_date")
+    private OffsetDateTime registrationCloseDate; // Ngày đóng đăng ký
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_teacher_id")
+    private Teacher assignedTeacher; // Giáo viên được gán
+
+    @Column(name = "teacher_assigned_at")
+    private OffsetDateTime teacherAssignedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "teacher_assigned_by")
+    private UserAccount teacherAssignedBy; // Người gán giáo viên
+
+    @Column(name = "direct_assign_reason", columnDefinition = "TEXT")
+    private String directAssignReason; // Lý do gán trực tiếp
+
+    @OneToMany(mappedBy = "classEntity", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<TeacherClassRegistration> teacherRegistrations = new HashSet<>();
+
     @OneToMany(mappedBy = "classEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private Set<Session> sessions = new HashSet<>();

@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS teacher_class_registration CASCADE;
 DROP TABLE IF EXISTS teacher_request CASCADE;
 DROP TABLE IF EXISTS student_request CASCADE;
 DROP TABLE IF EXISTS qa_report CASCADE;
@@ -428,12 +429,21 @@ CREATE TABLE "class" (
   decided_by BIGINT, -- duyệt bởi centerhead nào
   decided_at TIMESTAMPTZ, -- duyệt lúc nào
   rejection_reason TEXT, -- lý do bị từ chối (nếu có)
+  -- Teacher Registration Flow (sau khi class được approve)
+  registration_open_date TIMESTAMPTZ, -- ngày mở đăng ký (set khi approve)
+  registration_close_date TIMESTAMPTZ, -- deadline đăng ký
+  assigned_teacher_id BIGINT, -- giáo viên được chọn dạy lớp
+  teacher_assigned_at TIMESTAMPTZ, -- thời điểm gán giáo viên
+  teacher_assigned_by BIGINT, -- giáo vụ nào gán giáo viên
+  direct_assign_reason TEXT, -- lý do nếu assign trực tiếp (không qua đăng ký)
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_class_branch FOREIGN KEY(branch_id) REFERENCES branch(id) ON DELETE CASCADE,
   CONSTRAINT fk_class_subject FOREIGN KEY(subject_id) REFERENCES subject(id) ON DELETE CASCADE,
   CONSTRAINT fk_class_created_by FOREIGN KEY(created_by) REFERENCES user_account(id) ON DELETE SET NULL,
   CONSTRAINT fk_class_decided_by FOREIGN KEY(decided_by) REFERENCES user_account(id) ON DELETE SET NULL,
+  CONSTRAINT fk_class_assigned_teacher FOREIGN KEY(assigned_teacher_id) REFERENCES teacher(id) ON DELETE SET NULL,
+  CONSTRAINT fk_class_teacher_assigned_by FOREIGN KEY(teacher_assigned_by) REFERENCES user_account(id) ON DELETE SET NULL,
   CONSTRAINT uq_class_branch_code UNIQUE(branch_id,code),
   CONSTRAINT chk_class_modality CHECK (modality IN ('OFFLINE', 'ONLINE')),
   CONSTRAINT chk_class_status CHECK (status IN ('DRAFT', 'SUBMITTED', 'SCHEDULED', 'ONGOING', 'COMPLETED', 'CANCELLED')),
@@ -743,6 +753,27 @@ CREATE TABLE teacher_request (
   CONSTRAINT chk_teacher_request_status CHECK (status IN ('PENDING', 'WAITING_CONFIRM', 'APPROVED', 'REJECTED', 'CANCELLED'))
 );
 
+-- TIER 8: Teacher Class Registration (Teacher Registration Flow)
+CREATE TABLE teacher_class_registration (
+  id BIGSERIAL PRIMARY KEY,
+  teacher_id BIGINT NOT NULL,
+  class_id BIGINT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED, CANCELLED
+  note TEXT, -- ghi chú của giáo viên khi đăng ký
+  registered_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  cancelled_at TIMESTAMPTZ, -- thời điểm giáo viên hủy đăng ký
+  reviewed_at TIMESTAMPTZ, -- thời điểm giáo vụ review
+  reviewed_by BIGINT, -- giáo vụ nào review
+  rejection_reason TEXT, -- lý do từ chối (nếu có)
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  CONSTRAINT fk_tcr_teacher FOREIGN KEY(teacher_id) REFERENCES teacher(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tcr_class FOREIGN KEY(class_id) REFERENCES "class"(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tcr_reviewed_by FOREIGN KEY(reviewed_by) REFERENCES user_account(id) ON DELETE SET NULL,
+  CONSTRAINT uq_tcr_teacher_class UNIQUE(teacher_id, class_id),
+  CONSTRAINT chk_tcr_status CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'))
+);
+
 -- Branch & Organization
 CREATE INDEX idx_branch_center ON branch(center_id);
 CREATE INDEX idx_time_slot_template_branch ON time_slot_template(branch_id);
@@ -778,6 +809,8 @@ CREATE INDEX idx_class_branch ON "class"(branch_id);
 CREATE INDEX idx_class_subject ON "class"(subject_id);
 CREATE INDEX idx_class_created_by ON "class"(created_by);
 CREATE INDEX idx_class_decided_by ON "class"(decided_by);
+CREATE INDEX idx_class_assigned_teacher ON "class"(assigned_teacher_id);
+CREATE INDEX idx_class_registration_open ON "class"(registration_close_date) WHERE registration_close_date IS NOT NULL;
 CREATE INDEX idx_session_class ON session(class_id);
 CREATE INDEX idx_session_subject_session ON session(subject_session_id);
 CREATE INDEX idx_session_time_slot ON session(time_slot_template_id);
@@ -822,6 +855,13 @@ CREATE INDEX idx_teacher_request_new_time_slot ON teacher_request(new_time_slot_
 CREATE INDEX idx_teacher_request_new_resource ON teacher_request(new_resource_id);
 CREATE INDEX idx_teacher_request_new_session ON teacher_request(new_session_id);
 CREATE INDEX idx_teacher_request_decided_by ON teacher_request(decided_by);
+
+-- Teacher Class Registration
+CREATE INDEX idx_tcr_teacher ON teacher_class_registration(teacher_id);
+CREATE INDEX idx_tcr_class ON teacher_class_registration(class_id);
+CREATE INDEX idx_tcr_class_status ON teacher_class_registration(class_id, status);
+CREATE INDEX idx_tcr_teacher_status ON teacher_class_registration(teacher_id, status);
+CREATE INDEX idx_tcr_status_pending ON teacher_class_registration(status) WHERE status = 'PENDING';
 
 CREATE INDEX idx_notification_recipient_status ON notification(recipient_id, status);
 CREATE INDEX idx_notification_type_created ON notification(type, created_at);

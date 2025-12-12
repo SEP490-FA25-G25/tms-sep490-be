@@ -25,6 +25,7 @@ public class SubjectDTO {
     private LocalDate effectiveDate;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
+    private Integer numberOfSessions;
     private String subjectName;
     private String levelName;
 }

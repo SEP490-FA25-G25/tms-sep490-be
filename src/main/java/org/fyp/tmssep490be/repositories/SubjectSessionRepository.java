@@ -11,8 +11,9 @@ import java.util.List;
 @Repository
 public interface SubjectSessionRepository extends JpaRepository<SubjectSession, Long> {
 
-    // Tìm session theo phase, sắp xếp theo sequenceNo
-    List<SubjectSession> findByPhase_Subject_IdOrderByPhaseAscSequenceNoAsc(Long subjectId);
+    // Tìm session theo subject, sắp xếp theo phase.phaseNumber và sequenceNo
+    @Query("SELECT ss FROM SubjectSession ss WHERE ss.phase.subject.id = :subjectId ORDER BY ss.phase.phaseNumber ASC, ss.sequenceNo ASC")
+    List<SubjectSession> findBySubjectIdOrderByPhaseAndSequence(@Param("subjectId") Long subjectId);
 
     // Đếm số session theo subject
     @Query("SELECT COUNT(ss) FROM SubjectSession ss WHERE ss.phase.subject.id = :subjectId")

@@ -9,6 +9,7 @@ import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.Modality;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Data
@@ -39,10 +40,16 @@ public class ClassListItemDTO {
     private List<TeacherSummaryDTO> teachers;
 
     private String scheduleSummary;
+    private Integer[] scheduleDays;
 
     private Integer completedSessions;
     private Integer totalSessions;
 
     private Boolean canEnrollStudents;
     private String enrollmentRestrictionReason;
+
+    // Approval workflow fields
+    private OffsetDateTime submittedAt;
+    private OffsetDateTime decidedAt;
+    private String rejectionReason;
 }

@@ -44,8 +44,9 @@ public class SubjectService {
     private final EntityManager entityManager;
 
     // ========== GET ALL SUBJECTS ==========
-    public List<SubjectDTO> getAllSubjects(Long curriculumId, Long levelId) {
-        log.debug("Getting all subjects with filters - curriculumId: {}, levelId: {}", curriculumId, levelId);
+    public List<SubjectDTO> getAllSubjects(Long curriculumId, Long levelId, Boolean forClassCreation) {
+        log.debug("Getting all subjects with filters - curriculumId: {}, levelId: {}, forClassCreation: {}",
+                curriculumId, levelId, forClassCreation);
 
         List<Subject> subjects;
 
@@ -57,6 +58,14 @@ public class SubjectService {
             subjects = subjectRepository.findByLevelIdOrderByUpdatedAtDesc(levelId);
         } else {
             subjects = subjectRepository.findAll(Sort.by(Sort.Direction.DESC, "updatedAt"));
+        }
+
+        // Filter for class creation: only ACTIVE or PENDING_ACTIVATION subjects
+        if (Boolean.TRUE.equals(forClassCreation)) {
+            subjects = subjects.stream()
+                    .filter(subject -> subject.getStatus() == SubjectStatus.ACTIVE
+                            || subject.getStatus() == SubjectStatus.PENDING_ACTIVATION)
+                    .collect(Collectors.toList());
         }
 
         return subjects.stream()
@@ -74,6 +83,7 @@ public class SubjectService {
                         .effectiveDate(subject.getEffectiveDate())
                         .createdAt(subject.getCreatedAt())
                         .updatedAt(subject.getUpdatedAt())
+                        .numberOfSessions(subject.getNumberOfSessions())
                         .build())
                 .collect(Collectors.toList());
     }
