@@ -60,7 +60,7 @@ class SubjectServiceTest {
             when(subjectRepository.findByCurriculumIdAndLevelIdOrderByUpdatedAtDesc(curriculumId, levelId))
                     .thenReturn(List.of(s));
 
-            List<SubjectDTO> result = subjectService.getAllSubjects(curriculumId, levelId);
+            List<SubjectDTO> result = subjectService.getAllSubjects(curriculumId, levelId, null);
 
             assertEquals(1, result.size());
             assertEquals("SUB-A", result.get(0).getCode());
@@ -83,7 +83,7 @@ class SubjectServiceTest {
             when(subjectRepository.findByCurriculumIdOrderByUpdatedAtDesc(curriculumId))
                     .thenReturn(List.of(s));
 
-            List<SubjectDTO> result = subjectService.getAllSubjects(curriculumId, null);
+            List<SubjectDTO> result = subjectService.getAllSubjects(curriculumId, null,null);
 
             assertEquals(1, result.size());
             assertEquals("SUB-B", result.get(0).getCode());
@@ -105,7 +105,7 @@ class SubjectServiceTest {
             when(subjectRepository.findByLevelIdOrderByUpdatedAtDesc(levelId))
                     .thenReturn(List.of(s));
 
-            List<SubjectDTO> result = subjectService.getAllSubjects(null, levelId);
+            List<SubjectDTO> result = subjectService.getAllSubjects(null, levelId, null);
 
             assertEquals(1, result.size());
             assertEquals("SUB-C", result.get(0).getCode());
@@ -124,7 +124,7 @@ class SubjectServiceTest {
             when(subjectRepository.findAll()).thenReturn(List.of(s));
             when(subjectRepository.findAll(any(Sort.class))).thenReturn(List.of(s));
 
-            List<SubjectDTO> result = subjectService.getAllSubjects(null, null);
+            List<SubjectDTO> result = subjectService.getAllSubjects(null, null,null);
 
             assertEquals(1, result.size());
             assertEquals("SUB-D", result.get(0).getCode());
