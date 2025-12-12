@@ -191,4 +191,32 @@ public class SubjectController {
                                 .build());
         }
 
+        // ========== SYLLABUS AND MATERIALS ==========
+
+        @GetMapping("/{id}/syllabus")
+        @Operation(summary = "Get subject syllabus", description = "Lấy giáo trình của môn học")
+        public ResponseEntity<ResponseObject<SubjectDetailDTO>> getSubjectSyllabus(@PathVariable Long id) {
+                log.info("Getting syllabus for subject ID: {}", id);
+                SubjectDetailDTO syllabus = subjectService.getSubjectSyllabus(id);
+                return ResponseEntity.ok(ResponseObject.<SubjectDetailDTO>builder()
+                                .success(true)
+                                .message("Subject syllabus retrieved successfully")
+                                .data(syllabus)
+                                .build());
+        }
+
+        @GetMapping("/{id}/materials")
+        @Operation(summary = "Get subject materials", description = "Lấy tài liệu của môn học")
+        public ResponseEntity<ResponseObject<MaterialHierarchyDTO>> getSubjectMaterials(
+                        @PathVariable Long id,
+                        @RequestParam(required = false) Long studentId) {
+                log.info("Getting materials for subject ID: {}, studentId: {}", id, studentId);
+                MaterialHierarchyDTO materials = subjectService.getSubjectMaterials(id, studentId);
+                return ResponseEntity.ok(ResponseObject.<MaterialHierarchyDTO>builder()
+                                .success(true)
+                                .message("Subject materials retrieved successfully")
+                                .data(materials)
+                                .build());
+        }
+
 }
