@@ -1,6 +1,7 @@
 package org.fyp.tmssep490be.controllers;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,7 @@ import org.fyp.tmssep490be.dtos.subject.*;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.SubjectService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -212,6 +214,55 @@ public class SubjectController {
                         @RequestParam(required = false) Long studentId) {
                 log.info("Getting materials for subject ID: {}, studentId: {}", id, studentId);
                 MaterialHierarchyDTO materials = subjectService.getSubjectMaterials(id, studentId);
+                return ResponseEntity.ok(ResponseObject.<MaterialHierarchyDTO>builder()
+                                .success(true)
+                                .message("Subject materials retrieved successfully")
+                                .data(materials)
+                                .build());
+        }
+
+        @GetMapping("/{subjectId}/syllabus")
+        @Operation(summary = "Get subject syllabus", description = "Lấy cấu trúc giáo trình với phases và sessions")
+        public ResponseEntity<ResponseObject<SubjectDetailDTO>> getSubjectSyllabus(
+                        @Parameter(description = "Subject ID") @PathVariable Long subjectId,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                Long currentUserId = currentUser != null ? currentUser.getId() : null;
+                log.info("User {} requesting syllabus for subject {}", currentUserId, subjectId);
+
+                SubjectDetailDTO syllabus = subjectService.getSubjectSyllabus(subjectId);
+
+                return ResponseEntity.ok(ResponseObject.<SubjectDetailDTO>builder()
+                                .success(true)
+                                .message("Subject syllabus retrieved successfully")
+                                .data(syllabus)
+                                .build());
+        }
+
+        @GetMapping("/{subjectId}/materials")
+        @Operation(summary = "Get subject materials hierarchy", description = "Lấy tài liệu theo cấu trúc phân cấp: subject → phase → session")
+        public ResponseEntity<ResponseObject<MaterialHierarchyDTO>> getSubjectMaterials(
+                        @Parameter(description = "Subject ID") @PathVariable Long subjectId,
+                        @Parameter(description = "Student ID (bắt buộc cho học viên)") @RequestParam(required = false) Long studentId,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                Long currentUserId = currentUser != null ? currentUser.getId() : null;
+                boolean isStudent = currentUser != null &&
+                                currentUser.getAuthorities().stream()
+                                                .anyMatch(auth -> auth.getAuthority().equals("ROLE_STUDENT"));
+
+                // Students must provide studentId for access control
+                if (isStudent && studentId == null) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                        .body(ResponseObject.<MaterialHierarchyDTO>builder()
+                                                        .success(false)
+                                                        .message("Student ID required for material access")
+                                                        .build());
+                }
+
+                log.info("User {} requesting materials for subject {}", currentUserId, subjectId);
+
+                MaterialHierarchyDTO materials = subjectService.getSubjectMaterials(subjectId,
+                                isStudent ? studentId : null);
+
                 return ResponseEntity.ok(ResponseObject.<MaterialHierarchyDTO>builder()
                                 .success(true)
                                 .message("Subject materials retrieved successfully")
