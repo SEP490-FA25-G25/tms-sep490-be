@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -20,7 +21,11 @@ public class StudentsAttendanceResponseDTO {
     private String subjectName;
     private LocalDate date;
     private String timeSlotName;
+    private LocalTime sessionStartTime;
+    private LocalTime sessionEndTime;
+    private String sessionTopic;
     private AttendanceSummaryDTO summary;
     private List<StudentAttendanceDTO> students;
+    private Boolean hasHomework;
 }
 
