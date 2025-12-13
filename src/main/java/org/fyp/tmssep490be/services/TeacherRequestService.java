@@ -49,6 +49,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -139,10 +140,10 @@ public class TeacherRequestService {
 
         // Gửi thông báo cho giáo vụ
         try {
+            teacherRequestRepository.flush();
             sendNotificationToAcademicStaffForNewRequest(request);
         } catch (Exception e) {
-            log.error("Lỗi khi gửi notification cho giáo vụ về request {}: {}", request.getId(), e.getMessage());
-            // Không throw exception - notification failure không nên block việc tạo request
+            log.error("Lỗi khi gửi notification cho giáo vụ về request {}: {}", request.getId(), e.getMessage(), e);
         }
 
         return mapToResponseDTO(request);
@@ -299,12 +300,21 @@ public class TeacherRequestService {
                 }
             }
         } else {
-            // RESCHEDULE: giữ nguyên modality -> dùng classModality
-            Modality classModality = session.getClassEntity().getModality();
-            if (classModality != null) {
-                requiredResourceType = (classModality == Modality.OFFLINE) 
+            // RESCHEDULE: giữ nguyên modality -> lấy từ session resource, không phải class
+            Modality sessionModality = getSessionModality(session);
+            if (sessionModality != null) {
+                // Giữ nguyên modality của session
+                requiredResourceType = (sessionModality == Modality.OFFLINE) 
                         ? ResourceType.ROOM 
                         : ResourceType.VIRTUAL;
+            } else {
+                // Fallback về class modality nếu session chưa có resource
+                Modality classModality = session.getClassEntity().getModality();
+                if (classModality != null) {
+                    requiredResourceType = (classModality == Modality.OFFLINE) 
+                            ? ResourceType.ROOM 
+                            : ResourceType.VIRTUAL;
+                }
             }
         }
         
@@ -809,12 +819,18 @@ public class TeacherRequestService {
         UserAccount handler = decidedBy != null ? decidedBy : submittedBy;
         OffsetDateTime decidedAt = request.getDecidedAt() != null ? request.getDecidedAt() : request.getSubmittedAt();
 
-        // Xử lý modality cho MODALITY_CHANGE
+        // Xử lý modality cho MODALITY_CHANGE và RESCHEDULE
         Modality currentModality = null;
         Modality newModality = null;
-        if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
-            if (classEntity != null) {
-                currentModality = classEntity.getModality();
+        if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE || 
+            request.getRequestType() == TeacherRequestType.RESCHEDULE) {
+            // MODALITY_CHANGE và RESCHEDULE: lấy modality từ session (resource), không phải từ class
+            if (session != null) {
+                currentModality = getSessionModality(session);
+                // Nếu session chưa có resource, fallback về class modality
+                if (currentModality == null && classEntity != null) {
+                    currentModality = classEntity.getModality();
+                }
             }
         }
 
@@ -892,7 +908,31 @@ public class TeacherRequestService {
                 .collect(Collectors.toList());
     }
 
-    //Helper method để lấy branch IDs của user
+    // Helper method để lấy branch IDs của user
+    
+    // Lấy modality của session dựa vào resource được gán
+    // ROOM -> OFFLINE, VIRTUAL -> ONLINE
+    // Nếu session chưa có resource, trả về null
+    private Modality getSessionModality(Session session) {
+        if (session == null || session.getSessionResources() == null || session.getSessionResources().isEmpty()) {
+            return null;
+        }
+        
+        // Lấy resource đầu tiên của session
+        SessionResource sessionResource = session.getSessionResources().iterator().next();
+        if (sessionResource == null || sessionResource.getResource() == null) {
+            return null;
+        }
+        
+        ResourceType resourceType = sessionResource.getResource().getResourceType();
+        if (resourceType == null) {
+            return null;
+        }
+        
+        // Chuyển đổi ResourceType -> Modality
+        return (resourceType == ResourceType.ROOM) ? Modality.OFFLINE : Modality.ONLINE;
+    }
+
     private List<Long> getBranchIdsForUser(Long userId) {
         if (userId == null) {
             return List.of();
@@ -1132,21 +1172,70 @@ public class TeacherRequestService {
      // Gửi thông báo cho giáo vụ khi teacher tạo request mới
     private void sendNotificationToAcademicStaffForNewRequest(TeacherRequest request) {
         try {
+            // Đảm bảo teacher và userAccount được load
+            if (request.getTeacher() == null || request.getTeacher().getUserAccount() == null) {
+                log.error("Request {} không có teacher hoặc userAccount - không thể gửi notification", request.getId());
+                return;
+            }
+            
             // Lấy branch của teacher
             Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
             List<Long> teacherBranchIds = getBranchIdsForUser(teacherUserAccountId);
 
-            if (teacherBranchIds.isEmpty()) {
-                log.warn("Không tìm thấy branch cho teacher {} - không thể gửi notification", teacherUserAccountId);
-                return;
+            log.info("Tìm academic staff cho teacher {} với branch IDs: {}", teacherUserAccountId, teacherBranchIds);
+
+            // Luôn lấy tất cả academic staff trước để đảm bảo không bỏ sót
+            List<UserAccount> allAcademicStaff = userAccountRepository.findUsersByRole("ACADEMIC_AFFAIRS");
+            log.info("Tìm thấy tổng cộng {} academic staff trong hệ thống", allAcademicStaff.size());
+            
+            // Log chi tiết từng academic staff để debug
+            if (allAcademicStaff.isEmpty()) {
+                log.error("Không tìm thấy academic staff nào trong hệ thống với role ACADEMIC_AFFAIRS!");
+            } else {
+                allAcademicStaff.forEach(staff -> {
+                    List<Long> staffBranches = getBranchIdsForUser(staff.getId());
+                    log.info("Academic staff: ID={}, Name={}, Email={}, Branches={}", 
+                            staff.getId(), staff.getFullName(), staff.getEmail(), staffBranches);
+                });
             }
 
-            // Lấy tất cả academic staff của các branch này
-            List<UserAccount> academicStaffUsers = userAccountRepository.findByRoleCodeAndBranches(
-                    "ACADEMIC_AFFAIRS", teacherBranchIds);
+            List<UserAccount> academicStaffUsers;
+
+            // Nếu teacher có branch, filter academic staff theo branch trong code
+            // Lưu ý: Academic staff có thể thuộc nhiều branch, chỉ cần có 1 branch trùng là được
+            if (!teacherBranchIds.isEmpty() && !allAcademicStaff.isEmpty()) {
+                // Filter academic staff có ít nhất 1 branch trùng với teacher
+                academicStaffUsers = allAcademicStaff.stream()
+                        .filter(staff -> {
+                            List<Long> staffBranches = getBranchIdsForUser(staff.getId());
+                            // Kiểm tra xem có ít nhất 1 branch trùng không (anyMatch)
+                            boolean hasMatchingBranch = !staffBranches.isEmpty() && 
+                                    staffBranches.stream().anyMatch(teacherBranchIds::contains);
+                            if (hasMatchingBranch) {
+                                log.info("Academic staff {} (Name: {}, Branches: {}) có branch trùng với teacher branches {}", 
+                                        staff.getId(), staff.getFullName(), staffBranches, teacherBranchIds);
+                            } else {
+                                log.debug("Academic staff {} (Name: {}, Branches: {}) không có branch trùng với teacher branches {}", 
+                                        staff.getId(), staff.getFullName(), staffBranches, teacherBranchIds);
+                            }
+                            return hasMatchingBranch;
+                        })
+                        .collect(Collectors.toList());
+                log.info("Tìm thấy {} academic staff có branch trùng với teacher (teacher branches: {})", 
+                        academicStaffUsers.size(), teacherBranchIds);
+            } else {
+                log.warn("Teacher {} không có branch được gán hoặc không có academic staff, sẽ gửi notification cho tất cả academic staff", teacherUserAccountId);
+                academicStaffUsers = allAcademicStaff;
+            }
+
+            // Fallback: Nếu không tìm thấy theo branch, gửi cho tất cả academic staff
+            if (academicStaffUsers.isEmpty() && !allAcademicStaff.isEmpty()) {
+                log.info("Không tìm thấy academic staff theo branch, gửi cho tất cả {} academic staff", allAcademicStaff.size());
+                academicStaffUsers = allAcademicStaff;
+            }
 
             if (academicStaffUsers.isEmpty()) {
-                log.warn("Không tìm thấy academic staff nào cho branch {} - không thể gửi notification", teacherBranchIds);
+                log.error("Không tìm thấy academic staff nào trong hệ thống - không thể gửi notification");
                 return;
             }
 
@@ -1167,7 +1256,16 @@ public class TeacherRequestService {
 
             List<Long> recipientIds = academicStaffUsers.stream()
                     .map(UserAccount::getId)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
+
+            if (recipientIds.isEmpty()) {
+                log.error("Danh sách recipient IDs rỗng - không thể gửi notification");
+                return;
+            }
+
+            log.info("Chuẩn bị gửi notification cho {} academic staff (IDs: {}) về request {}",
+                    recipientIds.size(), recipientIds, request.getId());
 
             notificationService.sendBulkNotifications(
                     recipientIds,
@@ -1176,11 +1274,12 @@ public class TeacherRequestService {
                     message
             );
 
-            log.info("Đã gửi notification cho {} academic staff về request {} (type: {})",
+            log.info("Đã gửi notification thành công cho {} academic staff về request {} (type: {})",
                     recipientIds.size(), request.getId(), request.getRequestType());
         } catch (Exception e) {
-            log.error("Lỗi khi gửi notification cho academic staff về request {}: {}", request.getId(), e.getMessage());
-            throw e;
+            log.error("Lỗi khi gửi notification cho academic staff về request {}: {}", 
+                    request.getId(), e.getMessage(), e);
+            // Không throw exception - notification failure không nên block việc tạo request
         }
     }
 
@@ -1526,9 +1625,19 @@ public class TeacherRequestService {
                 : null;
 
         // Current modality/resource
-        String currentModality = classEntity != null && classEntity.getModality() != null
-                ? classEntity.getModality().name()
-                : null;
+        // MODALITY_CHANGE và RESCHEDULE: lấy modality từ session (resource), không phải từ class
+        String currentModality = null;
+        if ((request.getRequestType() == TeacherRequestType.MODALITY_CHANGE || 
+             request.getRequestType() == TeacherRequestType.RESCHEDULE) && session != null) {
+            Modality sessionModality = getSessionModality(session);
+            if (sessionModality != null) {
+                currentModality = sessionModality.name();
+            }
+        }
+        // Fallback về class modality nếu không lấy được từ session
+        if (currentModality == null && classEntity != null && classEntity.getModality() != null) {
+            currentModality = classEntity.getModality().name();
+        }
         String currentResourceName = session != null && session.getSessionResources() != null && !session.getSessionResources().isEmpty()
                 ? session.getSessionResources().iterator().next().getResource().getName()
                 : null;
