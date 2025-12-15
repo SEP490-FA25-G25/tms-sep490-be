@@ -45,9 +45,8 @@ public class CurriculumService {
         public List<CurriculumWithLevelsDTO> getAllCurriculumsWithLevels() {
                 log.debug("Fetching all curriculums with their levels");
 
-                // Lấy tất cả curriculums, sắp xếp theo updatedAt DESC (mới nhất trước)
-                List<Curriculum> curriculums = curriculumRepository.findAll(
-                                Sort.by(Sort.Direction.DESC, "updatedAt"));
+                // Lấy tất cả curriculums với PLOs, sắp xếp theo updatedAt DESC (mới nhất trước)
+                List<Curriculum> curriculums = curriculumRepository.findAllWithPlos();
 
                 List<CurriculumWithLevelsDTO> result = curriculums.stream()
                                 .map(this::convertToCurriculumWithLevelsDTO)

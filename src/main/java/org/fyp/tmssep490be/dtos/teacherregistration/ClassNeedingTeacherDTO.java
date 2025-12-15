@@ -8,13 +8,12 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
-// DTO hiển thị danh sách đăng ký của giáo viên
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MyRegistrationDTO {
-    private Long id;
+public class ClassNeedingTeacherDTO {
     private Long classId;
     private String classCode;
     private String className;
@@ -23,15 +22,14 @@ public class MyRegistrationDTO {
     private String modality;
     private LocalDate startDate;
     private LocalDate plannedEndDate;
-    private Short[] scheduleDays;
-    private String status;
-    private String note;
-    private OffsetDateTime registeredAt;
-    private OffsetDateTime registrationCloseDate;
-    private String rejectionReason;
-    private boolean canCancel; // Có thể hủy không (chưa hết hạn đăng ký)
+    private int[] scheduleDays;
+    private Integer maxCapacity;
 
-    // Time slot info for schedule display
-    private String timeSlotStart; // "8:00"
-    private String timeSlotEnd; // "10:00"
+    // Registration dates (null if not opened yet)
+    private OffsetDateTime registrationOpenDate;
+    private OffsetDateTime registrationCloseDate;
+
+    // Status flags
+    private boolean registrationOpened; // true if registrationOpenDate is set
+    private int pendingRegistrations; // count of pending teacher registrations
 }

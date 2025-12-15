@@ -68,6 +68,61 @@ public interface SessionResourceRepository extends JpaRepository<SessionResource
                         @Param("sessionDate") LocalDate sessionDate,
                         @Param("timeSlotId") Long timeSlotId);
 
+        /**
+         * Batch query to count resource conflicts across all classes (optimized - 1
+         * query instead of N)
+         * <p>
+         * Example: If current class has 8 sessions on Mondays, and another class is
+         * already using
+         * Room 101 on 2 of those Mondays, then conflictCount = 2 for Room 101.
+         * This represents: "2 out of 8 sessions cannot use Room 101"
+         * </p>
+         *
+         * @param resourceIds    list of resource IDs to check
+         * @param dates          list of dates from current class sessions
+         * @param timeSlotIds    list of time slot IDs to check (from current class
+         *                       sessions)
+         * @param excludeClassId class ID to exclude (current class being assigned)
+         * @return list of [resourceId, conflictCount] pairs
+         */
+        @Query(value = """
+                        WITH current_class_schedule AS (
+                          -- Get all unique (date, time_slot) pairs from current class
+                          SELECT DISTINCT s.date, s.time_slot_template_id
+                          FROM session s
+                          WHERE s.class_id = :excludeClassId
+                            AND s.date IN :dates
+                            AND s.time_slot_template_id IN :timeSlotIds
+                        ),
+                        resource_bookings AS (
+                          -- Find all (date, time_slot) pairs where resources are already booked by other classes
+                          SELECT DISTINCT
+                            sr.resource_id,
+                            s.date,
+                            s.time_slot_template_id
+                          FROM session_resource sr
+                          JOIN session s ON sr.session_id = s.id
+                          WHERE sr.resource_id IN :resourceIds
+                            AND s.date IN :dates
+                            AND s.time_slot_template_id IN :timeSlotIds
+                            AND s.class_id != :excludeClassId
+                            AND s.status IN ('PLANNED', 'ONGOING')
+                        )
+                        SELECT
+                          rb.resource_id as resourceId,
+                          COUNT(*) as conflictCount
+                        FROM resource_bookings rb
+                        INNER JOIN current_class_schedule ccs
+                          ON rb.date = ccs.date
+                          AND rb.time_slot_template_id = ccs.time_slot_template_id
+                        GROUP BY rb.resource_id
+                        """, nativeQuery = true)
+        List<Object[]> batchCountConflictsByResourcesAcrossAllClasses(
+                        @Param("resourceIds") List<Long> resourceIds,
+                        @Param("dates") List<LocalDate> dates,
+                        @Param("timeSlotIds") List<Long> timeSlotIds,
+                        @Param("excludeClassId") Long excludeClassId);
+
         // ==================== FROM DEPRECATED - CONFLICT CHECK ====================
 
         /**
