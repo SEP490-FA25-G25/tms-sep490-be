@@ -1797,29 +1797,34 @@ INSERT INTO notification (recipient_id, type, title, message, status, created_at
 
 -- 1. Create new classes that are APPROVED but need teacher assignment (with registration open)
 -- These classes have registration_open_date and registration_close_date set
+-- Using relative dates (NOW()) to ensure seed data always works
 INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date, planned_end_date, schedule_days, max_capacity, status, approval_status, created_by, decided_by, submitted_at, decided_at, registration_open_date, registration_close_date, created_at, updated_at) VALUES
 -- Class 201: Registration OPEN (closes in 5 days) - no registrations yet
-(201, 1, 1, 'HN-IELTS-REG-1', 'HN IELTS Foundation - Teacher Registration Test 1', 'OFFLINE', '2026-01-15', '2026-03-10', ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 6, 3, '2025-12-01 10:00:00+07', '2025-12-02 14:00:00+07', '2025-12-05 00:00:00+07', '2025-12-15 23:59:59+07', '2025-12-01 10:00:00+07', NOW()),
+(201, 1, 1, 'HN-IELTS-REG-1', 'HN IELTS Foundation - Teacher Registration Test 1', 'OFFLINE', (CURRENT_DATE + INTERVAL '30 days')::DATE, (CURRENT_DATE + INTERVAL '90 days')::DATE, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '10 days', NOW() - INTERVAL '9 days', NOW() - INTERVAL '3 days', NOW() + INTERVAL '5 days', NOW() - INTERVAL '10 days', NOW()),
 -- Class 202: Registration OPEN (closes in 3 days) - has multiple registrations
-(202, 1, 2, 'HN-IELTS-REG-2', 'HN IELTS Intermediate - Teacher Registration Test 2', 'OFFLINE', '2026-01-20', '2026-03-15', ARRAY[2,4,6]::smallint[], 18, 'SCHEDULED', 'APPROVED', 6, 3, '2025-12-02 10:00:00+07', '2025-12-03 14:00:00+07', '2025-12-05 00:00:00+07', '2025-12-13 23:59:59+07', '2025-12-02 10:00:00+07', NOW()),
+(202, 1, 2, 'HN-IELTS-REG-2', 'HN IELTS Intermediate - Teacher Registration Test 2', 'OFFLINE', (CURRENT_DATE + INTERVAL '35 days')::DATE, (CURRENT_DATE + INTERVAL '95 days')::DATE, ARRAY[2,4,6]::smallint[], 18, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '9 days', NOW() - INTERVAL '8 days', NOW() - INTERVAL '3 days', NOW() + INTERVAL '3 days', NOW() - INTERVAL '9 days', NOW()),
 -- Class 203: Registration CLOSED, teacher already assigned via registration
-(203, 1, 3, 'HN-IELTS-REG-3', 'HN IELTS Advanced - Teacher Assigned Test', 'ONLINE', '2026-01-10', '2026-04-01', ARRAY[1,3,5]::smallint[], 15, 'SCHEDULED', 'APPROVED', 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-28 00:00:00+07', '2025-12-08 23:59:59+07', '2025-11-25 10:00:00+07', NOW()),
+(203, 1, 3, 'HN-IELTS-REG-3', 'HN IELTS Advanced - Teacher Assigned Test', 'ONLINE', (CURRENT_DATE + INTERVAL '25 days')::DATE, (CURRENT_DATE + INTERVAL '100 days')::DATE, ARRAY[1,3,5]::smallint[], 15, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '15 days', NOW() - INTERVAL '14 days', NOW() - INTERVAL '12 days', NOW() - INTERVAL '2 days', NOW() - INTERVAL '15 days', NOW()),
 -- Class 204: Registration CLOSED, teacher directly assigned by AA (no registration)
-(204, 1, 4, 'HN-TOEIC-REG-1', 'HN TOEIC Foundation - Direct Assign Test', 'OFFLINE', '2026-02-01', '2026-03-25', ARRAY[2,4,6]::smallint[], 22, 'SCHEDULED', 'APPROVED', 6, 3, '2025-12-01 10:00:00+07', '2025-12-02 14:00:00+07', '2025-11-25 00:00:00+07', '2025-12-05 23:59:59+07', '2025-12-01 10:00:00+07', NOW()),
+(204, 1, 4, 'HN-TOEIC-REG-1', 'HN TOEIC Foundation - Direct Assign Test', 'OFFLINE', (CURRENT_DATE + INTERVAL '45 days')::DATE, (CURRENT_DATE + INTERVAL '100 days')::DATE, ARRAY[2,4,6]::smallint[], 22, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '12 days', NOW() - INTERVAL '11 days', NOW() - INTERVAL '15 days', NOW() - INTERVAL '5 days', NOW() - INTERVAL '12 days', NOW()),
 -- Class 205: HCM Branch - Registration OPEN
-(205, 2, 5, 'HCM-TOEIC-REG-1', 'HCM TOEIC Intermediate - Teacher Registration Test', 'OFFLINE', '2026-01-22', '2026-03-18', ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 8, 4, '2025-12-03 10:00:00+07', '2025-12-04 14:00:00+07', '2025-12-06 00:00:00+07', '2025-12-16 23:59:59+07', '2025-12-03 10:00:00+07', NOW());
+(205, 2, 5, 'HCM-TOEIC-REG-1', 'HCM TOEIC Intermediate - Teacher Registration Test', 'OFFLINE', (CURRENT_DATE + INTERVAL '40 days')::DATE, (CURRENT_DATE + INTERVAL '95 days')::DATE, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 8, 4, NOW() - INTERVAL '8 days', NOW() - INTERVAL '7 days', NOW() - INTERVAL '3 days', NOW() + INTERVAL '7 days', NOW() - INTERVAL '8 days', NOW()),
+-- Class 206: ONLINE class - Registration OPEN (test for online modality)
+(206, 1, 1, 'HN-IELTS-ONLINE-1', 'IELTS Foundation Online - Any Branch Teacher', 'ONLINE', (CURRENT_DATE + INTERVAL '28 days')::DATE, (CURRENT_DATE + INTERVAL '85 days')::DATE, ARRAY[2,4]::smallint[], 25, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '5 days', NOW() - INTERVAL '4 days', NOW() - INTERVAL '2 days', NOW() + INTERVAL '10 days', NOW() - INTERVAL '5 days', NOW()),
+-- Class 207: Registration OPEN but starts soon - has 1 registration
+(207, 1, 2, 'HN-IELTS-URGENT-1', 'HN IELTS Intermediate - Urgent Need Teacher', 'OFFLINE', (CURRENT_DATE + INTERVAL '14 days')::DATE, (CURRENT_DATE + INTERVAL '75 days')::DATE, ARRAY[1,3,5]::smallint[], 16, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '7 days', NOW() - INTERVAL '6 days', NOW() - INTERVAL '4 days', NOW() + INTERVAL '2 days', NOW() - INTERVAL '7 days', NOW());
 
 -- 2. Update Class 203 to have assigned teacher (Teacher 1 - John Smith)
 UPDATE "class" SET 
   assigned_teacher_id = 1,
-  teacher_assigned_at = '2025-12-09 10:00:00+07',
+  teacher_assigned_at = NOW() - INTERVAL '3 days',
   teacher_assigned_by = 6
 WHERE id = 203;
 
 -- 3. Update Class 204 to have directly assigned teacher (Teacher 5) with reason
 UPDATE "class" SET 
   assigned_teacher_id = 5,
-  teacher_assigned_at = '2025-12-06 11:00:00+07',
+  teacher_assigned_at = NOW() - INTERVAL '6 days',
   teacher_assigned_by = 6,
   direct_assign_reason = 'Chỉ có một giáo viên có chứng chỉ TOEIC phù hợp với lịch dạy của lớp này'
 WHERE id = 204;
@@ -1827,18 +1832,18 @@ WHERE id = 204;
 -- 4. Teacher Class Registrations for Class 202 (Multiple registrations, PENDING)
 INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, created_at, updated_at) VALUES
 -- Teacher 1 (John Smith) registered - PENDING
-(1, 1, 202, 'PENDING', 'Tôi có kinh nghiệm 5 năm dạy IELTS Intermediate và rất phù hợp với lịch học này.', '2025-12-06 09:30:00+07', '2025-12-06 09:30:00+07', NOW()),
+(1, 1, 202, 'PENDING', 'Tôi có kinh nghiệm 5 năm dạy IELTS Intermediate và rất phù hợp với lịch học này.', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days', NOW()),
 -- Teacher 2 (Emma Wilson) registered - PENDING
-(2, 2, 202, 'PENDING', 'Tôi muốn đăng ký dạy lớp này vì phù hợp với chuyên môn Reading & Writing của tôi.', '2025-12-07 14:15:00+07', '2025-12-07 14:15:00+07', NOW()),
+(2, 2, 202, 'PENDING', 'Tôi muốn đăng ký dạy lớp này vì phù hợp với chuyên môn Reading & Writing của tôi.', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', NOW()),
 -- Teacher 3 (Michael Brown) registered - PENDING
-(3, 3, 202, 'PENDING', NULL, '2025-12-08 10:00:00+07', '2025-12-08 10:00:00+07', NOW());
+(3, 3, 202, 'PENDING', NULL, NOW() - INTERVAL '12 hours', NOW() - INTERVAL '12 hours', NOW());
 
 -- 5. Teacher Class Registrations for Class 203 (One approved, others rejected)
 INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, reviewed_at, reviewed_by, rejection_reason, created_at, updated_at) VALUES
 -- Teacher 1 (John Smith) - APPROVED (this is the assigned teacher)
-(4, 1, 203, 'APPROVED', 'Tôi có kinh nghiệm dạy IELTS Advanced và đạt band 9.0.', '2025-12-01 08:00:00+07', '2025-12-09 10:00:00+07', 6, NULL, '2025-12-01 08:00:00+07', NOW()),
+(4, 1, 203, 'APPROVED', 'Tôi có kinh nghiệm dạy IELTS Advanced và đạt band 9.0.', NOW() - INTERVAL '10 days', NOW() - INTERVAL '3 days', 6, NULL, NOW() - INTERVAL '10 days', NOW()),
 -- Teacher 4 (Sarah Johnson) - REJECTED
-(5, 4, 203, 'REJECTED', 'Tôi muốn thử thách bản thân với lớp Advanced.', '2025-12-02 11:30:00+07', '2025-12-09 10:00:00+07', 6, 'Đã chọn giáo viên khác phù hợp hơn với trình độ Advanced.', '2025-12-02 11:30:00+07', NOW());
+(5, 4, 203, 'REJECTED', 'Tôi muốn thử thách bản thân với lớp Advanced.', NOW() - INTERVAL '9 days', NOW() - INTERVAL '3 days', 6, 'Đã chọn giáo viên khác phù hợp hơn với trình độ Advanced.', NOW() - INTERVAL '9 days', NOW());
 
 -- 6. Teacher Class Registrations for Class 201 (No registrations yet - empty)
 -- This class is used to test empty registration list
@@ -1846,14 +1851,25 @@ INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, 
 -- 7. Teacher Class Registration - CANCELLED by teacher
 INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, cancelled_at, created_at, updated_at) VALUES
 -- Teacher 6 registered then cancelled for Class 202
-(6, 6, 202, 'CANCELLED', 'Tôi muốn đăng ký dạy lớp này.', '2025-12-05 16:00:00+07', '2025-12-06 08:00:00+07', '2025-12-05 16:00:00+07', NOW());
+(6, 6, 202, 'CANCELLED', 'Tôi muốn đăng ký dạy lớp này.', NOW() - INTERVAL '3 days', NOW() - INTERVAL '2 days' - INTERVAL '8 hours', NOW() - INTERVAL '3 days', NOW());
 
 -- 8. HCM Teacher registrations for Class 205
 INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, created_at, updated_at) VALUES
 -- Teacher 10 (HCM teacher) - PENDING
-(7, 10, 205, 'PENDING', 'Tôi có kinh nghiệm dạy TOEIC Intermediate tại chi nhánh HCM.', '2025-12-07 09:00:00+07', '2025-12-07 09:00:00+07', NOW()),
+(7, 10, 205, 'PENDING', 'Tôi có kinh nghiệm dạy TOEIC Intermediate tại chi nhánh HCM.', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', NOW()),
 -- Teacher 11 (HCM teacher) - PENDING
-(8, 11, 205, 'PENDING', NULL, '2025-12-08 15:30:00+07', '2025-12-08 15:30:00+07', NOW());
+(8, 11, 205, 'PENDING', NULL, NOW() - INTERVAL '6 hours', NOW() - INTERVAL '6 hours', NOW());
+
+-- 9. Registration for Class 206 (ONLINE) - multiple branches can register
+INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, created_at, updated_at) VALUES
+-- Teacher 1 (HN teacher) - PENDING for online class
+(9, 1, 206, 'PENDING', 'Tôi muốn thử dạy online để mở rộng kỹ năng.', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', NOW()),
+-- Teacher 10 (HCM teacher) - PENDING for online class (can register across branches)
+(10, 10, 206, 'PENDING', 'Tôi có kinh nghiệm dạy online và muốn đăng ký lớp này.', NOW() - INTERVAL '18 hours', NOW() - INTERVAL '18 hours', NOW());
+
+-- 10. Registration for Class 207 (Urgent)
+INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, created_at, updated_at) VALUES
+(11, 2, 207, 'PENDING', 'Tôi có thể dạy lớp này và sẵn sàng bắt đầu sớm.', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', NOW());
 
 -- Update sequences
 SELECT setval('class_id_seq', (SELECT MAX(id) FROM class));

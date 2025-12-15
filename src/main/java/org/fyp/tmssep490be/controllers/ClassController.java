@@ -109,7 +109,6 @@ public class ClassController {
                                 .build());
         }
 
- 
         @GetMapping("/preview-code")
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
         public ResponseEntity<ResponseObject<PreviewClassCodeResponse>> previewClassCode(
@@ -203,7 +202,6 @@ public class ClassController {
                 }
         }
 
- 
         @GetMapping("/check-name")
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
         public ResponseEntity<ResponseObject<java.util.Map<String, Object>>> checkClassNameExists(
@@ -236,7 +234,6 @@ public class ClassController {
                                 .build());
         }
 
- 
         @GetMapping("/{classId}/sessions")
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
         public ResponseEntity<ResponseObject<org.fyp.tmssep490be.dtos.classcreation.ClassSessionsOverviewDTO>> getClassSessions(
@@ -254,7 +251,6 @@ public class ClassController {
                                                 .data(response)
                                                 .build());
         }
-
 
         @PostMapping("/{classId}/time-slots")
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
@@ -274,7 +270,6 @@ public class ClassController {
                                                 .data(response)
                                                 .build());
         }
-
 
         @GetMapping("/{classId}/resources")
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
@@ -296,7 +291,6 @@ public class ClassController {
                                                 .data(resources)
                                                 .build());
         }
-
 
         @PostMapping("/{classId}/resources")
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
@@ -321,6 +315,30 @@ public class ClassController {
                                                 .build());
         }
 
+        @PostMapping("/{classId}/sessions/{sessionId}/resource")
+        @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+        public ResponseEntity<ResponseObject<Void>> assignSessionResource(
+                        @PathVariable Long classId,
+                        @PathVariable Long sessionId,
+                        @RequestBody java.util.Map<String, Long> body,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                log.info("User {} assigning resource to session {} of class {}",
+                                currentUser.getId(), sessionId, classId);
+
+                Long resourceId = body.get("resourceId");
+                if (resourceId == null) {
+                        throw new CustomException(ErrorCode.INVALID_REQUEST);
+                }
+
+                classService.assignResourceToSession(classId, sessionId, resourceId, currentUser.getId());
+
+                return ResponseEntity.ok(
+                                ResponseObject.<Void>builder()
+                                                .success(true)
+                                                .message("Resource assigned to session successfully")
+                                                .build());
+        }
+
         @PostMapping("/{classId}/validate")
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
         public ResponseEntity<ResponseObject<org.fyp.tmssep490be.dtos.classcreation.ValidateClassResponse>> validateClass(
@@ -340,7 +358,6 @@ public class ClassController {
                                                 .build());
         }
 
- 
         @PostMapping("/{classId}/submit")
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
         public ResponseEntity<ResponseObject<org.fyp.tmssep490be.dtos.classcreation.SubmitClassResponse>> submitClass(
@@ -359,7 +376,6 @@ public class ClassController {
                                                 .build());
         }
 
- 
         @PostMapping("/{classId}/approve")
         @PreAuthorize("hasRole('CENTER_HEAD') or hasRole('MANAGER')")
         public ResponseEntity<ResponseObject<String>> approveClass(
@@ -375,7 +391,6 @@ public class ClassController {
                                 .data("APPROVED")
                                 .build());
         }
-
 
         @PostMapping("/{classId}/reject")
         @PreAuthorize("hasRole('CENTER_HEAD') or hasRole('MANAGER')")
