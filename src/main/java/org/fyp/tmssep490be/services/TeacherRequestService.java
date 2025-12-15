@@ -47,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -108,6 +109,24 @@ public class TeacherRequestService {
         // Không cho phép chọn buổi trong quá khứ
         if (session.getDate().isBefore(today)) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Session date is in the past");
+        }
+
+        // Giới hạn tối đa 3 yêu cầu cho cùng một lớp (tính các trạng thái PENDING, WAITING_CONFIRM, APPROVED)
+        if (session.getClassEntity() == null || session.getClassEntity().getId() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Session class is missing");
+        }
+        List<RequestStatus> countedStatuses = Arrays.asList(
+                RequestStatus.PENDING,
+                RequestStatus.WAITING_CONFIRM,
+                RequestStatus.APPROVED
+        );
+        long activeRequestsForClass = teacherRequestRepository.countActiveRequestsByTeacherAndClass(
+                teacher.getId(),
+                session.getClassEntity().getId(),
+                countedStatuses
+        );
+        if (activeRequestsForClass >= 3) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Bạn đã gửi 3 yêu cầu cho lớp này");
         }
 
         TeacherRequestType requestType = createDTO.getRequestType();
@@ -605,7 +624,8 @@ public class TeacherRequestService {
         List<Session> teacherSessions = sessionRepository.findSessionsForTeacherByDate(
                 teacherId, targetDate, sessionId);
 
-        // Lấy students của session hiện tại
+        // Lấy TẤT CẢ students có mặt trong session
+        // Lấy từ studentSessionson
         List<Long> studentIds = session.getStudentSessions().stream()
                 .filter(ss -> ss.getStudent() != null)
                 .map(ss -> ss.getStudent().getId())
