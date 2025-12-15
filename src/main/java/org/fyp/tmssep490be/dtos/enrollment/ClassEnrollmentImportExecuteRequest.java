@@ -21,9 +21,11 @@ public class ClassEnrollmentImportExecuteRequest {
     @NotNull(message = "Enrollment strategy is required")
     private EnrollmentStrategy strategy;
 
-    // Frontend sends only the selected students (not all students)
-    @NotEmpty(message = "Selected students list cannot be empty")
-    private List<StudentEnrollmentData> selectedStudents;
+    // Chỉ gửi IDs của students đã tồn tại (FOUND)
+    private List<Long> existingStudentIds;
+
+    // Chỉ gửi data của students cần tạo mới (CREATE)
+    private List<StudentEnrollmentData> newStudents;
 
     // Required only when strategy = OVERRIDE
     @Size(min = 20, message = "Override reason must be at least 20 characters")

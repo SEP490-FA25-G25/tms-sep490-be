@@ -77,8 +77,8 @@ public class EnrollmentController {
                 classId, file, currentUser.getId()
         );
 
-        log.info("Preview completed for class {}. Valid students: {}, Errors: {}",
-                classId, preview.getTotalValid(), preview.getErrorCount());
+        log.info("Preview completed for class {}. Total students: {}",
+                classId, preview.getStudents().size());
 
         return ResponseEntity.ok(ResponseObject.builder()
                 .success(true)
