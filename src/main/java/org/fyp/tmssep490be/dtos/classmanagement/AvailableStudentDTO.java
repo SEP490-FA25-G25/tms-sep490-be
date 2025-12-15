@@ -17,9 +17,6 @@ public class AvailableStudentDTO {
     private String phone;
     private String avatarUrl;
 
-    private Long branchId;
-    private String branchName;
-
     private String accountStatus;
 
     private List<SkillAssessmentDTO> replacementSkillAssessments;
@@ -27,7 +24,6 @@ public class AvailableStudentDTO {
     private ClassMatchInfoDTO classMatchInfo;
 
     private Integer activeEnrollments;
-    private Boolean canEnroll;
 
     @Data
     @Builder
