@@ -141,6 +141,11 @@ public class AttendanceService {
         List<StudentSession> allStudentSessions = new ArrayList<>(existingStudentSessions);
         AttendanceSummaryDTO summary = buildSummary(allStudentSessions);
 
+        // Check if session has homework
+        boolean hasHomework = session.getSubjectSession() != null &&
+                session.getSubjectSession().getStudentTask() != null &&
+                !session.getSubjectSession().getStudentTask().trim().isEmpty();
+
         return StudentsAttendanceResponseDTO.builder()
                 .sessionId(session.getId())
                 .classId(session.getClassEntity().getId())
@@ -148,9 +153,13 @@ public class AttendanceService {
                 .subjectCode(session.getClassEntity().getSubject().getCode())
                 .subjectName(session.getClassEntity().getSubject().getName())
                 .date(session.getDate())
-                .timeSlotName(session.getTimeSlotTemplate().getName())
+                .timeSlotName(session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : null)
+                .sessionStartTime(session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getStartTime() : null)
+                .sessionEndTime(session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getEndTime() : null)
+                .sessionTopic(session.getSubjectSession() != null ? session.getSubjectSession().getTopic() : null)
                 .summary(summary)
                 .students(students)
+                .hasHomework(hasHomework)
                 .build();
     }
 

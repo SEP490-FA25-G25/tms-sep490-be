@@ -107,6 +107,7 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
                         "ORDER BY c.startDate ASC")
         List<ClassEntity> findClassesNeedingTeacher(@Param("branchIds") List<Long> branchIds);
 
+
         // Lấy các lớp đang active mà teacher đang được assign (cho conflict detection)
         @Query("SELECT c FROM ClassEntity c " +
                         "WHERE c.assignedTeacher.id = :teacherId " +
@@ -115,4 +116,8 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
         List<ClassEntity> findActiveClassesByAssignedTeacher(
                         @Param("teacherId") Long teacherId,
                         @Param("fromDate") java.time.LocalDate fromDate);
+
+        // Find classes by status (for cronjob)
+        List<ClassEntity> findByStatus(ClassStatus status);
+
 }

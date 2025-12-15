@@ -58,7 +58,8 @@ public interface SessionResourceRepository extends JpaRepository<SessionResource
         // Tìm các session resources theo resource, ngày, và time slot (để check
         // conflict)
         @Query("SELECT sr FROM SessionResource sr " +
-                        "JOIN sr.session s " +
+                        "JOIN FETCH sr.session s " +
+                        "JOIN FETCH s.timeSlotTemplate " +
                         "WHERE sr.resource.id = :resourceId " +
                         "AND s.date = :sessionDate " +
                         "AND s.timeSlotTemplate.id = :timeSlotId " +
@@ -67,6 +68,7 @@ public interface SessionResourceRepository extends JpaRepository<SessionResource
                         @Param("resourceId") Long resourceId,
                         @Param("sessionDate") LocalDate sessionDate,
                         @Param("timeSlotId") Long timeSlotId);
+
 
         /**
          * Batch query to count resource conflicts across all classes (optimized - 1
@@ -122,6 +124,18 @@ public interface SessionResourceRepository extends JpaRepository<SessionResource
                         @Param("dates") List<LocalDate> dates,
                         @Param("timeSlotIds") List<Long> timeSlotIds,
                         @Param("excludeClassId") Long excludeClassId);
+
+        // Tìm tất cả session resources theo resource và ngày (để kiểm tra overlap conflict)
+        @Query("SELECT sr FROM SessionResource sr " +
+                        "JOIN FETCH sr.session s " +
+                        "JOIN FETCH s.timeSlotTemplate " +
+                        "WHERE sr.resource.id = :resourceId " +
+                        "AND s.date = :sessionDate " +
+                        "AND s.status != org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED")
+        List<SessionResource> findByResourceIdAndSessionDate(
+                        @Param("resourceId") Long resourceId,
+                        @Param("sessionDate") LocalDate sessionDate);
+
 
         // ==================== FROM DEPRECATED - CONFLICT CHECK ====================
 

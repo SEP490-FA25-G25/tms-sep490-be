@@ -159,6 +159,7 @@ public class TeacherGradeService {
                             .name(sa != null ? sa.getName() : "Assessment " + a.getId())
                             .kind(sa != null && sa.getKind() != null ? sa.getKind().name() : null)
                             .maxScore(sa != null && sa.getMaxScore() != null ? sa.getMaxScore().doubleValue() : null)
+                            .durationMinutes(sa != null ? sa.getDurationMinutes() : null)
                             .scheduledDate(a.getScheduledDate())
                             .build();
                 })

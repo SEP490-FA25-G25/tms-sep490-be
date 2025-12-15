@@ -24,6 +24,7 @@ public class StudentClassDTO {
     private String subjectCode;
 
     private Long branchId;
+    private String branchName;
     private String branchAddress;
 
     private String modality;

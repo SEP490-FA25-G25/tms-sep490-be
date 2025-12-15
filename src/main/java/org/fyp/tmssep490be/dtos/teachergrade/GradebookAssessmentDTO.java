@@ -12,6 +12,7 @@ public class GradebookAssessmentDTO {
     private String name;
     private String kind;
     private Double maxScore;
+    private Integer durationMinutes;
     private OffsetDateTime scheduledDate;
 }
 

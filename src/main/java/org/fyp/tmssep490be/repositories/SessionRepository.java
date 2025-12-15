@@ -244,6 +244,17 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
   Long countByClassEntityIdAndStatus(@Param("classId") Long classId,
       @Param("status") org.fyp.tmssep490be.entities.enums.SessionStatus status);
 
+  @Query("SELECT COUNT(s) FROM Session s " +
+      "WHERE s.classEntity.id = :classId " +
+      "AND s.status != org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED")
+  Long countNonCancelledSessionsByClassId(@Param("classId") Long classId);
+
+  @Query("SELECT COUNT(s) FROM Session s " +
+      "WHERE s.classEntity.id = :classId " +
+      "AND s.status IN :statuses")
+  Long countByClassEntityIdAndStatusIn(@Param("classId") Long classId,
+      @Param("statuses") List<org.fyp.tmssep490be.entities.enums.SessionStatus> statuses);
+
   /**
    * Update time slot for sessions by day of week
    * Used in Step 3: Assign Time Slots

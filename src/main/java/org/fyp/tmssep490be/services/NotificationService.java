@@ -202,9 +202,21 @@ public class NotificationService {
     }
 
     public void sendBulkNotifications(List<Long> recipientIds, NotificationType type, String title, String message) {
-        log.info("Gửi bulk notifications cho {} users", recipientIds.size());
+        log.info("Gửi bulk notifications cho {} users (IDs: {})", recipientIds.size(), recipientIds);
+
+        if (recipientIds == null || recipientIds.isEmpty()) {
+            log.warn("Danh sách recipient IDs rỗng hoặc null - không thể gửi notification");
+            return;
+        }
 
         List<UserAccount> recipients = userAccountRepository.findAllById(recipientIds);
+        log.info("Tìm thấy {} recipients từ {} IDs", recipients.size(), recipientIds.size());
+
+        if (recipients.isEmpty()) {
+            log.error("Không tìm thấy recipients nào với IDs: {}", recipientIds);
+            return;
+        }
+
         List<Notification> notifications = recipients.stream()
                 .map(recipient -> Notification.builder()
                         .recipient(recipient)
@@ -215,7 +227,9 @@ public class NotificationService {
                         .build())
                 .collect(Collectors.toList());
 
-        notificationRepository.saveAll(notifications);
+        log.info("Tạo {} notifications để lưu", notifications.size());
+        List<Notification> saved = notificationRepository.saveAll(notifications);
+        log.info("Đã lưu thành công {} notifications", saved.size());
     }
 
     public void createFeedbackReminderNotification(Long studentId, String phaseName, String subjectName, String className) {
