@@ -49,6 +49,7 @@ public class ExcelParserService {
             Row firstRow = sheet.getRow(0);
             boolean isClassSpecificTemplate = false;
 
+            // Vào đây để check là template có phải của class hay không
             if (firstRow != null && firstRow.getCell(0) != null) {
                 String firstCellValue = firstRow.getCell(0).getStringCellValue();
                 if (firstCellValue != null && firstCellValue.startsWith("Class:")) {

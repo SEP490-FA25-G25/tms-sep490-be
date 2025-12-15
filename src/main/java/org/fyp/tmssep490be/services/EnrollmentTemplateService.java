@@ -19,6 +19,7 @@ public class EnrollmentTemplateService {
     private final ClassRepository classRepository;
 
     public byte[] generateExcelTemplateWithClassInfo(Long classId) {
+        // Việc tạo ra một file excel tốn RAM nên để trong try
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
 
@@ -30,7 +31,6 @@ public class EnrollmentTemplateService {
 
             Sheet sheet = workbook.createSheet(className + " - Enrollment");
 
-            // Add class information row (row 0)
             Row infoRow = sheet.createRow(0);
             Cell infoCell = infoRow.createCell(0);
             infoCell.setCellValue("Class: " + className + " | Course: " + courseName);

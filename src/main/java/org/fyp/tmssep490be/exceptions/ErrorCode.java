@@ -65,6 +65,7 @@ public enum ErrorCode {
     INVALID_ENROLLMENT_STRATEGY(1211, "Chiến lược đăng ký không hợp lệ"),
     SELECTED_STUDENTS_EXCEED_CAPACITY(1213, "Số lượng học viên đã chọn vượt quá sức chứa"),
     PARTIAL_STRATEGY_MISSING_IDS(1212, "Cần chọn danh sách ID học viên cho chiến lược PARTIAL"),
+    NO_VALID_STUDENTS_TO_ENROLL(1218, "Không có học viên hợp lệ nào để đăng ký sau khi kiểm tra"),
 
     // Class errors (4000-4099)
     CLASS_NOT_FOUND(4000, "Không tìm thấy lớp học"),

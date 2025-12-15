@@ -1,9 +1,6 @@
 package org.fyp.tmssep490be.dtos.enrollment;
 
 public enum EnrollmentStrategy {
-    ALL,
-
-    PARTIAL,
-
-    OVERRIDE
+    NORMAL,    // Enroll within capacity limit
+    OVERRIDE   // Override capacity (requires reason)
 }

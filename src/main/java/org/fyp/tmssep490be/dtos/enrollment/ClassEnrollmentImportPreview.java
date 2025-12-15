@@ -21,6 +21,7 @@ public class ClassEnrollmentImportPreview {
     private List<StudentEnrollmentData> students;
     private int foundCount;      // Số students đã có trong DB
     private int createCount;     // Số students sẽ tạo mới
+    private int alreadyEnrolledCount;  // Số students đã đăng ký vào lớp (UI sẽ disable)
     private int errorCount;      // Số students có lỗi
     private int totalValid;      // found + create
 

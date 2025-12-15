@@ -105,6 +105,16 @@ public class EnrollmentService {
             errors.add(String.format("%d students have validation errors or duplicates", errorCount));
         }
 
+        // Count already enrolled students
+        int alreadyEnrolledCount = (int) parsedData.stream()
+                .filter(d -> d.getStatus() == StudentResolutionStatus.ALREADY_ENROLLED)
+                .count();
+
+        if (alreadyEnrolledCount > 0) {
+            warnings.add(String.format("%d học viên đã đăng ký vào lớp này, sẽ bị bỏ qua khi thực thi",
+                    alreadyEnrolledCount));
+        }
+
         // 7. Return preview
         return ClassEnrollmentImportPreview.builder()
                 .classId(classId)
@@ -115,6 +125,7 @@ public class EnrollmentService {
                         (int) parsedData.stream().filter(d -> d.getStatus() == StudentResolutionStatus.FOUND).count())
                 .createCount(
                         (int) parsedData.stream().filter(d -> d.getStatus() == StudentResolutionStatus.CREATE).count())
+                .alreadyEnrolledCount(alreadyEnrolledCount)
                 .errorCount(errorCount)
                 .totalValid(validStudentsCount)
                 .currentEnrolled(currentEnrolled)
@@ -145,6 +156,7 @@ public class EnrollmentService {
     }
 
     private void resolveStudents(List<StudentEnrollmentData> parsedData, ClassEntity classEntity) {
+        // Cái này để đảm bảo rằng một file excel không tồn tại 2 học viên cùng Emails
         Set<String> seenEmails = new HashSet<>();
 
         for (StudentEnrollmentData data : parsedData) {
@@ -178,7 +190,25 @@ public class EnrollmentService {
             if (userByEmail.isPresent()) {
                 Optional<Student> student = studentRepository.findByUserAccountId(userByEmail.get().getId());
                 if (student.isPresent()) {
+                    // Check if student already enrolled in this class
+                    boolean alreadyEnrolled = enrollmentRepository.existsByClassIdAndStudentIdAndStatus(
+                            classEntity.getId(),
+                            student.get().getId(),
+                            EnrollmentStatus.ENROLLED
+                    );
+
+                    if (alreadyEnrolled) {
+                        data.setStatus(StudentResolutionStatus.ALREADY_ENROLLED);
+                        data.setResolvedStudentId(student.get().getId());
+                        data.setErrorMessage("Học viên đã đăng ký vào lớp này");
+                        log.debug("Student {} already enrolled in class {}",
+                                student.get().getId(), classEntity.getId());
+                        continue;
+                    }
+
                     data.setStatus(StudentResolutionStatus.FOUND);
+
+                    // Set resolved student ID để lát nữa execute thì add vào enrollment
                     data.setResolvedStudentId(student.get().getId());
                     
                     // Check if student is in the class's branch
@@ -589,68 +619,78 @@ public class EnrollmentService {
         ClassEntity classEntity = classRepository.findByIdWithLock(request.getClassId())
                 .orElseThrow(() -> new EntityNotFoundException("Class not found: " + request.getClassId()));
 
-        // 2. Re-validate capacity (double-check for race condition)
+        // 2. Validate lại từng student (đảm bảo data không bị modify)
+        List<StudentEnrollmentData> validatedStudents = validateSelectedStudents(
+                request.getSelectedStudents(),
+                classEntity);
+
+        log.info("Validated {} students to enroll", validatedStudents.size());
+
+        // 3. Check capacity
         int currentEnrolled = enrollmentRepository.countByClassIdAndStatus(
                 request.getClassId(), EnrollmentStatus.ENROLLED);
+        int newStudentsCount = validatedStudents.size();
+        int totalAfterEnroll = currentEnrolled + newStudentsCount;
 
-        log.info("Class locked. Current enrollment: {}/{}", currentEnrolled, classEntity.getMaxCapacity());
-
-        // 3. Filter students theo strategy
-        List<StudentEnrollmentData> studentsToEnroll = filterStudentsByStrategy(
-                request,
-                classEntity,
-                currentEnrolled,
-                enrolledBy);
-
-        log.info("Filtered {} students to enroll based on strategy", studentsToEnroll.size());
+        if (request.getStrategy() == EnrollmentStrategy.NORMAL) {
+            // Không được vượt capacity
+            if (totalAfterEnroll > classEntity.getMaxCapacity()) {
+                throw new CustomException(ErrorCode.CLASS_CAPACITY_EXCEEDED,
+                        String.format("Cannot enroll %d students. Current: %d, Max: %d",
+                                newStudentsCount, currentEnrolled, classEntity.getMaxCapacity()));
+            }
+        } else {
+            // OVERRIDE - cần lý do
+            if (request.getOverrideReason() == null || request.getOverrideReason().length() < 20) {
+                throw new CustomException(ErrorCode.OVERRIDE_REASON_REQUIRED);
+            }
+            log.warn("CAPACITY_OVERRIDE: Class {} will have {}/{} students. Reason: {}. By user {}",
+                    request.getClassId(), totalAfterEnroll, classEntity.getMaxCapacity(),
+                    request.getOverrideReason(), enrolledBy);
+        }
 
         // 4. Create new students nếu cần
-        List<Long> allStudentIds = new ArrayList<>();
+        List<Long> studentIdsToEnroll = new ArrayList<>();
         int studentsCreated = 0;
         int studentsSynced = 0;
 
-        for (StudentEnrollmentData data : studentsToEnroll) {
+        for (StudentEnrollmentData data : validatedStudents) {
             if (data.getStatus() == StudentResolutionStatus.CREATE) {
                 Student newStudent = createStudentQuick(data, classEntity.getBranch().getId(), enrolledBy);
-                allStudentIds.add(newStudent.getId());
+                studentIdsToEnroll.add(newStudent.getId());
                 studentsCreated++;
                 log.info("Created new student: {} ({})", newStudent.getId(), data.getEmail());
+
             } else if (data.getStatus() == StudentResolutionStatus.FOUND) {
                 // Auto-sync to branch if needed
                 if (data.isNeedsBranchSync()) {
-                    Optional<Student> studentOpt = studentRepository.findById(data.getResolvedStudentId());
-                    if (studentOpt.isPresent()) {
-                        studentService.addStudentToBranch(
-                                studentOpt.get().getUserAccount().getId(),
-                                classEntity.getBranch().getId(),
-                                enrolledBy
-                        );
-                        studentsSynced++;
-                        log.info("Auto-synced existing student {} to branch {}",
-                                data.getResolvedStudentId(), classEntity.getBranch().getId());
-                    }
+                    studentService.addStudentToBranch(
+                            data.getResolvedStudentId(),
+                            classEntity.getBranch().getId(),
+                            enrolledBy);
+                    studentsSynced++;
+                    log.info("Auto-synced student {} to branch {}",
+                            data.getResolvedStudentId(), classEntity.getBranch().getId());
                 }
-                allStudentIds.add(data.getResolvedStudentId());
+                studentIdsToEnroll.add(data.getResolvedStudentId());
             }
         }
 
-        log.info("Created {} new students, synced {} students to branch, total {} students to enroll",
-                studentsCreated, studentsSynced, allStudentIds.size());
+        log.info("Created {} new students, synced {} students, total {} to enroll",
+                studentsCreated, studentsSynced, studentIdsToEnroll.size());
 
-        // 5. Determine if this is capacity override
+        // 5. Batch enroll
         boolean isOverride = request.getStrategy() == EnrollmentStrategy.OVERRIDE;
-        String overrideReason = isOverride ? request.getOverrideReason() : null;
-
-        // 6. Batch enroll all students
         EnrollmentResult result = enrollStudents(
                 request.getClassId(),
-                allStudentIds,
+                studentIdsToEnroll,
                 enrolledBy,
                 isOverride,
-                overrideReason);
+                request.getOverrideReason());
+
         result.setStudentsCreated(studentsCreated);
 
-        log.info("Enrollment completed. Enrolled: {}, Created: {}, Sessions per student: {}",
+        log.info("Enrollment completed. Enrolled: {}, Created: {}, Sessions: {}",
                 result.getEnrolledCount(), studentsCreated, result.getSessionsGeneratedPerStudent());
 
         return result;
@@ -724,94 +764,86 @@ public class EnrollmentService {
         return savedStudent;
     }
 
-    private List<StudentEnrollmentData> filterStudentsByStrategy(
-            ClassEnrollmentImportExecuteRequest request,
-            ClassEntity classEntity,
-            int currentEnrolled,
-            Long enrolledBy) {
-        List<StudentEnrollmentData> studentsToEnroll;
+    private List<StudentEnrollmentData> validateSelectedStudents(
+            List<StudentEnrollmentData> selectedStudents,
+            ClassEntity classEntity) {
 
-        switch (request.getStrategy()) {
-            case ALL:
-                // Enroll tất cả valid students
-                studentsToEnroll = request.getStudents().stream()
-                        .filter(s -> s.getStatus() == StudentResolutionStatus.FOUND
-                                || s.getStatus() == StudentResolutionStatus.CREATE)
-                        .collect(Collectors.toList());
+        List<StudentEnrollmentData> validated = new ArrayList<>();
+        Set<String> seenEmails = new HashSet<>();
+        Set<Long> seenIds = new HashSet<>();
 
-                // Validate capacity
-                if (currentEnrolled + studentsToEnroll.size() > classEntity.getMaxCapacity()) {
-                    throw new CustomException(ErrorCode.CLASS_CAPACITY_EXCEEDED);
-                }
-                break;
+        for (StudentEnrollmentData student : selectedStudents) {
+            // 1. Chỉ accept FOUND hoặc CREATE
+            if (student.getStatus() != StudentResolutionStatus.FOUND
+                    && student.getStatus() != StudentResolutionStatus.CREATE) {
+                log.warn("Skipping student with invalid status: {} - {}",
+                        student.getEmail(), student.getStatus());
+                continue;
+            }
 
-            case PARTIAL:
-                // Enroll chỉ selected students
-                if (request.getSelectedStudentIds() == null || request.getSelectedStudentIds().isEmpty()) {
-                    throw new CustomException(ErrorCode.PARTIAL_STRATEGY_MISSING_IDS);
+            // 2. Validate FOUND student vẫn tồn tại
+            if (student.getStatus() == StudentResolutionStatus.FOUND) {
+                if (student.getResolvedStudentId() == null) {
+                    log.warn("FOUND student missing resolvedStudentId: {}", student.getEmail());
+                    continue;
                 }
 
-                Set<Long> selectedIds = new HashSet<>(request.getSelectedStudentIds());
-
-                // FIXED: Use index-based matching for CREATE students instead of unreliable
-                // email hash
-                Map<Integer, StudentEnrollmentData> createStudentsByIndex = new HashMap<>();
-                for (int i = 0; i < request.getStudents().size(); i++) {
-                    StudentEnrollmentData student = request.getStudents().get(i);
-                    if (student.getStatus() == StudentResolutionStatus.CREATE) {
-                        createStudentsByIndex.put(i, student); // zero-based index to match frontend
-                    }
+                // Check duplicate trong request
+                if (seenIds.contains(student.getResolvedStudentId())) {
+                    log.warn("Duplicate student ID in request: {}", student.getResolvedStudentId());
+                    continue;
                 }
 
-                studentsToEnroll = new ArrayList<>();
-
-                // Add FOUND students by resolvedStudentId
-                for (StudentEnrollmentData student : request.getStudents()) {
-                    if (student.getStatus() == StudentResolutionStatus.FOUND
-                            && selectedIds.contains(student.getResolvedStudentId())) {
-                        studentsToEnroll.add(student);
-                    }
+                // Validate student tồn tại trong DB
+                if (!studentRepository.existsById(student.getResolvedStudentId())) {
+                    log.warn("Student ID {} not found in database", student.getResolvedStudentId());
+                    continue;
                 }
 
-                // Add CREATE students by index (frontend sends zero-based indices)
-                for (Long selectedIndex : selectedIds) {
-                    int index = selectedIndex.intValue();
-                    if (createStudentsByIndex.containsKey(index)) {
-                        studentsToEnroll.add(createStudentsByIndex.get(index));
-                    }
+                // Check đã enroll chưa
+                boolean alreadyEnrolled = enrollmentRepository.existsByClassIdAndStudentIdAndStatus(
+                        classEntity.getId(), student.getResolvedStudentId(), EnrollmentStatus.ENROLLED);
+                if (alreadyEnrolled) {
+                    log.warn("Student {} already enrolled in class {}",
+                            student.getResolvedStudentId(), classEntity.getId());
+                    continue;
                 }
 
-                log.debug("PARTIAL strategy: {} selected IDs, {} students to enroll",
-                        selectedIds.size(), studentsToEnroll.size());
+                seenIds.add(student.getResolvedStudentId());
+            }
 
-                // Validate capacity
-                if (currentEnrolled + studentsToEnroll.size() > classEntity.getMaxCapacity()) {
-                    throw new CustomException(ErrorCode.SELECTED_STUDENTS_EXCEED_CAPACITY);
-                }
-                break;
-
-            case OVERRIDE:
-                // Override capacity và enroll tất cả
-                if (request.getOverrideReason() == null || request.getOverrideReason().length() < 20) {
-                    throw new CustomException(ErrorCode.OVERRIDE_REASON_REQUIRED);
+            // 3. Validate CREATE student
+            if (student.getStatus() == StudentResolutionStatus.CREATE) {
+                // Validate required fields
+                if (student.getEmail() == null || student.getEmail().isBlank()) {
+                    log.warn("CREATE student missing email");
+                    continue;
                 }
 
-                studentsToEnroll = request.getStudents().stream()
-                        .filter(s -> s.getStatus() == StudentResolutionStatus.FOUND
-                                || s.getStatus() == StudentResolutionStatus.CREATE)
-                        .collect(Collectors.toList());
+                // Check duplicate email trong request
+                String emailLower = student.getEmail().toLowerCase();
+                if (seenEmails.contains(emailLower)) {
+                    log.warn("Duplicate email in request: {}", student.getEmail());
+                    continue;
+                }
 
-                log.warn(
-                        "CAPACITY_OVERRIDE: Class {} will enroll {} students (capacity: {}). Reason: {}. Approved by user {}",
-                        request.getClassId(), studentsToEnroll.size(), classEntity.getMaxCapacity(),
-                        request.getOverrideReason(), enrolledBy);
-                break;
+                // Validate email chưa tồn tại trong DB
+                if (userAccountRepository.findByEmail(student.getEmail()).isPresent()) {
+                    log.warn("Email {} already exists in database", student.getEmail());
+                    continue;
+                }
 
-            default:
-                throw new CustomException(ErrorCode.INVALID_ENROLLMENT_STRATEGY);
+                seenEmails.add(emailLower);
+            }
+
+            validated.add(student);
         }
 
-        return studentsToEnroll;
+        if (validated.isEmpty()) {
+            throw new CustomException(ErrorCode.NO_VALID_STUDENTS_TO_ENROLL);
+        }
+
+        return validated;
     }
 
     private String generateTemporaryPassword() {
