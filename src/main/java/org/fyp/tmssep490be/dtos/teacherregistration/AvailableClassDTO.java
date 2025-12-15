@@ -28,4 +28,14 @@ public class AvailableClassDTO {
     private OffsetDateTime registrationCloseDate;
     private int totalRegistrations; // Tổng số giáo viên đã đăng ký
     private boolean alreadyRegistered; // Giáo viên hiện tại đã đăng ký chưa
+
+    // Matching info for teacher skills
+    private Boolean isMatch; // true nếu giáo viên có skill phù hợp
+    private String matchReason; // "Phù hợp: IELTS - English"
+    private String curriculumName; // Curriculum name for matching (IELTS, TOEIC...)
+    private String curriculumLanguage; // Language of curriculum
+
+    // Time slot info for schedule display
+    private String timeSlotStart; // "14:00"
+    private String timeSlotEnd; // "16:30"
 }

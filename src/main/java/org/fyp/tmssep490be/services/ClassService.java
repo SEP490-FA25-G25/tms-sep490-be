@@ -1629,20 +1629,106 @@ public class ClassService {
                                                 ? org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL
                                                 : org.fyp.tmssep490be.entities.enums.ResourceType.ROOM;
 
-                // Get resources for the branch and filter by resource type
+                // Get resources for the branch and filter by resource type AND capacity
+                Integer requiredCapacity = classEntity.getMaxCapacity() != null ? classEntity.getMaxCapacity() : 0;
                 List<org.fyp.tmssep490be.entities.Resource> resources = resourceRepository
                                 .findByBranchIdOrderByNameAsc(classEntity.getBranch().getId())
                                 .stream()
                                 .filter(r -> r.getResourceType() == requiredType)
+                                .filter(r -> r.getCapacity() != null && r.getCapacity() >= requiredCapacity)
                                 .toList();
 
                 log.info("Found {} resources of type {} for class modality {}",
                                 resources.size(), requiredType, classEntity.getModality());
 
-                return resources.stream()
-                                .map(r -> org.fyp.tmssep490be.dtos.classcreation.AvailableResourceDTO.fromEntity(r, 0,
-                                                0))
+                // Get sessions for this class and dayOfWeek to calculate conflicts
+                List<org.fyp.tmssep490be.entities.Session> classSessions = sessionRepository
+                                .findByClassEntityId(classId)
+                                .stream()
+                                .filter(s -> s.getDate() != null &&
+                                                (s.getDate().getDayOfWeek().getValue() % 7) == dayOfWeek.intValue())
+                                .filter(s -> s.getTimeSlotTemplate() != null)
                                 .toList();
+
+                int totalSessions = classSessions.size();
+                Map<Long, Integer> conflictMap = new HashMap<>();
+
+                if (totalSessions > 0) {
+                        List<Long> resourceIds = resources.stream().map(org.fyp.tmssep490be.entities.Resource::getId)
+                                        .toList();
+                        List<LocalDate> dates = classSessions.stream()
+                                        .map(org.fyp.tmssep490be.entities.Session::getDate)
+                                        .distinct().toList();
+                        List<Long> timeSlotIds = classSessions.stream()
+                                        .map(s -> s.getTimeSlotTemplate().getId())
+                                        .distinct()
+                                        .toList();
+
+                        List<Object[]> conflictResults = sessionResourceRepository
+                                        .batchCountConflictsByResourcesAcrossAllClasses(
+                                                        resourceIds, dates, timeSlotIds, classId);
+
+                        for (Object[] result : conflictResults) {
+                                Long rId = ((Number) result[0]).longValue();
+                                Integer count = ((Number) result[1]).intValue();
+                                conflictMap.put(rId, count);
+                        }
+                }
+
+                log.info("Calculated conflicts for {} resources across {} sessions", resources.size(), totalSessions);
+
+                return resources.stream()
+                                .map(r -> org.fyp.tmssep490be.dtos.classcreation.AvailableResourceDTO.fromEntity(
+                                                r,
+                                                conflictMap.getOrDefault(r.getId(), 0),
+                                                totalSessions))
+                                .toList();
+        }
+
+        /**
+         * Assign a specific resource to a single session (used for conflict resolution)
+         */
+        @Transactional
+        public void assignResourceToSession(Long classId, Long sessionId, Long resourceId, Long userId) {
+                log.info("Assigning resource {} to session {} of class {} by user {}",
+                                resourceId, sessionId, classId, userId);
+
+                ClassEntity classEntity = classRepository.findById(classId)
+                                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+                validateClassBranchAccess(classEntity, userId);
+
+                org.fyp.tmssep490be.entities.Session session = sessionRepository.findById(sessionId)
+                                .orElseThrow(() -> new CustomException(ErrorCode.NO_SESSIONS_FOUND_FOR_CLASS));
+
+                // Verify session belongs to this class
+                if (!session.getClassEntity().getId().equals(classId)) {
+                        throw new CustomException(ErrorCode.INVALID_REQUEST);
+                }
+
+                org.fyp.tmssep490be.entities.Resource resource = resourceRepository.findById(resourceId)
+                                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+                // Verify resource belongs to same branch
+                if (!resource.getBranch().getId().equals(classEntity.getBranch().getId())) {
+                        throw new CustomException(ErrorCode.RESOURCE_NOT_IN_BRANCH);
+                }
+
+                // Delete existing resource assignment for this session
+                session.getSessionResources().clear();
+
+                // Create new assignment
+                org.fyp.tmssep490be.entities.SessionResource sessionResource = org.fyp.tmssep490be.entities.SessionResource
+                                .builder()
+                                .id(new org.fyp.tmssep490be.entities.SessionResource.SessionResourceId(sessionId,
+                                                resourceId))
+                                .session(session)
+                                .resource(resource)
+                                .build();
+
+                session.getSessionResources().add(sessionResource);
+                sessionRepository.save(session);
+                log.info("Successfully assigned resource {} to session {}", resourceId, sessionId);
         }
 
         @Transactional

@@ -67,15 +67,12 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
                         @Param("branchId") Long branchId,
                         @Param("modality") org.fyp.tmssep490be.entities.enums.Modality modality);
 
-
         @Query("SELECT c.code FROM ClassEntity c WHERE c.branch.id = :branchId AND c.code LIKE :likePattern ORDER BY c.code DESC LIMIT 1")
         String findHighestCodeByPrefixReadOnly(@Param("branchId") Long branchId,
                         @Param("likePattern") String likePattern);
 
- 
         boolean existsByBranchIdAndNameIgnoreCase(Long branchId, String name);
 
- 
         @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM ClassEntity c WHERE c.branch.id = :branchId AND LOWER(c.name) = LOWER(:name) AND c.id <> :excludeId")
         boolean existsByBranchIdAndNameIgnoreCaseAndIdNot(@Param("branchId") Long branchId, @Param("name") String name,
                         @Param("excludeId") Long excludeId);
@@ -110,6 +107,17 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
                         "ORDER BY c.startDate ASC")
         List<ClassEntity> findClassesNeedingTeacher(@Param("branchIds") List<Long> branchIds);
 
+
+        // Lấy các lớp đang active mà teacher đang được assign (cho conflict detection)
+        @Query("SELECT c FROM ClassEntity c " +
+                        "WHERE c.assignedTeacher.id = :teacherId " +
+                        "AND c.status IN ('SCHEDULED', 'ONGOING') " +
+                        "AND c.plannedEndDate >= :fromDate")
+        List<ClassEntity> findActiveClassesByAssignedTeacher(
+                        @Param("teacherId") Long teacherId,
+                        @Param("fromDate") java.time.LocalDate fromDate);
+
         // Find classes by status (for cronjob)
         List<ClassEntity> findByStatus(ClassStatus status);
+
 }
