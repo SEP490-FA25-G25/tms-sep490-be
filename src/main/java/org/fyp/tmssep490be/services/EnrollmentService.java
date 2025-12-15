@@ -112,6 +112,14 @@ public class EnrollmentService {
                 data.setErrorMessage("Email is required");
                 continue;
             }
+            
+            // Validate email format
+            if (!isValidEmail(data.getEmail())) {
+                data.setStatus(StudentResolutionStatus.ERROR);
+                data.setErrorMessage("Địa chỉ email không hợp lệ");
+                continue;
+            }
+            
             if (data.getFullName() == null || data.getFullName().isBlank()) {
                 data.setStatus(StudentResolutionStatus.ERROR);
                 data.setErrorMessage("Full name is required");
@@ -695,5 +703,15 @@ public class EnrollmentService {
         long timestamp = System.currentTimeMillis();
         int random = (int) (Math.random() * 1000);
         return String.format("ST%d%d%03d", branchId, timestamp, random);
+    }
+
+    /**
+     * Validate email format
+     */
+    private boolean isValidEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     }
 }

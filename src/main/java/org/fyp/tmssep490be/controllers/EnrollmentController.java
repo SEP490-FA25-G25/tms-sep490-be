@@ -32,6 +32,7 @@ public class EnrollmentController {
     private final EnrollmentService enrollmentService;
     private final EnrollmentTemplateService enrollmentTemplateService;
     private static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     @GetMapping("/classes/{classId}/template")
     @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
@@ -63,11 +64,22 @@ public class EnrollmentController {
     ) {
         log.info("Preview import request for class {} by user {}", classId, currentUser.getId());
 
-        // Validate file type
         if (file.isEmpty()) {
             throw new CustomException(ErrorCode.EXCEL_FILE_EMPTY);
         }
 
+        // Validate file size
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new CustomException(ErrorCode.FILE_SIZE_EXCEEDED);
+        }
+
+        // Validate file extension
+        String filename = file.getOriginalFilename();
+        if (filename == null || !filename.toLowerCase().endsWith(".xlsx")) {
+            throw new CustomException(ErrorCode.INVALID_FILE_TYPE_XLSX);
+        }
+
+        // Validate content type
         String contentType = file.getContentType();
         if (contentType == null || !contentType.equals(XLSX_CONTENT_TYPE)) {
             throw new CustomException(ErrorCode.INVALID_FILE_TYPE_XLSX);

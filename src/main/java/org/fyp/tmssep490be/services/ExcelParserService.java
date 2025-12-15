@@ -30,6 +30,9 @@ public class ExcelParserService {
     private static final int COLUMN_GENDER = 5;
     private static final int COLUMN_DOB = 6;
 
+    private static final int MAX_STUDENTS_PER_IMPORT = 100;
+    private static final String EMAIL_REGEX = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$";
+
     private static final DateTimeFormatter[] DATE_FORMATTERS = {
             DateTimeFormatter.ofPattern("yyyy-MM-dd"),
             DateTimeFormatter.ofPattern("dd/MM/yyyy"),
@@ -83,12 +86,29 @@ public class ExcelParserService {
                 throw new CustomException(ErrorCode.EXCEL_FILE_EMPTY);
             }
 
+            // Check max students limit
+            if (students.size() > MAX_STUDENTS_PER_IMPORT) {
+                throw new CustomException(ErrorCode.TOO_MANY_STUDENTS_IN_FILE,
+                        String.format("File chứa %d học viên, vượt quá giới hạn %d học viên cho một lần import",
+                                students.size(), MAX_STUDENTS_PER_IMPORT));
+            }
+
         } catch (IOException e) {
             log.error("Failed to parse Excel file", e);
             throw new CustomException(ErrorCode.EXCEL_PARSE_FAILED);
         }
 
         return students;
+    }
+
+    /**
+     * Validate email format
+     */
+    private boolean isValidEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        return email.matches(EMAIL_REGEX);
     }
 
     private boolean isRowEmpty(Row row) {
@@ -220,6 +240,13 @@ public class ExcelParserService {
 
             if (students.isEmpty()) {
                 throw new CustomException(ErrorCode.EXCEL_FILE_EMPTY);
+            }
+
+            // Check max students limit
+            if (students.size() > MAX_STUDENTS_PER_IMPORT) {
+                throw new CustomException(ErrorCode.TOO_MANY_STUDENTS_IN_FILE,
+                        String.format("File chứa %d học viên, vượt quá giới hạn %d học viên cho một lần import",
+                                students.size(), MAX_STUDENTS_PER_IMPORT));
             }
 
         } catch (IOException e) {

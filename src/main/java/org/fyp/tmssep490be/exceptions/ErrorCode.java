@@ -66,6 +66,9 @@ public enum ErrorCode {
     SELECTED_STUDENTS_EXCEED_CAPACITY(1213, "Số lượng học viên đã chọn vượt quá sức chứa"),
     PARTIAL_STRATEGY_MISSING_IDS(1212, "Cần chọn danh sách ID học viên cho chiến lược PARTIAL"),
     NO_VALID_STUDENTS_TO_ENROLL(1218, "Không có học viên hợp lệ nào để đăng ký sau khi kiểm tra"),
+    FILE_SIZE_EXCEEDED(1219, "Kích thước tệp vượt quá giới hạn cho phép (10MB)"),
+    TOO_MANY_STUDENTS_IN_FILE(1220, "Số lượng học viên trong file vượt quá giới hạn cho phép"),
+    INVALID_EMAIL_FORMAT(1221, "Định dạng email không hợp lệ"),
 
     // Class errors (4000-4099)
     CLASS_NOT_FOUND(4000, "Không tìm thấy lớp học"),
