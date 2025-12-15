@@ -605,7 +605,7 @@ public class TeacherRequestService {
         List<Session> teacherSessions = sessionRepository.findSessionsForTeacherByDate(
                 teacherId, targetDate, sessionId);
 
-        // Lấy students của session hiện tại (chỉ lấy các students đã đăng ký)
+        // Lấy students của session hiện tại
         List<Long> studentIds = session.getStudentSessions().stream()
                 .filter(ss -> ss.getStudent() != null)
                 .map(ss -> ss.getStudent().getId())
@@ -1185,12 +1185,12 @@ public class TeacherRequestService {
             log.info("Tìm academic staff cho teacher {} với branch IDs: {}", teacherUserAccountId, teacherBranchIds);
 
             // Luôn lấy tất cả academic staff trước để đảm bảo không bỏ sót
-            List<UserAccount> allAcademicStaff = userAccountRepository.findUsersByRole("ACADEMIC_AFFAIRS");
+            List<UserAccount> allAcademicStaff = userAccountRepository.findUsersByRole("ACADEMIC_AFFAIR");
             log.info("Tìm thấy tổng cộng {} academic staff trong hệ thống", allAcademicStaff.size());
             
             // Log chi tiết từng academic staff để debug
             if (allAcademicStaff.isEmpty()) {
-                log.error("Không tìm thấy academic staff nào trong hệ thống với role ACADEMIC_AFFAIRS!");
+                log.error("Không tìm thấy academic staff nào trong hệ thống với role ACADEMIC_AFFAIR!");
             } else {
                 allAcademicStaff.forEach(staff -> {
                     List<Long> staffBranches = getBranchIdsForUser(staff.getId());
@@ -1399,7 +1399,7 @@ public class TeacherRequestService {
 
             // Lấy tất cả academic staff của các branch này
             List<UserAccount> academicStaffUsers = userAccountRepository.findByRoleCodeAndBranches(
-                    "ACADEMIC_AFFAIRS", teacherBranchIds);
+                    "ACADEMIC_AFFAIR", teacherBranchIds);
 
             if (academicStaffUsers.isEmpty()) {
                 log.warn("Không tìm thấy academic staff nào cho branch {} - không thể gửi notification", teacherBranchIds);
