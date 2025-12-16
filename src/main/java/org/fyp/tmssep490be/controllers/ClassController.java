@@ -376,6 +376,29 @@ public class ClassController {
                                                 .build());
         }
 
+        /**
+         * Reset wizard step data when user navigates back and makes changes.
+         * This clears time slots and/or resources based on fromStep parameter.
+         */
+        @PostMapping("/{classId}/reset-steps")
+        @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+        public ResponseEntity<ResponseObject<java.util.Map<String, Object>>> resetWizardSteps(
+                        @PathVariable Long classId,
+                        @RequestParam Integer fromStep,
+                        @AuthenticationPrincipal UserPrincipal currentUser) {
+                log.info("User {} resetting wizard steps from {} for class {}",
+                                currentUser.getId(), fromStep, classId);
+
+                java.util.Map<String, Object> result = classService.resetWizardSteps(
+                                classId, fromStep, currentUser.getId());
+
+                return ResponseEntity.ok(ResponseObject.<java.util.Map<String, Object>>builder()
+                                .success(true)
+                                .message("Wizard steps reset successfully")
+                                .data(result)
+                                .build());
+        }
+
         @PostMapping("/{classId}/approve")
         @PreAuthorize("hasRole('CENTER_HEAD') or hasRole('MANAGER')")
         public ResponseEntity<ResponseObject<String>> approveClass(

@@ -52,6 +52,7 @@ public class ClassService {
         private final ResourceRepository resourceRepository;
         private final SessionResourceRepository sessionResourceRepository;
         private final ApprovalService approvalService;
+        private final VietnamHolidayService vietnamHolidayService;
 
         public Page<ClassListItemDTO> getClasses(
                         List<Long> branchIds,
@@ -1283,6 +1284,13 @@ public class ClassService {
                         Short targetDayOfWeek = rotatedDays[sessionIndex % rotatedDays.length];
                         LocalDate sessionDate = findNextDateForDayOfWeek(currentDate, targetDayOfWeek);
 
+                        // Skip holidays - find next available date with same day of week
+                        while (vietnamHolidayService.isHoliday(sessionDate)) {
+                                log.info("Session date {} is a holiday ({}), moving to next week",
+                                                sessionDate, vietnamHolidayService.getHolidayName(sessionDate));
+                                sessionDate = sessionDate.plusWeeks(1); // Move to same day next week
+                        }
+
                         Session session = Session.builder()
                                         .classEntity(classEntity)
                                         .subjectSession(subjectSession)
@@ -1337,22 +1345,24 @@ public class ClassService {
 
                 List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
 
-                // Calculate week number for each session based on class start date
+                // Calculate week number for each session based on class schedule
+                // Each week = N sessions where N = scheduleDays.length
                 LocalDate classStartDate = classEntity.getStartDate();
                 if (classStartDate == null && !sessions.isEmpty()) {
                         classStartDate = sessions.get(0).getDate();
                 }
                 final LocalDate startDate = classStartDate;
 
-                // Group sessions by week to calculate week ranges
+                // Get sessions per week from scheduleDays
+                int sessionsPerWeek = classEntity.getScheduleDays() != null
+                                ? classEntity.getScheduleDays().length
+                                : 3; // Default to 3 if not set
+
+                // Group sessions by class week (every N sessions = 1 week)
                 Map<Integer, List<Session>> sessionsByWeekNum = new LinkedHashMap<>();
-                for (Session session : sessions) {
-                        int weekNum = startDate != null
-                                        ? (int) java.time.temporal.ChronoUnit.WEEKS.between(
-                                                        startDate.with(java.time.DayOfWeek.MONDAY),
-                                                        session.getDate().with(java.time.DayOfWeek.MONDAY)) + 1
-                                        : 1;
-                        sessionsByWeekNum.computeIfAbsent(weekNum, k -> new ArrayList<>()).add(session);
+                for (int i = 0; i < sessions.size(); i++) {
+                        int weekNum = (i / sessionsPerWeek) + 1;
+                        sessionsByWeekNum.computeIfAbsent(weekNum, k -> new ArrayList<>()).add(sessions.get(i));
                 }
 
                 // Calculate week ranges
@@ -1424,12 +1434,8 @@ public class ClassService {
                                 case SUNDAY -> "Chủ nhật";
                         };
 
-                        // Calculate week number for this session
-                        int weekNum = startDate != null
-                                        ? (int) java.time.temporal.ChronoUnit.WEEKS.between(
-                                                        startDate.with(java.time.DayOfWeek.MONDAY),
-                                                        session.getDate().with(java.time.DayOfWeek.MONDAY)) + 1
-                                        : 1;
+                        // Calculate week number for this session (based on session index, not calendar)
+                        int weekNum = (sequenceNumber - 1) / sessionsPerWeek + 1;
 
                         sessionDTOs.add(org.fyp.tmssep490be.dtos.classcreation.ClassSessionsOverviewDTO.SessionDTO
                                         .builder()
@@ -1456,16 +1462,10 @@ public class ClassService {
                         sequenceNumber++;
                 }
 
-                // Build week groups
-                Map<Integer, List<Session>> sessionsByWeek = new LinkedHashMap<>();
-                for (Session session : sessions) {
-                        int weekOfYear = session.getDate().get(java.time.temporal.WeekFields.ISO.weekOfYear());
-                        sessionsByWeek.computeIfAbsent(weekOfYear, k -> new ArrayList<>()).add(session);
-                }
-
+                // Build week groups from sessionsByWeekNum (already grouped correctly)
                 List<org.fyp.tmssep490be.dtos.classcreation.ClassSessionsOverviewDTO.WeekGroupDTO> weekGroups = new ArrayList<>();
-                int weekNumber = 1;
-                for (Map.Entry<Integer, List<Session>> entry : sessionsByWeek.entrySet()) {
+                for (Map.Entry<Integer, List<Session>> entry : sessionsByWeekNum.entrySet()) {
+                        int weekNum = entry.getKey();
                         List<Session> weekSessions = entry.getValue();
                         LocalDate firstDate = weekSessions.stream().map(Session::getDate).min(LocalDate::compareTo)
                                         .orElse(null);
@@ -1475,12 +1475,11 @@ public class ClassService {
 
                         weekGroups.add(org.fyp.tmssep490be.dtos.classcreation.ClassSessionsOverviewDTO.WeekGroupDTO
                                         .builder()
-                                        .weekNumber(weekNumber)
+                                        .weekNumber(weekNum)
                                         .weekRange(weekRange)
                                         .sessionCount(weekSessions.size())
                                         .sessionIds(weekSessions.stream().map(Session::getId).toList())
                                         .build());
-                        weekNumber++;
                 }
 
                 // Build date range
@@ -1587,7 +1586,7 @@ public class ClassService {
                 // Build response
                 return org.fyp.tmssep490be.dtos.classcreation.AssignTimeSlotsResponse.builder()
                                 .success(totalSessionsUpdated > 0)
-                                .message(String.format("Time slots assignment completed. %d of %d sessions updated.",
+                                .message(String.format("Đã gán khung giờ thành công. %d/%d buổi đã được cập nhật.",
                                                 totalSessionsUpdated, totalSessions))
                                 .classId(classId)
                                 .classCode(classEntity.getCode())
@@ -1629,17 +1628,18 @@ public class ClassService {
                                                 ? org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL
                                                 : org.fyp.tmssep490be.entities.enums.ResourceType.ROOM;
 
-                // Get resources for the branch and filter by resource type AND capacity
-                Integer requiredCapacity = classEntity.getMaxCapacity() != null ? classEntity.getMaxCapacity() : 0;
+                // Get resources for the branch and filter by resource type only
+                // Note: We no longer filter by capacity - frontend will show warning for
+                // undersized rooms
                 List<org.fyp.tmssep490be.entities.Resource> resources = resourceRepository
                                 .findByBranchIdOrderByNameAsc(classEntity.getBranch().getId())
                                 .stream()
                                 .filter(r -> r.getResourceType() == requiredType)
-                                .filter(r -> r.getCapacity() != null && r.getCapacity() >= requiredCapacity)
                                 .toList();
 
-                log.info("Found {} resources of type {} for class modality {}",
-                                resources.size(), requiredType, classEntity.getModality());
+                log.info("Found {} resources of type {} for class modality {} (required capacity: {})",
+                                resources.size(), requiredType, classEntity.getModality(),
+                                classEntity.getMaxCapacity());
 
                 // Get sessions for this class and dayOfWeek to calculate conflicts
                 List<org.fyp.tmssep490be.entities.Session> classSessions = sessionRepository
@@ -1960,6 +1960,56 @@ public class ClassService {
                 // Delegate to ApprovalService (which handles validation, status update, and
                 // notifications)
                 return approvalService.submitForApproval(classId, userId);
+        }
+
+        // ==================== WIZARD RESET ====================
+
+        /**
+         * Reset wizard step data when user navigates back and makes changes.
+         * This clears time slots (Step 3) and resources (Step 4) assignments.
+         *
+         * @param classId  the class ID
+         * @param fromStep the step user is resetting from (e.g., 3 = clear Step 3+4, 4
+         *                 = clear Step 4 only)
+         * @param userId   the user ID for access validation
+         * @return summary of reset operations
+         */
+        @Transactional
+        public Map<String, Object> resetWizardSteps(Long classId, Integer fromStep, Long userId) {
+                log.info("Resetting wizard steps from step {} for class {} by user {}", fromStep, classId, userId);
+
+                ClassEntity classEntity = classRepository.findById(classId)
+                                .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
+
+                validateClassBranchAccess(classEntity, userId);
+
+                // Only DRAFT classes can be reset
+                if (classEntity.getStatus() != ClassStatus.DRAFT) {
+                        throw new CustomException(ErrorCode.CLASS_NOT_EDITABLE);
+                }
+
+                int timeSlotsCleared = 0;
+                int resourcesCleared = 0;
+
+                // Reset from Step 3 or earlier: clear time slots and resources
+                if (fromStep != null && fromStep <= 3) {
+                        timeSlotsCleared = sessionRepository.clearTimeSlotsForClass(classId);
+                        resourcesCleared = sessionResourceRepository.deleteAllByClassId(classId);
+                        log.info("Reset from Step 3: cleared {} time slots and {} resources for class {}",
+                                        timeSlotsCleared, resourcesCleared, classId);
+                }
+                // Reset from Step 4: clear only resources
+                else if (fromStep != null && fromStep == 4) {
+                        resourcesCleared = sessionResourceRepository.deleteAllByClassId(classId);
+                        log.info("Reset from Step 4: cleared {} resources for class {}", resourcesCleared, classId);
+                }
+
+                return Map.of(
+                                "classId", classId,
+                                "fromStep", fromStep,
+                                "timeSlotsCleared", timeSlotsCleared,
+                                "resourcesCleared", resourcesCleared,
+                                "message", "Wizard steps reset successfully");
         }
 
 }
