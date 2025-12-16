@@ -370,14 +370,20 @@ public class TeacherClassRegistrationService {
 
     // AA xem danh sách lớp cần review đăng ký
     @Transactional(readOnly = true)
-    public List<ClassRegistrationSummaryDTO> getClassesNeedingReview(Long userId) {
+    public List<ClassRegistrationSummaryDTO> getClassesNeedingReview(Long userId, Long requestedBranchId) {
         List<Long> branchIds = userBranchesRepository.findBranchIdsByUserId(userId);
 
         if (branchIds.isEmpty()) {
             return List.of();
         }
 
-        Long branchId = branchIds.get(0);
+        // Validate and use requestedBranchId if provided
+        if (requestedBranchId != null && !branchIds.contains(requestedBranchId)) {
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED, 
+                "Access denied to branch ID: " + requestedBranchId);
+        }
+
+        Long branchId = requestedBranchId != null ? requestedBranchId : branchIds.get(0);
 
         // Lấy các lớp có đăng ký pending
         List<Long> pendingClassIds = registrationRepository.findClassIdsWithPendingRegistrationsByBranchId(branchId);
@@ -397,15 +403,24 @@ public class TeacherClassRegistrationService {
 
     // AA xem danh sách lớp cần gán giáo viên (APPROVED, chưa có teacher)
     @Transactional(readOnly = true)
-    public List<ClassNeedingTeacherDTO> getClassesNeedingTeacher(Long userId) {
+    public List<ClassNeedingTeacherDTO> getClassesNeedingTeacher(Long userId, Long requestedBranchId) {
         List<Long> branchIds = userBranchesRepository.findBranchIdsByUserId(userId);
 
         if (branchIds.isEmpty()) {
             return List.of();
         }
 
+        // Validate and use requestedBranchId if provided
+        if (requestedBranchId != null && !branchIds.contains(requestedBranchId)) {
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED, 
+                "Access denied to branch ID: " + requestedBranchId);
+        }
+
+        List<Long> targetBranchIds = requestedBranchId != null ? 
+            List.of(requestedBranchId) : branchIds;
+
         // Lấy các lớp APPROVED + SCHEDULED chưa có teacher
-        List<ClassEntity> classes = classRepository.findClassesNeedingTeacher(branchIds);
+        List<ClassEntity> classes = classRepository.findClassesNeedingTeacher(targetBranchIds);
 
         return classes.stream()
                 .map(this::mapToClassNeedingTeacherDTO)
