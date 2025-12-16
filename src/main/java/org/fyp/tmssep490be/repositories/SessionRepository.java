@@ -257,6 +257,25 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     Long countByClassEntityIdAndStatusIn(@Param("classId") Long classId,
             @Param("statuses") List<org.fyp.tmssep490be.entities.enums.SessionStatus> statuses);
 
+    // ========= SUPPORT FOR SCHEDULER JOBS (attendance/report reminders) =========
+
+    // Tìm tất cả buổi học theo ngày
+    List<Session> findByDate(LocalDate date);
+
+    // Tìm các buổi học có endTime trong khoảng thời gian nhất định của một ngày (exclude CANCELLED)
+    @Query("""
+            SELECT s FROM Session s
+            JOIN s.timeSlotTemplate tst
+            WHERE s.date = :date
+              AND tst.endTime BETWEEN :startTime AND :endTime
+              AND s.status <> :cancelledStatus
+            """)
+    List<Session> findSessionsEndedBetween(
+            @Param("date") LocalDate date,
+            @Param("startTime") LocalTime startTime,
+            @Param("endTime") LocalTime endTime,
+            @Param("cancelledStatus") SessionStatus cancelledStatus);
+
     /**
      * Update time slot for sessions by day of week
      * Used in Step 3: Assign Time Slots

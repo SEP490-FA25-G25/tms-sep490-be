@@ -136,4 +136,17 @@ public class EmailService {
         sendEmailWithTemplateAsync(to, subject, "emails/password-reset", templateData);
     }
 
+    // Gửi email nhắc nhở Academic Affairs về số lượng yêu cầu pending
+    // - pendingCount: tổng số yêu cầu student + teacher đang chờ duyệt
+    // - oldestRequestDate: ngày sớm nhất mà job đang nhắc tới (string yyyy-MM-dd)
+    public void sendPendingRequestReminderAsync(String to, int pendingCount, String oldestRequestDate) {
+        String subject = "Nhắc nhở xử lý yêu cầu đang chờ";
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("pendingCount", pendingCount);
+        templateData.put("oldestRequestDate", oldestRequestDate);
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/pending-request-reminder", templateData);
+    }
+
 }
