@@ -791,10 +791,6 @@ INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date
 (9, 1, 2, 'HN-IELTS-I4', 'HN IELTS Intermediate 4 (Parallel C)', 'ONLINE', '2025-12-06', '2026-01-30', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', NOW()),
 (10, 1, 2, 'HN-IELTS-I5', 'HN IELTS Intermediate 5 (Late)', 'OFFLINE', '2025-12-16', '2026-02-07', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-09 10:00:00+07', '2025-12-10 14:00:00+07', '2025-12-09 10:00:00+07', NOW());
 
--- ========== SESSION GENERATION FOR 10 IELTS CLASSES ==========
--- Foundation classes (1-5) use subject_session 1-24, Intermediate classes (6-10) use subject_session 25-48
--- Pattern: Mon/Wed/Fri = ARRAY[1,3,5], Tue/Thu/Sat = ARRAY[2,4,6]
-
 -- Class 1: HN IELTS Foundation 1 (Early) - Mon/Wed/Fri, starts 2025-11-17 (2 weeks ahead)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
 SELECT s.idx, 1, s.idx, 1, ('2025-11-17'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
@@ -872,10 +868,6 @@ SELECT 900 + s.idx, 10, 24 + s.idx, 6, ('2025-12-16'::date + ((s.idx - 1) / 3) *
 FROM generate_series(1, 24) AS s(idx);
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 3 FROM session WHERE class_id = 10;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 10, 'SCHEDULED' FROM session WHERE class_id = 10;
-
-
--- ========== TIER 5: ENROLLMENTS & ATTENDANCE ==========
--- 10 IELTS classes (5 Foundation + 5 Intermediate), distributing 100 students
 
 -- Enrollments for Class 1 (HN-IELTS-F1 - Early) - 15 students (IDs 1-15)
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
@@ -984,11 +976,6 @@ UPDATE student_session
 SET attendance_status = 'PLANNED', recorded_at = NULL, homework_status = NULL
 WHERE session_id = 105;
 
--- ========== TIER 6: REQUESTS (For 10 IELTS classes) ==========
-
--- Student Request Scenarios (using class IDs 1-10)
--- Class 1-5: Foundation classes, Class 6-10: Intermediate classes
-
 -- SCENARIO 1: Approved Absence Request (Class 2 - Foundation Parallel A, student 20 - Nguyen Thi Linh)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
 (1, 20, 2, 'ABSENCE', 110, 'APPROVED', 'Family emergency - need to attend urgent family matter', 120, '2025-12-01 10:00:00+07', 6, '2025-12-01 14:00:00+07', 'Approved - valid reason');
@@ -1054,11 +1041,6 @@ INSERT INTO teacher_request (id, teacher_id, session_id, request_type, replaceme
 INSERT INTO teacher_request (id, teacher_id, session_id, request_type, status, request_reason, submitted_by, submitted_at) VALUES
 (7, 8, 720, 'REPLACEMENT', 'PENDING', 'Unexpected travel required - need someone to cover this session', 27, '2025-12-10 08:45:00+07');
 
--- ========== TIER 7: ASSESSMENTS & SCORES ==========
--- Only 2 subjects with 4 assessments each (IDs 1-8)
--- Foundation: Listening Quiz (1), Speaking Quiz (2), Midterm (3), Final (4)
--- Intermediate: Reading Quiz (5), Writing Assignment (6), Midterm (7), Final (8)
-
 -- Assessments for Class 1 (HN-IELTS-F1 - Early, ONGOING)
 INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
 (1, 1, 1, '2025-11-24 08:00:00+07', '2025-11-24 08:00:00+07', '2025-11-17 08:00:00+07', '2025-11-24 08:00:00+07'), -- Listening Quiz - completed
@@ -1086,10 +1068,6 @@ INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, act
 (14, 7, 6, '2025-12-13 08:00:00+07', NULL, '2025-12-02 08:00:00+07', '2025-12-02 08:00:00+07'), -- Writing Assignment - scheduled
 (15, 7, 7, '2025-12-23 08:00:00+07', NULL, '2025-12-02 08:00:00+07', '2025-12-02 08:00:00+07'), -- Midterm - scheduled
 (16, 7, 8, '2026-01-21 08:00:00+07', NULL, '2025-12-02 08:00:00+07', '2025-12-02 08:00:00+07'); -- Final - scheduled
-
--- =========================================
--- SCORES FOR COMPLETED ASSESSMENTS
--- =========================================
 
 -- Scores for Class 1, Listening Quiz (assessment_id = 1)
 INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
@@ -1156,9 +1134,6 @@ SELECT 10, e.student_id,
     '2025-11-29 14:00:00+07',
     '2025-11-29 14:00:00+07'
 FROM enrollment e WHERE e.class_id = 6;
-
--- ========== TIER 8: FEEDBACK & QA (Vietnamese Content) ==========
--- Simplified for 10 IELTS classes (1-10)
 
 -- Class 1 (Foundation Early): Positive feedback from students 1-8 (Nguyen Van An -> Do Thi Huong)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
@@ -1253,151 +1228,6 @@ INSERT INTO qa_report (id, class_id, reported_by, report_type, status, content, 
 (19, 6, 11, 'TEACHING_QUALITY_ASSESSMENT', 'SUBMITTED', 'Giáo viên có kinh nghiệm. Bài giảng chất lượng cao.', '2025-12-08 10:00:00+07', '2025-12-08 10:00:00+07'),
 (20, 4, 10, 'PHASE_REVIEW', 'DRAFT', 'Lớp online đang đi đúng tiến độ. Đề xuất duy trì chất lượng kỹ thuật.', '2025-12-09 10:00:00+07', '2025-12-09 10:00:00+07');
 
--- ================================================================================================
--- TEST DATA FOR TRANSFER REQUEST (SMART FILTERING)
--- Context Date: 2025-12-10
--- Current Class: HN-IELTS-F2 (ID 2) - Progress: Session 11 Completed
--- ================================================================================================
-
--- 1. Create Target Classes (B, C, D, E, F)
-INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date, planned_end_date, schedule_days, max_capacity, status, approval_status, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
--- Class B: Gap 0 (Same progress), 5 slots left (15 enrolled)
-(101, 1, 1, 'HN-IELTS-TEST-B', 'IELTS Test Class B (Gap 0)', 'OFFLINE', '2025-11-14', '2026-01-08', ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, NOW(), NOW(), NOW(), NOW()),
--- Class C: Gap 0 (Same progress), 3 slots left (17 enrolled)
-(102, 1, 1, 'HN-IELTS-TEST-C', 'IELTS Test Class C (Gap 0)', 'OFFLINE', '2025-11-14', '2026-01-08', ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, NOW(), NOW(), NOW(), NOW()),
--- Class D: Gap 1 (Faster by 1 session), 8 slots left (12 enrolled)
-(103, 1, 1, 'HN-IELTS-TEST-D', 'IELTS Test Class D (Gap 1)', 'OFFLINE', '2025-11-12', '2026-01-06', ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, NOW(), NOW(), NOW(), NOW()),
--- Class E: Gap 2 (Slower by 2 sessions), 10 slots left (10 enrolled)
-(104, 1, 1, 'HN-IELTS-TEST-E', 'IELTS Test Class E (Gap 2)', 'OFFLINE', '2025-11-19', '2026-01-13', ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, NOW(), NOW(), NOW(), NOW()),
--- Class F: Gap 5 (Faster by 5 sessions), 20 slots left (0 enrolled) - SHOULD BE FILTERED
-(105, 1, 1, 'HN-IELTS-TEST-F', 'IELTS Test Class F (Gap 5)', 'OFFLINE', '2025-11-03', '2025-12-28', ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', 6, 3, NOW(), NOW(), NOW(), NOW());
-
--- 3. Create Enrollments to simulate capacity
--- We use a helper to insert bulk enrollments. 
--- Note: We reuse student IDs 10-50 for these dummy enrollments.
--- Class B: 15 students
-INSERT INTO enrollment (student_id, class_id, status, enrolled_at, created_at, updated_at)
-SELECT id, 101, 'ENROLLED', NOW(), NOW(), NOW() FROM student WHERE id BETWEEN 10 AND 24;
-
--- Class C: 17 students
-INSERT INTO enrollment (student_id, class_id, status, enrolled_at, created_at, updated_at)
-SELECT id, 102, 'ENROLLED', NOW(), NOW(), NOW() FROM student WHERE id BETWEEN 25 AND 41;
-
--- Class D: 12 students
-INSERT INTO enrollment (student_id, class_id, status, enrolled_at, created_at, updated_at)
-SELECT id, 103, 'ENROLLED', NOW(), NOW(), NOW() FROM student WHERE id BETWEEN 42 AND 53;
-
--- Class E: 10 students
-INSERT INTO enrollment (student_id, class_id, status, enrolled_at, created_at, updated_at)
-SELECT id, 104, 'ENROLLED', NOW(), NOW(), NOW() FROM student WHERE id BETWEEN 54 AND 63;
-
--- Class F: 0 students (No insert needed)
-
--- 4. Create Sessions & Progress (Crucial for Content Gap)
--- We generate sessions with specific dates relative to '2025-12-10' to establish progress.
--- We use EXPLICIT IDs (starting from 1800) to avoid sequence conflicts with previous data.
-
--- Class B (Gap 0): Sessions 1-11 DONE, 12-16 PLANNED
-WITH ordered_sessions AS (
-    SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn 
-    FROM subject_session WHERE phase_id IN (1,2)
-)
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, status, created_at, updated_at)
-SELECT 
-    1800 + os.rn,
-    101,
-    os.id,
-    2,
-    '2025-11-14'::date + ((os.rn - 1) * 2 || ' days')::interval,
-    CASE WHEN os.rn <= 11 THEN 'DONE' ELSE 'PLANNED' END,
-    NOW(),
-    NOW()
-FROM ordered_sessions os WHERE os.rn <= 16;
-
--- Class C (Gap 0): Sessions 1-11 DONE, 12-16 PLANNED
-WITH ordered_sessions AS (
-    SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn 
-    FROM subject_session WHERE phase_id IN (1,2)
-)
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, status, created_at, updated_at)
-SELECT 
-    1850 + os.rn,
-    102,
-    os.id,
-    3,
-    '2025-11-14'::date + ((os.rn - 1) * 2 || ' days')::interval,
-    CASE WHEN os.rn <= 11 THEN 'DONE' ELSE 'PLANNED' END,
-    NOW(),
-    NOW()
-FROM ordered_sessions os WHERE os.rn <= 16;
-
--- Class D (Gap 1): Sessions 1-12 DONE, 13-17 PLANNED (Faster by 1)
-WITH ordered_sessions AS (
-    SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn 
-    FROM subject_session WHERE phase_id IN (1,2)
-)
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, status, created_at, updated_at)
-SELECT 
-    1900 + os.rn,
-    103,
-    os.id,
-    4,
-    '2025-11-12'::date + ((os.rn - 1) * 2 || ' days')::interval,
-    CASE WHEN os.rn <= 12 THEN 'DONE' ELSE 'PLANNED' END,
-    NOW(),
-    NOW()
-FROM ordered_sessions os WHERE os.rn <= 17;
-
--- Class E (Gap 2): Sessions 1-9 DONE, 10-14 PLANNED (Slower by 2)
-WITH ordered_sessions AS (
-    SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn 
-    FROM subject_session WHERE phase_id IN (1,2)
-)
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, status, created_at, updated_at)
-SELECT 
-    1950 + os.rn,
-    104,
-    os.id,
-    5,
-    '2025-11-19'::date + ((os.rn - 1) * 2 || ' days')::interval,
-    CASE WHEN os.rn <= 9 THEN 'DONE' ELSE 'PLANNED' END,
-    NOW(),
-    NOW()
-FROM ordered_sessions os WHERE os.rn <= 14;
-
--- Class F (Gap 5): Sessions 1-16 DONE, 17-21 PLANNED (Much Faster - should be FILTERED)
-WITH ordered_sessions AS (
-    SELECT id, ROW_NUMBER() OVER (ORDER BY id) as rn 
-    FROM subject_session WHERE phase_id IN (1,2)
-)
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, status, created_at, updated_at)
-SELECT 
-    2000 + os.rn,
-    105,
-    os.id,
-    6,
-    '2025-11-03'::date + ((os.rn - 1) * 2 || ' days')::interval,
-    CASE WHEN os.rn <= 16 THEN 'DONE' ELSE 'PLANNED' END,
-    NOW(),
-    NOW()
-FROM ordered_sessions os WHERE os.rn <= 21;
-
--- Assign Teachers to Sessions (Teaching Slots)
-INSERT INTO teaching_slot (session_id, teacher_id, status)
-SELECT id, 20, 'SCHEDULED' FROM session WHERE class_id = 101;
-
-INSERT INTO teaching_slot (session_id, teacher_id, status)
-SELECT id, 21, 'SCHEDULED' FROM session WHERE class_id = 102;
-
-INSERT INTO teaching_slot (session_id, teacher_id, status)
-SELECT id, 22, 'SCHEDULED' FROM session WHERE class_id = 103;
-
-INSERT INTO teaching_slot (session_id, teacher_id, status)
-SELECT id, 23, 'SCHEDULED' FROM session WHERE class_id = 104;
-
-INSERT INTO teaching_slot (session_id, teacher_id, status)
-SELECT id, 24, 'SCHEDULED' FROM session WHERE class_id = 105;
-
 -- ========== FINAL SEQUENCE UPDATES ==========
 SELECT setval('center_id_seq', (SELECT MAX(id) FROM center), true);
 SELECT setval('branch_id_seq', (SELECT MAX(id) FROM branch), true);
@@ -1414,7 +1244,7 @@ SELECT setval('clo_id_seq', (SELECT MAX(id) FROM clo), true);
 SELECT setval('subject_session_id_seq', (SELECT MAX(id) FROM subject_session), true);
 SELECT setval('subject_assessment_id_seq', (SELECT MAX(id) FROM subject_assessment), true);
 SELECT setval('class_id_seq', (SELECT MAX(id) FROM "class"), true);
-SELECT setval('session_id_seq', (SELECT MAX(id) FROM session), true); -- Should be at least 716 after adding new sessions
+SELECT setval('session_id_seq', (SELECT MAX(id) FROM session), true);
 SELECT setval('assessment_id_seq', (SELECT MAX(id) FROM assessment), true);
 SELECT setval('score_id_seq', (SELECT MAX(id) FROM score), true);
 SELECT setval('student_request_id_seq', (SELECT MAX(id) FROM student_request), true);
@@ -1426,84 +1256,3 @@ SELECT setval('time_slot_template_id_seq', (SELECT MAX(id) FROM time_slot_templa
 SELECT setval('resource_id_seq', (SELECT MAX(id) FROM resource), true);
 SELECT setval('feedback_question_id_seq', (SELECT MAX(id) FROM feedback_question), true);
 SELECT setval('enrollment_id_seq', (SELECT MAX(id) FROM enrollment), true);
-
--- 1. Create new classes that are APPROVED but need teacher assignment (with registration open)
--- These classes have registration_open_date and registration_close_date set
--- Using relative dates (NOW()) to ensure seed data always works
--- NOTE: Only subject_id 1 (Foundation) and 2 (Intermediate) exist
-INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date, planned_end_date, schedule_days, max_capacity, status, approval_status, created_by, decided_by, submitted_at, decided_at, registration_open_date, registration_close_date, created_at, updated_at) VALUES
--- Class 201: Registration OPEN (closes in 5 days) - no registrations yet
-(201, 1, 1, 'HN-IELTS-REG-1', 'HN IELTS Foundation - Teacher Registration Test 1', 'OFFLINE', (CURRENT_DATE + INTERVAL '30 days')::DATE, (CURRENT_DATE + INTERVAL '90 days')::DATE, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '10 days', NOW() - INTERVAL '9 days', NOW() - INTERVAL '3 days', NOW() + INTERVAL '5 days', NOW() - INTERVAL '10 days', NOW()),
--- Class 202: Registration OPEN (closes in 3 days) - has multiple registrations
-(202, 1, 2, 'HN-IELTS-REG-2', 'HN IELTS Intermediate - Teacher Registration Test 2', 'OFFLINE', (CURRENT_DATE + INTERVAL '35 days')::DATE, (CURRENT_DATE + INTERVAL '95 days')::DATE, ARRAY[2,4,6]::smallint[], 18, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '9 days', NOW() - INTERVAL '8 days', NOW() - INTERVAL '3 days', NOW() + INTERVAL '3 days', NOW() - INTERVAL '9 days', NOW()),
--- Class 203: Registration CLOSED, teacher already assigned via registration (Foundation)
-(203, 1, 1, 'HN-IELTS-REG-3', 'HN IELTS Foundation - Teacher Assigned Test', 'ONLINE', (CURRENT_DATE + INTERVAL '25 days')::DATE, (CURRENT_DATE + INTERVAL '100 days')::DATE, ARRAY[1,3,5]::smallint[], 15, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '15 days', NOW() - INTERVAL '14 days', NOW() - INTERVAL '12 days', NOW() - INTERVAL '2 days', NOW() - INTERVAL '15 days', NOW()),
--- Class 204: Registration CLOSED, teacher directly assigned by AA (Intermediate)
-(204, 1, 2, 'HN-IELTS-REG-4', 'HN IELTS Intermediate - Direct Assign Test', 'OFFLINE', (CURRENT_DATE + INTERVAL '45 days')::DATE, (CURRENT_DATE + INTERVAL '100 days')::DATE, ARRAY[2,4,6]::smallint[], 22, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '12 days', NOW() - INTERVAL '11 days', NOW() - INTERVAL '15 days', NOW() - INTERVAL '5 days', NOW() - INTERVAL '12 days', NOW()),
--- Class 205: HCM Branch - Registration OPEN (Foundation)
-(205, 2, 1, 'HCM-IELTS-REG-1', 'HCM IELTS Foundation - Teacher Registration Test', 'OFFLINE', (CURRENT_DATE + INTERVAL '40 days')::DATE, (CURRENT_DATE + INTERVAL '95 days')::DATE, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 8, 4, NOW() - INTERVAL '8 days', NOW() - INTERVAL '7 days', NOW() - INTERVAL '3 days', NOW() + INTERVAL '7 days', NOW() - INTERVAL '8 days', NOW()),
--- Class 206: ONLINE class - Registration OPEN (test for online modality)
-(206, 1, 1, 'HN-IELTS-ONLINE-1', 'IELTS Foundation Online - Any Branch Teacher', 'ONLINE', (CURRENT_DATE + INTERVAL '28 days')::DATE, (CURRENT_DATE + INTERVAL '85 days')::DATE, ARRAY[2,4]::smallint[], 25, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '5 days', NOW() - INTERVAL '4 days', NOW() - INTERVAL '2 days', NOW() + INTERVAL '10 days', NOW() - INTERVAL '5 days', NOW()),
--- Class 207: Registration OPEN but starts soon - has 1 registration (Intermediate)
-(207, 1, 2, 'HN-IELTS-REG-5', 'HN IELTS Intermediate - Urgent Need Teacher', 'OFFLINE', (CURRENT_DATE + INTERVAL '14 days')::DATE, (CURRENT_DATE + INTERVAL '75 days')::DATE, ARRAY[1,3,5]::smallint[], 16, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '7 days', NOW() - INTERVAL '6 days', NOW() - INTERVAL '4 days', NOW() + INTERVAL '2 days', NOW() - INTERVAL '7 days', NOW());
-
--- 2. Update Class 203 to have assigned teacher (Teacher 1 - John Smith)
-UPDATE "class" SET 
-  assigned_teacher_id = 1,
-  teacher_assigned_at = NOW() - INTERVAL '3 days',
-  teacher_assigned_by = 6
-WHERE id = 203;
-
--- 3. Update Class 204 to have directly assigned teacher (Teacher 5) with reason
-UPDATE "class" SET 
-  assigned_teacher_id = 5,
-  teacher_assigned_at = NOW() - INTERVAL '6 days',
-  teacher_assigned_by = 6,
-  direct_assign_reason = 'Giáo viên có kinh nghiệm IELTS phù hợp nhất với lịch dạy của lớp này'
-WHERE id = 204;
-
--- 4. Teacher Class Registrations for Class 202 (Multiple registrations, PENDING)
-INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, created_at, updated_at) VALUES
--- Teacher 1 (John Smith) registered - PENDING
-(1, 1, 202, 'PENDING', 'Tôi có kinh nghiệm 5 năm dạy IELTS Intermediate và rất phù hợp với lịch học này.', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days', NOW()),
--- Teacher 2 (Emma Wilson) registered - PENDING
-(2, 2, 202, 'PENDING', 'Tôi muốn đăng ký dạy lớp này vì phù hợp với chuyên môn Reading & Writing của tôi.', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', NOW()),
--- Teacher 3 (Michael Brown) registered - PENDING
-(3, 3, 202, 'PENDING', NULL, NOW() - INTERVAL '12 hours', NOW() - INTERVAL '12 hours', NOW());
-
--- 5. Teacher Class Registrations for Class 203 (One approved, others rejected)
-INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, reviewed_at, reviewed_by, rejection_reason, created_at, updated_at) VALUES
--- Teacher 1 (John Smith) - APPROVED (this is the assigned teacher)
-(4, 1, 203, 'APPROVED', 'Tôi có kinh nghiệm dạy IELTS Foundation và đạt band 9.0.', NOW() - INTERVAL '10 days', NOW() - INTERVAL '3 days', 6, NULL, NOW() - INTERVAL '10 days', NOW()),
--- Teacher 4 (Sarah Johnson) - REJECTED
-(5, 4, 203, 'REJECTED', 'Tôi muốn đăng ký dạy lớp Foundation này.', NOW() - INTERVAL '9 days', NOW() - INTERVAL '3 days', 6, 'Đã chọn giáo viên khác phù hợp hơn.', NOW() - INTERVAL '9 days', NOW());
-
--- 6. Teacher Class Registrations for Class 201 (No registrations yet - empty)
--- This class is used to test empty registration list
-
--- 7. Teacher Class Registration - CANCELLED by teacher
-INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, cancelled_at, created_at, updated_at) VALUES
--- Teacher 6 registered then cancelled for Class 202
-(6, 6, 202, 'CANCELLED', 'Tôi muốn đăng ký dạy lớp này.', NOW() - INTERVAL '3 days', NOW() - INTERVAL '2 days' - INTERVAL '8 hours', NOW() - INTERVAL '3 days', NOW());
-
--- 8. HCM Teacher registrations for Class 205
-INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, created_at, updated_at) VALUES
--- Teacher 10 (HCM teacher) - PENDING
-(7, 10, 205, 'PENDING', 'Tôi có kinh nghiệm dạy IELTS tại chi nhánh HCM.', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', NOW()),
--- Teacher 11 (HCM teacher) - PENDING
-(8, 11, 205, 'PENDING', NULL, NOW() - INTERVAL '6 hours', NOW() - INTERVAL '6 hours', NOW());
-
--- 9. Registration for Class 206 (ONLINE) - multiple branches can register
-INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, created_at, updated_at) VALUES
--- Teacher 1 (HN teacher) - PENDING for online class
-(9, 1, 206, 'PENDING', 'Tôi muốn thử dạy online để mở rộng kỹ năng.', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', NOW()),
--- Teacher 10 (HCM teacher) - PENDING for online class (can register across branches)
-(10, 10, 206, 'PENDING', 'Tôi có kinh nghiệm dạy online và muốn đăng ký lớp này.', NOW() - INTERVAL '18 hours', NOW() - INTERVAL '18 hours', NOW());
-
--- 10. Registration for Class 207 (Urgent)
-INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, created_at, updated_at) VALUES
-(11, 2, 207, 'PENDING', 'Tôi có thể dạy lớp này và sẵn sàng bắt đầu sớm.', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', NOW());
-
--- Update sequences
-SELECT setval('class_id_seq', (SELECT MAX(id) FROM class));
-SELECT setval('teacher_class_registration_id_seq', (SELECT MAX(id) FROM teacher_class_registration));

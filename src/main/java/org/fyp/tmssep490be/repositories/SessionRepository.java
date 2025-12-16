@@ -25,6 +25,8 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             LocalDate date,
             SessionStatus status);
 
+    List<Session> findByClassEntityIdInAndStatus(List<Long> classIds, SessionStatus status);
+
     boolean existsByTimeSlotTemplateId(Long timeSlotTemplateId);
 
     @Query("SELECT COUNT(DISTINCT s.classEntity.id) FROM Session s WHERE s.timeSlotTemplate.id = :timeSlotId AND s.status != 'CANCELLED'")

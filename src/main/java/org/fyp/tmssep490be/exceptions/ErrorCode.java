@@ -39,6 +39,7 @@ public enum ErrorCode {
 
     // Student errors (1100-1199)
     EMAIL_ALREADY_EXISTS(1103, "Email đã tồn tại"),
+    SKILL_ASSESSMENT_NOT_FOUND(1104, "Không tìm thấy đánh giá kỹ năng"),
     STUDENT_ROLE_NOT_FOUND(1105, "Vai trò HỌC VIÊN chưa được cấu hình trong hệ thống"),
     STUDENT_NOT_FOUND(1100, "Không tìm thấy học viên"),
     STUDENT_SESSION_NOT_FOUND(1106, "Không tìm thấy buổi học của học viên hoặc học viên chưa đăng ký buổi học này"),
@@ -69,6 +70,7 @@ public enum ErrorCode {
     FILE_SIZE_EXCEEDED(1219, "Kích thước tệp vượt quá giới hạn cho phép (10MB)"),
     TOO_MANY_STUDENTS_IN_FILE(1220, "Số lượng học viên trong file vượt quá giới hạn cho phép"),
     INVALID_EMAIL_FORMAT(1221, "Định dạng email không hợp lệ"),
+    ENROLLMENT_SCHEDULE_CONFLICT(1222, "Trùng lịch học với lớp đang theo học"),
 
     // Class errors (4000-4099)
     CLASS_NOT_FOUND(4000, "Không tìm thấy lớp học"),

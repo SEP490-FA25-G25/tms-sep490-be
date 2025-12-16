@@ -21,10 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -1280,6 +1277,64 @@ public class StudentRequestService {
                  slot2.getEndTime().isBefore(slot1.getStartTime()));
     }
 
+    private void validateScheduleConflictsForTransfer(
+            Long studentId, 
+            Long excludeClassId,
+            Long targetClassId, 
+            List<Session> targetClassSessions) {
+        
+        // 1. Get active enrollments excluding both current and target classes
+        List<Enrollment> activeEnrollments = enrollmentRepository
+                .findByStudentIdAndStatus(studentId, EnrollmentStatus.ENROLLED);
+        
+        List<Enrollment> otherEnrollments = activeEnrollments.stream()
+                .filter(e -> !e.getClassId().equals(excludeClassId) && !e.getClassId().equals(targetClassId))
+                .collect(Collectors.toList());
+        
+        if (otherEnrollments.isEmpty()) {
+            return; // No other active enrollments to check
+        }
+
+        // 2. Get sessions from other classes
+        List<Long> otherClassIds = otherEnrollments.stream()
+                .map(Enrollment::getClassId)
+                .distinct()
+                .collect(Collectors.toList());
+        
+        List<Session> otherClassSessions = sessionRepository.findByClassEntityIdInAndStatus(
+                otherClassIds, SessionStatus.PLANNED);
+
+        // 3. Check for time overlaps
+        for (Session targetSession : targetClassSessions) {
+            LocalDate targetDate = targetSession.getDate();
+            TimeSlotTemplate targetTimeSlot = targetSession.getTimeSlotTemplate();
+            
+            if (targetTimeSlot == null) continue;
+            
+            for (Session existingSession : otherClassSessions) {
+                if (!existingSession.getDate().equals(targetDate)) {
+                    continue;
+                }
+                
+                TimeSlotTemplate existingTimeSlot = existingSession.getTimeSlotTemplate();
+                if (existingTimeSlot == null) continue;
+                
+                if (hasTimeOverlap(targetTimeSlot, existingTimeSlot)) {
+                    String conflictingClass = existingSession.getClassEntity() != null 
+                            ? existingSession.getClassEntity().getCode() 
+                            : "Unknown";
+                    
+                    throw new BusinessRuleException("SCHEDULE_CONFLICT", 
+                            String.format("Lớp chuyển đến có lịch học trùng vào ngày %s (%s-%s) với lớp %s đang theo học",
+                                    targetDate,
+                                    targetTimeSlot.getStartTime(),
+                                    targetTimeSlot.getEndTime(),
+                                    conflictingClass));
+                }
+            }
+        }
+    }
+
     private StudentRequestDetailDTO.StudentAbsenceStatsDTO calculateAbsenceStats(Long studentId, Long classId) {
         List<StudentSession> sessions = studentSessionRepository.findByStudentIdAndClassEntityId(studentId, classId);
 
@@ -1413,21 +1468,8 @@ public class StudentRequestService {
                 .build();
     }
 
-    /**
-     * Lấy danh sách lớp có thể chuyển cho sinh viên
-     * 
-     * POLICY: LUÔN LUÔN cùng chi nhánh (same-branch only)
-     * - Chỉ tìm lớp cùng môn học (subject), cùng chi nhánh (branch)
-     * - Content gap ≤ 2 sessions (chênh lệch tiến độ không quá 2 buổi)
-     * - Lớp đích phải đang SCHEDULED hoặc ONGOING và còn chỗ trống
-     * 
-     * @param currentClassId ID lớp hiện tại
-     * @param targetModality Filter theo modality (OFFLINE/ONLINE), null = tất cả
-     * @param scheduleOnly Chỉ đổi lịch (giữ nguyên modality), true = lock modality
-     * @return TransferOptionsResponseDTO với danh sách lớp khả dụng, đã sort theo độ tương thích
-     */
     public TransferOptionsResponseDTO getTransferOptionsFlexible(
-            Long currentClassId, String targetModality, Boolean scheduleOnly) {
+            Long currentClassId, String targetModality) {
 
         ClassEntity currentClass = classRepository.findById(currentClassId)
                 .orElseThrow(() -> new ResourceNotFoundException("Current class not found with ID: " + currentClassId));
@@ -1438,15 +1480,10 @@ public class StudentRequestService {
         List<org.fyp.tmssep490be.entities.enums.ClassStatus> statuses = List.of(
                 org.fyp.tmssep490be.entities.enums.ClassStatus.SCHEDULED, 
                 org.fyp.tmssep490be.entities.enums.ClassStatus.ONGOING);
-        Long branchId = currentClass.getBranch().getId(); // ⚠️ LOCKED to current branch
+        Long branchId = currentClass.getBranch().getId();
         org.fyp.tmssep490be.entities.enums.Modality modality = null;
 
-        // Modality filter logic
-        if (Boolean.TRUE.equals(scheduleOnly)) {
-            // scheduleOnly=true → Lock cả modality (chỉ đổi slot thời gian)
-            modality = currentClass.getModality();
-        } else if (targetModality != null) {
-            // targetModality specified → Filter theo modality đó
+        if (targetModality != null) {
             try {
                 modality = org.fyp.tmssep490be.entities.enums.Modality.valueOf(targetModality);
             } catch (IllegalArgumentException e) {
@@ -1454,7 +1491,6 @@ public class StudentRequestService {
                     "Modality không hợp lệ: " + targetModality + ". Chỉ chấp nhận OFFLINE hoặc ONLINE.");
             }
         }
-        // else: targetModality = null → Tìm cả OFFLINE và ONLINE
 
         List<ClassEntity> targetClasses = classRepository.findByFlexibleCriteria(
             subjectId, excludeClassId, statuses, branchId, modality);
@@ -1468,9 +1504,12 @@ public class StudentRequestService {
                 .filter(dto -> {
                     // Filter by content gap: only include classes within ±2 sessions
                     Integer targetSessionNum = sessionRepository.findLastCompletedSessionNumber(dto.getClassId());
+                    // Lớp mới chưa học buổi nào → targetSessionNum = null
+                    //Lớp hiện tại chưa hoàn thành buổi nào → currentSessionNum = null → Giữ lại để AA có thể xem xét
                     if (currentSessionNum == null || targetSessionNum == null) {
-                        return true; // Include if no progress info available
+                        return true;
                     }
+
                     int gap = Math.abs(targetSessionNum - currentSessionNum);
                     return gap <= 2; // Only show classes within ±2 sessions
                 })
@@ -1590,11 +1629,24 @@ public class StudentRequestService {
             throw new BusinessRuleException("SESSION_DATE_MISMATCH", "Session date does not match effective date");
         }
 
-        // 9. Get student entity
+        // 9. Check schedule conflicts (exclude current class as student will leave it)
+        List<Session> targetClassFutureSessions = sessionRepository
+                .findByClassEntityIdAndDateAfterOrEqual(targetClass.getId(), dto.getEffectiveDate());
+        
+        if (!targetClassFutureSessions.isEmpty()) {
+            validateScheduleConflictsForTransfer(
+                    studentId, 
+                    dto.getCurrentClassId(),  // Exclude this class from conflict check
+                    dto.getTargetClassId(),
+                    targetClassFutureSessions
+            );
+        }
+
+        // 10. Get student entity
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
 
-        // 10. Create and save request
+        // 11. Create and save request
         StudentRequest request = StudentRequest.builder()
                 .student(student)
                 .requestType(StudentRequestType.TRANSFER)
@@ -2060,7 +2112,7 @@ public class StudentRequestService {
 
         return upcomingSessions.stream()
                 .filter(session -> session.getStatus() == SessionStatus.PLANNED)
-                .sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate()))
+                .sorted(Comparator.comparing(Session::getDate))
                 .limit(4)
                 .map(session -> {
                     String timeSlot = "TBA";
@@ -2090,9 +2142,7 @@ public class StudentRequestService {
         List<Session> allSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
         
         Long upcomingSessionId = allSessions.stream()
-                .filter(s -> s.getStatus() == SessionStatus.PLANNED && !s.getDate().isBefore(today))
-                .sorted((s1, s2) -> s1.getDate().compareTo(s2.getDate()))
-                .findFirst()
+                .filter(s -> s.getStatus() == SessionStatus.PLANNED && !s.getDate().isBefore(today)).min(Comparator.comparing(Session::getDate))
                 .map(Session::getId)
                 .orElse(null);
 
