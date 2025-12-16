@@ -9,6 +9,7 @@ import org.fyp.tmssep490be.entities.enums.*;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
+import org.fyp.tmssep490be.utils.ScheduleUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -501,24 +502,7 @@ public class EnrollmentService {
     }
 
     private String buildScheduleDisplay(ClassEntity classEntity) {
-        if (classEntity.getScheduleDays() == null || classEntity.getScheduleDays().length == 0) {
-            return "Chưa có lịch cụ thể";
-        }
-
-        // Convert schedule days to day names
-        String[] dayNames = { "CN", "T2", "T3", "T4", "T5", "T6", "T7" };
-        StringBuilder schedule = new StringBuilder();
-
-        for (int i = 0; i < classEntity.getScheduleDays().length; i++) {
-            if (i > 0)
-                schedule.append(", ");
-            int dayIndex = classEntity.getScheduleDays()[i];
-            if (dayIndex >= 0 && dayIndex < dayNames.length) {
-                schedule.append(dayNames[dayIndex]);
-            }
-        }
-
-        return schedule.toString();
+        return ScheduleUtils.generateScheduleDisplayFromMetadata(classEntity);
     }
 
     @Transactional

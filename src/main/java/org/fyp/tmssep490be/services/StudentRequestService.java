@@ -10,6 +10,7 @@ import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
 import org.fyp.tmssep490be.repositories.*;
+import org.fyp.tmssep490be.utils.ScheduleUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -2000,7 +2001,7 @@ public class StudentRequestService {
         boolean hasPending = studentRequestRepository.existsByStudentIdAndCurrentClassIdAndRequestTypeAndStatusIn(
                 studentId, classEntity.getId(), StudentRequestType.TRANSFER, List.of(RequestStatus.PENDING));
 
-        String scheduleInfo = formatScheduleInfo(classEntity);
+        String scheduleInfo = ScheduleUtils.generateScheduleDisplayFromMetadata(classEntity);
         String scheduleTime = getScheduleTimeFromSessions(classEntity.getId());
 
         List<Session> classSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
@@ -2072,7 +2073,7 @@ public class StudentRequestService {
 
         boolean canTransfer = availableSlots > 0;
 
-        String scheduleDays = formatScheduleDays(targetClass.getScheduleDays());
+        String scheduleDays = ScheduleUtils.generateScheduleDisplayFromMetadata(targetClass);
         
         String scheduleTime = getScheduleTimeFromSessions(targetClass.getId());
 
@@ -2195,48 +2196,7 @@ public class StudentRequestService {
         return currentValue.equals(targetValue) ? "No change" : currentValue + " → " + targetValue;
     }
 
-    private String formatScheduleInfo(ClassEntity classEntity) {
-        StringBuilder schedule = new StringBuilder();
-
-        // Format schedule days (e.g., "Mon, Wed, Fri")
-        if (classEntity.getScheduleDays() != null && classEntity.getScheduleDays().length > 0) {
-            String days = formatScheduleDays(classEntity.getScheduleDays());
-            schedule.append(days);
-        }
-
-        // Add date range
-        if (classEntity.getStartDate() != null) {
-            if (schedule.length() > 0) schedule.append(" - ");
-            schedule.append(classEntity.getStartDate());
-            if (classEntity.getPlannedEndDate() != null) {
-                schedule.append(" to ").append(classEntity.getPlannedEndDate());
-            }
-        }
-
-        return schedule.length() > 0 ? schedule.toString() : "Schedule TBD";
-    }
-
-    private String formatScheduleDays(Short[] scheduleDays) {
-        if (scheduleDays == null || scheduleDays.length == 0) {
-            return "TBD";
-        }
-        return Arrays.stream(scheduleDays)
-                .map(this::dayOfWeekToString)
-                .collect(Collectors.joining(", "));
-    }
-
-    private String dayOfWeekToString(Short dayNum) {
-        return switch (dayNum) {
-            case 1 -> "Mon";
-            case 2 -> "Tue";
-            case 3 -> "Wed";
-            case 4 -> "Thu";
-            case 5 -> "Fri";
-            case 6 -> "Sat";
-            case 7 -> "Sun";
-            default -> String.valueOf(dayNum);
-        };
-    }
+    // Schedule formatting methods removed - now using ScheduleUtils for consistency
 
     private String getScheduleTimeFromSessions(Long classId) {
         List<Session> allSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
@@ -2245,39 +2205,8 @@ public class StudentRequestService {
             return "TBA";
         }
 
-        Map<Integer, String> dayToTimeSlot = new java.util.LinkedHashMap<>();
-        
-        allSessions.stream()
-            .filter(s -> s.getStatus() == SessionStatus.PLANNED && s.getTimeSlotTemplate() != null)
-            .forEach(session -> {
-                int dayOfWeek = session.getDate().getDayOfWeek().getValue();
-                if (!dayToTimeSlot.containsKey(dayOfWeek)) {
-                    TimeSlotTemplate ts = session.getTimeSlotTemplate();
-                    dayToTimeSlot.put(dayOfWeek, ts.getStartTime() + "-" + ts.getEndTime());
-                }
-            });
-
-        if (dayToTimeSlot.isEmpty()) {
-            return "TBA";
-        }
-
-        return dayToTimeSlot.entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .map(e -> dayOfWeekToVietnamese(e.getKey()) + " " + e.getValue())
-            .collect(Collectors.joining(", "));
-    }
-
-    private String dayOfWeekToVietnamese(int dayOfWeek) {
-        return switch (dayOfWeek) {
-            case 1 -> "T2";
-            case 2 -> "T3";
-            case 3 -> "T4";
-            case 4 -> "T5";
-            case 5 -> "T6";
-            case 6 -> "T7";
-            case 7 -> "CN";
-            default -> "T" + dayOfWeek;
-        };
+        // Use ScheduleUtils to extract and format schedule with day names and time slots
+        return ScheduleUtils.generateScheduleSummary(allSessions);
     }
 
     private TransferOptionsResponseDTO.CurrentClassInfo buildCurrentClassInfo(ClassEntity currentClass) {
@@ -2291,7 +2220,7 @@ public class StudentRequestService {
                 .branchId(currentClass.getBranch().getId())
                 .branchName(currentClass.getBranch().getName())
                 .modality(currentClass.getModality().name())
-                .scheduleDays(formatScheduleInfo(currentClass))
+                .scheduleDays(ScheduleUtils.generateScheduleDisplayFromMetadata(currentClass))
                 .scheduleTime("Varies by session")
                 .currentSession(currentSessionCount)
                 .build();

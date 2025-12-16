@@ -780,15 +780,15 @@ INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date
 -- IELTS Foundation (Subject 1) - 5 classes (24 sessions each)
 (1, 1, 1, 'HN-IELTS-F1', 'HN IELTS Foundation 1 (Early)', 'OFFLINE', '2025-11-17', '2026-01-09', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07', '2025-11-10 10:00:00+07', NOW()),
 (2, 1, 1, 'HN-IELTS-F2', 'HN IELTS Foundation 2 (Parallel A)', 'OFFLINE', '2025-12-01', '2026-01-23', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-24 10:00:00+07', '2025-11-25 14:00:00+07', '2025-11-24 10:00:00+07', NOW()),
-(3, 1, 1, 'HN-IELTS-F3', 'HN IELTS Foundation 3 (Parallel B)', 'OFFLINE', '2025-12-03', '2026-01-27', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-26 10:00:00+07', '2025-11-27 14:00:00+07', '2025-11-26 10:00:00+07', NOW()),
-(4, 1, 1, 'HN-IELTS-F4', 'HN IELTS Foundation 4 (Parallel C)', 'ONLINE', '2025-12-05', '2026-01-29', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-28 10:00:00+07', '2025-11-29 14:00:00+07', '2025-11-28 10:00:00+07', NOW()),
+(3, 1, 1, 'HN-IELTS-F3', 'HN IELTS Foundation 3 (Parallel B)', 'OFFLINE', '2025-12-03', '2026-01-27', NULL, ARRAY[0,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-26 10:00:00+07', '2025-11-27 14:00:00+07', '2025-11-26 10:00:00+07', NOW()),
+(4, 1, 1, 'HN-IELTS-F4', 'HN IELTS Foundation 4 (Parallel C)', 'ONLINE', '2025-12-05', '2026-01-29', NULL, ARRAY[1,3,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-28 10:00:00+07', '2025-11-29 14:00:00+07', '2025-11-28 10:00:00+07', NOW()),
 (5, 1, 1, 'HN-IELTS-F5', 'HN IELTS Foundation 5 (Late)', 'OFFLINE', '2025-12-15', '2026-02-06', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-08 10:00:00+07', '2025-12-09 14:00:00+07', '2025-12-08 10:00:00+07', NOW()),
 
 -- IELTS Intermediate (Subject 2) - 5 classes (24 sessions each)
 (6, 1, 2, 'HN-IELTS-I1', 'HN IELTS Intermediate 1 (Early)', 'OFFLINE', '2025-11-17', '2026-01-09', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07', '2025-11-10 10:00:00+07', NOW()),
 (7, 1, 2, 'HN-IELTS-I2', 'HN IELTS Intermediate 2 (Parallel A)', 'OFFLINE', '2025-12-02', '2026-01-24', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', NOW()),
-(8, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Parallel B)', 'OFFLINE', '2025-12-04', '2026-01-28', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-27 10:00:00+07', '2025-11-28 14:00:00+07', '2025-11-27 10:00:00+07', NOW()),
-(9, 1, 2, 'HN-IELTS-I4', 'HN IELTS Intermediate 4 (Parallel C)', 'ONLINE', '2025-12-06', '2026-01-30', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', NOW()),
+(8, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Parallel B)', 'OFFLINE', '2025-12-04', '2026-01-28', NULL, ARRAY[1,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-27 10:00:00+07', '2025-11-28 14:00:00+07', '2025-11-27 10:00:00+07', NOW()),
+(9, 1, 2, 'HN-IELTS-I4', 'HN IELTS Intermediate 4 (Parallel C)', 'ONLINE', '2025-12-06', '2026-01-30', NULL, ARRAY[0,2,4]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', NOW()),
 (10, 1, 2, 'HN-IELTS-I5', 'HN IELTS Intermediate 5 (Late)', 'OFFLINE', '2025-12-16', '2026-02-07', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-09 10:00:00+07', '2025-12-10 14:00:00+07', '2025-12-09 10:00:00+07', NOW());
 
 -- Class 1: HN IELTS Foundation 1 (Early) - Mon/Wed/Fri, starts 2025-11-17 (2 weeks ahead)
