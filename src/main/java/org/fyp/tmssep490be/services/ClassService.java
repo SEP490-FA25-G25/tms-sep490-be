@@ -612,26 +612,24 @@ public class ClassService {
                 List<ReplacementSkillAssessment> allAssessments = studentIds.isEmpty() ? List.of()
                                 : skillAssessmentRepository.findByStudentIdIn(studentIds);
 
-                // Group assessments by student ID
+                // Nhóm toàn bộ bài kiểm tra của một student vào một key trong map bằng
+                // studentId
+                // 1L: [assessment1_of_student1, assessment2_of_student1],
+                // 2L: [assessment1_of_student2, assessment2_of_student2],
+                // 3L: [assessment1_of_student3, assessment2_of_student3]
                 Map<Long, List<ReplacementSkillAssessment>> assessmentsByStudent = allAssessments.stream()
                                 .collect(Collectors.groupingBy(assessment -> assessment.getStudent().getId()));
 
-                // Convert to DTOs with complete assessment data and sort by matchPriority
+                // Sort by matchPriority (ascending: 1, 2, 3)
                 List<AvailableStudentDTO> allDtos = allAvailableStudents.stream()
                                 .map(student -> convertToAvailableStudentDTO(
                                                 student,
                                                 assessmentsByStudent.get(student.getId()),
                                                 classCurriculumId,
                                                 classLevelId))
-                                .sorted((dto1, dto2) -> {
-                                        // Sort by matchPriority (ascending: 1, 2, 3)
-                                        int priorityCompare = dto1.getClassMatchInfo().getMatchPriority()
-                                                        .compareTo(dto2.getClassMatchInfo().getMatchPriority());
-                                        if (priorityCompare != 0) {
-                                                return priorityCompare;
-                                        }
-                                        return dto1.getFullName().compareTo(dto2.getFullName());
-                                })
+                                .sorted(Comparator.comparingInt(
+                                                (AvailableStudentDTO dto) -> dto.getClassMatchInfo().getMatchPriority())
+                                                .thenComparing(AvailableStudentDTO::getFullName))
                                 .collect(Collectors.toList());
 
                 // Apply pagination manually on sorted list
@@ -651,14 +649,6 @@ public class ClassService {
                 UserAccount userAccount = student.getUserAccount();
                 List<ReplacementSkillAssessment> filteredAssessments = filterAllowedAssessments(assessments);
 
-                // Get branch info (take first branch)
-                String branchName = null;
-                Long branchId = null;
-                if (userAccount.getUserBranches() != null && !userAccount.getUserBranches().isEmpty()) {
-                        branchId = userAccount.getUserBranches().iterator().next().getBranch().getId();
-                        branchName = userAccount.getUserBranches().iterator().next().getBranch().getName();
-                }
-
                 // Convert all assessments to DTOs
                 List<AvailableStudentDTO.SkillAssessmentDTO> assessmentDTOs = !filteredAssessments.isEmpty()
                                 ? filteredAssessments.stream()
@@ -669,16 +659,12 @@ public class ClassService {
                                 : List.of();
 
                 // Calculate class match info
-                ReplacementSkillAssessment matchingAssessment = findMatchingAssessment(
-                                filteredAssessments, classCurriculumId, classLevelId);
                 AvailableStudentDTO.ClassMatchInfoDTO classMatchInfo = calculateClassMatchInfo(
-                                matchingAssessment, classCurriculumId, classLevelId);
+                                filteredAssessments, classCurriculumId, classLevelId);
 
                 // Get active enrollments count
                 int activeEnrollments = enrollmentRepository.countByStudentIdAndStatus(
                                 student.getId(), EnrollmentStatus.ENROLLED);
-                int maxEnrollments = 3; // Default policy
-                boolean canEnroll = activeEnrollments < maxEnrollments;
 
                 return AvailableStudentDTO.builder()
                                 .id(student.getId())
@@ -687,12 +673,9 @@ public class ClassService {
                                 .email(userAccount.getEmail())
                                 .phone(userAccount.getPhone())
                                 .avatarUrl(userAccount.getAvatarUrl())
-                                .branchId(branchId)
-                                .branchName(branchName)
                                 .replacementSkillAssessments(assessmentDTOs)
                                 .classMatchInfo(classMatchInfo)
                                 .activeEnrollments(activeEnrollments)
-                                .canEnroll(canEnroll)
                                 .accountStatus(userAccount.getStatus().name())
                                 .build();
         }
@@ -707,12 +690,17 @@ public class ClassService {
                                 .collect(Collectors.toList());
         }
 
-        private ReplacementSkillAssessment findMatchingAssessment(
+        private AvailableStudentDTO.ClassMatchInfoDTO calculateClassMatchInfo(
                         List<ReplacementSkillAssessment> assessments,
                         Long classCurriculumId,
                         Long classLevelId) {
+                // Default: No match
+                Integer matchPriority = 3;
+                String matchingSkill = null;
+                AvailableStudentDTO.LevelInfoDTO matchingLevel = null;
+
                 if (assessments == null || assessments.isEmpty() || classCurriculumId == null) {
-                        return null;
+                        return buildClassMatchInfo(matchPriority, matchingSkill, matchingLevel);
                 }
 
                 // Find assessments matching the class curriculum
@@ -723,51 +711,43 @@ public class ClassService {
                                 .toList();
 
                 if (curriculumMatches.isEmpty()) {
-                        return null;
+                        return buildClassMatchInfo(matchPriority, matchingSkill, matchingLevel);
                 }
 
-                // Find perfect match (curriculum + level)
+                // Try to find perfect match (curriculum + level)
+                ReplacementSkillAssessment matchingAssessment = null;
                 if (classLevelId != null) {
-                        for (ReplacementSkillAssessment assessment : curriculumMatches) {
-                                if (assessment.getLevel().getId().equals(classLevelId)) {
-                                        return assessment;
-                                }
+                        matchingAssessment = curriculumMatches.stream()
+                                        .filter(a -> a.getLevel().getId().equals(classLevelId))
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (matchingAssessment != null) {
+                                matchPriority = 1; // Perfect match (curriculum + level)
                         }
                 }
 
-                return curriculumMatches.get(0);
+                // If no perfect match, take first curriculum match
+                if (matchingAssessment == null) {
+                        matchingAssessment = curriculumMatches.get(0);
+                        matchPriority = 2; // Partial match (curriculum only)
+                }
+
+                // Build result with matched assessment info
+                matchingSkill = matchingAssessment.getSkill().name();
+                matchingLevel = convertToLevelInfoDTO(matchingAssessment.getLevel());
+
+                return buildClassMatchInfo(matchPriority, matchingSkill, matchingLevel);
         }
 
-        private AvailableStudentDTO.ClassMatchInfoDTO calculateClassMatchInfo(
-                        ReplacementSkillAssessment matchingAssessment,
-                        Long classCurriculumId,
-                        Long classLevelId) {
-                Integer matchPriority = 3; // Default: No match
-                String matchingSkill = null;
-                AvailableStudentDTO.LevelInfoDTO matchingLevel = null;
-
-                if (matchingAssessment != null && matchingAssessment.getLevel() != null) {
-                        Long assessmentCurriculumId = matchingAssessment.getLevel().getCurriculum() != null
-                                        ? matchingAssessment.getLevel().getCurriculum().getId()
-                                        : null;
-                        Long assessmentLevelId = matchingAssessment.getLevel().getId();
-
-                        if (assessmentCurriculumId != null && assessmentCurriculumId.equals(classCurriculumId)) {
-                                matchingSkill = matchingAssessment.getSkill().name();
-                                matchingLevel = convertToLevelInfoDTO(matchingAssessment.getLevel());
-
-                                if (classLevelId != null && assessmentLevelId.equals(classLevelId)) {
-                                        matchPriority = 1;
-                                } else {
-                                        matchPriority = 2;
-                                }
-                        }
-                }
-
+        private AvailableStudentDTO.ClassMatchInfoDTO buildClassMatchInfo(
+                        Integer priority,
+                        String skill,
+                        AvailableStudentDTO.LevelInfoDTO level) {
                 return AvailableStudentDTO.ClassMatchInfoDTO.builder()
-                                .matchPriority(matchPriority)
-                                .matchingSkill(matchingSkill)
-                                .matchingLevel(matchingLevel)
+                                .matchPriority(priority)
+                                .matchingSkill(skill)
+                                .matchingLevel(level)
                                 .build();
         }
 
@@ -1628,18 +1608,17 @@ public class ClassService {
                                                 ? org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL
                                                 : org.fyp.tmssep490be.entities.enums.ResourceType.ROOM;
 
-                // Get resources for the branch and filter by resource type only
-                // Note: We no longer filter by capacity - frontend will show warning for
-                // undersized rooms
+                // Get resources for the branch and filter by resource type AND capacity
+                Integer requiredCapacity = classEntity.getMaxCapacity() != null ? classEntity.getMaxCapacity() : 0;
                 List<org.fyp.tmssep490be.entities.Resource> resources = resourceRepository
                                 .findByBranchIdOrderByNameAsc(classEntity.getBranch().getId())
                                 .stream()
                                 .filter(r -> r.getResourceType() == requiredType)
+                                .filter(r -> r.getCapacity() != null && r.getCapacity() >= requiredCapacity)
                                 .toList();
 
-                log.info("Found {} resources of type {} for class modality {} (required capacity: {})",
-                                resources.size(), requiredType, classEntity.getModality(),
-                                classEntity.getMaxCapacity());
+                log.info("Found {} resources of type {} for class modality {}",
+                                resources.size(), requiredType, classEntity.getModality());
 
                 // Get sessions for this class and dayOfWeek to calculate conflicts
                 List<org.fyp.tmssep490be.entities.Session> classSessions = sessionRepository

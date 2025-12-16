@@ -24,6 +24,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -1071,20 +1072,18 @@ public class StudentRequestService {
         }
 
         // Business Rule: SAME-BRANCH ONLY - không cho phép học bù ở branch khác
-        int weeksLimit = MAKEUP_WEEKS_LIMIT;
 
-        // Find makeup options with same subject session (same content)
+        // Tìm các buổi cùng subject trong cùng chi nhánh, trong giới hạn thời gian
         List<Session> makeupOptions = sessionRepository.findMakeupSessionOptions(
                 targetSession.getSubjectSession().getId(),
                 targetSessionId,
                 targetSession.getClassEntity().getBranch().getId(),
-                weeksLimit
+                MAKEUP_WEEKS_LIMIT
         );
 
-        // Apply smart ranking and filtering
         List<MakeupOptionDTO> rankedOptions = makeupOptions.stream()
                 .map(session -> mapToMakeupOptionDTO(session, targetSession, studentId))
-                .filter(option -> option != null) // Filter out sessions with conflicts
+                .filter(Objects::nonNull) // Filter out sessions with conflicts
                 .sorted((a, b) -> {
                     // Primary: Sort by total score (higher is better)
                     int scoreCompare = b.getMatchScore().getTotalScore().compareTo(a.getMatchScore().getTotalScore());

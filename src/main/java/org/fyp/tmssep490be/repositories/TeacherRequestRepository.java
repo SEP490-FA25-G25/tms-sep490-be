@@ -58,6 +58,15 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
            "ORDER BY tr.submittedAt DESC")
     List<TeacherRequest> findByStatusOrderBySubmittedAtDesc(@Param("status") RequestStatus status);
 
+        // Đếm số yêu cầu của giáo viên cho một lớp theo các trạng thái cho trước
+        @Query("SELECT COUNT(tr) FROM TeacherRequest tr " +
+        "WHERE tr.teacher.id = :teacherId " +
+        "AND tr.session.classEntity.id = :classId " +
+        "AND tr.status IN :statuses")
+long countActiveRequestsByTeacherAndClass(@Param("teacherId") Long teacherId,
+                                          @Param("classId") Long classId,
+                                          @Param("statuses") List<RequestStatus> statuses);
+
     //Lấy đầy đủ thông tin yêu cầu theo ID
     @Query("SELECT tr FROM TeacherRequest tr " +
            "LEFT JOIN FETCH tr.teacher t " +

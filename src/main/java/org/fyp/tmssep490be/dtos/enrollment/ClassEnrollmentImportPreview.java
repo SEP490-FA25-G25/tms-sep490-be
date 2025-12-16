@@ -17,25 +17,11 @@ public class ClassEnrollmentImportPreview {
     private String classCode;
     private String className;
 
-    // Students data
+    // Students data (FE sẽ tự filter và đếm)
     private List<StudentEnrollmentData> students;
-    private int foundCount;      // Số students đã có trong DB
-    private int createCount;     // Số students sẽ tạo mới
-    private int errorCount;      // Số students có lỗi
-    private int totalValid;      // found + create
 
-    // Capacity info
+    // Capacity info (chỉ giữ thông tin cơ bản, FE tự tính các giá trị khác)
     private int currentEnrolled;
     private int maxCapacity;
-    private int availableSlots;
-    private boolean exceedsCapacity;
-    private int exceededBy;  // Số lượng vượt quá (0 nếu không vượt)
-
-    // Warnings
-    private List<String> warnings;
-    private List<String> errors;
-
-    // Recommendation
-    private EnrollmentRecommendation recommendation;
 }
 

@@ -34,6 +34,7 @@ public class StudentController {
     private final StudentPortalService studentPortalService;
     private final StudentContextHelper studentContextHelper;
     private static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 
     @GetMapping
@@ -179,10 +180,23 @@ public class StudentController {
     ) {
         log.info("User {} previewing student import for branch {}", currentUser.getId(), branchId);
 
+        // Validate file is not empty
         if (file.isEmpty()) {
             throw new org.fyp.tmssep490be.exceptions.CustomException(org.fyp.tmssep490be.exceptions.ErrorCode.EXCEL_FILE_EMPTY);
         }
 
+        // Validate file size (10MB max)
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new org.fyp.tmssep490be.exceptions.CustomException(org.fyp.tmssep490be.exceptions.ErrorCode.FILE_SIZE_EXCEEDED);
+        }
+
+        // Validate file extension
+        String filename = file.getOriginalFilename();
+        if (filename == null || !filename.toLowerCase().endsWith(".xlsx")) {
+            throw new org.fyp.tmssep490be.exceptions.CustomException(org.fyp.tmssep490be.exceptions.ErrorCode.INVALID_FILE_TYPE_XLSX);
+        }
+
+        // Validate content type
         String contentType = file.getContentType();
         if (contentType == null || !contentType.equals(XLSX_CONTENT_TYPE)) {
             throw new org.fyp.tmssep490be.exceptions.CustomException(org.fyp.tmssep490be.exceptions.ErrorCode.INVALID_FILE_TYPE_XLSX);

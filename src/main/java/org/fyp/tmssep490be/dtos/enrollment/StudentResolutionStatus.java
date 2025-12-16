@@ -5,6 +5,8 @@ public enum StudentResolutionStatus {
 
     CREATE, // Student mới → sẽ tạo mới rồi enroll
 
+    ALREADY_ENROLLED, // Student đã đăng ký vào lớp này → UI sẽ disable
+
     DUPLICATE, // Trùng trong file Excel (error)
 
     ERROR // Validation lỗi (email invalid, missing fields...)

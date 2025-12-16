@@ -21,15 +21,14 @@ public class ClassEnrollmentImportExecuteRequest {
     @NotNull(message = "Enrollment strategy is required")
     private EnrollmentStrategy strategy;
 
-    // Nếu strategy = PARTIAL → phải có
-    private List<Long> selectedStudentIds;
+    // Chỉ gửi IDs của students đã tồn tại (FOUND)
+    private List<Long> existingStudentIds;
 
-    // Nếu strategy = OVERRIDE → phải có
+    // Chỉ gửi data của students cần tạo mới (CREATE)
+    private List<StudentEnrollmentData> newStudents;
+
+    // Required only when strategy = OVERRIDE
     @Size(min = 20, message = "Override reason must be at least 20 characters")
     private String overrideReason;
-
-    // Students từ preview
-    @NotEmpty(message = "Students list cannot be empty")
-    private List<StudentEnrollmentData> students;
 }
 

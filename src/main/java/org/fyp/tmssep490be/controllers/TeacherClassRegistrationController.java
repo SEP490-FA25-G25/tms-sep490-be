@@ -131,10 +131,11 @@ public class TeacherClassRegistrationController {
         @GetMapping("/classes-needing-review")
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
         public ResponseEntity<ResponseObject<List<ClassRegistrationSummaryDTO>>> getClassesNeedingReview(
-                        @AuthenticationPrincipal UserPrincipal userPrincipal) {
+                        @AuthenticationPrincipal UserPrincipal userPrincipal,
+                        @RequestParam(required = false) Long branchId) {
 
                 List<ClassRegistrationSummaryDTO> classes = registrationService
-                                .getClassesNeedingReview(userPrincipal.getId());
+                                .getClassesNeedingReview(userPrincipal.getId(), branchId);
 
                 return ResponseEntity.ok(ResponseObject.<List<ClassRegistrationSummaryDTO>>builder()
                                 .success(true)
@@ -147,10 +148,11 @@ public class TeacherClassRegistrationController {
         @GetMapping("/classes-needing-teacher")
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
         public ResponseEntity<ResponseObject<List<ClassNeedingTeacherDTO>>> getClassesNeedingTeacher(
-                        @AuthenticationPrincipal UserPrincipal userPrincipal) {
+                        @AuthenticationPrincipal UserPrincipal userPrincipal,
+                        @RequestParam(required = false) Long branchId) {
 
                 List<ClassNeedingTeacherDTO> classes = registrationService
-                                .getClassesNeedingTeacher(userPrincipal.getId());
+                                .getClassesNeedingTeacher(userPrincipal.getId(), branchId);
 
                 return ResponseEntity.ok(ResponseObject.<List<ClassNeedingTeacherDTO>>builder()
                                 .success(true)

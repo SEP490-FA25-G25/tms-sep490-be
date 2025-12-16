@@ -39,8 +39,6 @@ DROP TABLE IF EXISTS replacement_skill_assessment CASCADE;
 DROP TABLE IF EXISTS feedback_question CASCADE;
 DROP TABLE IF EXISTS student_feedback_response CASCADE;
 DROP TABLE IF EXISTS notification CASCADE;
-DROP TABLE IF EXISTS policy_history CASCADE;
-DROP TABLE IF EXISTS system_policy CASCADE;
 
 -- Drop existing enum types (to ensure clean recreation)
 DROP TYPE IF EXISTS session_status_enum CASCADE;

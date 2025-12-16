@@ -24,11 +24,8 @@ public class StudentEnrollmentData {
     private StudentResolutionStatus status;  // FOUND/CREATE/DUPLICATE/ERROR
     private Long resolvedStudentId;  // Nếu FOUND
     private String errorMessage;  // Nếu ERROR
-    
+
     // Multi-branch support
     private boolean needsBranchSync;  // true if student exists but not in class's branch
     private String note;  // Additional information for UI display
-
-
-
 }
