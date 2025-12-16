@@ -1,62 +1,46 @@
 package org.fyp.tmssep490be.services;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.fyp.tmssep490be.entities.SystemPolicy;
-import org.fyp.tmssep490be.repositories.SystemPolicyRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-
+/**
+ * Simple policy service that returns default values.
+ * For capstone project, hardcoded defaults are sufficient.
+ * Future improvement: Could read from application.properties if needed.
+ */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class PolicyService {
 
-    private final SystemPolicyRepository systemPolicyRepository;
-
-    @Transactional(readOnly = true)
+    /**
+     * Get a string policy value. Returns the default value directly.
+     */
     public String getGlobalString(String policyKey, String defaultValue) {
-        return systemPolicyRepository.findFirstByPolicyKeyOrderByIdAsc(policyKey)
-                .map(SystemPolicy::getCurrentValue)
-                .filter(value -> value != null && !value.trim().isEmpty())
-                .orElse(defaultValue);
+        log.debug("Getting policy '{}', returning default: {}", policyKey, defaultValue);
+        return defaultValue;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Get an integer policy value. Returns the default value directly.
+     */
     public int getGlobalInt(String policyKey, int defaultValue) {
-        return systemPolicyRepository.findFirstByPolicyKeyOrderByIdAsc(policyKey)
-                .map(SystemPolicy::getCurrentValue)
-                .map(value -> {
-                    try {
-                        return Integer.parseInt(value);
-                    } catch (NumberFormatException ex) {
-                        log.warn("Policy {} has non-integer value '{}', using default {}", policyKey, value, defaultValue);
-                        return defaultValue;
-                    }
-                })
-                .orElse(defaultValue);
+        log.debug("Getting policy '{}', returning default: {}", policyKey, defaultValue);
+        return defaultValue;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Get a boolean policy value. Returns the default value directly.
+     */
     public boolean getGlobalBoolean(String policyKey, boolean defaultValue) {
-        return systemPolicyRepository.findFirstByPolicyKeyOrderByIdAsc(policyKey)
-                .map(SystemPolicy::getCurrentValue)
-                .map(value -> {
-                    if (value == null) {
-                        return defaultValue;
-                    }
-                    String normalized = value.trim().toLowerCase();
-                    if ("true".equals(normalized) || "1".equals(normalized) || "yes".equals(normalized)) {
-                        return true;
-                    }
-                    if ("false".equals(normalized) || "0".equals(normalized) || "no".equals(normalized)) {
-                        return false;
-                    }
-                    log.warn("Policy {} has non-boolean value '{}', using default {}", policyKey, value, defaultValue);
-                    return defaultValue;
-                })
-                .orElse(defaultValue);
+        log.debug("Getting policy '{}', returning default: {}", policyKey, defaultValue);
+        return defaultValue;
     }
 
+    /**
+     * Get a double policy value. Returns the default value directly.
+     */
+    public double getGlobalDouble(String policyKey, double defaultValue) {
+        log.debug("Getting policy '{}', returning default: {}", policyKey, defaultValue);
+        return defaultValue;
+    }
 }

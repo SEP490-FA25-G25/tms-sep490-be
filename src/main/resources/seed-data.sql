@@ -1,8 +1,6 @@
 TRUNCATE TABLE student_feedback_response CASCADE;
 TRUNCATE TABLE student_feedback CASCADE;
 TRUNCATE TABLE qa_report CASCADE;
-TRUNCATE TABLE policy_history CASCADE;
-TRUNCATE TABLE system_policy CASCADE;
 TRUNCATE TABLE score CASCADE;
 TRUNCATE TABLE assessment CASCADE;
 TRUNCATE TABLE subject_assessment_clo_mapping CASCADE;
@@ -128,20 +126,110 @@ INSERT INTO user_account (id, email, phone, full_name, gender, dob, address, pas
 (43, 'inactive.teacher@tms-edu.vn', '0912001024', 'Sam Inactive',  'MALE', '1988-04-01', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'INACTIVE', '2024-02-01 00:00:00+07', '2024-02-01 00:00:00+07');
 
 -- Students (100 students total: 50 per branch for realistic testing)
-INSERT INTO user_account (id, email, phone, full_name, gender, dob, address, password_hash, status, created_at, updated_at) 
-SELECT 
-    100 + s.id, 
-    'student.' || LPAD(s.id::text, 4, '0') || '@gmail.com', 
-    '0900' || LPAD(s.id::text, 6, '0'),
-    'Student ' || LPAD(s.id::text, 4, '0'),
-    CASE WHEN s.id % 2 = 0 THEN  'FEMALE' ELSE  'MALE' END, 
-    make_date(2000 + (s.id % 6), (s.id % 12) + 1, (s.id % 28) + 1),
-    CASE WHEN s.id <= 50 THEN 'Ha Noi' ELSE 'TP. HCM' END,
-    '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.',
-    'ACTIVE',
-    '2024-03-01 00:00:00+07',
-    '2024-03-01 00:00:00+07'
-FROM generate_series(1, 100) AS s(id);
+-- Vietnamese real names for students
+INSERT INTO user_account (id, email, phone, full_name, gender, dob, address, password_hash, status, created_at, updated_at) VALUES
+-- Ha Noi Students (IDs 101-150)
+(101, 'nguyenvanan01@gmail.com', '0900000001', 'Nguyen Van An', 'MALE', '2000-01-15', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(102, 'tranthimai02@gmail.com', '0900000002', 'Tran Thi Mai', 'FEMALE', '2001-02-20', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(103, 'levanbinh03@gmail.com', '0900000003', 'Le Van Binh', 'MALE', '2002-03-10', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(104, 'phamthihoa04@gmail.com', '0900000004', 'Pham Thi Hoa', 'FEMALE', '2000-04-25', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(105, 'hoangvancuong05@gmail.com', '0900000005', 'Hoang Van Cuong', 'MALE', '2001-05-18', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(106, 'nguyenthilan06@gmail.com', '0900000006', 'Nguyen Thi Lan', 'FEMALE', '2002-06-08', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(107, 'vuvanduc07@gmail.com', '0900000007', 'Vu Van Duc', 'MALE', '2000-07-22', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(108, 'dothihuong08@gmail.com', '0900000008', 'Do Thi Huong', 'FEMALE', '2001-08-14', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(109, 'buivannam09@gmail.com', '0900000009', 'Bui Van Nam', 'MALE', '2002-09-05', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(110, 'dangthiphuong10@gmail.com', '0900000010', 'Dang Thi Phuong', 'FEMALE', '2000-10-30', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(111, 'tranvanquang11@gmail.com', '0900000011', 'Tran Van Quang', 'MALE', '2001-11-12', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(112, 'nguyenthithu12@gmail.com', '0900000012', 'Nguyen Thi Thu', 'FEMALE', '2002-12-03', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(113, 'levanson13@gmail.com', '0900000013', 'Le Van Son', 'MALE', '2000-01-28', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(114, 'phamthithanh14@gmail.com', '0900000014', 'Pham Thi Thanh', 'FEMALE', '2001-02-17', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(115, 'hovanung15@gmail.com', '0900000015', 'Ho Van Hung', 'MALE', '2002-03-22', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(116, 'vuongthiloan16@gmail.com', '0900000016', 'Vuong Thi Loan', 'FEMALE', '2000-04-11', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(117, 'ngovantuong17@gmail.com', '0900000017', 'Ngo Van Truong', 'MALE', '2001-05-09', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(118, 'lethiyen18@gmail.com', '0900000018', 'Le Thi Yen', 'FEMALE', '2002-06-28', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(119, 'tranvanhieu19@gmail.com', '0900000019', 'Tran Van Hieu', 'MALE', '2000-07-15', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(120, 'nguyenthilinh20@gmail.com', '0900000020', 'Nguyen Thi Linh', 'FEMALE', '2001-08-04', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(121, 'phamvanlong21@gmail.com', '0900000021', 'Pham Van Long', 'MALE', '2002-09-19', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(122, 'vuthimyhanh22@gmail.com', '0900000022', 'Vu Thi My Hanh', 'FEMALE', '2000-10-08', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(123, 'doanhvan23@gmail.com', '0900000023', 'Doan Van Khanh', 'MALE', '2001-11-27', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(124, 'tranthinga24@gmail.com', '0900000024', 'Tran Thi Nga', 'FEMALE', '2002-12-16', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(125, 'nguyenvanphuc25@gmail.com', '0900000025', 'Nguyen Van Phuc', 'MALE', '2000-01-03', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(126, 'lethidiem26@gmail.com', '0900000026', 'Le Thi Diem', 'FEMALE', '2001-02-22', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(127, 'hoangquoctuan27@gmail.com', '0900000027', 'Hoang Quoc Tuan', 'MALE', '2002-03-14', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(128, 'vuthihue28@gmail.com', '0900000028', 'Vu Thi Hue', 'FEMALE', '2000-04-08', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(129, 'nguyenvanminh29@gmail.com', '0900000029', 'Nguyen Van Minh', 'MALE', '2001-05-27', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(130, 'dinhthitrang30@gmail.com', '0900000030', 'Dinh Thi Trang', 'FEMALE', '2002-06-19', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(131, 'buixuanhoang31@gmail.com', '0900000031', 'Bui Xuan Hoang', 'MALE', '2000-07-11', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(132, 'ngothikieu32@gmail.com', '0900000032', 'Ngo Thi Kieu', 'FEMALE', '2001-08-30', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(133, 'tranminhdat33@gmail.com', '0900000033', 'Tran Minh Dat', 'MALE', '2002-09-23', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(134, 'phamthithao34@gmail.com', '0900000034', 'Pham Thi Thao', 'FEMALE', '2000-10-15', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(135, 'leducthanh35@gmail.com', '0900000035', 'Le Duc Thanh', 'MALE', '2001-11-07', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(136, 'vuthithanhthuy36@gmail.com', '0900000036', 'Vu Thi Thanh Thuy', 'FEMALE', '2002-12-29', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(137, 'nguyenhoanghuy37@gmail.com', '0900000037', 'Nguyen Hoang Huy', 'MALE', '2000-01-21', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(138, 'dothiquyen38@gmail.com', '0900000038', 'Do Thi Quyen', 'FEMALE', '2001-02-14', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(139, 'hoangvanhai39@gmail.com', '0900000039', 'Hoang Van Hai', 'MALE', '2002-03-08', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(140, 'tranthianh40@gmail.com', '0900000040', 'Tran Thi Anh', 'FEMALE', '2000-04-02', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(141, 'nguyenvanson41@gmail.com', '0900000041', 'Nguyen Van Son', 'MALE', '2001-05-25', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(142, 'phanthithom42@gmail.com', '0900000042', 'Phan Thi Thom', 'FEMALE', '2002-06-17', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(143, 'levantri43@gmail.com', '0900000043', 'Le Van Tri', 'MALE', '2000-07-09', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(144, 'vuthihong44@gmail.com', '0900000044', 'Vu Thi Hong', 'FEMALE', '2001-08-01', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(145, 'dangvanquyet45@gmail.com', '0900000045', 'Dang Van Quyet', 'MALE', '2002-09-24', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(146, 'nguyenthitam46@gmail.com', '0900000046', 'Nguyen Thi Tam', 'FEMALE', '2000-10-18', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(147, 'trananhtuan47@gmail.com', '0900000047', 'Tran Anh Tuan', 'MALE', '2001-11-10', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(148, 'lethithao48@gmail.com', '0900000048', 'Le Thi Thao', 'FEMALE', '2002-12-02', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(149, 'phamvanthang49@gmail.com', '0900000049', 'Pham Van Thang', 'MALE', '2000-01-26', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(150, 'vuthingoc50@gmail.com', '0900000050', 'Vu Thi Ngoc', 'FEMALE', '2001-02-18', 'Ha Noi', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+-- Ho Chi Minh Students (IDs 151-200)
+(151, 'nguyenhoanganh51@gmail.com', '0900000051', 'Nguyen Hoang Anh', 'MALE', '2002-03-12', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(152, 'tranthimylam52@gmail.com', '0900000052', 'Tran Thi My Lam', 'FEMALE', '2000-04-06', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(153, 'levankien53@gmail.com', '0900000053', 'Le Van Kien', 'MALE', '2001-05-29', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(154, 'phamthikim54@gmail.com', '0900000054', 'Pham Thi Kim', 'FEMALE', '2002-06-21', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(155, 'hoangminhkhoi55@gmail.com', '0900000055', 'Hoang Minh Khoi', 'MALE', '2000-07-13', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(156, 'nguyenthidao56@gmail.com', '0900000056', 'Nguyen Thi Dao', 'FEMALE', '2001-08-05', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(157, 'vuthanhphong57@gmail.com', '0900000057', 'Vu Thanh Phong', 'MALE', '2002-09-28', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(158, 'dothithuy58@gmail.com', '0900000058', 'Do Thi Thuy', 'FEMALE', '2000-10-20', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(159, 'buiquocviet59@gmail.com', '0900000059', 'Bui Quoc Viet', 'MALE', '2001-11-12', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(160, 'dangthiloan60@gmail.com', '0900000060', 'Dang Thi Loan', 'FEMALE', '2002-12-04', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(161, 'tranvanphuoc61@gmail.com', '0900000061', 'Tran Van Phuoc', 'MALE', '2000-01-27', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(162, 'nguyenthitu62@gmail.com', '0900000062', 'Nguyen Thi Tu', 'FEMALE', '2001-02-19', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(163, 'letrungkien63@gmail.com', '0900000063', 'Le Trung Kien', 'MALE', '2002-03-13', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(164, 'phamthithanh64@gmail.com', '0900000064', 'Pham Thi Hanh', 'FEMALE', '2000-04-07', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(165, 'hoangduclong65@gmail.com', '0900000065', 'Hoang Duc Long', 'MALE', '2001-05-30', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(166, 'vuthixuan66@gmail.com', '0900000066', 'Vu Thi Xuan', 'FEMALE', '2002-06-22', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(167, 'ngovanphu67@gmail.com', '0900000067', 'Ngo Van Phu', 'MALE', '2000-07-14', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(168, 'lethimua68@gmail.com', '0900000068', 'Le Thi Mua', 'FEMALE', '2001-08-06', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(169, 'tranquangdung69@gmail.com', '0900000069', 'Tran Quang Dung', 'MALE', '2002-09-29', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(170, 'nguyenthiquỳnh70@gmail.com', '0900000070', 'Nguyen Thi Quynh', 'FEMALE', '2000-10-21', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(171, 'phamvantien71@gmail.com', '0900000071', 'Pham Van Tien', 'MALE', '2001-11-13', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(172, 'vuthiloi72@gmail.com', '0900000072', 'Vu Thi Loi', 'FEMALE', '2002-12-05', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(173, 'doanvanhai73@gmail.com', '0900000073', 'Doan Van Hai', 'MALE', '2000-01-28', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(174, 'tranthinhung74@gmail.com', '0900000074', 'Tran Thi Nhung', 'FEMALE', '2001-02-20', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(175, 'nguyenvanphong75@gmail.com', '0900000075', 'Nguyen Van Phong', 'MALE', '2002-03-14', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(176, 'lethicuc76@gmail.com', '0900000076', 'Le Thi Cuc', 'FEMALE', '2000-04-08', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(177, 'hoangvandai77@gmail.com', '0900000077', 'Hoang Van Dai', 'MALE', '2001-05-31', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(178, 'vuthicham78@gmail.com', '0900000078', 'Vu Thi Cham', 'FEMALE', '2002-06-23', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(179, 'nguyenquochung79@gmail.com', '0900000079', 'Nguyen Quoc Hung', 'MALE', '2000-07-15', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(180, 'dinhthithao80@gmail.com', '0900000080', 'Dinh Thi Thao', 'FEMALE', '2001-08-07', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(181, 'buiminhtrung81@gmail.com', '0900000081', 'Bui Minh Trung', 'MALE', '2002-09-30', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(182, 'ngothidan82@gmail.com', '0900000082', 'Ngo Thi Dan', 'FEMALE', '2000-10-22', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(183, 'tranvanbach83@gmail.com', '0900000083', 'Tran Van Bach', 'MALE', '2001-11-14', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(184, 'phamthinuong84@gmail.com', '0900000084', 'Pham Thi Nuong', 'FEMALE', '2002-12-06', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(185, 'leducnhan85@gmail.com', '0900000085', 'Le Duc Nhan', 'MALE', '2000-01-29', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(186, 'vuthiyeu86@gmail.com', '0900000086', 'Vu Thi Yeu', 'FEMALE', '2001-02-21', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(187, 'nguyenvankhoa87@gmail.com', '0900000087', 'Nguyen Van Khoa', 'MALE', '2002-03-15', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(188, 'dothikim88@gmail.com', '0900000088', 'Do Thi Kim', 'FEMALE', '2000-04-09', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(189, 'hoangvanthanh89@gmail.com', '0900000089', 'Hoang Van Thanh', 'MALE', '2001-06-01', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(190, 'tranthiphuc90@gmail.com', '0900000090', 'Tran Thi Phuc', 'FEMALE', '2002-06-24', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(191, 'nguyentrunghai91@gmail.com', '0900000091', 'Nguyen Trung Hai', 'MALE', '2000-07-16', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(192, 'phanthidung92@gmail.com', '0900000092', 'Phan Thi Dung', 'FEMALE', '2001-08-08', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(193, 'levancan93@gmail.com', '0900000093', 'Le Van Can', 'MALE', '2002-10-01', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(194, 'vuthichinh94@gmail.com', '0900000094', 'Vu Thi Chinh', 'FEMALE', '2000-10-23', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(195, 'dangvanthuan95@gmail.com', '0900000095', 'Dang Van Thuan', 'MALE', '2001-11-15', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(196, 'nguyenthimao96@gmail.com', '0900000096', 'Nguyen Thi Mao', 'FEMALE', '2002-12-07', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(197, 'tranducphi97@gmail.com', '0900000097', 'Tran Duc Phi', 'MALE', '2000-01-30', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(198, 'lethitran98@gmail.com', '0900000098', 'Le Thi Tran', 'FEMALE', '2001-02-22', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(199, 'phamvanhai99@gmail.com', '0900000099', 'Pham Van Hai', 'MALE', '2002-03-16', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(200, 'vuthithu100@gmail.com', '0900000100', 'Vu Thi Thu', 'FEMALE', '2000-04-10', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
 
 -- Feedback Questions (for student feedback feature)
 INSERT INTO feedback_question (id, question_text, question_type, options, display_order, created_at, updated_at) VALUES
@@ -158,11 +246,9 @@ INSERT INTO branch (id, center_id, code, name, address, phone, email, district, 
 (1, 1, 'HN01', 'TMS Ha Noi Branch', '456 Lang Ha, Dong Da, Ha Noi', '+84-24-3888-9999', 'hanoi01@tms-edu.vn', 'Dong Da', 'Ha Noi', 'ACTIVE', '2024-01-15', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
 (2, 1, 'HCM01', 'TMS Ho Chi Minh Branch', '789 Le Loi, Quan 1, TP. HCM', '+84-28-3777-6666', 'hcm01@tms-edu.vn', 'Quan 1', 'TP. HCM', 'ACTIVE', '2024-03-01', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
 
--- Subjects
+-- Curriculum (chỉ giữ IELTS)
 INSERT INTO curriculum (id, code, name, description, language, status, created_by, created_at, updated_at) VALUES
-(1, 'IELTS', 'International English Language Testing System', 'Comprehensive IELTS preparation courses', 'English', 'ACTIVE', 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(2, 'TOEIC', 'Test of English for International Communication', 'Business English certification courses', 'English', 'ACTIVE', 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(3, 'JLPT', 'Japanese Language Proficiency Test', 'Japanese language certification preparation', 'Japanese', 'ACTIVE', 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
+(1, 'IELTS', 'International English Language Testing System', 'Comprehensive IELTS preparation courses', 'English', 'ACTIVE', 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
 
 -- Time Slot Templates - REALISTIC SCHEDULES FOR LANGUAGE CENTER
 INSERT INTO time_slot_template (id, branch_id, name, start_time, end_time, created_at, updated_at) VALUES
@@ -245,7 +331,7 @@ INSERT INTO user_role (user_id, role_id) VALUES
 -- Teachers (original + new)
 INSERT INTO user_role (user_id, role_id) SELECT id, 6 FROM user_account WHERE id >= 20 AND id <= 43;
 -- Students
-INSERT INTO user_role (user_id, role_id) SELECT id, 7 FROM user_account WHERE id >= 101;
+INSERT INTO user_role (user_id, role_id) SELECT id, 7 FROM user_account WHERE id BETWEEN 101 AND 200;
 
 INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES
 -- Staff assignments
@@ -258,10 +344,10 @@ INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 2, 8 FROM
 INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES (36, 1, 6), (37, 1, 6), (38, 1, 6), (39, 1, 6), (40, 1, 6), (43, 1, 6);
 -- New Teachers - HCM (TOEIC, Weekend)
 INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES (41, 2, 8), (42, 2, 8);
--- Students - HN
+-- Students - HN (user_id 101-150)
 INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 1, 6 FROM user_account WHERE id BETWEEN 101 AND 150;
--- Students - HCM
-INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 2, 8 FROM user_account WHERE id > 150;
+-- Students - HCM (user_id 151-200)
+INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 2, 8 FROM user_account WHERE id BETWEEN 151 AND 200;
 
 -- Teachers & Students
 INSERT INTO teacher (id, user_account_id, employee_code, hire_date, contract_type, created_at, updated_at)
@@ -281,7 +367,7 @@ INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES (12, 1, 1);
 INSERT INTO student (id, user_id, student_code, created_at, updated_at)
 SELECT (id - 100), id, 'STD-' || LPAD((id - 100)::text, 4, '0'),
 '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'
-FROM user_account WHERE id >= 101;
+FROM user_account WHERE id BETWEEN 101 AND 200;
 
 -- Each teacher has all 5 skills: GENERAL, LISTENING, READING, WRITING, SPEAKING
 -- Level represents IELTS band scores: 6.5-9.0 scale
@@ -444,7 +530,7 @@ INSERT INTO teacher_skill (teacher_id, skill, specialization, language, level) V
 (23, 'LISTENING', 'IELTS', 'English', 8.5);
 
 
--- Levels (CEFR-based A1-C2 for both IELTS and TOEIC)
+-- Levels (CEFR-based A1-C2 for IELTS only)
 INSERT INTO level (id, curriculum_id, code, name, sort_order, created_at, updated_at) VALUES
 -- IELTS Levels (A1 -> C2)
 (1, 1, 'A1', 'IELTS A1 (Beginner)', 1, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
@@ -452,14 +538,7 @@ INSERT INTO level (id, curriculum_id, code, name, sort_order, created_at, update
 (3, 1, 'B1', 'IELTS B1 (Intermediate)', 3, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
 (4, 1, 'B2', 'IELTS B2 (Upper-Intermediate)', 4, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
 (5, 1, 'C1', 'IELTS C1 (Advanced)', 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(6, 1, 'C2', 'IELTS C2 (Proficiency)', 6, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
--- TOEIC Levels (A1 -> C2)
-(7, 2, 'A1', 'TOEIC A1 (Beginner)', 1, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(8, 2, 'A2', 'TOEIC A2 (Elementary)', 2, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(9, 2, 'B1', 'TOEIC B1 (Intermediate)', 3, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(10, 2, 'B2', 'TOEIC B2 (Upper-Intermediate)', 4, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(11, 2, 'C1', 'TOEIC C1 (Advanced)', 5, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(12, 2, 'C2', 'TOEIC C2 (Proficiency)', 6, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
+(6, 1, 'C2', 'IELTS C2 (Proficiency)', 6, '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
 
 -- Replacement Skill Assessments for initial students
 -- Simulates placement test results before their first enrollment.
@@ -484,10 +563,10 @@ INSERT INTO replacement_skill_assessment (student_id, skill, level_id, score, as
 (1, 'READING', 1, '32/40', '2025-06-15', 'ielts_placement', 6, 'IELTS Reading Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07'),
 (1, 'SPEAKING', 1, '30/40', '2025-06-15', 'ielts_placement', 6, 'IELTS Speaking Assessment', '2025-06-15 00:00:00+07', '2025-06-15 00:00:00+07');
 
--- Student 2: TOEIC Placement Test
+-- Student 2: IELTS Placement Test
 INSERT INTO replacement_skill_assessment (student_id, skill, level_id, score, assessment_date, assessment_type, assessed_by, note, created_at, updated_at) VALUES
-(2, 'LISTENING', 9, '375/495', '2025-06-16', 'toeic_placement', 6, 'TOEIC Listening Placement Test', '2025-06-16 00:00:00+07', '2025-06-16 00:00:00+07'),
-(2, 'READING', 9, '360/495', '2025-06-16', 'toeic_placement', 6, 'TOEIC Reading Placement Test', '2025-06-16 00:00:00+07', '2025-06-16 00:00:00+07');
+(2, 'LISTENING', 3, '28/40', '2025-06-16', 'ielts_placement', 6, 'IELTS Listening Placement Test', '2025-06-16 00:00:00+07', '2025-06-16 00:00:00+07'),
+(2, 'READING', 3, '26/40', '2025-06-16', 'ielts_placement', 6, 'IELTS Reading Placement Test', '2025-06-16 00:00:00+07', '2025-06-16 00:00:00+07');
 
 -- PLOs for IELTS Subject
 INSERT INTO plo (id, curriculum_id, code, description, created_at, updated_at) VALUES
@@ -495,24 +574,13 @@ INSERT INTO plo (id, curriculum_id, code, description, created_at, updated_at) V
 (2, 1, 'PLO2', 'Comprehend and produce simple English texts for common situations', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
 (3, 1, 'PLO3', 'Apply intermediate English grammar and vocabulary in professional contexts', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
 (4, 1, 'PLO4', 'Analyze and evaluate complex English texts across various topics', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(5, 1, 'PLO5', 'Produce coherent, well-structured academic essays and reports', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
--- PLOs for TOEIC Subject
-(6, 2, 'PLO1', 'Understand workplace conversations and announcements', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(7, 2, 'PLO2', 'Comprehend business emails, reports, and articles', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(8, 2, 'PLO3', 'Use appropriate business vocabulary and grammar', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(9, 2, 'PLO4', 'Communicate effectively in professional settings', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07'),
-(10, 2, 'PLO5', 'Apply business etiquette in written and spoken communication', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
+(5, 1, 'PLO5', 'Produce coherent, well-structured academic essays and reports', '2024-06-01 00:00:00+07', '2024-06-01 00:00:00+07');
 
--- Courses: 3 IELTS + 3 TOEIC
+-- Courses: 2 IELTS subjects only (Foundation + Intermediate)
 INSERT INTO subject (id, curriculum_id, level_id, logical_subject_code, version, code, name, description, total_hours, number_of_sessions, hours_per_session, prerequisites, target_audience, teaching_methods, score_scale, status, approval_status, decided_by_manager, decided_at, rejection_reason, created_by, created_at, updated_at, effective_date) VALUES
 -- IELTS Courses
 (1, 1, 1, 'IELTS-FOUND-2025', 1, 'IELTS-FOUND-2025-V1', 'IELTS Foundation 2025', 'Khóa học nền tảng cho người mới bắt đầu, mục tiêu band 3.0-4.0', 60, 24, 2.5, 'Không yêu cầu kiến thức nền tảng.', 'Học viên mất gốc hoặc mới bắt đầu học tiếng Anh.', 'Communicative Language Teaching (CLT) kết hợp bài tập thực hành.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-20 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-20 14:00:00+07', '2024-09-01'),
-(2, 1, 3, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 60, 24, 2.5, 'Hoàn thành khóa Foundation hoặc IELTS 4.0+', 'Học viên có nền tảng cơ bản, mục tiêu band 5.0-5.5.', 'Chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-25 14:00:00+07', '2024-09-01'),
-(3, 1, 4, 'IELTS-ADV-2025', 1, 'IELTS-ADV-2025-V1', 'IELTS Advanced 2025', 'Khóa học nâng cao, mục tiêu band 6.5+', 100, 40, 2.5, 'Hoàn thành khóa Intermediate hoặc IELTS 5.5+', 'Học viên muốn đạt band 6.5+ để du học hoặc làm việc.', 'Luyện đề cường độ cao và phản hồi cá nhân hóa.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-08-25 14:00:00+07', '2024-09-01'),
--- TOEIC Courses (subject_id = 2, level_id = 8,9,11 for TOEIC levels)
-(4, 2, 8, 'TOEIC-FOUND-2025', 1, 'TOEIC-FOUND-2025-V1', 'TOEIC Foundation 2025', 'Nền tảng TOEIC cho người mới, mục tiêu 300-450', 50, 20, 2.5, 'Không yêu cầu kiến thức nền tảng.', 'Sinh viên, người đi làm mới bắt đầu học TOEIC.', 'Làm quen với format đề thi và từ vựng cơ bản.', '0-990', 'ACTIVE', 'APPROVED', 2, '2024-09-01 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-09-01 14:00:00+07', '2024-09-15'),
-(5, 2, 9, 'TOEIC-INT-2025', 1, 'TOEIC-INT-2025-V1', 'TOEIC Intermediate 2025', 'Chuẩn bị thi TOEIC mục tiêu 500-650', 60, 24, 2.5, 'Hoàn thành TOEIC Foundation hoặc 400+', 'Người đi làm muốn nâng cao kỹ năng tiếng Anh công sở.', 'Từ vựng kinh doanh và chiến thuật làm bài.', '0-990', 'ACTIVE', 'APPROVED', 2, '2024-09-05 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-09-05 14:00:00+07', '2024-09-15'),
-(6, 2, 11, 'TOEIC-ADV-2025', 1, 'TOEIC-ADV-2025-V1', 'TOEIC Advanced 2025', 'Luyện thi TOEIC mục tiêu 750+', 70, 28, 2.5, 'Hoàn thành TOEIC Intermediate hoặc 600+', 'Quản lý và chuyên viên cần chứng chỉ TOEIC cao.', 'Case study thực tế và business negotiation.', '0-990', 'ACTIVE', 'APPROVED', 2, '2024-09-10 14:00:00+07', NULL, 5, '2024-08-20 00:00:00+07', '2024-09-10 14:00:00+07', '2024-09-15');
+(2, 1, 3, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 60, 24, 2.5, 'Hoàn thành khóa Foundation hoặc IELTS 4.0+', 'Học viên có nền tảng cơ bản, mục tiêu band 5.0-5.5.', 'Chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-25 14:00:00+07', '2024-09-01');
 -- Course Phases for Foundation
 INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
 (1, 1, 1, 'Foundation Basics', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
@@ -522,27 +590,6 @@ INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, c
 INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
 (3, 2, 1, 'Skill Building', 5, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (4, 2, 2, 'Test Strategies', 5, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
-
--- Course Phases for IELTS Advanced (Course 3)
-INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
-(6, 3, 1, 'Advanced Techniques', 6, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(7, 3, 2, 'Intensive Practice', 6, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
-(8, 3, 3, 'Test Mastery', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
-
--- Course Phases for TOEIC Foundation (Course 4)
-INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
-(9, 4, 1, 'TOEIC Basics', 4, '2024-09-01 00:00:00+07', '2024-09-01 00:00:00+07'),
-(10, 4, 2, 'Practice & Review', 4, '2024-09-01 00:00:00+07', '2024-09-01 00:00:00+07');
-
--- Course Phases for TOEIC Intermediate (Course 5)
-INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
-(11, 5, 1, 'Business Vocabulary & Grammar', 4, '2024-09-05 00:00:00+07', '2024-09-05 00:00:00+07'),
-(12, 5, 2, 'Test Techniques & Practice', 4, '2024-09-05 00:00:00+07', '2024-09-05 00:00:00+07');
-
--- Course Phases for TOEIC Advanced (Course 6)
-INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
-(13, 6, 1, 'Advanced Business Communication', 5, '2024-09-10 00:00:00+07', '2024-09-10 00:00:00+07'),
-(14, 6, 2, 'Executive Test Preparation', 5, '2024-09-10 00:00:00+07', '2024-09-10 00:00:00+07');
 
 -- Course Sessions for Foundation (24 sessions = 8 weeks × 3 sessions/week)
 INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at) VALUES
@@ -584,52 +631,6 @@ SELECT 36 + s.idx, 4, 12 + s.idx, 'IELTS Int Strategies ' || s.idx, 'Learn strat
 FROM generate_series(1, 12) AS s(idx);
 
 
--- Course 3: IELTS Advanced (40 sessions)
--- Phase 6: 15 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 54 + s.idx, 6, s.idx, 'IELTS Adv Techniques ' || s.idx, 'Advanced techniques', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 15) AS s(idx);
--- Phase 7: 15 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 69 + s.idx, 7, s.idx, 'IELTS Adv Practice ' || s.idx, 'Intensive practice', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 15) AS s(idx);
--- Phase 8: 10 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 84 + s.idx, 8, s.idx, 'IELTS Adv Mastery ' || s.idx, 'Mastery test', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 10) AS s(idx);
-
--- Course 4: TOEIC Foundation (20 sessions)
--- Phase 9: 10 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 94 + s.idx, 9, s.idx, 'TOEIC Found Basics ' || s.idx, 'Basic concepts', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 10) AS s(idx);
--- Phase 10: 10 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 104 + s.idx, 10, s.idx, 'TOEIC Found Practice ' || s.idx, 'Practice questions', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 10) AS s(idx);
-
--- Course 5: TOEIC Intermediate (24 sessions)
--- Phase 11: 12 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 114 + s.idx, 11, s.idx, 'TOEIC Int Business ' || s.idx, 'Business vocab', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 12) AS s(idx);
--- Phase 12: 12 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 126 + s.idx, 12, s.idx, 'TOEIC Int Techniques ' || s.idx, 'Test techniques', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 12) AS s(idx);
-
--- Course 6: TOEIC Advanced (28 sessions)
--- Phase 13: 14 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 138 + s.idx, 13, s.idx, 'TOEIC Adv Comm ' || s.idx, 'Advanced comm', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 14) AS s(idx);
--- Phase 14: 14 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 152 + s.idx, 14, s.idx, 'TOEIC Adv Prep ' || s.idx, 'Exam prep', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 14) AS s(idx);
-
-
-
 -- CLOs for Foundation Course
 INSERT INTO clo (id, subject_id, code, description, created_at, updated_at) VALUES
 (1, 1, 'CLO1', 'Understand basic English in familiar everyday situations', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
@@ -651,68 +652,13 @@ INSERT INTO clo (id, subject_id, code, description, created_at, updated_at) VALU
 (7, 2, 'CLO3', 'Write structured essays', NOW(), NOW()),
 (8, 2, 'CLO4', 'Speak fluently on abstract topics', NOW(), NOW());
 
--- CLOs for Course 3 (IELTS Advanced)
-INSERT INTO clo (id, subject_id, code, description, created_at, updated_at) VALUES
-(9, 3, 'CLO1', 'Master advanced IELTS techniques', NOW(), NOW()),
-(10, 3, 'CLO2', 'Comprehend academic lectures', NOW(), NOW()),
-(11, 3, 'CLO3', 'Produce sophisticated writing', NOW(), NOW()),
-(12, 3, 'CLO4', 'Demonstrate native-like speaking', NOW(), NOW());
-
--- CLOs for Course 4 (TOEIC Foundation)
-INSERT INTO clo (id, subject_id, code, description, created_at, updated_at) VALUES
-(13, 4, 'CLO1', 'Understand basic business English', NOW(), NOW()),
-(14, 4, 'CLO2', 'Identify key information in announcements', NOW(), NOW()),
-(15, 4, 'CLO3', 'Read simple business documents', NOW(), NOW()),
-(16, 4, 'CLO4', 'Use basic business grammar', NOW(), NOW());
-
--- CLOs for Course 5 (TOEIC Intermediate)
-INSERT INTO clo (id, subject_id, code, description, created_at, updated_at) VALUES
-(17, 5, 'CLO1', 'Comprehend business meetings', NOW(), NOW()),
-(18, 5, 'CLO2', 'Analyze business reports', NOW(), NOW()),
-(19, 5, 'CLO3', 'Write professional emails', NOW(), NOW()),
-(20, 5, 'CLO4', 'Participate in business discussions', NOW(), NOW());
-
--- CLOs for Course 6 (TOEIC Advanced)
-INSERT INTO clo (id, subject_id, code, description, created_at, updated_at) VALUES
-(21, 6, 'CLO1', 'Negotiate in English', NOW(), NOW()),
-(22, 6, 'CLO2', 'Understand complex business scenarios', NOW(), NOW()),
-(23, 6, 'CLO3', 'Draft executive summaries', NOW(), NOW()),
-(24, 6, 'CLO4', 'Present business proposals', NOW(), NOW());
-
--- PLO-CLO Mappings for new CLOs
+-- PLO-CLO Mappings for Course 2
 INSERT INTO plo_clo_mapping (plo_id, clo_id, status) VALUES
--- Course 2 (IELTS) -> PLO 3, 4
-(3, 5, 'ACTIVE'), (4, 6, 'ACTIVE'), (5, 7, 'ACTIVE'), (3, 8, 'ACTIVE'),
--- Course 3 (IELTS) -> PLO 4, 5
-(4, 9, 'ACTIVE'), (4, 10, 'ACTIVE'), (5, 11, 'ACTIVE'), (5, 12, 'ACTIVE'),
--- Course 4 (TOEIC) -> PLO 6, 7 (Subject 2)
-(6, 13, 'ACTIVE'), (6, 14, 'ACTIVE'), (7, 15, 'ACTIVE'), (8, 16, 'ACTIVE'),
--- Course 5 (TOEIC) -> PLO 8, 9
-(9, 17, 'ACTIVE'), (7, 18, 'ACTIVE'), (10, 19, 'ACTIVE'), (9, 20, 'ACTIVE'),
--- Course 6 (TOEIC) -> PLO 9, 10
-(9, 21, 'ACTIVE'), (7, 22, 'ACTIVE'), (10, 23, 'ACTIVE'), (9, 24, 'ACTIVE');
+(3, 5, 'ACTIVE'), (4, 6, 'ACTIVE'), (5, 7, 'ACTIVE'), (3, 8, 'ACTIVE');
 
--- Course Session-CLO Mappings for new sessions
--- Course 2 (Sessions 25-54) -> CLO 5-8
+-- Course Session-CLO Mappings for Course 2 (Sessions 25-48) -> CLO 5-8
 INSERT INTO subject_session_clo_mapping (subject_session_id, clo_id, status)
-SELECT id, 5 + (id % 4), 'ACTIVE' FROM subject_session WHERE id BETWEEN 25 AND 54;
-
--- Course 3 (Sessions 55-94) -> CLO 9-12
-INSERT INTO subject_session_clo_mapping (subject_session_id, clo_id, status)
-SELECT id, 9 + (id % 4), 'ACTIVE' FROM subject_session WHERE id BETWEEN 55 AND 94;
-
--- Course 4 (Sessions 95-114) -> CLO 13-16
-INSERT INTO subject_session_clo_mapping (subject_session_id, clo_id, status)
-SELECT id, 13 + (id % 4), 'ACTIVE' FROM subject_session WHERE id BETWEEN 95 AND 114;
-
--- Course 5 (Sessions 115-138) -> CLO 17-20
-INSERT INTO subject_session_clo_mapping (subject_session_id, clo_id, status)
-SELECT id, 17 + (id % 4), 'ACTIVE' FROM subject_session WHERE id BETWEEN 115 AND 138;
-
--- Course 6 (Sessions 139-166) -> CLO 21-24
-INSERT INTO subject_session_clo_mapping (subject_session_id, clo_id, status)
-SELECT id, 21 + (id % 4), 'ACTIVE' FROM subject_session WHERE id BETWEEN 139 AND 166;
-
+SELECT id, 5 + (id % 4), 'ACTIVE' FROM subject_session WHERE id BETWEEN 25 AND 48;
 
 
 -- Course Session-CLO Mappings (Sample - map each CLO to relevant sessions)
@@ -800,52 +746,6 @@ INSERT INTO subject_material (subject_id, phase_id, subject_session_id, title, d
 (2, 4, NULL, 'IELTS Test Strategies Handbook', 'Strategies for all 4 skills.', 'DOCUMENT', '/materials/phases/4/strategies.pdf', 5),
 (2, 4, 37, 'Speaking Part 2 Cue Cards', 'Practice cue cards for Speaking Part 2.', 'DOCUMENT', '/materials/sessions/37/cue-cards.pdf', 5);
 
--- Course Materials for IELTS Advanced (Course 3)
-INSERT INTO subject_material (subject_id, phase_id, subject_session_id, title, description, material_type, url, uploaded_by) VALUES
--- Course Level
-(3, NULL, NULL, 'IELTS Advanced Syllabus', 'Advanced course syllabus.', 'DOCUMENT', '/materials/courses/3/syllabus.pdf', 5),
--- Phase 6: Advanced Techniques
-(3, 6, NULL, 'Advanced Techniques Manual', 'Deep dive into band 7+ techniques.', 'DOCUMENT', '/materials/phases/6/manual.pdf', 5),
-(3, 6, 55, 'Academic Vocabulary List', 'List of high-level academic words.', 'DOCUMENT', '/materials/sessions/55/vocab.pdf', 5),
--- Phase 7: Intensive Practice
-(3, 7, NULL, 'Intensive Practice Workbook', 'Workbook for daily practice.', 'DOCUMENT', '/materials/phases/7/workbook.pdf', 5),
-(3, 7, 70, 'Writing Task 2 Samples', 'Band 8.0+ essay samples.', 'DOCUMENT', '/materials/sessions/70/samples.pdf', 5),
--- Phase 8: Test Mastery
-(3, 8, NULL, 'Mastery Test Pack', 'Set of difficult practice tests.', 'DOCUMENT', '/materials/phases/8/test-pack.zip', 5);
-
--- Course Materials for TOEIC Foundation (Course 4)
-INSERT INTO subject_material (subject_id, phase_id, subject_session_id, title, description, material_type, url, uploaded_by) VALUES
--- Course Level
-(4, NULL, NULL, 'TOEIC Foundation Syllabus', 'Syllabus for TOEIC beginners.', 'DOCUMENT', '/materials/courses/4/syllabus.pdf', 5),
--- Phase 9: TOEIC Basics
-(4, 9, NULL, 'TOEIC Basics Guide', 'Introduction to TOEIC format.', 'DOCUMENT', '/materials/phases/9/guide.pdf', 5),
-(4, 9, 95, 'Business Vocab Starter', 'Essential business vocabulary.', 'DOCUMENT', '/materials/sessions/95/vocab.pdf', 5),
--- Phase 10: Practice & Review
-(4, 10, NULL, 'Practice Questions Set', 'Set of practice questions.', 'DOCUMENT', '/materials/phases/10/questions.pdf', 5),
-(4, 10, 105, 'Listening Part 1 Practice', 'Photos for listening practice.', 'DOCUMENT', '/materials/sessions/105/photos.pdf', 5);
-
--- Course Materials for TOEIC Intermediate (Course 5)
-INSERT INTO subject_material (subject_id, phase_id, subject_session_id, title, description, material_type, url, uploaded_by) VALUES
--- Course Level
-(5, NULL, NULL, 'TOEIC Intermediate Syllabus', 'Syllabus for intermediate learners.', 'DOCUMENT', '/materials/courses/5/syllabus.pdf', 5),
--- Phase 11: Business Vocab & Grammar
-(5, 11, NULL, 'Business Grammar Handbook', 'Grammar for business contexts.', 'DOCUMENT', '/materials/phases/11/grammar.pdf', 5),
-(5, 11, 115, 'Meeting Terminology', 'Vocabulary for business meetings.', 'DOCUMENT', '/materials/sessions/115/meetings.pdf', 5),
--- Phase 12: Test Techniques
-(5, 12, NULL, 'TOEIC Techniques Guide', 'Tips and tricks for the test.', 'DOCUMENT', '/materials/phases/12/techniques.pdf', 5),
-(5, 12, 127, 'Reading Part 7 Strategies', 'Strategies for reading passages.', 'DOCUMENT', '/materials/sessions/127/strategies.pdf', 5);
-
--- Course Materials for TOEIC Advanced (Course 6)
-INSERT INTO subject_material (subject_id, phase_id, subject_session_id, title, description, material_type, url, uploaded_by) VALUES
--- Course Level
-(6, NULL, NULL, 'TOEIC Advanced Syllabus', 'Syllabus for advanced learners.', 'DOCUMENT', '/materials/courses/6/syllabus.pdf', 5),
--- Phase 13: Adv Business Comm
-(6, 13, NULL, 'Advanced Communication Guide', 'Guide to executive communication.', 'DOCUMENT', '/materials/phases/13/guide.pdf', 5),
-(6, 13, 139, 'Negotiation Case Studies', 'Real-world negotiation scenarios.', 'DOCUMENT', '/materials/sessions/139/cases.pdf', 5),
--- Phase 14: Executive Prep
-(6, 14, NULL, 'Executive Prep Pack', 'Preparation materials for high scores.', 'DOCUMENT', '/materials/phases/14/prep.pdf', 5),
-(6, 14, 153, 'Full Simulation Test', 'Full-length simulation test.', 'DOCUMENT', '/materials/sessions/153/simulation.pdf', 5);
-
 -- Course Assessments for Foundation
 INSERT INTO subject_assessment (id, subject_id, name, kind, duration_minutes, max_score, skill, created_at, updated_at) VALUES
 (1, 1, 'Listening Quiz 1', 'QUIZ', 30, 20, 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
@@ -869,303 +769,162 @@ INSERT INTO subject_assessment (id, subject_id, name, kind, duration_minutes, ma
 (7, 2, 'Writing Task 2 Assignment', 'HOMEWORK', 60, 100, 'WRITING', NOW(), NOW()),
 (8, 2, 'Full Mock Test', 'FINAL', 180, 100, 'GENERAL', NOW(), NOW());
 
--- Course Assessments for IELTS Advanced (ID 3)
-INSERT INTO subject_assessment (id, subject_id, name, kind, duration_minutes, max_score, skill, created_at, updated_at) VALUES
-(9, 3, 'Advanced Writing Portfolio', 'HOMEWORK', 120, 100, 'WRITING', NOW(), NOW()),
-(10, 3, 'Speaking Part 3 Mastery', 'QUIZ', 20, 100, 'SPEAKING', NOW(), NOW()),
-(11, 3, 'Full Mock Test', 'FINAL', 180, 100, 'GENERAL', NOW(), NOW());
-
--- Course Assessments for TOEIC Foundation (ID 4)
-INSERT INTO subject_assessment (id, subject_id, name, kind, duration_minutes, max_score, skill, created_at, updated_at) VALUES
-(12, 4, 'Listening Mini-Test', 'QUIZ', 30, 100, 'LISTENING', NOW(), NOW()),
-(13, 4, 'Reading Mini-Test', 'QUIZ', 30, 100, 'READING', NOW(), NOW()),
-(14, 4, 'Final TOEIC Test', 'FINAL', 120, 990, 'GENERAL', NOW(), NOW());
-
--- Course Assessments for TOEIC Intermediate (ID 5)
-INSERT INTO subject_assessment (id, subject_id, name, kind, duration_minutes, max_score, skill, created_at, updated_at) VALUES
-(15, 5, 'Midterm TOEIC Test', 'MIDTERM', 120, 990, 'GENERAL', NOW(), NOW()),
-(16, 5, 'Final TOEIC Test', 'FINAL', 120, 990, 'GENERAL', NOW(), NOW());
-
--- Course Assessments for TOEIC Advanced (ID 6)
-INSERT INTO subject_assessment (id, subject_id, name, kind, duration_minutes, max_score, skill, created_at, updated_at) VALUES
-(17, 6, 'Business Case Study', 'HOMEWORK', 120, 100, 'WRITING', NOW(), NOW()),
-(18, 6, 'Final TOEIC Test', 'FINAL', 120, 990, 'GENERAL', NOW(), NOW());
-
--- -- Course Materials for Intermediate (ID 2)
--- INSERT INTO subject_material (subject_id, phase_id, subject_session_id, title, description, material_type, url, uploaded_by) VALUES
--- (2, NULL, NULL, 'IELTS Intermediate Syllabus', 'Course syllabus', 'DOCUMENT', '/materials/courses/2/syllabus.pdf', 5),
--- (2, 3, 25, 'Complex Grammar Guide', 'Guide to complex sentences', 'DOCUMENT', '/materials/sessions/25/grammar.pdf', 5);
-
 -- ========== TIER 4: CLASSES & SESSIONS ==========
 
--- Classes: 18 total (3 per course x 6 courses), NO HYBRID
+-- Classes: 10 total (5 per subject x 2 subjects)
+-- Timing pattern per subject:
+--   - Class 1: Early (2 weeks ahead)
+--   - Classes 2-4: Parallel (standard timing, 1-2 sessions apart within same week)
+--   - Class 5: Late (2 weeks behind)
 INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date, planned_end_date, actual_end_date, schedule_days, max_capacity, status, approval_status, rejection_reason, created_by, decided_by, submitted_at, decided_at, created_at, updated_at) VALUES
--- IELTS Foundation (Course 1) - 3 classes (Staggered: Fast, Standard, Slow)
-(1, 1, 1, 'HN-IELTS-F1', 'HN IELTS Foundation 1 (Fast)', 'OFFLINE', '2025-10-27', '2025-12-19', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-10-20 10:00:00+07', '2025-10-21 14:00:00+07', '2025-10-20 10:00:00+07', NOW()),
-(2, 1, 1, 'HN-IELTS-F2', 'HN IELTS Foundation 2 (Standard)', 'OFFLINE', '2025-11-14', '2026-01-08', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-01 10:00:00+07', '2025-11-02 14:00:00+07', '2025-11-01 10:00:00+07', NOW()),
-(3, 1, 1, 'HN-IELTS-F3', 'HN IELTS Foundation 3 (Slow)', 'OFFLINE', '2025-12-03', '2026-01-26', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', NOW()),
+-- IELTS Foundation (Subject 1) - 5 classes (24 sessions each)
+(1, 1, 1, 'HN-IELTS-F1', 'HN IELTS Foundation 1 (Early)', 'OFFLINE', '2025-11-17', '2026-01-09', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07', '2025-11-10 10:00:00+07', NOW()),
+(2, 1, 1, 'HN-IELTS-F2', 'HN IELTS Foundation 2 (Parallel A)', 'OFFLINE', '2025-12-01', '2026-01-23', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-24 10:00:00+07', '2025-11-25 14:00:00+07', '2025-11-24 10:00:00+07', NOW()),
+(3, 1, 1, 'HN-IELTS-F3', 'HN IELTS Foundation 3 (Parallel B)', 'OFFLINE', '2025-12-03', '2026-01-27', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-26 10:00:00+07', '2025-11-27 14:00:00+07', '2025-11-26 10:00:00+07', NOW()),
+(4, 1, 1, 'HN-IELTS-F4', 'HN IELTS Foundation 4 (Parallel C)', 'ONLINE', '2025-12-05', '2026-01-29', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-28 10:00:00+07', '2025-11-29 14:00:00+07', '2025-11-28 10:00:00+07', NOW()),
+(5, 1, 1, 'HN-IELTS-F5', 'HN IELTS Foundation 5 (Late)', 'OFFLINE', '2025-12-15', '2026-02-06', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-08 10:00:00+07', '2025-12-09 14:00:00+07', '2025-12-08 10:00:00+07', NOW()),
 
--- IELTS Intermediate (Course 2) - 3 classes (Staggered: Fast, Standard, Slow)
-(4, 1, 2, 'HN-IELTS-I1', 'HN IELTS Intermediate 1 (Fast)', 'OFFLINE', '2025-10-27', '2025-12-19', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-10-20 10:00:00+07', '2025-10-21 14:00:00+07', '2025-10-20 10:00:00+07', NOW()),
-(5, 1, 2, 'HN-IELTS-I2', 'HN IELTS Intermediate 2 (Standard)', 'OFFLINE', '2025-11-14', '2026-01-08', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-01 10:00:00+07', '2025-11-02 14:00:00+07', '2025-11-01 10:00:00+07', NOW()),
-(6, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Slow)', 'OFFLINE', '2025-12-03', '2026-01-26', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', NOW()),
+-- IELTS Intermediate (Subject 2) - 5 classes (24 sessions each)
+(6, 1, 2, 'HN-IELTS-I1', 'HN IELTS Intermediate 1 (Early)', 'OFFLINE', '2025-11-17', '2026-01-09', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07', '2025-11-10 10:00:00+07', NOW()),
+(7, 1, 2, 'HN-IELTS-I2', 'HN IELTS Intermediate 2 (Parallel A)', 'OFFLINE', '2025-12-02', '2026-01-24', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', NOW()),
+(8, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Parallel B)', 'OFFLINE', '2025-12-04', '2026-01-28', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-27 10:00:00+07', '2025-11-28 14:00:00+07', '2025-11-27 10:00:00+07', NOW()),
+(9, 1, 2, 'HN-IELTS-I4', 'HN IELTS Intermediate 4 (Parallel C)', 'ONLINE', '2025-12-06', '2026-01-30', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', NOW()),
+(10, 1, 2, 'HN-IELTS-I5', 'HN IELTS Intermediate 5 (Late)', 'OFFLINE', '2025-12-16', '2026-02-07', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-09 10:00:00+07', '2025-12-10 14:00:00+07', '2025-12-09 10:00:00+07', NOW());
 
--- IELTS Advanced (Course 3) - 3 classes (40 sessions)
-(7, 1, 3, 'HN-IELTS-A1', 'HN IELTS Advanced 1', 'ONLINE', '2025-09-22', '2026-01-09', '2026-01-09', ARRAY[1,3,5]::smallint[], 15, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-09-15 10:00:00+07', '2025-09-16 14:00:00+07', '2025-09-15 10:00:00+07', '2026-01-09 18:00:00+07'),
-(8, 1, 3, 'HN-IELTS-A2', 'HN IELTS Advanced 2', 'OFFLINE', '2025-12-08', '2026-03-27', NULL, ARRAY[2,4,6]::smallint[], 15, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-01 10:00:00+07', '2025-12-02 14:00:00+07', '2025-12-01 10:00:00+07', '2025-12-02 14:00:00+07'),
-(9, 2, 3, 'HCM-IELTS-A1', 'HCM IELTS Advanced 1', 'OFFLINE', '2025-11-24', '2026-03-13', NULL, ARRAY[1,3,5]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-09 10:00:00+07', '2025-11-10 14:00:00+07', '2025-11-09 10:00:00+07', '2025-11-24 08:00:00+07'),
+-- ========== SESSION GENERATION FOR 10 IELTS CLASSES ==========
+-- Foundation classes (1-5) use subject_session 1-24, Intermediate classes (6-10) use subject_session 25-48
+-- Pattern: Mon/Wed/Fri = ARRAY[1,3,5], Tue/Thu/Sat = ARRAY[2,4,6]
 
--- TOEIC Foundation (Course 4) - 3 classes
-(10, 1, 4, 'HN-TOEIC-F1', 'HN TOEIC Foundation 1', 'OFFLINE', '2025-10-01', '2025-11-20', '2025-11-20', ARRAY[1,3,5]::smallint[], 20, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-09-20 10:00:00+07', '2025-09-21 14:00:00+07', '2025-09-20 10:00:00+07', '2025-11-20 18:00:00+07'),
-(11, 1, 4, 'HN-TOEIC-F2', 'HN TOEIC Foundation 2', 'ONLINE', '2025-12-01', '2026-01-20', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-20 10:00:00+07', '2025-11-21 14:00:00+07', '2025-11-20 10:00:00+07', '2025-12-01 08:00:00+07'),
-(12, 2, 4, 'HCM-TOEIC-F1', 'HCM TOEIC Foundation 1', 'OFFLINE', '2025-11-25', '2026-01-14', NULL, ARRAY[1,3,5]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-15 10:00:00+07', '2025-11-16 14:00:00+07', '2025-11-15 10:00:00+07', '2025-11-25 08:00:00+07'),
-
--- TOEIC Intermediate (Course 5) - 3 classes
-(13, 1, 5, 'HN-TOEIC-I1', 'HN TOEIC Intermediate 1', 'OFFLINE', '2025-10-08', '2025-12-05', '2025-12-05', ARRAY[2,4,6]::smallint[], 18, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-09-28 10:00:00+07', '2025-09-29 14:00:00+07', '2025-09-28 10:00:00+07', '2025-12-05 18:00:00+07'),
-(14, 1, 5, 'HN-TOEIC-I2', 'HN TOEIC Intermediate 2', 'ONLINE', '2025-12-10', '2026-02-06', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-01 10:00:00+07', '2025-12-02 14:00:00+07', '2025-12-01 10:00:00+07', '2025-12-02 14:00:00+07'),
-(15, 2, 5, 'HCM-TOEIC-I1', 'HCM TOEIC Intermediate 1', 'OFFLINE', '2025-12-01', '2026-01-28', NULL, ARRAY[2,4,6]::smallint[], 18, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-20 10:00:00+07', '2025-11-21 14:00:00+07', '2025-11-20 10:00:00+07', '2025-12-01 08:00:00+07'),
-
--- TOEIC Advanced (Course 6) - 3 classes
-(16, 1, 6, 'HN-TOEIC-A1', 'HN TOEIC Advanced 1', 'OFFLINE', '2025-10-15', '2025-12-20', '2025-12-05', ARRAY[1,3,5]::smallint[], 15, 'COMPLETED', 'APPROVED', NULL, 6, 3, '2025-10-05 10:00:00+07', '2025-10-06 14:00:00+07', '2025-10-05 10:00:00+07', '2025-12-05 18:00:00+07'),
-(17, 1, 6, 'HN-TOEIC-A2', 'HN TOEIC Advanced 2', 'ONLINE', '2025-12-15', '2026-02-20', NULL, ARRAY[2,4,6]::smallint[], 15, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-05 10:00:00+07', '2025-12-06 14:00:00+07', '2025-12-05 10:00:00+07', '2025-12-06 14:00:00+07'),
-(18, 2, 6, 'HCM-TOEIC-A1', 'HCM TOEIC Advanced 1', 'OFFLINE', '2025-12-08', '2026-02-12', NULL, ARRAY[1,3,5]::smallint[], 15, 'ONGOING', 'APPROVED', NULL, 8, 4, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', '2025-12-08 08:00:00+07');
-
--- Generate Sessions for Class 1 (HN-IELTS-F1 - Fast)
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-SELECT s.idx, 1, s.idx, 1, ('2025-10-27'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
-CASE WHEN ('2025-10-27'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END,
-'Session note.', '2025-10-20 10:00:00+07', NOW()
+-- Class 1: HN IELTS Foundation 1 (Early) - Mon/Wed/Fri, starts 2025-11-17 (2 weeks ahead)
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT s.idx, 1, s.idx, 1, ('2025-11-17'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+  CASE WHEN ('2025-11-17'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-10 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
-
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 1 FROM session WHERE class_id = 1;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 1, 'SCHEDULED' FROM session WHERE class_id = 1;
 
--- Generate Sessions for Class 2 (HN-IELTS-F2 - Standard)
+-- Class 2: HN IELTS Foundation 2 (Parallel A) - Mon/Wed/Fri, starts 2025-12-01
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 100 + s.idx, 2, s.idx, 1, ('2025-11-14'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
-  CASE WHEN ('2025-11-14'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-01 10:00:00+07', NOW()
+SELECT 100 + s.idx, 2, s.idx, 2, ('2025-12-01'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+  CASE WHEN ('2025-12-01'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-24 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
-
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 2 FROM session WHERE class_id = 2;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 2, 'SCHEDULED' FROM session WHERE class_id = 2;
 
--- Generate Sessions for Class 3 (HN-IELTS-F3 - Slow)
+-- Class 3: HN IELTS Foundation 3 (Parallel B) - Mon/Wed/Fri, starts 2025-12-03 (2 days behind Class 2)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 200 + s.idx, 3, s.idx, 1, ('2025-12-03'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
-  CASE WHEN ('2025-12-03'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-25 10:00:00+07', NOW()
+SELECT 200 + s.idx, 3, s.idx, 3, ('2025-12-03'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+  CASE WHEN ('2025-12-03'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-26 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
-
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 3 FROM session WHERE class_id = 3;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 3, 'SCHEDULED' FROM session WHERE class_id = 3;
 
--- Generate Sessions for Class 4 (HN-IELTS-I1 - Fast)
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-SELECT 300 + s.idx, 4, 24 + s.idx, 2, ('2025-10-27'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
-CASE WHEN ('2025-10-27'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END,
-'Session note.', '2025-10-20 10:00:00+07', NOW()
+-- Class 4: HN IELTS Foundation 4 (Parallel C - Online) - Tue/Thu/Sat, starts 2025-12-05 (4 days behind Class 2)
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT 300 + s.idx, 4, s.idx, 5, ('2025-12-05'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS',
+  CASE WHEN ('2025-12-05'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-28 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 9 FROM session WHERE class_id = 4;
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 4 FROM session WHERE class_id = 4;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 4, 'SCHEDULED' FROM session WHERE class_id = 4;
 
--- Generate Sessions for Class 5 (HN-IELTS-I2 - Standard)
+-- Class 5: HN IELTS Foundation 5 (Late) - Mon/Wed/Fri, starts 2025-12-15 (2 weeks behind)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 400 + s.idx, 5, 24 + s.idx, 2, ('2025-11-14'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
-  CASE WHEN ('2025-11-14'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-01 10:00:00+07', NOW()
+SELECT 400 + s.idx, 5, s.idx, 1, ('2025-12-15'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'PLANNED', '2025-12-08 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 10 FROM session WHERE class_id = 5;
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 1 FROM session WHERE class_id = 5;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 5, 'SCHEDULED' FROM session WHERE class_id = 5;
 
--- Generate Sessions for Class 6 (HN-IELTS-I3 - Slow)
+-- Class 6: HN IELTS Intermediate 1 (Early) - Tue/Thu/Sat, starts 2025-11-17 (2 weeks ahead)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 500 + s.idx, 6, 24 + s.idx, 2, ('2025-12-03'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
-  CASE WHEN ('2025-12-03'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-25 10:00:00+07', NOW()
+SELECT 500 + s.idx, 6, 24 + s.idx, 6, ('2025-11-17'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS',
+  CASE WHEN ('2025-11-17'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-10 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 11 FROM session WHERE class_id = 6;
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 2 FROM session WHERE class_id = 6;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 6, 'SCHEDULED' FROM session WHERE class_id = 6;
 
--- Generate Sessions for Class 7 (HN-IELTS-A1) - COMPLETED
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-SELECT 600 + s.idx, 7, 54 + s.idx, 5, ('2025-09-22'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'DONE', 'Completed.', '2025-09-15 10:00:00+07', NOW()
-FROM generate_series(1, 40) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 4 FROM session WHERE class_id = 7;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 5, 'SCHEDULED' FROM session WHERE class_id = 7;
-
--- Generate Sessions for Class 8 (HN-IELTS-A2) - SCHEDULED
+-- Class 7: HN IELTS Intermediate 2 (Parallel A) - Tue/Thu/Sat, starts 2025-12-02
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 700 + s.idx, 8, 54 + s.idx, 6, ('2025-12-08'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS', 'PLANNED', '2025-12-01 10:00:00+07', NOW()
-FROM generate_series(1, 40) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 3 FROM session WHERE class_id = 8;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 6, 'SCHEDULED' FROM session WHERE class_id = 8;
-
--- Generate Sessions for Class 9 (HCM-IELTS-A1) - ONGOING
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 800 + s.idx, 9, 54 + s.idx, 11, ('2025-11-24'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
-  CASE WHEN ('2025-11-24'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-05' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-09 10:00:00+07', NOW()
-FROM generate_series(1, 40) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 6 FROM session WHERE class_id = 9;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 11, 'SCHEDULED' FROM session WHERE class_id = 9;
-
--- Generate Sessions for Class 10 (HN-TOEIC-F1) - COMPLETED
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-SELECT 900 + s.idx, 10, 94 + s.idx, 2, ('2025-10-01'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'DONE', 'Completed.', '2025-09-20 10:00:00+07', NOW()
-FROM generate_series(1, 20) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 1 FROM session WHERE class_id = 10;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 17, 'SCHEDULED' FROM session WHERE class_id = 10;
-
--- Generate Sessions for Class 11 (HN-TOEIC-F2) - ONGOING ONLINE
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 1000 + s.idx, 11, 94 + s.idx, 6, ('2025-12-01'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS',
-  CASE WHEN ('2025-12-01'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END) < '2025-12-05' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-20 10:00:00+07', NOW()
-FROM generate_series(1, 20) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 4 FROM session WHERE class_id = 11;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 18, 'SCHEDULED' FROM session WHERE class_id = 11;
-
--- Generate Sessions for Class 12 (HCM-TOEIC-F1) - ONGOING
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 1100 + s.idx, 12, 94 + s.idx, 10, ('2025-11-25'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
-  CASE WHEN ('2025-11-25'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-05' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-15 10:00:00+07', NOW()
-FROM generate_series(1, 20) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 5 FROM session WHERE class_id = 12;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 22, 'SCHEDULED' FROM session WHERE class_id = 12;
-
--- Generate Sessions for Class 13 (HN-TOEIC-I1) - COMPLETED
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-SELECT 1200 + s.idx, 13, 114 + s.idx, 3, ('2025-10-08'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS', 'DONE', 'Completed.', '2025-09-28 10:00:00+07', NOW()
+SELECT 600 + s.idx, 7, 24 + s.idx, 6, ('2025-12-02'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+  CASE WHEN ('2025-12-02'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-25 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 3 FROM session WHERE class_id = 7;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 7, 'SCHEDULED' FROM session WHERE class_id = 7;
 
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 2 FROM session WHERE class_id = 13;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 17, 'SCHEDULED' FROM session WHERE class_id = 13;
-
--- Generate Sessions for Class 14 (HN-TOEIC-I2) - SCHEDULED ONLINE
+-- Class 8: HN IELTS Intermediate 3 (Parallel B) - Tue/Thu/Sat, starts 2025-12-04 (2 days behind Class 7)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 1300 + s.idx, 14, s.idx, 5, ('2025-12-10'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'PLANNED', '2025-12-01 10:00:00+07', NOW()
+SELECT 700 + s.idx, 8, 24 + s.idx, 6, ('2025-12-04'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS',
+  CASE WHEN ('2025-12-04'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-27 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 2 FROM session WHERE class_id = 8;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 8, 'SCHEDULED' FROM session WHERE class_id = 8;
 
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 4 FROM session WHERE class_id = 14;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 18, 'SCHEDULED' FROM session WHERE class_id = 14;
-
--- Generate Sessions for Class 15 (HCM-TOEIC-I1) - ONGOING
+-- Class 9: HN IELTS Intermediate 4 (Parallel C - Online) - Tue/Thu/Sat, starts 2025-12-06 (4 days behind Class 7)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 1400 + s.idx, 15, s.idx, 14, ('2025-12-01'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS',
-  CASE WHEN ('2025-12-01'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END) < '2025-12-05' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-20 10:00:00+07', NOW()
+SELECT 800 + s.idx, 9, 24 + s.idx, 5, ('2025-12-06'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS',
+  CASE WHEN ('2025-12-06'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END) < '2025-12-10' THEN 'DONE' ELSE 'PLANNED' END, '2025-11-29 10:00:00+07', NOW()
 FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 4 FROM session WHERE class_id = 9;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 9, 'SCHEDULED' FROM session WHERE class_id = 9;
 
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 7 FROM session WHERE class_id = 15;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 22, 'SCHEDULED' FROM session WHERE class_id = 15;
-
--- Generate Sessions for Class 16 (HN-TOEIC-A1) - COMPLETED
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, teacher_note, created_at, updated_at)
-SELECT 1500 + s.idx, 16, 138 + s.idx, 2, ('2025-10-15'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'DONE', 'Completed.', '2025-10-05 10:00:00+07', NOW()
-FROM generate_series(1, 28) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 3 FROM session WHERE class_id = 16;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 17, 'SCHEDULED' FROM session WHERE class_id = 16;
-
--- Generate Sessions for Class 17 (HN-TOEIC-A2) - SCHEDULED ONLINE
+-- Class 10: HN IELTS Intermediate 5 (Late) - Tue/Thu/Sat, starts 2025-12-16 (2 weeks behind)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 1600 + s.idx, 17, 138 + s.idx, 6, ('2025-12-15'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS', 'PLANNED', '2025-12-05 10:00:00+07', NOW()
-FROM generate_series(1, 28) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 4 FROM session WHERE class_id = 17;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 18, 'SCHEDULED' FROM session WHERE class_id = 17;
-
--- Generate Sessions for Class 18 (HCM-TOEIC-A1) - ONGOING
-INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
-SELECT 1700 + s.idx, 18, 138 + s.idx, 11, ('2025-12-08'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'PLANNED', '2025-11-25 10:00:00+07', NOW()
-FROM generate_series(1, 28) AS s(idx);
-
-INSERT INTO session_resource (session_id, resource_id) SELECT id, 6 FROM session WHERE class_id = 18;
-INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 22, 'SCHEDULED' FROM session WHERE class_id = 18;
+SELECT 900 + s.idx, 10, 24 + s.idx, 6, ('2025-12-16'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'PLANNED', '2025-12-09 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 3 FROM session WHERE class_id = 10;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 10, 'SCHEDULED' FROM session WHERE class_id = 10;
 
 
 -- ========== TIER 5: ENROLLMENTS & ATTENDANCE ==========
+-- 10 IELTS classes (5 Foundation + 5 Intermediate), distributing 100 students
 
--- Enrollments for Class 1 (HN-IELTS-F1) - 15 students (IDs 2-16)
+-- Enrollments for Class 1 (HN-IELTS-F1 - Early) - 15 students (IDs 1-15)
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (100 + s.id), 1, s.id + 1, 'ENROLLED', '2025-10-20 09:00:00+07', 6, 1, '2025-10-20 09:00:00+07', NOW()
+SELECT (100 + s.id), 1, s.id, 'ENROLLED', '2025-11-10 09:00:00+07', 6, 1, '2025-11-10 09:00:00+07', NOW()
 FROM generate_series(1, 15) AS s(id);
 
--- Enrollments for Class 2 (HN-IELTS-F2) - 20 students (Student 1 + IDs 17-35)
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at) VALUES
-(200, 2, 1, 'ENROLLED', '2025-11-01 09:00:00+07', 6, 101, '2025-11-01 09:00:00+07', NOW());
-
+-- Enrollments for Class 2 (HN-IELTS-F2 - Parallel A) - 15 students (IDs 16-30)
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (201 + s.id), 2, s.id + 16, 'ENROLLED', '2025-11-01 09:00:00+07', 6, 101, '2025-11-01 09:00:00+07', NOW()
-FROM generate_series(1, 19) AS s(id);
+SELECT (200 + s.id), 2, s.id + 15, 'ENROLLED', '2025-11-24 09:00:00+07', 6, 101, '2025-11-24 09:00:00+07', NOW()
+FROM generate_series(1, 15) AS s(id);
 
--- Enrollments for Class 3 (HN-IELTS-F3) - 20 students
+-- Enrollments for Class 3 (HN-IELTS-F3 - Parallel B) - 15 students (IDs 31-45)
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (300 + s.id), 3, s.id + 35, 'ENROLLED', '2025-11-25 09:00:00+07', 6, 201, '2025-11-25 09:00:00+07', NOW()
+SELECT (300 + s.id), 3, s.id + 30, 'ENROLLED', '2025-11-26 09:00:00+07', 6, 201, '2025-11-26 09:00:00+07', NOW()
+FROM generate_series(1, 15) AS s(id);
+
+-- Enrollments for Class 4 (HN-IELTS-F4 - Parallel C Online) - 20 students (IDs 46-65)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT (400 + s.id), 4, s.id + 45, 'ENROLLED', '2025-11-28 09:00:00+07', 6, 301, '2025-11-28 09:00:00+07', NOW()
 FROM generate_series(1, 20) AS s(id);
 
--- Enrollments for Class 4 (HN-IELTS-I1) - 18 students
+-- Enrollments for Class 5 (HN-IELTS-F5 - Late) - 10 students (IDs 66-75) - SCHEDULED class
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (400 + s.id), 4, s.id + 55, 'ENROLLED', '2025-10-20 09:00:00+07', 6, 301, '2025-10-20 09:00:00+07', NOW()
-FROM generate_series(1, 18) AS s(id);
+SELECT (500 + s.id), 5, s.id + 65, 'ENROLLED', '2025-12-08 09:00:00+07', 6, 401, '2025-12-08 09:00:00+07', NOW()
+FROM generate_series(1, 10) AS s(id);
 
--- Enrollments for Class 5 (HN-IELTS-I2) - 15 students
+-- Enrollments for Class 6 (HN-IELTS-I1 - Early) - 12 students (IDs 76-87)
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (500 + s.id), 5, s.id + 73, 'ENROLLED', '2025-11-07 09:00:00+07', 6, 401, '2025-11-07 09:00:00+07', NOW()
-FROM generate_series(1, 15) AS s(id);
-
--- Enrollments for Class 6 (HN-IELTS-I3) - 12 students (Remaining)
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (600 + s.id), 6, s.id + 88, 'ENROLLED', '2025-11-25 09:00:00+07', 6, 501, '2025-11-25 09:00:00+07', NOW()
+SELECT (600 + s.id), 6, s.id + 75, 'ENROLLED', '2025-11-10 09:00:00+07', 6, 501, '2025-11-10 09:00:00+07', NOW()
 FROM generate_series(1, 12) AS s(id);
 
--- Enrollments for Class 7 (HN-IELTS-A1) - 12 students, completed
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, left_at, left_session_id, created_at, updated_at)
-SELECT (700 + s.id), 7, s.id + 15, 'COMPLETED', '2025-09-15 09:00:00+07', 6, 601, '2025-12-01 18:00:00+07', 624, '2025-09-15 09:00:00+07', '2025-12-01 18:00:00+07'
+-- Enrollments for Class 7 (HN-IELTS-I2 - Parallel A) - 12 students (IDs 88-99)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT (700 + s.id), 7, s.id + 87, 'ENROLLED', '2025-11-25 09:00:00+07', 6, 601, '2025-11-25 09:00:00+07', NOW()
 FROM generate_series(1, 12) AS s(id);
 
--- Enrollments for Class 9 (HCM-IELTS-A1) - 12 students, ongoing
+-- Enrollments for Class 8 (HN-IELTS-I3 - Parallel B) - 1 student (ID 100)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at) VALUES
+(801, 8, 100, 'ENROLLED', '2025-11-27 09:00:00+07', 6, 701, '2025-11-27 09:00:00+07', NOW());
+
+-- Enrollments for Class 9 (HN-IELTS-I4 - Parallel C Online) - reusing students 1-5 (they can take both Foundation and Intermediate)
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (900 + s.id), 9, s.id + 88, 'ENROLLED', '2025-11-09 09:00:00+07', 8, 801, '2025-11-09 09:00:00+07', NOW()
-FROM generate_series(1, 12) AS s(id);
+SELECT (900 + s.id), 9, s.id, 'ENROLLED', '2025-11-29 09:00:00+07', 6, 801, '2025-11-29 09:00:00+07', NOW()
+FROM generate_series(1, 5) AS s(id);
 
--- Enrollments for Class 10 (HN-TOEIC-F1) - 18 students, completed
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, left_at, left_session_id, created_at, updated_at)
-SELECT (1000 + s.id), 10, s.id + 27, 'COMPLETED', '2025-09-20 09:00:00+07', 6, 901, '2025-11-20 18:00:00+07', 920, '2025-09-20 09:00:00+07', '2025-11-20 18:00:00+07'
-FROM generate_series(1, 18) AS s(id);
-
--- Enrollments for Class 11 (HN-TOEIC-F2) - 22 students, ongoing online
+-- Enrollments for Class 10 (HN-IELTS-I5 - Late) - SCHEDULED class, reusing students 6-10
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (1100 + s.id), 11, s.id + 45, 'ENROLLED', '2025-11-20 09:00:00+07', 6, 1001, '2025-11-20 09:00:00+07', NOW()
-FROM generate_series(1, 22) AS s(id);
-
--- Enrollments for Class 12 (HCM-TOEIC-F1) - 18 students, ongoing
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (1200 + s.id), 12, s.id + 67, 'ENROLLED', '2025-11-15 09:00:00+07', 8, 1101, '2025-11-15 09:00:00+07', NOW()
-FROM generate_series(1, 18) AS s(id);
-
--- Enrollments for Class 13 (HN-TOEIC-I1) - 16 students, completed
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, left_at, left_session_id, created_at, updated_at)
-SELECT (1300 + s.id), 13, s.id + 5, 'COMPLETED', '2025-09-28 09:00:00+07', 6, 1201, '2025-12-05 18:00:00+07', 1224, '2025-09-28 09:00:00+07', '2025-12-05 18:00:00+07'
-FROM generate_series(1, 16) AS s(id);
-
--- Enrollments for Class 15 (HCM-TOEIC-I1) - 15 students, ongoing
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (1500 + s.id), 15, s.id + 85, 'ENROLLED', '2025-11-20 09:00:00+07', 8, 1401, '2025-11-20 09:00:00+07', NOW()
-FROM generate_series(1, 15) AS s(id);
-
--- Enrollments for Class 16 (HN-TOEIC-A1) - 13 students, completed
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, left_at, left_session_id, created_at, updated_at)
-SELECT (1600 + s.id), 16, s.id + 21, 'COMPLETED', '2025-10-05 09:00:00+07', 6, 1501, '2025-12-05 18:00:00+07', 1528, '2025-10-05 09:00:00+07', '2025-12-05 18:00:00+07'
-FROM generate_series(1, 13) AS s(id);
-
--- Enrollments for Class 18 (HCM-TOEIC-A1) - 12 students, ongoing
-INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
-SELECT (1800 + s.id), 18, s.id + 75, 'ENROLLED', '2025-11-25 09:00:00+07', 8, 1701, '2025-11-25 09:00:00+07', NOW()
-FROM generate_series(1, 12) AS s(id);
+SELECT (1000 + s.id), 10, s.id + 5, 'ENROLLED', '2025-12-09 09:00:00+07', 6, 901, '2025-12-09 09:00:00+07', NOW()
+FROM generate_series(1, 5) AS s(id);
 
 -- Student Sessions (Attendance) for ALL classes
 -- Generates attendance records for ALL sessions (DONE, PLANNED, IN_PROGRESS)
@@ -1207,309 +966,233 @@ ON CONFLICT (student_id, session_id) DO NOTHING;
 -- ========== PHASE 3: EDGE CASES & ENHANCEMENTS ==========
 
 -- 1. High Absence Scenario (Test Attendance Warnings)
--- Student 17 (in Class 2) has been absent for most sessions
+-- Student 20 (Nguyen Thi Linh - in Class 2) has been absent for most sessions
 UPDATE student_session
 SET attendance_status = 'ABSENT'
-WHERE student_id = 17 -- Student ID 17 is enrolled in Class 2 (Enrollment ID 201)
+WHERE student_id = 20 -- Student ID 20 = Nguyen Thi Linh, enrolled in Class 2
   AND session_id IN (SELECT id FROM session WHERE class_id = 2 AND status = 'DONE');
 
--- 2. Student.0001 Absent on Session 105 (Class 2 HN-IELTS-F2)
--- student.0001@gmail.com (student_id = 1) absent on session 105
+-- 2. Test absence on specific session
+-- Student 16 (Vuong Thi Loan - in Class 2) absent on session 105
 UPDATE student_session
 SET attendance_status = 'ABSENT'
-WHERE student_id = 1 AND session_id = 105;
+WHERE student_id = 16 AND session_id = 105;
 
 -- 3. Teacher Forgot Attendance Scenario (Test Reminders)
--- Note: We no longer delete StudentSession records as they are needed for schedule display
--- Instead, session 105 will have attendance_status = 'PLANNED' to indicate teacher hasn't recorded yet
+-- Session 105 (Class 2) will have attendance_status = 'PLANNED' to indicate teacher hasn't recorded yet
 UPDATE student_session 
 SET attendance_status = 'PLANNED', recorded_at = NULL, homework_status = NULL
 WHERE session_id = 105;
 
--- ========== TIER 6: REQUESTS (Simplified for new class structure) ==========
+-- ========== TIER 6: REQUESTS (For 10 IELTS classes) ==========
 
--- Student Request Scenarios (using new class IDs 1-18)
--- Class 1: HN-IELTS-F1 (completed), Class 2: HN-IELTS-F2 (ongoing), Class 3: HCM-IELTS-F1 (ongoing online)
+-- Student Request Scenarios (using class IDs 1-10)
+-- Class 1-5: Foundation classes, Class 6-10: Intermediate classes
 
--- SCENARIO 1: Approved Absence Request (Class 2, student 16)
+-- SCENARIO 1: Approved Absence Request (Class 2 - Foundation Parallel A, student 20 - Nguyen Thi Linh)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
-(1, 16, 2, 'ABSENCE', 110, 'APPROVED', 'Family emergency - need to attend urgent family matter', 116, '2025-11-10 10:00:00+07', 6, '2025-11-10 14:00:00+07', 'Approved - valid reason');
+(1, 20, 2, 'ABSENCE', 110, 'APPROVED', 'Family emergency - need to attend urgent family matter', 120, '2025-12-01 10:00:00+07', 6, '2025-12-01 14:00:00+07', 'Approved - valid reason');
 
--- SCENARIO 2: Pending Absence Request (Class 2, student 17)
+-- SCENARIO 2: Pending Absence Request (Class 2, student 21 - Pham Van Long)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at) VALUES
-(2, 17, 2, 'ABSENCE', 115, 'PENDING', 'Medical appointment - doctor consultation scheduled', 117, '2025-11-15 09:00:00+07');
+(2, 21, 2, 'ABSENCE', 115, 'PENDING', 'Medical appointment - doctor consultation scheduled', 121, '2025-12-03 09:00:00+07');
 
--- SCENARIO 3: Rejected Absence Request (Class 3, student 51)
+-- SCENARIO 3: Rejected Absence Request (Class 3 - Foundation Parallel B, student 35 - Le Duc Thanh)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
-(3, 51, 3, 'ABSENCE', 210, 'REJECTED', 'Want to attend friend birthday party', 151, '2025-11-12 10:00:00+07', 8, '2025-11-12 15:00:00+07', 'Rejected - not a valid reason for academic absence');
+(3, 35, 3, 'ABSENCE', 210, 'REJECTED', 'Want to attend friend birthday party', 135, '2025-12-02 10:00:00+07', 6, '2025-12-02 15:00:00+07', 'Rejected - not a valid reason for academic absence');
 
--- SCENARIO 4: Approved Makeup Request (Class 2 -> Class 3)
+-- SCENARIO 4: Approved Makeup Request (Class 2 -> Class 3 parallel Foundation classes, student 22 - Vu Thi My Hanh)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, makeup_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
-(4, 18, 2, 'MAKEUP', 105, 205, 'APPROVED', 'Missed session due to illness, want to makeup in online class', 118, '2025-11-08 10:00:00+07', 6, '2025-11-08 16:00:00+07');
+(4, 22, 2, 'MAKEUP', 105, 205, 'APPROVED', 'Missed session due to illness, want to makeup in parallel class', 122, '2025-12-01 10:00:00+07', 6, '2025-12-01 16:00:00+07');
 
--- SCENARIO 5: Pending Makeup Request (Class 2, student 19)
+-- SCENARIO 5: Pending Makeup Request (Class 2, student 23 - Doan Van Khanh)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, makeup_session_id, status, request_reason, submitted_by, submitted_at) VALUES
-(5, 19, 2, 'MAKEUP', 108, 208, 'PENDING', 'Missed session due to work commitment, requesting makeup', 119, '2025-11-18 11:00:00+07');
+(5, 23, 2, 'MAKEUP', 108, 208, 'PENDING', 'Missed session due to work commitment, requesting makeup', 123, '2025-12-04 11:00:00+07');
 
--- SCENARIO 6: Approved Transfer Request (Class 2 -> Class 3, student 20)
+-- SCENARIO 6: Approved Transfer Request (Class 2 Offline -> Class 4 Online, student 24 - Tran Thi Nga)
 INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
-(6, 20, 2, 3, 'TRANSFER', '2025-11-20', 215, 'APPROVED', 'Need to change to online class due to work schedule conflict', 6, '2025-11-15 10:00:00+07', 6, '2025-11-16 14:00:00+07');
+(6, 24, 2, 4, 'TRANSFER', '2025-12-10', 310, 'APPROVED', 'Need to change to online class due to work schedule conflict', 6, '2025-12-05 10:00:00+07', 6, '2025-12-06 14:00:00+07');
 
--- SCENARIO 7: Pending Transfer Request (Class 10 -> Class 11, TOEIC)
+-- SCENARIO 7: Pending Transfer Request (Class 6 Intermediate -> Class 9 Online Intermediate, student 80 - Dinh Thi Thao)
 INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
-(7, 28, 10, 11, 'TRANSFER', '2025-12-01', 1010, 'PENDING', 'Need online class due to relocation', 128, '2025-11-25 10:00:00+07', 'Tier 1 self-service request');
+(7, 80, 6, 9, 'TRANSFER', '2025-12-15', 810, 'PENDING', 'Need online class due to relocation', 180, '2025-12-08 10:00:00+07', 'Tier 1 self-service request');
 
--- SCENARIO 8: Rejected Transfer - same class
+-- SCENARIO 8: Rejected Transfer - same class (student 25 - Nguyen Van Phuc)
 INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
-(8, 21, 2, 2, 'TRANSFER', '2025-11-20', 115, 'REJECTED', 'Accidentally selected current class', 121, '2025-11-10 09:00:00+07', 6, '2025-11-10 15:00:00+07', 'Rejected - cannot transfer to the same class');
+(8, 25, 2, 2, 'TRANSFER', '2025-12-10', 115, 'REJECTED', 'Accidentally selected current class', 125, '2025-12-02 09:00:00+07', 6, '2025-12-02 15:00:00+07', 'Rejected - cannot transfer to the same class');
 
--- SCENARIO 9: Request created by Academic Affair on behalf (waiting confirmation)
+-- SCENARIO 9: Request created by Academic Affair on behalf (student 26 - Le Thi Diem, waiting confirmation)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
-(9, 22, 2, 'ABSENCE', 118, 'WAITING_CONFIRM', 'Student called to report illness - created on behalf', 6, '2025-11-20 13:00:00+07', 'Created by Academic Affair via phone call');
+(9, 26, 2, 'ABSENCE', 118, 'WAITING_CONFIRM', 'Student called to report illness - created on behalf', 6, '2025-12-05 13:00:00+07', 'Created by Academic Affair via phone call');
 
 -- Teacher Request Scenarios
 -- SCENARIO 10: Teacher Replacement Request - Approved (Class 1, session 10)
 INSERT INTO teacher_request (id, teacher_id, session_id, request_type, replacement_teacher_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
-(1, 5, 10, 'REPLACEMENT', 6, 'APPROVED', 'Family emergency - cannot attend session', 24, '2025-09-01 08:00:00+07', 6, '2025-09-01 10:00:00+07');
+(1, 1, 10, 'REPLACEMENT', 2, 'APPROVED', 'Family emergency - cannot attend session', 20, '2025-11-15 08:00:00+07', 6, '2025-11-15 10:00:00+07');
 
 -- SCENARIO 11: Teacher Reschedule Request - Pending (Class 2)
 INSERT INTO teacher_request (id, teacher_id, session_id, request_type, new_date, new_time_slot_id, new_resource_id, status, request_reason, submitted_by, submitted_at) VALUES
-(2, 6, 112, 'RESCHEDULE', '2025-11-25', 5, 2, 'PENDING', 'Conference attendance - propose rescheduling to evening slot', 25, '2025-11-15 09:00:00+07');
-
--- SCENARIO 12: Teacher Modality Change Request - Approved (Class 4)
-INSERT INTO teacher_request (id, teacher_id, session_id, request_type, new_resource_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
-(3, 11, 310, 'MODALITY_CHANGE', 4, 'APPROVED', 'Room air conditioning broken - need to switch to online', 30, '2025-10-01 07:00:00+07', 6, '2025-10-01 08:00:00+07');
+(2, 2, 112, 'RESCHEDULE', '2025-12-20', 5, 2, 'PENDING', 'Conference attendance - propose rescheduling to evening slot', 21, '2025-12-05 09:00:00+07');
 
 -- SCENARIO 13: Rejected Teacher Request
 INSERT INTO teacher_request (id, teacher_id, session_id, request_type, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
-(4, 5, 15, 'REPLACEMENT', 'REJECTED', 'Personal reason - insufficient notice', 24, '2025-09-10 08:00:00+07', 6, '2025-09-10 10:00:00+07');
+(3, 1, 15, 'REPLACEMENT', 'REJECTED', 'Personal reason - insufficient notice', 20, '2025-11-20 08:00:00+07', 6, '2025-11-20 10:00:00+07');
 
--- SCENARIO 14: Pending Replacement Request (Emma Wilson - teacher 2)
+-- SCENARIO 14: Pending Replacement Request (Teacher 3)
 INSERT INTO teacher_request (id, teacher_id, session_id, request_type, status, request_reason, submitted_by, submitted_at) VALUES
-(5, 2, 20, 'REPLACEMENT', 'PENDING', 'Medical appointment scheduled - need substitute teacher for this session', 21, '2025-12-01 14:30:00+07');
+(4, 3, 210, 'REPLACEMENT', 'PENDING', 'Medical appointment scheduled - need substitute teacher for this session', 22, '2025-12-08 14:30:00+07');
 
--- SCENARIO 15: Pending Reschedule Request (David Lee - teacher 3)
+-- SCENARIO 15: Pending Reschedule Request (Teacher 4)
 INSERT INTO teacher_request (id, teacher_id, session_id, request_type, new_date, new_time_slot_id, new_resource_id, status, request_reason, submitted_by, submitted_at) VALUES
-(6, 3, 105, 'RESCHEDULE', '2025-12-20', 3, 1, 'PENDING', 'Personal commitment conflicts with original schedule - request to move to Friday evening', 22, '2025-12-02 09:15:00+07');
+(5, 4, 305, 'RESCHEDULE', '2025-12-20', 3, 1, 'PENDING', 'Personal commitment conflicts with original schedule - request to move to Friday evening', 23, '2025-12-09 09:15:00+07');
 
--- SCENARIO 16: Pending Modality Change Request (Sarah Johnson - teacher 4)
-INSERT INTO teacher_request (id, teacher_id, session_id, request_type, new_resource_id, status, request_reason, submitted_by, submitted_at) VALUES
-(7, 4, 210, 'MODALITY_CHANGE', 5, 'PENDING', 'Classroom equipment malfunction - request to switch to online format for this session', 23, '2025-12-03 11:00:00+07');
-
--- SCENARIO 17: Waiting Confirm Replacement Request (James Taylor - teacher 7)
+-- SCENARIO 16: Waiting Confirm Replacement Request (Teacher 7)
 INSERT INTO teacher_request (id, teacher_id, session_id, request_type, replacement_teacher_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
-(8, 7, 115, 'REPLACEMENT', 8, 'WAITING_CONFIRM', 'Family event - cannot attend session, replacement teacher assigned', 26, '2025-11-28 10:00:00+07', 6, '2025-11-28 14:00:00+07');
+(6, 7, 615, 'REPLACEMENT', 8, 'WAITING_CONFIRM', 'Family event - cannot attend session, replacement teacher assigned', 26, '2025-12-06 10:00:00+07', 6, '2025-12-06 14:00:00+07');
 
--- SCENARIO 18: Pending Replacement Request (Anna Martinez - teacher 8)
+-- SCENARIO 17: Pending Replacement Request (Teacher 8)
 INSERT INTO teacher_request (id, teacher_id, session_id, request_type, status, request_reason, submitted_by, submitted_at) VALUES
-(9, 8, 120, 'REPLACEMENT', 'PENDING', 'Unexpected travel required - need someone to cover this session', 27, '2025-12-04 08:45:00+07');
-
--- SCENARIO 19: Approved Reschedule Request (John Smith - teacher 1)
-INSERT INTO teacher_request (id, teacher_id, session_id, request_type, new_date, new_time_slot_id, new_resource_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
-(10, 1, 5, 'RESCHEDULE', '2025-09-08', 2, 1, 'APPROVED', 'Conference attendance - reschedule approved', 20, '2025-09-02 09:00:00+07', 6, '2025-09-02 11:00:00+07');
+(7, 8, 720, 'REPLACEMENT', 'PENDING', 'Unexpected travel required - need someone to cover this session', 27, '2025-12-10 08:45:00+07');
 
 -- ========== TIER 7: ASSESSMENTS & SCORES ==========
+-- Only 2 subjects with 4 assessments each (IDs 1-8)
+-- Foundation: Listening Quiz (1), Speaking Quiz (2), Midterm (3), Final (4)
+-- Intermediate: Reading Quiz (5), Writing Assignment (6), Midterm (7), Final (8)
 
--- Assessments for Class 2 (scheduled and completed)
+-- Assessments for Class 1 (HN-IELTS-F1 - Early, ONGOING)
 INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(1, 2, 1, '2025-11-21 08:00:00+07', '2025-11-21 08:00:00+07', '2025-11-14 08:00:00+07', '2025-11-21 08:00:00+07'), -- Listening Quiz 1 - completed
-(2, 2, 2, '2025-11-26 08:00:00+07', '2025-11-26 08:00:00+07', '2025-11-14 08:00:00+07', '2025-11-26 08:00:00+07'), -- Speaking Quiz 1 - completed
-(3, 2, 5, '2025-12-10 08:00:00+07', NULL, '2025-11-14 08:00:00+07', '2025-11-14 08:00:00+07'), -- Midterm - today
-(4, 2, 6, '2026-01-07 08:00:00+07', NULL, '2025-11-14 08:00:00+07', '2025-11-14 08:00:00+07'); -- Final - scheduled
+(1, 1, 1, '2025-11-24 08:00:00+07', '2025-11-24 08:00:00+07', '2025-11-17 08:00:00+07', '2025-11-24 08:00:00+07'), -- Listening Quiz - completed
+(2, 1, 2, '2025-11-28 08:00:00+07', '2025-11-28 08:00:00+07', '2025-11-17 08:00:00+07', '2025-11-28 08:00:00+07'), -- Speaking Quiz - completed
+(3, 1, 3, '2025-12-08 08:00:00+07', '2025-12-08 08:00:00+07', '2025-11-17 08:00:00+07', '2025-12-08 08:00:00+07'), -- Midterm - completed
+(4, 1, 4, '2026-01-06 08:00:00+07', NULL, '2025-11-17 08:00:00+07', '2025-11-17 08:00:00+07'); -- Final - scheduled
 
--- Assessments for Class 16 (HN-INT-O1) - Ongoing class for teacher grading demo
--- Uses course_assessment ids 7 and 8 (Intermediate course)
+-- Assessments for Class 2 (HN-IELTS-F2 - Parallel A, ONGOING)
 INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(20, 16, 7, '2025-11-30 08:00:00+07', '2025-11-30 08:00:00+07', '2025-11-25 08:00:00+07', '2025-11-30 08:00:00+07'), -- Writing Task 2 Assignment - completed
-(21, 16, 8, '2025-12-15 08:00:00+07', NULL, '2025-11-25 08:00:00+07', '2025-11-25 08:00:00+07'); -- Full Mock Test - upcoming
+(5, 2, 1, '2025-12-08 08:00:00+07', '2025-12-08 08:00:00+07', '2025-12-01 08:00:00+07', '2025-12-08 08:00:00+07'), -- Listening Quiz - today
+(6, 2, 2, '2025-12-12 08:00:00+07', NULL, '2025-12-01 08:00:00+07', '2025-12-01 08:00:00+07'), -- Speaking Quiz - scheduled
+(7, 2, 3, '2025-12-22 08:00:00+07', NULL, '2025-12-01 08:00:00+07', '2025-12-01 08:00:00+07'), -- Midterm - scheduled
+(8, 2, 4, '2026-01-20 08:00:00+07', NULL, '2025-12-01 08:00:00+07', '2025-12-01 08:00:00+07'); -- Final - scheduled
+
+-- Assessments for Class 6 (HN-IELTS-I1 - Intermediate Early, ONGOING)
+INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
+(9, 6, 5, '2025-11-25 08:00:00+07', '2025-11-25 08:00:00+07', '2025-11-17 08:00:00+07', '2025-11-25 08:00:00+07'), -- Reading Quiz - completed
+(10, 6, 6, '2025-11-29 08:00:00+07', '2025-11-29 08:00:00+07', '2025-11-17 08:00:00+07', '2025-11-29 08:00:00+07'), -- Writing Assignment - completed
+(11, 6, 7, '2025-12-09 08:00:00+07', NULL, '2025-11-17 08:00:00+07', '2025-11-17 08:00:00+07'), -- Midterm - scheduled
+(12, 6, 8, '2026-01-07 08:00:00+07', NULL, '2025-11-17 08:00:00+07', '2025-11-17 08:00:00+07'); -- Final - scheduled
+
+-- Assessments for Class 7 (HN-IELTS-I2 - Intermediate Parallel A, ONGOING)
+INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
+(13, 7, 5, '2025-12-09 08:00:00+07', NULL, '2025-12-02 08:00:00+07', '2025-12-02 08:00:00+07'), -- Reading Quiz - scheduled
+(14, 7, 6, '2025-12-13 08:00:00+07', NULL, '2025-12-02 08:00:00+07', '2025-12-02 08:00:00+07'), -- Writing Assignment - scheduled
+(15, 7, 7, '2025-12-23 08:00:00+07', NULL, '2025-12-02 08:00:00+07', '2025-12-02 08:00:00+07'), -- Midterm - scheduled
+(16, 7, 8, '2026-01-21 08:00:00+07', NULL, '2025-12-02 08:00:00+07', '2025-12-02 08:00:00+07'); -- Final - scheduled
 
 -- =========================================
--- ADDITIONAL ASSESSMENTS FOR COMPLETED CLASSES
+-- SCORES FOR COMPLETED ASSESSMENTS
 -- =========================================
 
--- Class 4 (IELTS Intermediate - Completed)
-INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(30, 4, 7, '2025-11-24 08:00:00+07', '2025-11-24 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-24 08:00:00+07'),
-(31, 4, 8, '2025-12-19 08:00:00+07', NULL, '2025-10-27 08:00:00+07', '2025-10-27 08:00:00+07');
-
--- Class 7 (IELTS Advanced - Completed)
-INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(32, 7, 9, '2025-10-20 08:00:00+07', '2025-10-20 08:00:00+07', '2025-10-01 08:00:00+07', '2025-10-20 08:00:00+07'),
-(33, 7, 10, '2025-11-05 08:00:00+07', '2025-11-05 08:00:00+07', '2025-10-01 08:00:00+07', '2025-11-05 08:00:00+07'),
-(34, 7, 11, '2025-11-25 08:00:00+07', '2025-11-25 08:00:00+07', '2025-10-01 08:00:00+07', '2025-11-25 08:00:00+07');
-
--- Class 10 (TOEIC Foundation - Completed)
-INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(35, 10, 12, '2025-10-10 08:00:00+07', '2025-10-10 08:00:00+07', '2025-09-20 08:00:00+07', '2025-10-10 08:00:00+07'),
-(36, 10, 13, '2025-10-10 09:00:00+07', '2025-10-10 09:00:00+07', '2025-09-20 08:00:00+07', '2025-10-10 09:00:00+07'),
-(37, 10, 14, '2025-11-15 08:00:00+07', '2025-11-15 08:00:00+07', '2025-09-20 08:00:00+07', '2025-11-15 08:00:00+07');
-
--- Class 13 (TOEIC Intermediate - Completed)
-INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(38, 13, 15, '2025-11-01 08:00:00+07', '2025-11-01 08:00:00+07', '2025-10-01 08:00:00+07', '2025-11-01 08:00:00+07'),
-(39, 13, 16, '2025-12-01 08:00:00+07', '2025-12-01 08:00:00+07', '2025-10-01 08:00:00+07', '2025-12-01 08:00:00+07');
-
--- Class 16 (TOEIC Advanced - Completed)
--- Note: Class 16 already has assessments 20, 21 defined above.
--- But 21 is 'upcoming'. We need to mark it as completed if the class is completed.
--- Updating Assessment 21 to be completed
-UPDATE assessment SET actual_date = '2025-12-01 08:00:00+07', updated_at = NOW() WHERE id = 21;
--- Adding Assessment 17 (Case Study)
-INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(40, 16, 17, '2025-11-10 08:00:00+07', '2025-11-10 08:00:00+07', '2025-10-01 08:00:00+07', '2025-11-10 08:00:00+07');
-
--- Scores for completed assessments (Listening Quiz 1)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at) VALUES
-(1, 1, 18.0, 'Good listening skills', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
-(1, 2, 16.5, 'Need more practice on numbers', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
-(1, 3, 19.0, 'Excellent performance', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
-(1, 4, 15.0, 'Satisfactory', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
-(1, 5, 17.5, 'Good work', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
-(1, 6, 14.0, 'Need improvement', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
-(1, 7, 18.5, 'Very good', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
-(1, 8, 16.0, 'Good progress', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
-(1, 9, 17.0, 'Well done', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07'),
-(1, 10, 15.5, 'Fair performance', 1, '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07', '2025-11-22 10:00:00+07');
-
--- Scores for Class 16, Writing Task 2 Assignment (assessment_id = 20)
--- Students 1-10 are enrolled in Class 16
+-- Scores for Class 1, Listening Quiz (assessment_id = 1)
 INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT
-    20,
-    s.id,
-    60 + floor(random() * 25)::int, -- Score between 60 and 84
-    'Initial writing assignment score',
-    5, -- Graded by Teacher 5 (Michael Brown)
-    '2025-12-01 10:00:00+07',
-    '2025-12-01 10:00:00+07',
-    '2025-12-01 10:00:00+07'
-FROM generate_series(1, 10) AS s(id);
+SELECT 1, e.student_id, 
+    14 + floor(random() * 7)::int, -- Score between 14 and 20
+    'Good listening comprehension.', 
+    1, -- Graded by Teacher 1
+    '2025-11-24 14:00:00+07',
+    '2025-11-24 14:00:00+07',
+    '2025-11-24 14:00:00+07'
+FROM enrollment e WHERE e.class_id = 1;
 
--- Scores for Speaking Quiz 1
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at) VALUES
-(2, 1, 17.0, 'Good fluency, work on pronunciation', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
-(2, 2, 18.0, 'Confident speaker', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
-(2, 3, 16.5, 'Good effort', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
-(2, 4, 15.0, 'Need more practice', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
-(2, 5, 19.0, 'Excellent speaking skills', 1, '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07');
+-- Scores for Class 1, Speaking Quiz (assessment_id = 2)
+INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
+SELECT 2, e.student_id, 
+    13 + floor(random() * 8)::int, -- Score between 13 and 20
+    'Clear pronunciation, keep practicing.', 
+    1, 
+    '2025-11-28 14:00:00+07',
+    '2025-11-28 14:00:00+07',
+    '2025-11-28 14:00:00+07'
+FROM enrollment e WHERE e.class_id = 1;
 
--- Assessments for Class 1 (COMPLETED)
-INSERT INTO assessment (id, class_id, subject_assessment_id, scheduled_date, actual_date, created_at, updated_at) VALUES
-(10, 1, 1, '2025-11-03 08:00:00+07', '2025-11-03 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-03 08:00:00+07'), -- Listening Quiz 1
-(11, 1, 2, '2025-11-07 08:00:00+07', '2025-11-07 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-07 08:00:00+07'), -- Speaking Quiz 1
-(12, 1, 3, '2025-11-17 08:00:00+07', '2025-11-17 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-17 08:00:00+07'), -- Reading Quiz 1
-(13, 1, 4, '2025-11-21 08:00:00+07', '2025-11-21 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-21 08:00:00+07'), -- Writing Assignment 1
-(14, 1, 5, '2025-11-26 08:00:00+07', '2025-11-26 08:00:00+07', '2025-10-27 08:00:00+07', '2025-11-26 08:00:00+07'), -- Midterm Exam
-(15, 1, 6, '2025-12-19 08:00:00+07', NULL, '2025-10-27 08:00:00+07', '2025-10-27 08:00:00+07'); -- Final Exam
-
--- Scores for Class 1, Midterm Exam (assessment_id = 14)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at)
-SELECT
-    14,
-    s.id,
+-- Scores for Class 1, Midterm (assessment_id = 3)
+INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
+SELECT 3, e.student_id, 
     60 + floor(random() * 35)::int, -- Score between 60 and 94
-    'Good overall performance on the midterm.',
-    3, -- Graded by Teacher 3
-    '2025-11-28 10:00:00+07'
-FROM generate_series(1, 15) AS s(id);
+    'Good midterm performance.', 
+    1, 
+    '2025-12-08 16:00:00+07',
+    '2025-12-08 16:00:00+07',
+    '2025-12-08 16:00:00+07'
+FROM enrollment e WHERE e.class_id = 1;
 
+-- Scores for Class 2, Listening Quiz (assessment_id = 5)
+INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
+SELECT 5, e.student_id, 
+    15 + floor(random() * 6)::int, -- Score between 15 and 20
+    'Excellent listening skills.', 
+    2, -- Graded by Teacher 2
+    '2025-12-08 14:00:00+07',
+    '2025-12-08 14:00:00+07',
+    '2025-12-08 14:00:00+07'
+FROM enrollment e WHERE e.class_id = 2;
 
+-- Scores for Class 6, Reading Quiz (assessment_id = 9)
+INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
+SELECT 9, e.student_id, 
+    14 + floor(random() * 7)::int, -- Score between 14 and 20
+    'Good reading comprehension.', 
+    6, -- Graded by Teacher 6
+    '2025-11-25 14:00:00+07',
+    '2025-11-25 14:00:00+07',
+    '2025-11-25 14:00:00+07'
+FROM enrollment e WHERE e.class_id = 6;
 
--- =========================================
--- ADDITIONAL SCORES FOR COMPLETED CLASSES
--- =========================================
-
--- Scores for Class 4 (IELTS Intermediate)
--- Assessment 30 (Writing)
+-- Scores for Class 6, Writing Assignment (assessment_id = 10)
 INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 30, e.student_id, 60 + floor(random() * 30)::int, 'Good effort on writing task.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 4;
-
-
--- Scores for Class 7 (IELTS Advanced)
--- Assessment 32 (Writing Portfolio)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 32, e.student_id, 70 + floor(random() * 25)::int, 'Strong portfolio.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 7;
--- Assessment 33 (Speaking)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 33, e.student_id, 75 + floor(random() * 20)::int, 'Fluent speaking.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 7;
--- Assessment 34 (Final)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 34, e.student_id, 70 + floor(random() * 25)::int, 'Advanced level achieved.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 7;
-
--- Scores for Class 10 (TOEIC Foundation)
--- Assessment 35 (Listening)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 35, e.student_id, 60 + floor(random() * 35)::int, 'Listening skills improving.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 10;
--- Assessment 36 (Reading)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 36, e.student_id, 55 + floor(random() * 40)::int, 'Keep practicing reading.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 10;
--- Assessment 37 (Final)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 37, e.student_id, 500 + floor(random() * 300)::int, 'TOEIC Foundation completed.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 10;
-
--- Scores for Class 13 (TOEIC Intermediate)
--- Assessment 38 (Midterm)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 38, e.student_id, 600 + floor(random() * 200)::int, 'Midterm progress good.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 13;
--- Assessment 39 (Final)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 39, e.student_id, 650 + floor(random() * 200)::int, 'Ready for Advanced level.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 13;
-
--- Scores for Class 16 (TOEIC Advanced)
--- Assessment 40 (Case Study)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 40, e.student_id, 75 + floor(random() * 20)::int, 'Good business analysis.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 16;
--- Assessment 21 (Final - Updated to completed)
-INSERT INTO score (assessment_id, student_id, score, feedback, graded_by, graded_at, created_at, updated_at)
-SELECT 21, e.student_id, 800 + floor(random() * 150)::int, 'Excellent TOEIC score.', 6, NOW(), NOW(), NOW()
-FROM enrollment e WHERE e.class_id = 16;
+SELECT 10, e.student_id, 
+    12 + floor(random() * 9)::int, -- Score between 12 and 20
+    'Work on essay structure.', 
+    6, 
+    '2025-11-29 14:00:00+07',
+    '2025-11-29 14:00:00+07',
+    '2025-11-29 14:00:00+07'
+FROM enrollment e WHERE e.class_id = 6;
 
 -- ========== TIER 8: FEEDBACK & QA (Vietnamese Content) ==========
+-- Simplified for 10 IELTS classes (1-10)
 
--- Student Feedback (Sample 50+ entries with Vietnamese comments)
--- Class 13 (High Perf): Positive feedback
+-- Class 1 (Foundation Early): Positive feedback from students 1-8 (Nguyen Van An -> Do Thi Huong)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
-SELECT 100 + s.id, 60 + s.id, 13, 1, true, '2025-08-20 10:00:00+07', 'Học viên rất hài lòng.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
+SELECT 100 + s.id, s.id, 1, 1, true, '2025-12-01 10:00:00+07', 'Học viên rất hài lòng với chất lượng giảng dạy.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
 SELECT f.id, q.id, 
     CASE WHEN q.question_type = 'rating' THEN 5 ELSE NULL END,
     NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 13;
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 1;
 
--- Class 14 (Average): Mixed feedback
+-- Class 6 (Intermediate Early): Mixed feedback from students 76-83 (Le Thi Cuc -> Tran Van Bach)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
-SELECT 200 + s.id, 70 + s.id, 14, 1, true, '2025-08-25 10:00:00+07', 'Cần cải thiện tốc độ giảng dạy.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
+SELECT 200 + s.id, 75 + s.id, 6, 3, true, '2025-12-02 10:00:00+07', 'Cần cải thiện tốc độ giảng dạy.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
 SELECT f.id, q.id, 
     CASE WHEN q.question_type = 'rating' THEN 3 + (f.id % 2) ELSE NULL END, -- Rating 3 or 4
     NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 14;
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 6;
 
--- Class 15 (At Risk): Negative feedback
+-- Class 3 (Foundation Parallel B): Average feedback from students 31-38 (Bui Xuan Hoang -> Do Thi Quyen)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
-SELECT 300 + s.id, 80 + s.id, 15, 1, true, '2025-07-30 10:00:00+07', 'Giáo viên thường xuyên đến muộn.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
+SELECT 300 + s.id, 30 + s.id, 3, 1, true, '2025-12-03 10:00:00+07', 'Giáo viên thường xuyên giải đáp thắc mắc.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
 SELECT f.id, q.id, 
-    CASE WHEN q.question_type = 'rating' THEN 2 ELSE NULL END, -- Rating 2
+    CASE WHEN q.question_type = 'rating' THEN 4 ELSE NULL END,
     NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 15;
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 3;
 
--- Class 2 (Ongoing High Perf): Recent feedback
+-- Class 2 (Foundation Parallel A): Recent feedback from students 16-20 (Vuong Thi Loan -> Nguyen Thi Linh)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
-SELECT 400 + s.id, s.id, 2, 1, true, '2025-10-28 10:00:00+07', 'Rất thích cách cô giáo tổ chức trò chơi.', NOW(), NOW() FROM generate_series(1, 5) AS s(id);
+SELECT 400 + s.id, 15 + s.id, 2, 1, true, '2025-12-08 10:00:00+07', 'Rất thích cách cô giáo tổ chức trò chơi.', NOW(), NOW() FROM generate_series(1, 5) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
 SELECT f.id, q.id, 
@@ -1517,7 +1200,7 @@ SELECT f.id, q.id,
     NOW(), NOW()
 FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 2;
 
--- Reset feedback 401 (student 1, class 2, phase 1) to pending for demo
+-- Reset feedback 401 (student 16 - Vuong Thi Loan, class 2, phase 1) to pending for demo
 DELETE FROM student_feedback_response WHERE feedback_id = 401;
 UPDATE student_feedback
 SET is_feedback = false,
@@ -1528,47 +1211,47 @@ WHERE id = 401;
 
 -- 1. Classroom Observation (Dự giờ) - Class 2 (Good)
 INSERT INTO qa_report (id, class_id, session_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
-(1, 2, 105, 10, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Giáo viên chuẩn bị bài kỹ lưỡng. Tương tác với học viên tốt. Không khí lớp học sôi nổi. Đề xuất giáo viên chia sẻ kinh nghiệm giảng dạy cho các giáo viên mới.', '2025-10-15 10:00:00+07', '2025-10-15 10:00:00+07'),
-(2, 2, 110, 10, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Học viên tham gia đầy đủ. Bài giảng đi đúng trọng tâm. Tiếp tục phát huy.', '2025-10-25 10:00:00+07', '2025-10-25 10:00:00+07');
+(1, 2, 105, 10, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Giáo viên chuẩn bị bài kỹ lưỡng. Tương tác với học viên tốt. Không khí lớp học sôi nổi. Đề xuất giáo viên chia sẻ kinh nghiệm giảng dạy cho các giáo viên mới.', '2025-12-05 10:00:00+07', '2025-12-05 10:00:00+07'),
+(2, 2, 110, 10, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Học viên tham gia đầy đủ. Bài giảng đi đúng trọng tâm. Tiếp tục phát huy.', '2025-12-08 10:00:00+07', '2025-12-08 10:00:00+07');
 
--- 2. Classroom Observation - Class 15 (Issues)
+-- 2. Classroom Observation - Class 4 (Online Foundation)
 INSERT INTO qa_report (id, class_id, session_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
-(3, 15, 1005, 11, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Giáo viên vào lớp muộn 10 phút. Lớp học ồn ào, thiếu kiểm soát. Nhắc nhở giáo viên về quy định giờ giấc. Cần có biện pháp quản lý lớp học tốt hơn.', '2025-07-25 10:00:00+07', '2025-07-25 10:00:00+07'),
-(4, 15, 1010, 11, 'CLASSROOM_OBSERVATION', 'DRAFT', 'Học viên ít tương tác. Giáo viên chỉ giảng bài một chiều. Cần tổ chức training về phương pháp giảng dạy tương tác.', '2025-08-05 10:00:00+07', '2025-08-05 10:00:00+07');
+(3, 4, 305, 11, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Lớp học trực tuyến diễn ra suôn sẻ. Đường truyền ổn định. Học viên tham gia đầy đủ camera và micro.', '2025-12-08 10:00:00+07', '2025-12-08 10:00:00+07'),
+(4, 4, 310, 11, 'CLASSROOM_OBSERVATION', 'DRAFT', 'Một số học viên ít tương tác. Cần khuyến khích tham gia nhiều hơn.', '2025-12-09 10:00:00+07', '2025-12-09 10:00:00+07');
 
 -- 3. Student Feedback Analysis (Phân tích phản hồi)
 INSERT INTO qa_report (id, class_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
-(5, 13, 10, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', '100% học viên hài lòng với khóa học. Điểm đánh giá trung bình 4.8/5. Khen thưởng giáo viên.', '2025-08-25 10:00:00+07', '2025-08-25 10:00:00+07'),
-(6, 14, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', 'Phản hồi trái chiều. Một số học viên phàn nàn về tốc độ giảng dạy. Trao đổi với giáo viên để điều chỉnh tốc độ phù hợp với trình độ học viên.', '2025-08-30 10:00:00+07', '2025-08-30 10:00:00+07'),
-(7, 15, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', 'Nhiều phản hồi tiêu cực về thái độ giáo viên và chất lượng bài giảng. Cần họp khẩn với giáo viên và Academic Manager để xem xét vấn đề.', '2025-08-05 10:00:00+07', '2025-08-05 10:00:00+07');
+(5, 1, 10, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', '100% học viên hài lòng với khóa học. Điểm đánh giá trung bình 4.8/5. Khen thưởng giáo viên.', '2025-12-05 10:00:00+07', '2025-12-05 10:00:00+07'),
+(6, 6, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', 'Phản hồi trái chiều. Một số học viên phàn nàn về tốc độ giảng dạy. Trao đổi với giáo viên để điều chỉnh tốc độ phù hợp với trình độ học viên.', '2025-12-06 10:00:00+07', '2025-12-06 10:00:00+07'),
+(7, 3, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', 'Phản hồi tích cực về nội dung bài giảng. Đề xuất tiếp tục phương pháp giảng dạy hiện tại.', '2025-12-07 10:00:00+07', '2025-12-07 10:00:00+07');
 
 -- 4. CLO Achievement Analysis (Đánh giá CLO)
 INSERT INTO qa_report (id, class_id, phase_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
-(8, 13, 1, 10, 'CLO_ACHIEVEMENT_ANALYSIS', 'SUBMITTED', 'Học viên đạt 90% chuẩn đầu ra Phase 1. Cho phép chuyển sang Phase 2.', '2025-08-15 10:00:00+07', '2025-08-15 10:00:00+07'),
-(9, 15, 1, 11, 'CLO_ACHIEVEMENT_ANALYSIS', 'SUBMITTED', 'Chỉ 60% học viên đạt chuẩn đầu ra. Kỹ năng Viết còn yếu. Tổ chức các buổi phụ đạo thêm về kỹ năng Viết.', '2025-08-01 10:00:00+07', '2025-08-01 10:00:00+07');
+(8, 1, 1, 10, 'CLO_ACHIEVEMENT_ANALYSIS', 'SUBMITTED', 'Học viên đạt 90% chuẩn đầu ra Phase 1. Cho phép chuyển sang Phase 2.', '2025-12-05 10:00:00+07', '2025-12-05 10:00:00+07'),
+(9, 6, 3, 11, 'CLO_ACHIEVEMENT_ANALYSIS', 'SUBMITTED', '85% học viên đạt chuẩn đầu ra. Kỹ năng Viết cần được tăng cường thêm.', '2025-12-06 10:00:00+07', '2025-12-06 10:00:00+07');
 
 -- 5. Attendance & Engagement Review (Đánh giá chuyên cần)
 INSERT INTO qa_report (id, class_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
-(10, 7, 11, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'SUBMITTED', 'Tỷ lệ chuyên cần thấp (dưới 80%). Nhiều học viên nghỉ không phép. Liên hệ phụ huynh để thông báo tình hình. Cảnh báo học viên về nguy cơ cấm thi.', '2025-10-25 10:00:00+07', '2025-10-25 10:00:00+07'),
-(11, 2, 10, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'SUBMITTED', 'Tỷ lệ chuyên cần cao (>95%). Tiếp tục duy trì.', '2025-10-20 10:00:00+07', '2025-10-20 10:00:00+07');
+(10, 7, 11, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'SUBMITTED', 'Tỷ lệ chuyên cần cao (>90%). Học viên tham gia tích cực. Tiếp tục duy trì.', '2025-12-08 10:00:00+07', '2025-12-08 10:00:00+07'),
+(11, 2, 10, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'SUBMITTED', 'Tỷ lệ chuyên cần cao (>95%). Tiếp tục duy trì.', '2025-12-07 10:00:00+07', '2025-12-07 10:00:00+07');
 
 -- 6. Teaching Quality Assessment (Đánh giá chất lượng giảng dạy)
 INSERT INTO qa_report (id, class_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
-(12, 1, 10, 'TEACHING_QUALITY_ASSESSMENT', 'SUBMITTED', 'Giáo viên có chuyên môn vững, phương pháp sư phạm tốt. Đề xuất tăng lương hoặc thăng cấp bậc.', '2025-09-05 10:00:00+07', '2025-09-05 10:00:00+07'),
-(13, 16, 10, 'TEACHING_QUALITY_ASSESSMENT', 'DRAFT', 'Giáo viên còn lúng túng khi xử lý tình huống sư phạm. Cần tham gia khóa đào tạo kỹ năng quản lý lớp học.', '2025-10-30 10:00:00+07', '2025-10-30 10:00:00+07');
+(12, 1, 10, 'TEACHING_QUALITY_ASSESSMENT', 'SUBMITTED', 'Giáo viên có chuyên môn vững, phương pháp sư phạm tốt. Đề xuất tăng lương hoặc thăng cấp bậc.', '2025-12-05 10:00:00+07', '2025-12-05 10:00:00+07'),
+(13, 8, 10, 'TEACHING_QUALITY_ASSESSMENT', 'DRAFT', 'Giáo viên cần cải thiện kỹ năng quản lý lớp học online. Đề xuất tham gia khóa đào tạo.', '2025-12-09 10:00:00+07', '2025-12-09 10:00:00+07');
 
 -- 7. Phase Review (Đánh giá giai đoạn)
 INSERT INTO qa_report (id, class_id, phase_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
-(14, 2, 1, 10, 'PHASE_REVIEW', 'SUBMITTED', 'Hoàn thành Phase 1 đúng tiến độ. Kết quả kiểm tra giữa kỳ khả quan. Chuẩn bị tài liệu cho Phase 2.', '2025-10-28 10:00:00+07', '2025-10-28 10:00:00+07'),
-(15, 16, 1, 10, 'PHASE_REVIEW', 'DRAFT', 'Tiến độ chậm hơn dự kiến 2 buổi. Cần bố trí lịch học bù để đuổi kịp chương trình.', '2025-10-30 10:00:00+07', '2025-10-30 10:00:00+07');
+(14, 2, 1, 10, 'PHASE_REVIEW', 'SUBMITTED', 'Hoàn thành Phase 1 đúng tiến độ. Kết quả kiểm tra giữa kỳ khả quan. Chuẩn bị tài liệu cho Phase 2.', '2025-12-08 10:00:00+07', '2025-12-08 10:00:00+07'),
+(15, 9, 3, 10, 'PHASE_REVIEW', 'DRAFT', 'Lớp online cần tăng cường hoạt động tương tác. Đề xuất bổ sung thêm các bài tập nhóm.', '2025-12-09 10:00:00+07', '2025-12-09 10:00:00+07');
 
--- 8. General Reports
+-- 8. Additional Reports
 INSERT INTO qa_report (id, class_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
-(16, 5, 11, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Lớp học trực tuyến (Online) diễn ra suôn sẻ, đường truyền ổn định. Đảm bảo duy trì chất lượng kỹ thuật.', '2025-10-15 10:00:00+07', '2025-10-15 10:00:00+07'),
-(17, 18, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', 'Học viên đánh giá cao sự nhiệt tình của trợ giảng (TA). Khen thưởng đội ngũ TA.', '2025-10-28 10:00:00+07', '2025-10-28 10:00:00+07'),
-(18, 3, 10, 'CLO_ACHIEVEMENT_ANALYSIS', 'SUBMITTED', 'Kỹ năng Nói của học viên lớp Online thấp hơn so với lớp Offline. Tăng cường các hoạt động Speaking trong giờ học Online.', '2025-10-20 10:00:00+07', '2025-10-20 10:00:00+07'),
-(19, 6, 11, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'SUBMITTED', 'Lớp buổi tối thường xuyên có học viên đến muộn do tắc đường. Xem xét lùi giờ học xuống 15 phút nếu khả thi.', '2025-10-22 10:00:00+07', '2025-10-22 10:00:00+07'),
-(20, 4, 10, 'TEACHING_QUALITY_ASSESSMENT', 'DRAFT', 'Chưa có dữ liệu đánh giá (Lớp chưa bắt đầu). Lên kế hoạch dự giờ ngay tuần đầu tiên.', '2025-11-01 10:00:00+07', '2025-11-01 10:00:00+07');
+(16, 5, 11, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Lớp SCHEDULED chưa bắt đầu. Lên kế hoạch dự giờ tuần đầu tiên.', '2025-12-10 10:00:00+07', '2025-12-10 10:00:00+07'),
+(17, 10, 11, 'ATTENDANCE_ENGAGEMENT_REVIEW', 'SUBMITTED', 'Lớp SCHEDULED. Chuẩn bị theo dõi chuyên cần ngay từ buổi đầu.', '2025-12-10 10:00:00+07', '2025-12-10 10:00:00+07'),
+(18, 3, 10, 'CLO_ACHIEVEMENT_ANALYSIS', 'SUBMITTED', 'Kỹ năng Nói của học viên tốt. Tiếp tục duy trì phương pháp giảng dạy.', '2025-12-07 10:00:00+07', '2025-12-07 10:00:00+07'),
+(19, 6, 11, 'TEACHING_QUALITY_ASSESSMENT', 'SUBMITTED', 'Giáo viên có kinh nghiệm. Bài giảng chất lượng cao.', '2025-12-08 10:00:00+07', '2025-12-08 10:00:00+07'),
+(20, 4, 10, 'PHASE_REVIEW', 'DRAFT', 'Lớp online đang đi đúng tiến độ. Đề xuất duy trì chất lượng kỹ thuật.', '2025-12-09 10:00:00+07', '2025-12-09 10:00:00+07');
 
 -- ================================================================================================
 -- TEST DATA FOR TRANSFER REQUEST (SMART FILTERING)
@@ -1743,76 +1426,26 @@ SELECT setval('time_slot_template_id_seq', (SELECT MAX(id) FROM time_slot_templa
 SELECT setval('resource_id_seq', (SELECT MAX(id) FROM resource), true);
 SELECT setval('feedback_question_id_seq', (SELECT MAX(id) FROM feedback_question), true);
 SELECT setval('enrollment_id_seq', (SELECT MAX(id) FROM enrollment), true);
--- Sample notifications for different users and scenarios
--- =====================================================
--- NOTIFICATION DATA
--- =====================================================
-
--- Academic Affairs notifications
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'staff.huong.hn@tms-edu.vn'), 'REQUEST', 'Yêu cầu chuyển lớp chờ duyệt', 'Học sinh Nguyen Van A yêu cầu chuyển từ lớp HSK1-101 sang HSK2-201', 'UNREAD', CURRENT_TIMESTAMP - INTERVAL '1 day', NULL);
-
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'staff.huong.hn@tms-edu.vn'), 'REQUEST', 'Yêu cầu nghỉ học chờ duyệt', 'Học sinh Tran Thi B yêu cầu nghỉ buổi học ngày 2025-11-15', 'UNREAD', CURRENT_TIMESTAMP - INTERVAL '2 hours', NULL);
-
--- Teacher notifications
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'john.smith@tms-edu.vn'), 'REMINDER', 'Nhắc nhở buổi học', 'Lớp HSK1-101 sẽ bắt đầu vào lúc 09:00 ngày mai tại phòng Room-A', 'UNREAD', CURRENT_TIMESTAMP - INTERVAL '3 hours', NULL);
-
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'john.smith@tms-edu.vn'), 'REMINDER', 'Nhắc nhở cung cấp phản hồi', 'Vui lòng cung cấp phản hồi cho khóa học Foundation Level sau khi hoàn thành', 'READ', CURRENT_TIMESTAMP - INTERVAL '1 week', CURRENT_TIMESTAMP - INTERVAL '1 week');
-
--- Student notifications
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'student.0001@gmail.com'), 'NOTIFICATION', 'Thông báo điểm số', 'Điểm bài kiểm tra giữa kỳ của bạn đã có: 8.5/10', 'UNREAD', CURRENT_TIMESTAMP - INTERVAL '6 hours', NULL);
-
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'student.0001@gmail.com'), 'REMINDER', 'Hạn nộp bài tập', 'Bài tập cuối tuần sẽ hết hạn vào ngày 2025-11-27 23:59', 'UNREAD', CURRENT_TIMESTAMP - INTERVAL '12 hours', NULL);
-
--- Center Head notifications
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'head.hn01@tms-edu.vn'), 'SYSTEM', 'Cảnh báo giấy phép Zoom', 'Giấy phép Zoom cho phòng Room-B sẽ hết hạn trong 15 ngày', 'UNREAD', CURRENT_TIMESTAMP - INTERVAL '4 hours', NULL);
-
--- System notifications for multiple users
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'john.smith@tms-edu.vn'), 'SYSTEM', 'Bảo trì hệ thống', 'Hệ thống sẽ bảo trì từ 02:00-04:00 ngày 2025-11-28', 'UNREAD', CURRENT_TIMESTAMP - INTERVAL '30 minutes', NULL);
-
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'staff.huong.hn@tms-edu.vn'), 'SYSTEM', 'Bảo trì hệ thống', 'Hệ thống sẽ bảo trì từ 02:00-04:00 ngày 2025-11-28', 'UNREAD', CURRENT_TIMESTAMP - INTERVAL '30 minutes', NULL);
-
--- Read notifications for testing
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'student.0002@gmail.com'), 'NOTIFICATION', 'Buổi học đã di chuyển', 'Lớp HSK1-102 ngày 2025-11-20 đã được chuyển sang phòng Room-C', 'READ', CURRENT_TIMESTAMP - INTERVAL '3 days', CURRENT_TIMESTAMP - INTERVAL '1 day');
-
-INSERT INTO notification (recipient_id, type, title, message, status, created_at, read_at) VALUES
-((SELECT id FROM user_account WHERE email = 'emma.wilson@tms-edu.vn'), 'REQUEST', 'Yêu cầu thay thế đã duyệt', 'Yêu cầu dạy thay lớp HSK2-201 ngày 2025-11-15 đã được duyệt', 'READ', CURRENT_TIMESTAMP - INTERVAL '5 days', CURRENT_TIMESTAMP - INTERVAL '4 days');
-
--- ================================================================================================
--- TEST DATA FOR TEACHER CLASS REGISTRATION FLOW
--- Context Date: 2025-12-10
--- This section creates test data for the new Teacher Registration flow:
--- 1. Classes with APPROVED status needing teacher registration
--- 2. Teacher registration records in various statuses
--- ================================================================================================
 
 -- 1. Create new classes that are APPROVED but need teacher assignment (with registration open)
 -- These classes have registration_open_date and registration_close_date set
 -- Using relative dates (NOW()) to ensure seed data always works
+-- NOTE: Only subject_id 1 (Foundation) and 2 (Intermediate) exist
 INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date, planned_end_date, schedule_days, max_capacity, status, approval_status, created_by, decided_by, submitted_at, decided_at, registration_open_date, registration_close_date, created_at, updated_at) VALUES
 -- Class 201: Registration OPEN (closes in 5 days) - no registrations yet
 (201, 1, 1, 'HN-IELTS-REG-1', 'HN IELTS Foundation - Teacher Registration Test 1', 'OFFLINE', (CURRENT_DATE + INTERVAL '30 days')::DATE, (CURRENT_DATE + INTERVAL '90 days')::DATE, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '10 days', NOW() - INTERVAL '9 days', NOW() - INTERVAL '3 days', NOW() + INTERVAL '5 days', NOW() - INTERVAL '10 days', NOW()),
 -- Class 202: Registration OPEN (closes in 3 days) - has multiple registrations
 (202, 1, 2, 'HN-IELTS-REG-2', 'HN IELTS Intermediate - Teacher Registration Test 2', 'OFFLINE', (CURRENT_DATE + INTERVAL '35 days')::DATE, (CURRENT_DATE + INTERVAL '95 days')::DATE, ARRAY[2,4,6]::smallint[], 18, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '9 days', NOW() - INTERVAL '8 days', NOW() - INTERVAL '3 days', NOW() + INTERVAL '3 days', NOW() - INTERVAL '9 days', NOW()),
--- Class 203: Registration CLOSED, teacher already assigned via registration
-(203, 1, 3, 'HN-IELTS-REG-3', 'HN IELTS Advanced - Teacher Assigned Test', 'ONLINE', (CURRENT_DATE + INTERVAL '25 days')::DATE, (CURRENT_DATE + INTERVAL '100 days')::DATE, ARRAY[1,3,5]::smallint[], 15, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '15 days', NOW() - INTERVAL '14 days', NOW() - INTERVAL '12 days', NOW() - INTERVAL '2 days', NOW() - INTERVAL '15 days', NOW()),
--- Class 204: Registration CLOSED, teacher directly assigned by AA (no registration)
-(204, 1, 4, 'HN-TOEIC-REG-1', 'HN TOEIC Foundation - Direct Assign Test', 'OFFLINE', (CURRENT_DATE + INTERVAL '45 days')::DATE, (CURRENT_DATE + INTERVAL '100 days')::DATE, ARRAY[2,4,6]::smallint[], 22, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '12 days', NOW() - INTERVAL '11 days', NOW() - INTERVAL '15 days', NOW() - INTERVAL '5 days', NOW() - INTERVAL '12 days', NOW()),
--- Class 205: HCM Branch - Registration OPEN
-(205, 2, 5, 'HCM-TOEIC-REG-1', 'HCM TOEIC Intermediate - Teacher Registration Test', 'OFFLINE', (CURRENT_DATE + INTERVAL '40 days')::DATE, (CURRENT_DATE + INTERVAL '95 days')::DATE, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 8, 4, NOW() - INTERVAL '8 days', NOW() - INTERVAL '7 days', NOW() - INTERVAL '3 days', NOW() + INTERVAL '7 days', NOW() - INTERVAL '8 days', NOW()),
+-- Class 203: Registration CLOSED, teacher already assigned via registration (Foundation)
+(203, 1, 1, 'HN-IELTS-REG-3', 'HN IELTS Foundation - Teacher Assigned Test', 'ONLINE', (CURRENT_DATE + INTERVAL '25 days')::DATE, (CURRENT_DATE + INTERVAL '100 days')::DATE, ARRAY[1,3,5]::smallint[], 15, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '15 days', NOW() - INTERVAL '14 days', NOW() - INTERVAL '12 days', NOW() - INTERVAL '2 days', NOW() - INTERVAL '15 days', NOW()),
+-- Class 204: Registration CLOSED, teacher directly assigned by AA (Intermediate)
+(204, 1, 2, 'HN-IELTS-REG-4', 'HN IELTS Intermediate - Direct Assign Test', 'OFFLINE', (CURRENT_DATE + INTERVAL '45 days')::DATE, (CURRENT_DATE + INTERVAL '100 days')::DATE, ARRAY[2,4,6]::smallint[], 22, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '12 days', NOW() - INTERVAL '11 days', NOW() - INTERVAL '15 days', NOW() - INTERVAL '5 days', NOW() - INTERVAL '12 days', NOW()),
+-- Class 205: HCM Branch - Registration OPEN (Foundation)
+(205, 2, 1, 'HCM-IELTS-REG-1', 'HCM IELTS Foundation - Teacher Registration Test', 'OFFLINE', (CURRENT_DATE + INTERVAL '40 days')::DATE, (CURRENT_DATE + INTERVAL '95 days')::DATE, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', 8, 4, NOW() - INTERVAL '8 days', NOW() - INTERVAL '7 days', NOW() - INTERVAL '3 days', NOW() + INTERVAL '7 days', NOW() - INTERVAL '8 days', NOW()),
 -- Class 206: ONLINE class - Registration OPEN (test for online modality)
 (206, 1, 1, 'HN-IELTS-ONLINE-1', 'IELTS Foundation Online - Any Branch Teacher', 'ONLINE', (CURRENT_DATE + INTERVAL '28 days')::DATE, (CURRENT_DATE + INTERVAL '85 days')::DATE, ARRAY[2,4]::smallint[], 25, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '5 days', NOW() - INTERVAL '4 days', NOW() - INTERVAL '2 days', NOW() + INTERVAL '10 days', NOW() - INTERVAL '5 days', NOW()),
--- Class 207: Registration OPEN but starts soon - has 1 registration
-(207, 1, 2, 'HN-IELTS-URGENT-1', 'HN IELTS Intermediate - Urgent Need Teacher', 'OFFLINE', (CURRENT_DATE + INTERVAL '14 days')::DATE, (CURRENT_DATE + INTERVAL '75 days')::DATE, ARRAY[1,3,5]::smallint[], 16, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '7 days', NOW() - INTERVAL '6 days', NOW() - INTERVAL '4 days', NOW() + INTERVAL '2 days', NOW() - INTERVAL '7 days', NOW());
+-- Class 207: Registration OPEN but starts soon - has 1 registration (Intermediate)
+(207, 1, 2, 'HN-IELTS-REG-5', 'HN IELTS Intermediate - Urgent Need Teacher', 'OFFLINE', (CURRENT_DATE + INTERVAL '14 days')::DATE, (CURRENT_DATE + INTERVAL '75 days')::DATE, ARRAY[1,3,5]::smallint[], 16, 'SCHEDULED', 'APPROVED', 6, 3, NOW() - INTERVAL '7 days', NOW() - INTERVAL '6 days', NOW() - INTERVAL '4 days', NOW() + INTERVAL '2 days', NOW() - INTERVAL '7 days', NOW());
 
 -- 2. Update Class 203 to have assigned teacher (Teacher 1 - John Smith)
 UPDATE "class" SET 
@@ -1826,7 +1459,7 @@ UPDATE "class" SET
   assigned_teacher_id = 5,
   teacher_assigned_at = NOW() - INTERVAL '6 days',
   teacher_assigned_by = 6,
-  direct_assign_reason = 'Chỉ có một giáo viên có chứng chỉ TOEIC phù hợp với lịch dạy của lớp này'
+  direct_assign_reason = 'Giáo viên có kinh nghiệm IELTS phù hợp nhất với lịch dạy của lớp này'
 WHERE id = 204;
 
 -- 4. Teacher Class Registrations for Class 202 (Multiple registrations, PENDING)
@@ -1841,9 +1474,9 @@ INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, 
 -- 5. Teacher Class Registrations for Class 203 (One approved, others rejected)
 INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, reviewed_at, reviewed_by, rejection_reason, created_at, updated_at) VALUES
 -- Teacher 1 (John Smith) - APPROVED (this is the assigned teacher)
-(4, 1, 203, 'APPROVED', 'Tôi có kinh nghiệm dạy IELTS Advanced và đạt band 9.0.', NOW() - INTERVAL '10 days', NOW() - INTERVAL '3 days', 6, NULL, NOW() - INTERVAL '10 days', NOW()),
+(4, 1, 203, 'APPROVED', 'Tôi có kinh nghiệm dạy IELTS Foundation và đạt band 9.0.', NOW() - INTERVAL '10 days', NOW() - INTERVAL '3 days', 6, NULL, NOW() - INTERVAL '10 days', NOW()),
 -- Teacher 4 (Sarah Johnson) - REJECTED
-(5, 4, 203, 'REJECTED', 'Tôi muốn thử thách bản thân với lớp Advanced.', NOW() - INTERVAL '9 days', NOW() - INTERVAL '3 days', 6, 'Đã chọn giáo viên khác phù hợp hơn với trình độ Advanced.', NOW() - INTERVAL '9 days', NOW());
+(5, 4, 203, 'REJECTED', 'Tôi muốn đăng ký dạy lớp Foundation này.', NOW() - INTERVAL '9 days', NOW() - INTERVAL '3 days', 6, 'Đã chọn giáo viên khác phù hợp hơn.', NOW() - INTERVAL '9 days', NOW());
 
 -- 6. Teacher Class Registrations for Class 201 (No registrations yet - empty)
 -- This class is used to test empty registration list
@@ -1856,7 +1489,7 @@ INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, 
 -- 8. HCM Teacher registrations for Class 205
 INSERT INTO teacher_class_registration (id, teacher_id, class_id, status, note, registered_at, created_at, updated_at) VALUES
 -- Teacher 10 (HCM teacher) - PENDING
-(7, 10, 205, 'PENDING', 'Tôi có kinh nghiệm dạy TOEIC Intermediate tại chi nhánh HCM.', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', NOW()),
+(7, 10, 205, 'PENDING', 'Tôi có kinh nghiệm dạy IELTS tại chi nhánh HCM.', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', NOW()),
 -- Teacher 11 (HCM teacher) - PENDING
 (8, 11, 205, 'PENDING', NULL, NOW() - INTERVAL '6 hours', NOW() - INTERVAL '6 hours', NOW());
 
