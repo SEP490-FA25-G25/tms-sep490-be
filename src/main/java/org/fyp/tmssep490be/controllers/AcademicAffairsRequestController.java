@@ -6,6 +6,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
 import org.fyp.tmssep490be.dtos.schedule.WeeklyScheduleResponseDTO;
 import org.fyp.tmssep490be.dtos.studentrequest.*;
+import org.fyp.tmssep490be.entities.UserAccount;
+import org.fyp.tmssep490be.exceptions.BusinessRuleException;
+import org.fyp.tmssep490be.repositories.UserAccountRepository;
+import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.fyp.tmssep490be.security.UserPrincipal;
 import org.fyp.tmssep490be.services.StudentRequestService;
 import org.fyp.tmssep490be.services.StudentScheduleService;
@@ -17,6 +21,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/academic-requests")
@@ -26,6 +32,8 @@ public class AcademicAffairsRequestController {
 
     private final StudentRequestService studentRequestService;
     private final StudentScheduleService studentScheduleService;
+    private final UserBranchesRepository userBranchesRepository;
+    private final UserAccountRepository userAccountRepository;
 
     @GetMapping("/pending")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
@@ -102,6 +110,34 @@ public class AcademicAffairsRequestController {
         Page<AARequestResponseDTO> requests = studentRequestService.getAllRequests(currentUser.getId(), filter);
 
         return ResponseEntity.ok(ResponseObject.success("Retrieved all requests successfully", requests));
+    }
+
+    @GetMapping("/staff")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<AAStaffDTO>>> getAAStaffForFilters(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        // Get current user's assigned branches
+        List<Long> userBranchIds = userBranchesRepository.findBranchIdsByUserId(currentUser.getId());
+
+        if (userBranchIds.isEmpty()) {
+            throw new BusinessRuleException("ACCESS_DENIED",
+                "User is not assigned to any branch. Contact administrator.");
+        }
+
+        // Find all AA users in the same branches (using role code "ACADEMIC_AFFAIR")
+        List<UserAccount> aaStaff = userAccountRepository.findByRoleCodeAndBranches("ACADEMIC_AFFAIR", userBranchIds);
+
+        // Map to simplified DTO
+        List<AAStaffDTO> staffList = aaStaff.stream()
+                .map(user -> AAStaffDTO.builder()
+                        .id(user.getId())
+                        .fullName(user.getFullName())
+                        .email(user.getEmail())
+                        .build())
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ResponseObject.success("Retrieved AA staff successfully", staffList));
     }
 
     @GetMapping("/{requestId}")
