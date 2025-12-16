@@ -77,6 +77,7 @@ public class SubjectService {
                         .levelName(subject.getLevel() != null ? subject.getLevel().getName() : null)
                         .status(subject.getStatus() != null ? subject.getStatus().name() : null)
                         .approvalStatus(subject.getApprovalStatus() != null ? subject.getApprovalStatus().name() : null)
+                        .requesterName(subject.getCreatedBy() != null ? subject.getCreatedBy().getFullName() : null)
                         .rejectionReason(subject.getRejectionReason())
                         .submittedAt(subject.getSubmittedAt())
                         .decidedAt(subject.getDecidedAt())
