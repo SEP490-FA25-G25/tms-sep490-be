@@ -29,9 +29,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
-import java.util.stream.Collectors;
-import java.util.List;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -60,6 +57,31 @@ public class TeacherClassService {
     
     // Chuyển đổi ClassEntity sang TeacherClassListItemDTO
     private TeacherClassListItemDTO mapToTeacherClassListItemDTO(ClassEntity classEntity) {
+        // Lấy toàn bộ buổi học của lớp
+        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
+
+        int totalSessions = sessions.size();
+
+        // Tính tổng điểm danh (present/absent) để lấy attendanceRate
+        long totalPresent = 0;
+        long totalAbsent = 0;
+
+        for (Session session : sessions) {
+            List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(session.getId());
+            totalPresent += studentSessions.stream()
+                    .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                    .count();
+            totalAbsent += studentSessions.stream()
+                    .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                    .count();
+        }
+
+        Double attendanceRate = null;
+        long attendanceRecords = totalPresent + totalAbsent;
+        if (attendanceRecords > 0) {
+            attendanceRate = (double) totalPresent / attendanceRecords;
+        }
+
         return TeacherClassListItemDTO.builder()
                 .id(classEntity.getId())
                 .code(classEntity.getCode())
@@ -75,9 +97,8 @@ public class TeacherClassService {
                 .startDate(classEntity.getStartDate())
                 .plannedEndDate(classEntity.getPlannedEndDate())
                 .status(classEntity.getStatus())
-                // Tính toán tổng số buổi học từ SessionRepository
-                .totalSessions(null)
-                .attendanceRate(null)
+                .totalSessions(totalSessions)
+                .attendanceRate(attendanceRate)
                 .build();
     }
 
