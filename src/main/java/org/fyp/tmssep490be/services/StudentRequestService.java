@@ -1671,10 +1671,12 @@ public class StudentRequestService {
         // 11. Execute transfer inline (no nested @Transactional)
         log.info("Executing transfer for request {}", request.getId());
         
-        // Find the last session of OLD class before effective date
+        // Find the last session the student ACTUALLY attended in the old class
+        // This should be the latest session that is DONE or has a date before today
+        LocalDate today = LocalDate.now();
         List<Session> oldClassSessions = sessionRepository.findAllByClassIdOrderByDateAndTime(currentClass.getId())
                 .stream()
-                .filter(s -> s.getDate().isBefore(dto.getEffectiveDate()))
+                .filter(s -> s.getStatus() == SessionStatus.DONE || s.getDate().isBefore(today))
                 .sorted((s1, s2) -> s2.getDate().compareTo(s1.getDate()))
                 .toList();
         
@@ -1706,10 +1708,15 @@ public class StudentRequestService {
         log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
                 newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
 
-        // Mark future StudentSessions from old class as transferred
-        List<StudentSession> futureOldSessions = studentSessionRepository
-                .findByStudentIdAndClassEntityIdAndSessionDateAfterOrEqual(
-                        studentId, currentClass.getId(), dto.getEffectiveDate());
+        // Mark all sessions AFTER lastSessionInOldClass as transferred
+        // This includes any sessions the student hasn't attended yet
+        Long lastSessionId = lastSessionInOldClass != null ? lastSessionInOldClass.getId() : 0L;
+        List<StudentSession> allOldClassSessions = studentSessionRepository
+                .findByStudentIdAndClassEntityId(studentId, currentClass.getId());
+        
+        List<StudentSession> futureOldSessions = allOldClassSessions.stream()
+                .filter(ss -> ss.getSession().getId() > lastSessionId)
+                .toList();
 
         for (StudentSession ss : futureOldSessions) {
             ss.setAttendanceStatus(AttendanceStatus.ABSENT);
@@ -1906,10 +1913,12 @@ public class StudentRequestService {
             throw new BusinessRuleException("ENROLLMENT_NOT_FOUND", "Current enrollment not found");
         }
 
-        // Find the last session of OLD class before effective date
+        // Find the last session the student ACTUALLY attended in the old class
+        // This should be the latest session that is DONE or has a date before today
+        LocalDate today = LocalDate.now();
         List<Session> oldClassSessions = sessionRepository.findAllByClassIdOrderByDateAndTime(currentClass.getId())
                 .stream()
-                .filter(s -> s.getDate().isBefore(effectiveDate))
+                .filter(s -> s.getStatus() == SessionStatus.DONE || s.getDate().isBefore(today))
                 .sorted((s1, s2) -> s2.getDate().compareTo(s1.getDate()))
                 .toList();
         
@@ -1940,11 +1949,15 @@ public class StudentRequestService {
         log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
                 newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
 
-        // 4. Mark future StudentSessions from old class as transferred (from effectiveDate onwards)
-        // Query StudentSession directly instead of Session to ensure we only update existing records
-        List<StudentSession> futureOldSessions = studentSessionRepository
-                .findByStudentIdAndClassEntityIdAndSessionDateAfterOrEqual(
-                        studentId, currentClass.getId(), effectiveDate);
+        // 4. Mark all sessions AFTER lastSessionInOldClass as transferred
+        // This includes any sessions the student hasn't attended yet
+        Long lastSessionId = lastSessionInOldClass != null ? lastSessionInOldClass.getId() : 0L;
+        List<StudentSession> allOldClassSessions = studentSessionRepository
+                .findByStudentIdAndClassEntityId(studentId, currentClass.getId());
+        
+        List<StudentSession> futureOldSessions = allOldClassSessions.stream()
+                .filter(ss -> ss.getSession().getId() > lastSessionId)
+                .toList();
 
         for (StudentSession ss : futureOldSessions) {
             ss.setAttendanceStatus(AttendanceStatus.ABSENT);
