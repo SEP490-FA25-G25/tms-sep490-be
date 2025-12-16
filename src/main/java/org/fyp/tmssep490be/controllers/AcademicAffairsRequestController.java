@@ -241,15 +241,14 @@ public class AcademicAffairsRequestController {
 
     @GetMapping("/transfer-options")
     @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
-    public ResponseEntity<ResponseObject<TransferOptionsResponseDTO>> getFlexibleTransferOptions(
+    public ResponseEntity<ResponseObject<TransferOptionsResponseDTO>> getTransferOptions(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @RequestParam Long currentClassId,
-            @RequestParam(required = false) Long targetBranchId,
             @RequestParam(required = false) String targetModality,
             @RequestParam(required = false) Boolean scheduleOnly) {
 
         TransferOptionsResponseDTO response = studentRequestService.getTransferOptionsFlexible(
-                currentClassId, targetBranchId, targetModality, scheduleOnly);
+                currentClassId, targetModality, scheduleOnly);
 
         return ResponseEntity.ok(ResponseObject.success("Retrieved transfer options successfully", response));
     }

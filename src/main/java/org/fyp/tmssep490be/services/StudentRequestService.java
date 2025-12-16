@@ -1413,39 +1413,48 @@ public class StudentRequestService {
                 .build();
     }
 
+    /**
+     * Lấy danh sách lớp có thể chuyển cho sinh viên
+     * 
+     * POLICY: LUÔN LUÔN cùng chi nhánh (same-branch only)
+     * - Chỉ tìm lớp cùng môn học (subject), cùng chi nhánh (branch)
+     * - Content gap ≤ 2 sessions (chênh lệch tiến độ không quá 2 buổi)
+     * - Lớp đích phải đang SCHEDULED hoặc ONGOING và còn chỗ trống
+     * 
+     * @param currentClassId ID lớp hiện tại
+     * @param targetModality Filter theo modality (OFFLINE/ONLINE), null = tất cả
+     * @param scheduleOnly Chỉ đổi lịch (giữ nguyên modality), true = lock modality
+     * @return TransferOptionsResponseDTO với danh sách lớp khả dụng, đã sort theo độ tương thích
+     */
     public TransferOptionsResponseDTO getTransferOptionsFlexible(
-            Long currentClassId, Long targetBranchId, String targetModality, Boolean scheduleOnly) {
+            Long currentClassId, String targetModality, Boolean scheduleOnly) {
 
         ClassEntity currentClass = classRepository.findById(currentClassId)
                 .orElseThrow(() -> new ResourceNotFoundException("Current class not found with ID: " + currentClassId));
 
-        // Build filter parameters
+        // Build filter parameters - ALWAYS same branch
         Long subjectId = currentClass.getSubject().getId();
         Long excludeClassId = currentClassId;
         List<org.fyp.tmssep490be.entities.enums.ClassStatus> statuses = List.of(
                 org.fyp.tmssep490be.entities.enums.ClassStatus.SCHEDULED, 
                 org.fyp.tmssep490be.entities.enums.ClassStatus.ONGOING);
-        Long branchId = currentClass.getBranch().getId();
+        Long branchId = currentClass.getBranch().getId(); // ⚠️ LOCKED to current branch
         org.fyp.tmssep490be.entities.enums.Modality modality = null;
 
-        // SAME-BRANCH VALIDATION: targetBranchId must equal current class branch (defensive)
-        if (targetBranchId != null && !targetBranchId.equals(branchId)) {
-            throw new BusinessRuleException("CROSS_BRANCH_NOT_SUPPORTED",
-                "Không thể chuyển sang lớp ở chi nhánh khác. " +
-                "Vui lòng liên hệ Sale để đăng ký lớp mới tại chi nhánh mong muốn.");
-        }
-
-        // Modality handling: if scheduleOnly => lock to current modality; else allow override
+        // Modality filter logic
         if (Boolean.TRUE.equals(scheduleOnly)) {
+            // scheduleOnly=true → Lock cả modality (chỉ đổi slot thời gian)
             modality = currentClass.getModality();
         } else if (targetModality != null) {
+            // targetModality specified → Filter theo modality đó
             try {
                 modality = org.fyp.tmssep490be.entities.enums.Modality.valueOf(targetModality);
             } catch (IllegalArgumentException e) {
                 throw new BusinessRuleException("INVALID_MODALITY",
-                    "Invalid modality: " + targetModality + ". Must be OFFLINE or ONLINE");
+                    "Modality không hợp lệ: " + targetModality + ". Chỉ chấp nhận OFFLINE hoặc ONLINE.");
             }
         }
+        // else: targetModality = null → Tìm cả OFFLINE và ONLINE
 
         List<ClassEntity> targetClasses = classRepository.findByFlexibleCriteria(
             subjectId, excludeClassId, statuses, branchId, modality);
@@ -1484,16 +1493,8 @@ public class StudentRequestService {
 
         TransferOptionsResponseDTO.CurrentClassInfo currentClassInfo = buildCurrentClassInfo(currentClass);
 
-        TransferOptionsResponseDTO.TransferCriteria transferCriteria =
-            TransferOptionsResponseDTO.TransferCriteria.builder()
-                .branchChange(targetBranchId != null && !targetBranchId.equals(currentClass.getBranch().getId()))
-                .modalityChange(targetModality != null && !targetModality.equals(currentClass.getModality().name()))
-                .scheduleChange(Boolean.TRUE.equals(scheduleOnly))
-                .build();
-
         return TransferOptionsResponseDTO.builder()
                 .currentClass(currentClassInfo)
-                .transferCriteria(transferCriteria)
                 .availableClasses(availableClasses)
                 .build();
     }
@@ -2128,11 +2129,9 @@ public class StudentRequestService {
     private TransferOptionDTO mapToTransferOptionDTOWithChanges(ClassEntity targetClass, ClassEntity currentClass) {
         TransferOptionDTO dto = mapToTransferOptionDTO(targetClass, currentClass);
 
-        // Build changes summary
+        // Build changes summary - chỉ modality (FE chỉ dùng field này)
         TransferOptionDTO.Changes changes = TransferOptionDTO.Changes.builder()
-                .branch(buildChangeText(currentClass.getBranch().getName(), targetClass.getBranch().getName()))
                 .modality(buildChangeText(currentClass.getModality().name(), targetClass.getModality().name()))
-                .schedule(buildScheduleChangeText(currentClass, targetClass))
                 .build();
 
         dto.setChanges(changes);
@@ -2144,16 +2143,6 @@ public class StudentRequestService {
             return "Unknown";
         }
         return currentValue.equals(targetValue) ? "No change" : currentValue + " → " + targetValue;
-    }
-
-    private String buildScheduleChangeText(ClassEntity currentClass, ClassEntity targetClass) {
-        String currentSchedule = formatScheduleInfo(currentClass);
-        String targetSchedule = formatScheduleInfo(targetClass);
-
-        if (currentSchedule.equals(targetSchedule)) {
-            return "No change";
-        }
-        return currentSchedule + " → " + targetSchedule;
     }
 
     private String formatScheduleInfo(ClassEntity classEntity) {
@@ -2281,13 +2270,11 @@ public class StudentRequestService {
         int diff = targetSessionNum - currentSessionNum;
         
         if (diff == 0) {
-            return "Tiến độ tương đương (Buổi " + currentSessionNum + ")";
-        } else if (Math.abs(diff) <= 2) {
-            return String.format("Tiến độ gần tương đương (Chênh %d buổi)", Math.abs(diff));
+            return "Tiến độ tương đương";
         } else if (diff > 0) {
-            return String.format("Lớp mới nhanh hơn %d buổi", diff);
+            return String.format("Nhanh hơn %d buổi", diff);
         } else {
-            return String.format("Lớp mới chậm hơn %d buổi", Math.abs(diff));
+            return String.format("Chậm hơn %d buổi", Math.abs(diff));
         }
     }
 

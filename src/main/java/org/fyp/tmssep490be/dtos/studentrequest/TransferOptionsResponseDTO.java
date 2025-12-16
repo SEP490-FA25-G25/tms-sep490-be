@@ -14,7 +14,6 @@ import java.util.List;
 public class TransferOptionsResponseDTO {
 
     private CurrentClassInfo currentClass;
-    private TransferCriteria transferCriteria;
     private List<TransferOptionDTO> availableClasses;
 
     @Data
@@ -32,15 +31,5 @@ public class TransferOptionsResponseDTO {
         private String scheduleDays;
         private String scheduleTime;
         private Integer currentSession;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TransferCriteria {
-        private Boolean branchChange;
-        private Boolean modalityChange;
-        private Boolean scheduleChange;
     }
 }

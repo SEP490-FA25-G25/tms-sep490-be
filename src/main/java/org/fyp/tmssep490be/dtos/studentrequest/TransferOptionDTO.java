@@ -39,14 +39,19 @@ public class TransferOptionDTO {
     private List<UpcomingSession> upcomingSessions;
     private List<SessionInfo> allSessions; // All sessions for timeline view
 
+    /**
+     * Changes summary - so sánh lớp đích với lớp hiện tại
+     * Frontend chỉ dùng để check hasModalityChange, không dùng branch/schedule
+     */
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Changes {
-        private String branch;
+        /**
+         * Modality change: "No change" hoặc "OFFLINE → ONLINE" / "ONLINE → OFFLINE"
+         */
         private String modality;
-        private String schedule;
     }
 
     @Data
