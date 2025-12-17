@@ -5,7 +5,6 @@ import lombok.*;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.entities.enums.StudentRequestType;
 
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -37,6 +36,12 @@ public class StudentRequest {
     @JoinColumn(name = "target_class_id")
     private ClassEntity targetClass;
 
+    /**
+     * Target session - meaning depends on request type:
+     * - ABSENCE: The session student wants to be absent from
+     * - MAKEUP: The original session student missed
+     * - TRANSFER: The first session student will join in target class (joinSession)
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "target_session_id")
     private Session targetSession;
@@ -44,13 +49,6 @@ public class StudentRequest {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "makeup_session_id")
     private Session makeupSession;
-
-    @Column(name = "effective_date")
-    private LocalDate effectiveDate;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "effective_session_id")
-    private Session effectiveSession;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

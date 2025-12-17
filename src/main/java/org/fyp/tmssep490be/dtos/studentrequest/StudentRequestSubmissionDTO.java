@@ -26,6 +26,8 @@ public class StudentRequestSubmissionDTO {
     @NotNull(message = "Class ID is required")
     private Long currentClassId;
 
+    private Long targetClassId; // For TRANSFER requests only - the class to transfer to
+
     @NotNull(message = "Target session ID is required")
     private Long targetSessionId;
 
@@ -42,6 +44,15 @@ public class StudentRequestSubmissionDTO {
     public boolean isMakeupSessionValid() {
         if ("MAKEUP".equalsIgnoreCase(requestType)) {
             return makeupSessionId != null;
+        }
+        return true;
+    }
+
+    // Validation helper: targetClassId must be present for TRANSFER requests
+    @AssertTrue(message = "Target class ID is required for TRANSFER requests")
+    public boolean isTransferValid() {
+        if ("TRANSFER".equalsIgnoreCase(requestType)) {
+            return targetClassId != null;
         }
         return true;
     }

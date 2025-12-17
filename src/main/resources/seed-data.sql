@@ -787,11 +787,6 @@ INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date
 -- IELTS Intermediate (Subject 2) - 5 classes (24 sessions each)
 (6, 1, 2, 'HN-IELTS-I1', 'HN IELTS Intermediate 1 (Early)', 'OFFLINE', '2025-11-17', '2026-01-09', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07', '2025-11-10 10:00:00+07', NOW()),
 (7, 1, 2, 'HN-IELTS-I2', 'HN IELTS Intermediate 2 (Parallel A)', 'OFFLINE', '2025-12-02', '2026-01-24', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', NOW()),
-<<<<<<< Updated upstream
-(8, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Parallel B)', 'OFFLINE', '2025-12-04', '2026-01-28', NULL, ARRAY[1,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-27 10:00:00+07', '2025-11-28 14:00:00+07', '2025-11-27 10:00:00+07', NOW()),
-(9, 1, 2, 'HN-IELTS-I4', 'HN IELTS Intermediate 4 (Parallel C)', 'ONLINE', '2025-12-06', '2026-01-30', NULL, ARRAY[0,2,4]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', NOW()),
-(10, 1, 2, 'HN-IELTS-I5', 'HN IELTS Intermediate 5 (Late)', 'OFFLINE', '2025-12-16', '2026-02-07', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-09 10:00:00+07', '2025-12-10 14:00:00+07', '2025-12-09 10:00:00+07', NOW());
-=======
 (8, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Parallel B)', 'OFFLINE', '2025-12-04', '2026-01-28', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-27 10:00:00+07', '2025-11-28 14:00:00+07', '2025-11-27 10:00:00+07', NOW()),
 (9, 1, 2, 'HN-IELTS-I4', 'HN IELTS Intermediate 4 (Parallel C)', 'ONLINE', '2025-12-06', '2026-01-30', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', NOW()),
 (10, 1, 2, 'HN-IELTS-I5', 'HN IELTS Intermediate 5 (Late)', 'OFFLINE', '2025-12-16', '2026-02-07', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-09 10:00:00+07', '2025-12-10 14:00:00+07', '2025-12-09 10:00:00+07', NOW()),
@@ -806,7 +801,6 @@ INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date
 (14, 2, 2, 'HCM-IELTS-I1', 'HCM IELTS Intermediate 1', 'OFFLINE', '2025-12-19', '2026-02-11', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-12 10:00:00+07', '2025-12-13 14:00:00+07', '2025-12-12 10:00:00+07', NOW()),
 (15, 2, 2, 'HCM-IELTS-I2', 'HCM IELTS Intermediate 2', 'OFFLINE', '2025-12-21', '2026-02-13', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-14 10:00:00+07', '2025-12-15 14:00:00+07', '2025-12-14 10:00:00+07', NOW()),
 (16, 2, 2, 'HCM-IELTS-I3', 'HCM IELTS Intermediate 3 (Online)', 'ONLINE', '2025-12-23', '2026-02-15', NULL, ARRAY[2,4,6]::smallint[], 25, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-16 10:00:00+07', '2025-12-17 14:00:00+07', '2025-12-16 10:00:00+07', NOW());
->>>>>>> Stashed changes
 
 -- Class 1: HN IELTS Foundation 1 (Early) - Mon/Wed/Fri, starts 2025-11-17 (2 weeks ahead)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
@@ -1087,16 +1081,19 @@ INSERT INTO student_request (id, student_id, current_class_id, request_type, tar
 (5, 23, 2, 'MAKEUP', 108, 208, 'PENDING', 'Missed session due to work commitment, requesting makeup', 123, '2025-12-04 11:00:00+07');
 
 -- SCENARIO 6: Approved Transfer Request (Class 2 Offline -> Class 4 Online, student 24 - Tran Thi Nga)
-INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
-(6, 24, 2, 4, 'TRANSFER', '2025-12-10', 310, 'APPROVED', 'Need to change to online class due to work schedule conflict', 6, '2025-12-05 10:00:00+07', 6, '2025-12-06 14:00:00+07');
+-- target_session_id=310 means: join Class 4 starting from their session on 2025-12-10
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
+(6, 24, 2, 4, 'TRANSFER', 310, 'APPROVED', 'Need to change to online class due to work schedule conflict', 6, '2025-12-05 10:00:00+07', 6, '2025-12-06 14:00:00+07');
 
 -- SCENARIO 7: Pending Transfer Request (Class 6 Intermediate -> Class 9 Online Intermediate, student 80 - Dinh Thi Thao)
-INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
-(7, 80, 6, 9, 'TRANSFER', '2025-12-15', 810, 'PENDING', 'Need online class due to relocation', 180, '2025-12-08 10:00:00+07', 'Tier 1 self-service request');
+-- target_session_id=810 means: join Class 9 starting from their session on 2025-12-15
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
+(7, 80, 6, 9, 'TRANSFER', 810, 'PENDING', 'Need online class due to relocation', 6, '2025-12-08 10:00:00+07', 'Created by AA on behalf of student');
 
 -- SCENARIO 8: Rejected Transfer - same class (student 25 - Nguyen Van Phuc)
-INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
-(8, 25, 2, 2, 'TRANSFER', '2025-12-10', 115, 'REJECTED', 'Accidentally selected current class', 125, '2025-12-02 09:00:00+07', 6, '2025-12-02 15:00:00+07', 'Rejected - cannot transfer to the same class');
+-- target_session_id=115 means: attempted to join Class 2 session on 2025-12-10 (invalid - same class)
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
+(8, 25, 2, 2, 'TRANSFER', 115, 'REJECTED', 'Accidentally selected current class', 6, '2025-12-02 09:00:00+07', 6, '2025-12-02 15:00:00+07', 'Rejected - cannot transfer to the same class. Created by AA.');
 
 -- SCENARIO 9: Request created by Academic Affair on behalf (student 26 - Le Thi Diem, waiting confirmation)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES

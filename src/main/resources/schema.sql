@@ -525,7 +525,6 @@ CREATE TABLE student_session (
   is_makeup BOOLEAN DEFAULT false,
   makeup_session_id BIGINT, -- nếu là buổi học bù thì lưu session bù
   original_session_id BIGINT, -- nếu là buổi học bù thì lưu session gốc
-  is_transferred_out BOOLEAN DEFAULT false, -- true nếu học sinh chuyển lớp và không còn tham gia session này
   attendance_status VARCHAR(20) NOT NULL DEFAULT 'PLANNED',
   homework_status VARCHAR(20),
   note TEXT,
@@ -648,10 +647,8 @@ CREATE TABLE student_request (
   current_class_id BIGINT, -- lớp hiện tại của student
   request_type VARCHAR(20) NOT NULL,
   target_class_id BIGINT, -- lớp muốn chuyển đến (dành cho transfer request)
-  target_session_id BIGINT, -- dành buổi gốc mình chọn để học bù hoặc nghỉ
+  target_session_id BIGINT, -- buổi học đích: ABSENCE/MAKEUP=buổi nghỉ, TRANSFER=buổi bắt đầu lớp mới
   makeup_session_id BIGINT, -- dành buổi học bù mình muốn học bù
-  effective_date DATE, -- ngày có hiệu lực của request (dành cho transfer request)
-  effective_session_id BIGINT, -- buổi học có hiệu lực (dành cho transfer request)
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
   submitted_at TIMESTAMPTZ,
   submitted_by BIGINT,
@@ -664,7 +661,6 @@ CREATE TABLE student_request (
   CONSTRAINT fk_student_request_target_class FOREIGN KEY(target_class_id) REFERENCES "class"(id) ON DELETE SET NULL,
   CONSTRAINT fk_student_request_target_session FOREIGN KEY(target_session_id) REFERENCES session(id) ON DELETE SET NULL,
   CONSTRAINT fk_student_request_makeup_session FOREIGN KEY(makeup_session_id) REFERENCES session(id) ON DELETE SET NULL,
-  CONSTRAINT fk_student_request_effective_session FOREIGN KEY(effective_session_id) REFERENCES session(id) ON DELETE SET NULL,
   CONSTRAINT fk_student_request_submitted_by FOREIGN KEY(submitted_by) REFERENCES user_account(id) ON DELETE SET NULL,
   CONSTRAINT fk_student_request_decided_by FOREIGN KEY(decided_by) REFERENCES user_account(id) ON DELETE SET NULL,
   CONSTRAINT chk_student_request_type CHECK (request_type IN ('ABSENCE', 'MAKEUP', 'TRANSFER')),

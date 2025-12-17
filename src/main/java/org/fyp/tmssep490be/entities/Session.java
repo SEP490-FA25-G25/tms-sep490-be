@@ -79,10 +79,6 @@ public class Session {
     @Builder.Default
     private Set<StudentRequest> makeupStudentRequests = new HashSet<>();
 
-    @OneToMany(mappedBy = "effectiveSession")
-    @Builder.Default
-    private Set<StudentRequest> effectiveStudentRequests = new HashSet<>();
-
     @OneToMany(mappedBy = "joinSession")
     @Builder.Default
     private Set<Enrollment> joinEnrollments = new HashSet<>();
