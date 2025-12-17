@@ -41,6 +41,7 @@ import org.fyp.tmssep490be.repositories.TeachingSlotRepository;
 import org.fyp.tmssep490be.repositories.TimeSlotTemplateRepository;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.repositories.UserBranchesRepository;
+import org.fyp.tmssep490be.services.EmailService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,6 +71,7 @@ public class TeacherRequestService {
     private final ResourceRepository resourceRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
     private final NotificationService notificationService;
+    private final EmailService emailService;
 
     private static final int MIN_REASON_LENGTH = 10;
     private static final boolean REQUIRE_RESOURCE_FOR_MODALITY_CHANGE = true;
@@ -157,12 +159,15 @@ public class TeacherRequestService {
         request = teacherRequestRepository.save(request);
         log.info("Created teacher request {} type {} for user {}", request.getId(), requestType, userId);
 
-        // Gửi thông báo cho giáo vụ
+        // Gửi thông báo + email
         try {
             teacherRequestRepository.flush();
+            // 1) Thông báo cho giáo vụ
             sendNotificationToAcademicStaffForNewRequest(request);
+            // 2) Email cho giáo viên về việc đã tạo request
+            sendEmailNotificationForCreatedRequest(request);
         } catch (Exception e) {
-            log.error("Lỗi khi gửi notification cho giáo vụ về request {}: {}", request.getId(), e.getMessage(), e);
+            log.error("Lỗi khi gửi notification/email về request {}: {}", request.getId(), e.getMessage(), e);
         }
 
         return mapToResponseDTO(request);
@@ -1335,6 +1340,42 @@ public class TeacherRequestService {
         }
     }
 
+    // Gửi email cho teacher khi request được approve (MODALITY_CHANGE/RESCHEDULE)
+    private void sendEmailNotificationForApproval(TeacherRequest request) {
+        try {
+            UserAccount teacherAccount = request.getTeacher() != null ? request.getTeacher().getUserAccount() : null;
+            if (teacherAccount == null || teacherAccount.getEmail() == null || teacherAccount.getEmail().trim().isEmpty()) {
+                log.warn("Teacher {} has no email, skip approval email for request {}", 
+                        request.getTeacher() != null ? request.getTeacher().getId() : null,
+                        request.getId());
+                return;
+            }
+
+            String email = teacherAccount.getEmail();
+            String teacherName = teacherAccount.getFullName();
+
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+            Session session = request.getSession();
+            String sessionInfo = session != null
+                    ? String.format("%s (%s)", 
+                        session.getDate(), 
+                        session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A")
+                    : "N/A";
+
+            String subject = "Yêu cầu của bạn đã được phê duyệt";
+            StringBuilder body = new StringBuilder();
+            body.append("Xin chào ").append(teacherName).append(",<br/><br/>")
+                .append("Yêu cầu ").append(requestTypeName.toLowerCase())
+                .append(" của bạn cho buổi học ").append(sessionInfo)
+                .append(" đã được giáo vụ phê duyệt.<br/><br/>")
+                .append("Trân trọng,<br/>Hệ thống TMS");
+
+            emailService.sendEmailAsync(email, subject, body.toString());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi approval email cho teacher về request {}: {}", request.getId(), e.getMessage());
+        }
+    }
+
     // Gửi thông báo cho replacement teacher khi request được approve và chờ confirm
     private void sendNotificationToReplacementTeacher(TeacherRequest request) {
         try {
@@ -1372,6 +1413,48 @@ public class TeacherRequestService {
         }
     }
 
+    // Gửi email mời giáo viên dạy thay khi request REPLACEMENT được approve (WAITING_CONFIRM)
+    private void sendEmailNotificationForReplacementInvitation(TeacherRequest request) {
+        try {
+            if (request.getReplacementTeacher() == null || request.getReplacementTeacher().getUserAccount() == null) {
+                log.warn("Replacement teacher has no user account - skip replacement invitation email for request {}", request.getId());
+                return;
+            }
+
+            UserAccount replacementAccount = request.getReplacementTeacher().getUserAccount();
+            if (replacementAccount.getEmail() == null || replacementAccount.getEmail().trim().isEmpty()) {
+                log.warn("Replacement teacher {} has no email - skip replacement invitation email for request {}", 
+                        replacementAccount.getId(), request.getId());
+                return;
+            }
+
+            String email = replacementAccount.getEmail();
+            String replacementName = replacementAccount.getFullName();
+            String originalTeacherName = request.getTeacher() != null && request.getTeacher().getUserAccount() != null
+                    ? request.getTeacher().getUserAccount().getFullName()
+                    : "một giáo viên khác";
+
+            Session session = request.getSession();
+            String sessionInfo = session != null
+                    ? String.format("%s (%s)", 
+                        session.getDate(), 
+                        session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A")
+                    : "N/A";
+
+            String subject = "Lời mời dạy thay từ hệ thống TMS";
+            StringBuilder body = new StringBuilder();
+            body.append("Xin chào ").append(replacementName).append(",<br/><br/>")
+                .append("Bạn được mời dạy thay cho giáo viên ").append(originalTeacherName)
+                .append(" tại buổi học ").append(sessionInfo).append(".<br/>")
+                .append("Vui lòng vào hệ thống để xác nhận hoặc từ chối yêu cầu này.<br/><br/>")
+                .append("Trân trọng,<br/>Hệ thống TMS");
+
+            emailService.sendEmailAsync(email, subject, body.toString());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi replacement invitation email cho request {}: {}", request.getId(), e.getMessage());
+        }
+    }
+
     // Gửi thông báo cho teacher khi request bị reject
     private void sendNotificationToTeacherForRejection(TeacherRequest request, String reason) {
         try {
@@ -1402,6 +1485,43 @@ public class TeacherRequestService {
         } catch (Exception e) {
             log.error("Lỗi khi gửi notification cho teacher về rejection của request {}: {}", request.getId(), e.getMessage());
             throw e;
+        }
+    }
+
+    // Gửi email cho teacher khi request bị reject
+    private void sendEmailNotificationForRejection(TeacherRequest request, String reason) {
+        try {
+            UserAccount teacherAccount = request.getTeacher() != null ? request.getTeacher().getUserAccount() : null;
+            if (teacherAccount == null || teacherAccount.getEmail() == null || teacherAccount.getEmail().trim().isEmpty()) {
+                log.warn("Teacher {} has no email, skip rejection email for request {}", 
+                        request.getTeacher() != null ? request.getTeacher().getId() : null,
+                        request.getId());
+                return;
+            }
+
+            String email = teacherAccount.getEmail();
+            String teacherName = teacherAccount.getFullName();
+
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+            Session session = request.getSession();
+            String sessionInfo = session != null
+                    ? String.format("%s (%s)", 
+                        session.getDate(), 
+                        session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A")
+                    : "N/A";
+
+            String subject = "Yêu cầu của bạn đã bị từ chối";
+            StringBuilder body = new StringBuilder();
+            body.append("Xin chào ").append(teacherName).append(",<br/><br/>")
+                .append("Yêu cầu ").append(requestTypeName.toLowerCase())
+                .append(" của bạn cho buổi học ").append(sessionInfo)
+                .append(" đã bị giáo vụ từ chối.<br/>")
+                .append("Lý do: ").append(reason).append("<br/><br/>")
+                .append("Trân trọng,<br/>Hệ thống TMS");
+
+            emailService.sendEmailAsync(email, subject, body.toString());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi rejection email cho teacher về request {}: {}", request.getId(), e.getMessage());
         }
     }
 
@@ -1457,6 +1577,42 @@ public class TeacherRequestService {
         } catch (Exception e) {
             log.error("Lỗi khi gửi notification cho academic staff về replacement confirmation của request {}: {}", request.getId(), e.getMessage());
             throw e;
+        }
+    }
+
+    // Gửi email cho teacher khi tự tạo request (teacher side)
+    private void sendEmailNotificationForCreatedRequest(TeacherRequest request) {
+        try {
+            UserAccount teacherAccount = request.getTeacher() != null ? request.getTeacher().getUserAccount() : null;
+            if (teacherAccount == null || teacherAccount.getEmail() == null || teacherAccount.getEmail().trim().isEmpty()) {
+                log.warn("Teacher {} has no email, skip created email for request {}", 
+                        request.getTeacher() != null ? request.getTeacher().getId() : null,
+                        request.getId());
+                return;
+            }
+
+            String email = teacherAccount.getEmail();
+            String teacherName = teacherAccount.getFullName();
+
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+            Session session = request.getSession();
+            String sessionInfo = session != null
+                    ? String.format("%s (%s)", 
+                        session.getDate(), 
+                        session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A")
+                    : "N/A";
+
+            String subject = "Bạn đã tạo yêu cầu mới trên hệ thống TMS";
+            StringBuilder body = new StringBuilder();
+            body.append("Xin chào ").append(teacherName).append(",<br/><br/>")
+                .append("Bạn vừa tạo yêu cầu ").append(requestTypeName.toLowerCase())
+                .append(" cho buổi học ").append(sessionInfo).append(".<br/>")
+                .append("Hệ thống sẽ thông báo khi yêu cầu được xử lý.<br/><br/>")
+                .append("Trân trọng,<br/>Hệ thống TMS");
+
+            emailService.sendEmailAsync(email, subject, body.toString());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi created email cho teacher về request {}: {}", request.getId(), e.getMessage());
         }
     }
 
@@ -2059,18 +2215,22 @@ public class TeacherRequestService {
         request = teacherRequestRepository.save(request);
         log.info("Request {} approved successfully by academic staff {}", requestId, academicStaffUserId);
 
-        // Gửi thông báo cho teacher
+        // Gửi thông báo + email cho teacher
         try {
             if (request.getRequestType() == TeacherRequestType.REPLACEMENT && request.getStatus() == RequestStatus.WAITING_CONFIRM) {
                 // REPLACEMENT: gửi thông báo cho replacement teacher
                 sendNotificationToReplacementTeacher(request);
+                // Email cho replacement teacher (mời dạy thay)
+                sendEmailNotificationForReplacementInvitation(request);
             } else {
                 // MODALITY_CHANGE và RESCHEDULE: gửi thông báo cho teacher gốc
                 sendNotificationToTeacherForApproval(request);
+                // Email cho teacher về việc request đã được duyệt
+                sendEmailNotificationForApproval(request);
             }
         } catch (Exception e) {
-            log.error("Lỗi khi gửi notification cho teacher về request {}: {}", requestId, e.getMessage());
-            // Không throw exception - notification failure không nên block việc approve
+            log.error("Lỗi khi gửi notification/email cho teacher về request {}: {}", requestId, e.getMessage());
+            // Không throw exception - notification/email failure không nên block việc approve
         }
 
         return mapToResponseDTO(request);
@@ -2419,9 +2579,10 @@ public class TeacherRequestService {
         request = teacherRequestRepository.save(request);
         log.info("Request {} rejected successfully by academic staff {}", requestId, academicStaffUserId);
 
-        // Gửi thông báo cho teacher
+        // Gửi thông báo + email cho teacher
         try {
             sendNotificationToTeacherForRejection(request, reason.trim());
+            sendEmailNotificationForRejection(request, reason.trim());
         } catch (Exception e) {
             log.error("Lỗi khi gửi notification cho teacher về request {}: {}", requestId, e.getMessage());
             // Không throw exception - notification failure không nên block việc reject

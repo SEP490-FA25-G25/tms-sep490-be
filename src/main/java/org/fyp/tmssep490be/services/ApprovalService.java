@@ -11,6 +11,7 @@ import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.NotificationType;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
+import org.fyp.tmssep490be.utils.ScheduleUtils;
 import org.fyp.tmssep490be.repositories.ClassRepository;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.springframework.stereotype.Service;
@@ -289,22 +290,6 @@ public class ApprovalService {
     }
 
     private String buildScheduleDisplay(ClassEntity classEntity) {
-        if (classEntity.getScheduleDays() == null || classEntity.getScheduleDays().length == 0) {
-            return "Chưa có lịch cụ thể";
-        }
-
-        String[] dayNames = { "CN", "T2", "T3", "T4", "T5", "T6", "T7" };
-        StringBuilder schedule = new StringBuilder();
-
-        for (int i = 0; i < classEntity.getScheduleDays().length; i++) {
-            if (i > 0)
-                schedule.append(", ");
-            int dayIndex = classEntity.getScheduleDays()[i];
-            if (dayIndex >= 0 && dayIndex < dayNames.length) {
-                schedule.append(dayNames[dayIndex]);
-            }
-        }
-
-        return schedule.toString();
+        return ScheduleUtils.generateScheduleDisplayFromMetadata(classEntity);
     }
 }

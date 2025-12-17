@@ -244,11 +244,10 @@ public class AcademicAffairsRequestController {
     public ResponseEntity<ResponseObject<TransferOptionsResponseDTO>> getTransferOptions(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @RequestParam Long currentClassId,
-            @RequestParam(required = false) String targetModality,
-            @RequestParam(required = false) Boolean scheduleOnly) {
+            @RequestParam(required = false) String targetModality) {
 
         TransferOptionsResponseDTO response = studentRequestService.getTransferOptionsFlexible(
-                currentClassId, targetModality, scheduleOnly);
+                currentClassId, targetModality);
 
         return ResponseEntity.ok(ResponseObject.success("Retrieved transfer options successfully", response));
     }

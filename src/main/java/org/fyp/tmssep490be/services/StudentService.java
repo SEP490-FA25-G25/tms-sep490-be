@@ -1240,5 +1240,133 @@ public class StudentService {
         return convertToStudentDetailDTO(student);
     }
 
+    @Transactional
+    public StudentDetailDTO updateStudent(Long studentId, UpdateStudentRequest request, Long currentUserId) {
+        log.info("Updating student {} by user {}", studentId, currentUserId);
+
+        // 1. Find student and validate access
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+        validateStudentAccess(student, currentUserId);
+
+        UserAccount user = student.getUserAccount();
+
+        if (!user.getEmail().equalsIgnoreCase(request.getEmail())) {
+            userAccountRepository.findByEmail(request.getEmail())
+                    .ifPresent(existingUser -> {
+                        if (!existingUser.getId().equals(user.getId())) {
+                            throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
+                        }
+                    });
+        }
+
+        if (request.getPhone() != null && !request.getPhone().isBlank()) {
+            String currentPhone = user.getPhone();
+            if (currentPhone == null || !currentPhone.equals(request.getPhone())) {
+                if (userAccountRepository.existsByPhone(request.getPhone())) {
+                    throw new CustomException(ErrorCode.USER_PHONE_ALREADY_EXISTS);
+                }
+            }
+        }
+
+        user.setEmail(request.getEmail());
+        user.setFullName(request.getFullName());
+        user.setPhone(request.getPhone());
+        user.setFacebookUrl(request.getFacebookUrl());
+        user.setAddress(request.getAddress());
+        user.setAvatarUrl(request.getAvatarUrl());
+        user.setGender(request.getGender());
+        user.setDob(request.getDateOfBirth());
+
+        if (request.getStatus() != null) {
+            user.setStatus(request.getStatus());
+        }
+
+        userAccountRepository.save(user);
+        log.debug("Updated user account fields for student {}", studentId);
+
+        if (request.getSkillAssessments() != null && !request.getSkillAssessments().isEmpty()) {
+            for (SkillAssessmentUpdateInput assessmentInput : request.getSkillAssessments()) {
+                if (assessmentInput.getId() != null) {
+                    updateExistingSkillAssessment(student, assessmentInput, currentUserId);
+                } else {
+                    createNewSkillAssessment(student, assessmentInput, currentUserId);
+                }
+            }
+        }
+
+        log.info("Successfully updated student {} by user {}", studentId, currentUserId);
+        return convertToStudentDetailDTO(student);
+    }
+
+    private void updateExistingSkillAssessment(Student student, SkillAssessmentUpdateInput input, Long currentUserId) {
+        ReplacementSkillAssessment assessment = replacementSkillAssessmentRepository.findById(input.getId())
+                .orElseThrow(() -> new CustomException(ErrorCode.SKILL_ASSESSMENT_NOT_FOUND));
+
+        if (!assessment.getStudent().getId().equals(student.getId())) {
+            throw new CustomException(ErrorCode.SKILL_ASSESSMENT_NOT_FOUND);
+        }
+
+        Level level = levelRepository.findById(input.getLevelId())
+                .orElseThrow(() -> new CustomException(ErrorCode.LEVEL_NOT_FOUND));
+
+        assessment.setSkill(input.getSkill());
+        assessment.setLevel(level);
+        assessment.setScore(input.getScore());
+        assessment.setAssessmentDate(input.getAssessmentDate() != null ? input.getAssessmentDate() : assessment.getAssessmentDate());
+        assessment.setAssessmentType(input.getAssessmentType());
+        assessment.setNote(input.getNote());
+
+        if (input.getAssessedByUserId() != null) {
+            UserAccount assessedBy = userAccountRepository.findById(input.getAssessedByUserId())
+                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+            assessment.setAssessedBy(assessedBy);
+        }
+
+        replacementSkillAssessmentRepository.save(assessment);
+        log.debug("Updated skill assessment {} for student {}", input.getId(), student.getId());
+    }
+
+    private void createNewSkillAssessment(Student student, SkillAssessmentUpdateInput input, Long currentUserId) {
+        Level level = levelRepository.findById(input.getLevelId())
+                .orElseThrow(() -> new CustomException(ErrorCode.LEVEL_NOT_FOUND));
+
+        ReplacementSkillAssessment assessment = new ReplacementSkillAssessment();
+        assessment.setStudent(student);
+        assessment.setSkill(input.getSkill());
+        assessment.setLevel(level);
+        assessment.setScore(input.getScore());
+        assessment.setAssessmentDate(input.getAssessmentDate() != null ? input.getAssessmentDate() : LocalDate.now());
+        assessment.setAssessmentType(input.getAssessmentType() != null ? input.getAssessmentType() : "manual_update");
+        assessment.setNote(input.getNote());
+
+        Long assessorId = input.getAssessedByUserId() != null ? input.getAssessedByUserId() : currentUserId;
+        UserAccount assessedBy = userAccountRepository.findById(assessorId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        assessment.setAssessedBy(assessedBy);
+
+        replacementSkillAssessmentRepository.save(assessment);
+        log.debug("Created new skill assessment for student {} with skill {}", student.getId(), input.getSkill());
+    }
+
+    @Transactional
+    public void deleteSkillAssessment(Long studentId, Long assessmentId, Long currentUserId) {
+        log.info("Deleting skill assessment {} for student {} by user {}", assessmentId, studentId, currentUserId);
+
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+        validateStudentAccess(student, currentUserId);
+
+        ReplacementSkillAssessment assessment = replacementSkillAssessmentRepository.findById(assessmentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SKILL_ASSESSMENT_NOT_FOUND));
+
+        if (!assessment.getStudent().getId().equals(studentId)) {
+            throw new CustomException(ErrorCode.SKILL_ASSESSMENT_NOT_FOUND);
+        }
+
+        replacementSkillAssessmentRepository.delete(assessment);
+        log.info("Successfully deleted skill assessment {} for student {}", assessmentId, studentId);
+    }
+
 }
 

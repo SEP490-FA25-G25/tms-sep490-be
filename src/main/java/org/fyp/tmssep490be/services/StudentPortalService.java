@@ -26,12 +26,14 @@ import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
 
 import java.time.DayOfWeek;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.fyp.tmssep490be.entities.enums.Modality;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.entities.enums.TeachingSlotStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
+import org.fyp.tmssep490be.utils.ScheduleUtils;
 import org.fyp.tmssep490be.repositories.AssessmentRepository;
 import org.fyp.tmssep490be.repositories.ClassRepository;
 import org.fyp.tmssep490be.repositories.EnrollmentRepository;
@@ -535,46 +537,23 @@ public class StudentPortalService {
     }
 
     private List<StudentClassDTO.ScheduleDetailDTO> generateScheduleDetails(ClassEntity classEntity) {
-        if (classEntity.getScheduleDays() == null || classEntity.getScheduleDays().length == 0) {
-            return List.of();
-        }
-
         List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
         if (sessions.isEmpty()) {
             return List.of();
         }
 
-        // Group sessions by day of week to get time slots
-        Map<Integer, String> dayTimeSlots = new HashMap<>();
-        for (Session session : sessions) {
-            if (session.getTimeSlotTemplate() != null) {
-                int dayOfWeek = session.getDate().getDayOfWeek().getValue();
-                String timeSlot = String.format("%s-%s", 
-                    session.getTimeSlotTemplate().getStartTime(), 
-                    session.getTimeSlotTemplate().getEndTime());
-                dayTimeSlots.putIfAbsent(dayOfWeek, timeSlot);
-            }
-        }
+        Map<Integer, String> dayTimeSlots = ScheduleUtils.extractScheduleFromSessions(sessions);
 
-        return Arrays.stream(classEntity.getScheduleDays())
-            .sorted()
-            .map(day -> {
-                DayOfWeek dayOfWeek = DayOfWeek.of(day);
-                String dayName = switch (dayOfWeek) {
-                    case MONDAY -> "Thứ 2";
-                    case TUESDAY -> "Thứ 3";
-                    case WEDNESDAY -> "Thứ 4";
-                    case THURSDAY -> "Thứ 5";
-                    case FRIDAY -> "Thứ 6";
-                    case SATURDAY -> "Thứ 7";
-                    case SUNDAY -> "Chủ nhật";
-                };
-
-                String[] times = dayTimeSlots.getOrDefault(day, "07:00-08:30").split("-");
+        return dayTimeSlots.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(entry -> {
+                String dayName = ScheduleUtils.getDayNameVietnamese(entry.getKey());
+                String[] times = ScheduleUtils.parseTimeSlot(entry.getValue());
+                
                 return StudentClassDTO.ScheduleDetailDTO.builder()
                     .day(dayName)
-                    .startTime(times.length > 0 ? times[0] : "07:00")
-                    .endTime(times.length > 1 ? times[1] : "08:30")
+                    .startTime(times[0])
+                    .endTime(times[1])
                     .build();
             })
             .collect(Collectors.toList());
@@ -592,40 +571,8 @@ public class StudentPortalService {
     }
 
     private String generateScheduleSummary(ClassEntity classEntity) {
-        if (classEntity.getScheduleDays() == null || classEntity.getScheduleDays().length == 0) {
-            return "Chưa có lịch";
-        }
-
-        // Convert schedule days (1-7) to Vietnamese day names
-        List<String> dayNames = Arrays.stream(classEntity.getScheduleDays())
-                .sorted()
-                .map(day -> {
-                    DayOfWeek dayOfWeek = DayOfWeek.of(day);
-                    return switch (dayOfWeek) {
-                        case MONDAY -> "Thứ 2";
-                        case TUESDAY -> "Thứ 3";
-                        case WEDNESDAY -> "Thứ 4";
-                        case THURSDAY -> "Thứ 5";
-                        case FRIDAY -> "Thứ 6";
-                        case SATURDAY -> "Thứ 7";
-                        case SUNDAY -> "Chủ nhật";
-                    };
-                })
-                .collect(Collectors.toList());
-
-        String daysString = String.join(", ", dayNames);
-
-        // Add time slot info if available (get from first session)
         List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
-        if (!sessions.isEmpty() && sessions.get(0).getTimeSlotTemplate() != null) {
-            var timeSlot = sessions.get(0).getTimeSlotTemplate();
-            String timeString = String.format("%s-%s", 
-                timeSlot.getStartTime(), 
-                timeSlot.getEndTime());
-            return String.format("%s | %s", daysString, timeString);
-        }
-
-        return daysString;
+        return ScheduleUtils.generateScheduleSummary(sessions);
     }
 
     private List<EnrollmentStatus> resolveEnrollmentStatuses(List<String> filters) {

@@ -9,6 +9,7 @@ import org.fyp.tmssep490be.entities.enums.*;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
+import org.fyp.tmssep490be.utils.ScheduleUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,14 +63,17 @@ public class EnrollmentService {
         // 3. Resolve từng student (FOUND/CREATE/ERROR)
         resolveStudents(parsedData, classEntity);
 
-        // 4. Get capacity info
+        // 4. Check schedule conflicts for FOUND students
+        checkScheduleConflictsForPreview(parsedData, classEntity);
+
+        // 5. Get capacity info
         int currentEnrolled = enrollmentRepository.countByClassIdAndStatus(
                 classId, EnrollmentStatus.ENROLLED);
 
         log.info("Preview completed. Total students: {}, Current enrolled: {}/{}",
                 parsedData.size(), currentEnrolled, classEntity.getMaxCapacity());
 
-        // 5. Return simple preview (FE sẽ tự tính các giá trị khác)
+        // 6. Return simple preview (FE sẽ tự tính các giá trị khác)
         return ClassEnrollmentImportPreview.builder()
                 .classId(classId)
                 .classCode(classEntity.getCode())
@@ -287,7 +291,22 @@ public class EnrollmentService {
 
         log.info("Found {} future sessions for class", futureSessions.size());
 
-        // 3. Batch insert enrollments
+        // 3. Validate schedule conflicts for each student
+        Map<Long, Student> studentMap = studentRepository.findAllById(studentIds).stream()
+                .collect(Collectors.toMap(Student::getId, s -> s));
+        
+        for (Long studentId : studentIds) {
+            Student student = studentMap.get(studentId);
+            String studentEmail = student != null && student.getUserAccount() != null 
+                    ? student.getUserAccount().getEmail() 
+                    : studentId.toString();
+            
+            validateScheduleConflicts(studentId, classId, futureSessions, studentEmail);
+        }
+        
+        log.info("Schedule conflict validation passed for all {} students", studentIds.size());
+
+        // 4. Batch insert enrollments
         List<Enrollment> enrollments = new ArrayList<>();
         for (Long studentId : studentIds) {
             // Check duplicate enrollment
@@ -322,17 +341,10 @@ public class EnrollmentService {
 
         log.info("Saved {} enrollment records", enrollments.size());
 
-        // 4. Auto-generate student_session records
+        // 5. Auto-generate student_session records
         List<StudentSession> studentSessions = new ArrayList<>();
 
-        // Fetch all students to avoid lazy loading issues
-        List<Long> enrolledStudentIds = enrollments.stream()
-                .map(Enrollment::getStudentId)
-                .distinct()
-                .collect(Collectors.toList());
-        Map<Long, Student> studentMap = studentRepository.findAllById(enrolledStudentIds).stream()
-                .collect(Collectors.toMap(Student::getId, s -> s));
-
+        // Note: studentMap already fetched in step 3 for conflict validation, reuse it here
         for (Enrollment enrollment : enrollments) {
             Student student = studentMap.get(enrollment.getStudentId());
             if (student == null) {
@@ -490,24 +502,7 @@ public class EnrollmentService {
     }
 
     private String buildScheduleDisplay(ClassEntity classEntity) {
-        if (classEntity.getScheduleDays() == null || classEntity.getScheduleDays().length == 0) {
-            return "Chưa có lịch cụ thể";
-        }
-
-        // Convert schedule days to day names
-        String[] dayNames = { "CN", "T2", "T3", "T4", "T5", "T6", "T7" };
-        StringBuilder schedule = new StringBuilder();
-
-        for (int i = 0; i < classEntity.getScheduleDays().length; i++) {
-            if (i > 0)
-                schedule.append(", ");
-            int dayIndex = classEntity.getScheduleDays()[i];
-            if (dayIndex >= 0 && dayIndex < dayNames.length) {
-                schedule.append(dayNames[dayIndex]);
-            }
-        }
-
-        return schedule.toString();
+        return ScheduleUtils.generateScheduleDisplayFromMetadata(classEntity);
     }
 
     @Transactional
@@ -705,6 +700,45 @@ public class EnrollmentService {
         return String.format("ST%d%d%03d", branchId, timestamp, random);
     }
 
+    private void checkScheduleConflictsForPreview(List<StudentEnrollmentData> parsedData, ClassEntity classEntity) {
+        // Get future sessions của target class
+        List<Session> newClassSessions = sessionRepository
+                .findByClassEntityIdAndDateGreaterThanEqualAndStatusOrderByDateAsc(
+                        classEntity.getId(),
+                        LocalDate.now(),
+                        SessionStatus.PLANNED);
+        
+        if (newClassSessions.isEmpty()) {
+            return; // No sessions to check
+        }
+
+        for (StudentEnrollmentData data : parsedData) {
+            // Only check FOUND students (existing students)
+            if (data.getStatus() != StudentResolutionStatus.FOUND) {
+                continue;
+            }
+            
+            if (data.getResolvedStudentId() == null) {
+                continue;
+            }
+
+            try {
+                validateScheduleConflicts(
+                        data.getResolvedStudentId(), 
+                        classEntity.getId(), 
+                        newClassSessions, 
+                        data.getEmail()
+                );
+            } catch (CustomException e) {
+                // Catch conflict and mark as ERROR in preview (don't throw)
+                data.setStatus(StudentResolutionStatus.ERROR);
+                data.setErrorMessage(e.getMessage());
+                log.debug("Schedule conflict detected in preview for student {}: {}", 
+                        data.getEmail(), e.getMessage());
+            }
+        }
+    }
+
     /**
      * Validate email format
      */
@@ -713,5 +747,88 @@ public class EnrollmentService {
             return false;
         }
         return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    }
+
+    /**
+     * Check if time slots overlap
+     */
+    private boolean hasTimeOverlap(TimeSlotTemplate slot1, TimeSlotTemplate slot2) {
+        if (slot1 == null || slot2 == null) return false;
+        return !(slot1.getEndTime().isBefore(slot2.getStartTime()) || 
+                 slot2.getEndTime().isBefore(slot1.getStartTime()));
+    }
+
+    /**
+     * Validate schedule conflicts for a student enrolling in a new class.
+     * Throws CustomException if student has schedule conflict with active enrollments.
+     * 
+     * @param studentId Student ID to check
+     * @param newClassId New class ID to enroll into
+     * @param newClassSessions Sessions of the new class
+     * @param studentEmail Student email for error message
+     */
+    private void validateScheduleConflicts(Long studentId, Long newClassId, 
+                                          List<Session> newClassSessions, String studentEmail) {
+        // 1. Get active enrollments (excluding the target class itself)
+        List<Enrollment> activeEnrollments = enrollmentRepository
+                .findByStudentIdAndStatus(studentId, EnrollmentStatus.ENROLLED);
+        
+        if (activeEnrollments.isEmpty()) {
+            return; // No conflicts if no active enrollments
+        }
+
+        // 2. Filter out the target class (for transfer scenarios)
+        List<Enrollment> otherEnrollments = activeEnrollments.stream()
+                .filter(e -> !e.getClassId().equals(newClassId))
+                .collect(Collectors.toList());
+        
+        if (otherEnrollments.isEmpty()) {
+            return; // No other active enrollments
+        }
+
+        // 3. Get sessions from other classes
+        List<Long> otherClassIds = otherEnrollments.stream()
+                .map(Enrollment::getClassId)
+                .distinct()
+                .collect(Collectors.toList());
+        
+        List<Session> otherClassSessions = sessionRepository.findByClassEntityIdInAndStatus(
+                otherClassIds, SessionStatus.PLANNED);
+
+        // 4. Check for time overlaps
+        for (Session newSession : newClassSessions) {
+            LocalDate newDate = newSession.getDate();
+            TimeSlotTemplate newTimeSlot = newSession.getTimeSlotTemplate();
+            
+            if (newTimeSlot == null) continue; // Skip sessions without time slot
+            
+            for (Session existingSession : otherClassSessions) {
+                if (!existingSession.getDate().equals(newDate)) {
+                    continue; // Different date, no conflict
+                }
+                
+                TimeSlotTemplate existingTimeSlot = existingSession.getTimeSlotTemplate();
+                if (existingTimeSlot == null) continue;
+                
+                if (hasTimeOverlap(newTimeSlot, existingTimeSlot)) {
+                    // Found conflict
+                    String conflictingClass = existingSession.getClassEntity() != null 
+                            ? existingSession.getClassEntity().getCode() 
+                            : "Unknown";
+                    
+                    String errorMsg = String.format(
+                            "Học viên %s có lịch học trùng vào ngày %s (%s-%s) với lớp %s đang theo học",
+                            studentEmail != null ? studentEmail : studentId.toString(),
+                            newDate,
+                            newTimeSlot.getStartTime(),
+                            newTimeSlot.getEndTime(),
+                            conflictingClass
+                    );
+                    
+                    log.warn("Schedule conflict detected: {}", errorMsg);
+                    throw new CustomException(ErrorCode.ENROLLMENT_SCHEDULE_CONFLICT, errorMsg);
+                }
+            }
+        }
     }
 }

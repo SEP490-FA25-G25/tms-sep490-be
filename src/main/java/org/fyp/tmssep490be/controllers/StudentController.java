@@ -153,6 +153,43 @@ public class StudentController {
                 .build());
     }
 
+    @PutMapping("/{studentId}")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<StudentDetailDTO>> updateStudent(
+            @PathVariable Long studentId,
+            @Valid @RequestBody UpdateStudentRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} updating student {} with email: {}", currentUser.getId(), studentId, request.getEmail());
+
+        StudentDetailDTO updatedStudent = studentService.updateStudent(studentId, request, currentUser.getId());
+
+        log.info("Successfully updated student {} by user {}", studentId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<StudentDetailDTO>builder()
+                .success(true)
+                .message("Cập nhật thông tin học viên thành công")
+                .data(updatedStudent)
+                .build());
+    }
+
+    @DeleteMapping("/{studentId}/skill-assessments/{assessmentId}")
+    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<Void>> deleteSkillAssessment(
+            @PathVariable Long studentId,
+            @PathVariable Long assessmentId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} deleting skill assessment {} for student {}", currentUser.getId(), assessmentId, studentId);
+
+        studentService.deleteSkillAssessment(studentId, assessmentId, currentUser.getId());
+
+        return ResponseEntity.ok(ResponseObject.<Void>builder()
+                .success(true)
+                .message("Xóa đánh giá kỹ năng thành công")
+                .build());
+    }
+
     // Template học viên của lớp khi đưa cho sale, sale lấy template và gửi lại giáo vụ những người đăng ký và add vào hệ thống
     @GetMapping("/import/template")
     @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
