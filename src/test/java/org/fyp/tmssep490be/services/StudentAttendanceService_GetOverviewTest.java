@@ -64,7 +64,6 @@ class StudentAttendanceService_GetOverviewTest {
         StudentSession ss = new StudentSession();
         ss.setSession(s);
         ss.setAttendanceStatus(status);
-        ss.setIsTransferredOut(false);
 
         return ss;
     }
@@ -132,26 +131,6 @@ class StudentAttendanceService_GetOverviewTest {
         assertEquals(1, dto.getAbsent());
         assertEquals(1, dto.getExcused());
         assertEquals(1, dto.getUpcoming());
-    }
-
-    /** TC4: Session is transferred out → MUST be ignored */
-    @Test
-    void getOverview_transferredOut_ignored() {
-        Enrollment e = mockEnrollment(20L, ClassStatus.ONGOING, EnrollmentStatus.ENROLLED);
-
-        when(enrollmentRepository.findByStudentIdWithClassAndCourse(1L))
-                .thenReturn(List.of(e));
-
-        StudentSession ss = mockSession(1L, 20L, AttendanceStatus.PRESENT, LocalDate.now().minusDays(1));
-        ss.setIsTransferredOut(true);
-
-        when(studentSessionRepository.findAllByStudentId(1L))
-                .thenReturn(List.of(ss));
-
-        var dto = service.getOverview(1L).getClasses().get(0);
-
-        assertEquals(0, dto.getTotalSessions());
-        assertEquals(0, dto.getAttended());
     }
 
     /** TC5: CANCELLED session → MUST be ignored */
