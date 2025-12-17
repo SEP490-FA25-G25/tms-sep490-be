@@ -67,11 +67,6 @@ public class StudentAttendanceService {
                                     return false;
                                 }
                                 
-                                // Filter transferred out sessions
-                                if (Boolean.TRUE.equals(ss.getIsTransferredOut())) {
-                                    return false;
-                                }
-                                
                                 Long sessionId = session.getId();
                                 Long joinId = enrollment.getJoinSessionId();
                                 Long leftId = enrollment.getLeftSessionId();
@@ -167,11 +162,6 @@ public class StudentAttendanceService {
                 .filter(ss -> {
                     Session session = ss.getSession();
                     if (session == null || session.getStatus() == SessionStatus.CANCELLED) {
-                        return false;
-                    }
-                    
-                    // Filter transferred out sessions
-                    if (Boolean.TRUE.equals(ss.getIsTransferredOut())) {
                         return false;
                     }
                     

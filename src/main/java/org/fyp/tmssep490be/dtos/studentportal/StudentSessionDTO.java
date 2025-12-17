@@ -19,7 +19,6 @@ public class StudentSessionDTO {
     private Boolean isMakeup;
     private Long makeupSessionId;
     private Long originalSessionId;
-    private Boolean isTransferredOut;
     private String note;
     private OffsetDateTime recordedAt;
 }

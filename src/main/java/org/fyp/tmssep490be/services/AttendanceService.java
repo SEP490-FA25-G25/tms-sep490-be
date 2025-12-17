@@ -703,25 +703,58 @@ public class AttendanceService {
             return false;
         }
 
-        LocalDate sessionDate = session.getDate();
-        LocalDateTime now = LocalDateTime.now();
-
-        LocalDateTime sessionEndDateTime;
-        if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
-            LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
-            sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
-        } else {
-            sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
-        }
-
-        if (sessionEndDateTime.isAfter(now)) {
+        SessionStatus status = session.getStatus();
+        
+        // Không cho phép điểm danh nếu session bị hủy
+        if (status == SessionStatus.CANCELLED) {
             return false;
         }
 
-        LocalDate deadlineDate = sessionDate.plusDays(2);
-        LocalDateTime deadline = LocalDateTime.of(deadlineDate, LocalTime.MAX);
+        LocalDate sessionDate = session.getDate();
+        LocalDateTime now = LocalDateTime.now();
 
-        return !now.isAfter(deadline);
+        // Tính toán thời gian bắt đầu và kết thúc
+        LocalDateTime sessionStartDateTime;
+        LocalDateTime sessionEndDateTime;
+        
+        if (session.getTimeSlotTemplate() != null) {
+            if (session.getTimeSlotTemplate().getStartTime() != null) {
+                LocalTime startTime = session.getTimeSlotTemplate().getStartTime();
+                sessionStartDateTime = LocalDateTime.of(sessionDate, startTime);
+            } else {
+                sessionStartDateTime = LocalDateTime.of(sessionDate, LocalTime.MIN);
+            }
+            
+            if (session.getTimeSlotTemplate().getEndTime() != null) {
+                LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+            } else {
+                sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+            }
+        } else {
+            sessionStartDateTime = LocalDateTime.of(sessionDate, LocalTime.MIN);
+            sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+        }
+
+        // Cho phép điểm danh nếu:
+        // 1. Session đang diễn ra (đã đến giờ bắt đầu và chưa kết thúc)
+        // 2. Hoặc session đã kết thúc nhưng chưa quá 48 giờ
+        boolean isSessionOngoing = !now.isBefore(sessionStartDateTime) && !now.isAfter(sessionEndDateTime);
+        boolean isWithin48HoursAfterEnd = now.isAfter(sessionEndDateTime);
+        
+        if (isSessionOngoing) {
+            return true; // Cho phép điểm danh trong khi buổi học đang diễn ra
+        }
+        
+        if (isWithin48HoursAfterEnd) {
+            // Cho phép chỉnh sửa trong vòng 48 giờ sau khi kết thúc
+            LocalDate deadlineDate = sessionDate.plusDays(2);
+            LocalDateTime deadline = LocalDateTime.of(deadlineDate, LocalTime.MAX);
+            return !now.isAfter(deadline);
+        }
+
+        // Nếu chưa đến giờ bắt đầu, không cho phép điểm danh
+        return false;
     }
 }
 

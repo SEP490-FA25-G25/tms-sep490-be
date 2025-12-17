@@ -203,12 +203,11 @@ public class StudentPortalService {
                 .filter(session -> session.getDate().isBefore(today) || session.getStatus() != SessionStatus.PLANNED)
                 .toList();
 
-        // Get student sessions for attendance data - filter by enrollment timeline and isTransferredOut
+        // Get student sessions for attendance data - filter by enrollment timeline
         List<StudentSession> studentSessions = studentSessionRepository.findAllByStudentId(studentId)
                 .stream()
                 .filter(ss -> ss.getSession().getClassEntity().getId().equals(classId))
                 .filter(ss -> ss.getSession().getStatus() != SessionStatus.CANCELLED)
-                .filter(ss -> !Boolean.TRUE.equals(ss.getIsTransferredOut()))  // Filter transferred out sessions
                 .filter(ss -> {
                     Long sessionId = ss.getSession().getId();
                     Long joinId = enrollment.getJoinSessionId();
@@ -369,7 +368,6 @@ public class StudentPortalService {
                 .isMakeup(ss.getIsMakeup())
                 .makeupSessionId(ss.getMakeupSession() != null ? ss.getMakeupSession().getId() : null)
                 .originalSessionId(ss.getOriginalSession() != null ? ss.getOriginalSession().getId() : null)
-                .isTransferredOut(ss.getIsTransferredOut())
                 .note(ss.getNote())
                 .recordedAt(ss.getRecordedAt())
                 .build();

@@ -41,7 +41,7 @@ class StudentAttendanceService_GetReportTest {
     }
 
     private StudentSession mockStudentSession(
-            Long ssId, ClassEntity cls, AttendanceStatus attendance, LocalDate date, boolean transferredOut) {
+            Long ssId, ClassEntity cls, AttendanceStatus attendance, LocalDate date) {
 
         Session session = new Session();
         session.setId(ssId);
@@ -54,7 +54,6 @@ class StudentAttendanceService_GetReportTest {
         StudentSession ss = new StudentSession();
         ss.setSession(session);
         ss.setAttendanceStatus(attendance);
-        ss.setIsTransferredOut(transferredOut);
 
         return ss;
     }
@@ -92,22 +91,20 @@ class StudentAttendanceService_GetReportTest {
         assertTrue(result.getSessions().isEmpty());
     }
 
-    /** TC2 – Ignoring CANCELLED & transferredOut sessions */
+    /** TC2 – Ignoring CANCELLED sessions */
     @Test
-    void getReport_ignoreCancelledAndTransferredOut() {
+    void getReport_ignoreCancelledSessions() {
         ClassEntity cls = mockClass();
         Enrollment e = mockEnrollment(cls, EnrollmentStatus.ENROLLED, null, null);
 
         when(enrollmentRepository.findByStudentIdAndClassId(1L, 10L))
                 .thenReturn(e);
 
-        StudentSession cancelled = mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now().minusDays(1), false);
+        StudentSession cancelled = mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now().minusDays(1));
         cancelled.getSession().setStatus(SessionStatus.CANCELLED);
 
-        StudentSession transferred = mockStudentSession(2L, cls, AttendanceStatus.PRESENT, LocalDate.now().minusDays(1), true);
-
         when(studentSessionRepository.findByStudentIdAndClassEntityId(1L, 10L))
-                .thenReturn(List.of(cancelled, transferred));
+                .thenReturn(List.of(cancelled));
 
         var result = service.getReport(1L, 10L);
 
@@ -121,7 +118,7 @@ class StudentAttendanceService_GetReportTest {
         Enrollment e = mockEnrollment(cls, EnrollmentStatus.ENROLLED, null, null);
         when(enrollmentRepository.findByStudentIdAndClassId(1L, 10L)).thenReturn(e);
 
-        StudentSession ss = mockStudentSession(1L, cls, null, LocalDate.now().minusDays(1), false);
+        StudentSession ss = mockStudentSession(1L, cls, null, LocalDate.now().minusDays(1));
 
         when(studentSessionRepository.findByStudentIdAndClassEntityId(1L, 10L))
                 .thenReturn(List.of(ss));
@@ -139,10 +136,10 @@ class StudentAttendanceService_GetReportTest {
         when(enrollmentRepository.findByStudentIdAndClassId(1L, 10L)).thenReturn(e);
 
         List<StudentSession> sessions = List.of(
-                mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now().minusDays(1), false),
-                mockStudentSession(2L, cls, AttendanceStatus.ABSENT, LocalDate.now().minusDays(1), false),
-                mockStudentSession(3L, cls, AttendanceStatus.EXCUSED, LocalDate.now().minusDays(1), false),
-                mockStudentSession(4L, cls, AttendanceStatus.PLANNED, LocalDate.now().plusDays(1), false)
+                mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now().minusDays(1)),
+                mockStudentSession(2L, cls, AttendanceStatus.ABSENT, LocalDate.now().minusDays(1)),
+                mockStudentSession(3L, cls, AttendanceStatus.EXCUSED, LocalDate.now().minusDays(1)),
+                mockStudentSession(4L, cls, AttendanceStatus.PLANNED, LocalDate.now().plusDays(1))
         );
 
         when(studentSessionRepository.findByStudentIdAndClassEntityId(1L, 10L))
@@ -165,8 +162,8 @@ class StudentAttendanceService_GetReportTest {
         when(enrollmentRepository.findByStudentIdAndClassId(1L, 10L)).thenReturn(e);
 
         List<StudentSession> sessions = List.of(
-                mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now().minusDays(1), false),
-                mockStudentSession(2L, cls, AttendanceStatus.ABSENT, LocalDate.now().minusDays(1), false)
+                mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now().minusDays(1)),
+                mockStudentSession(2L, cls, AttendanceStatus.ABSENT, LocalDate.now().minusDays(1))
         );
 
         when(studentSessionRepository.findByStudentIdAndClassEntityId(1L, 10L))
@@ -226,8 +223,8 @@ class StudentAttendanceService_GetReportTest {
         Enrollment e = mockEnrollment(cls, EnrollmentStatus.ENROLLED, 2L, null);
         when(enrollmentRepository.findByStudentIdAndClassId(1L, 10L)).thenReturn(e);
 
-        StudentSession beforeJoin = mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now(), false);
-        StudentSession afterJoin = mockStudentSession(3L, cls, AttendanceStatus.PRESENT, LocalDate.now(), false);
+        StudentSession beforeJoin = mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now());
+        StudentSession afterJoin = mockStudentSession(3L, cls, AttendanceStatus.PRESENT, LocalDate.now());
 
         when(studentSessionRepository.findByStudentIdAndClassEntityId(1L, 10L))
                 .thenReturn(List.of(beforeJoin, afterJoin));
@@ -244,8 +241,8 @@ class StudentAttendanceService_GetReportTest {
         Enrollment e = mockEnrollment(cls, EnrollmentStatus.TRANSFERRED, null, 2L);
         when(enrollmentRepository.findByStudentIdAndClassId(1L, 10L)).thenReturn(e);
 
-        StudentSession beforeLeft = mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now(), false);
-        StudentSession afterLeft = mockStudentSession(3L, cls, AttendanceStatus.PRESENT, LocalDate.now(), false);
+        StudentSession beforeLeft = mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now());
+        StudentSession afterLeft = mockStudentSession(3L, cls, AttendanceStatus.PRESENT, LocalDate.now());
 
         when(studentSessionRepository.findByStudentIdAndClassEntityId(1L, 10L))
                 .thenReturn(List.of(beforeLeft, afterLeft));
@@ -269,7 +266,7 @@ class StudentAttendanceService_GetReportTest {
         makeupSession.setDate(LocalDate.now());
 
         // Base session
-        StudentSession ss = mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now(), false);
+        StudentSession ss = mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now());
         ss.setIsMakeup(true);
         ss.setMakeupSession(makeupSession);
 
@@ -290,7 +287,7 @@ class StudentAttendanceService_GetReportTest {
         when(enrollmentRepository.findByStudentIdAndClassId(1L, 10L)).thenReturn(e);
 
         // session is CANCELLED → activeSessions empty
-        StudentSession ss = mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now(), false);
+        StudentSession ss = mockStudentSession(1L, cls, AttendanceStatus.PRESENT, LocalDate.now());
         ss.getSession().setStatus(SessionStatus.CANCELLED);
 
         when(studentSessionRepository.findByStudentIdAndClassEntityId(1L, 10L))

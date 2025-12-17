@@ -1503,7 +1503,7 @@ public class StudentRequestService {
         List<TransferOptionDTO> availableClasses = targetClasses.stream()
                 .map(cls -> mapToTransferOptionDTOWithChanges(cls, currentClass))
                 .filter(dto -> {
-                    // Filter by content gap: only include classes within ±2 sessions
+                    // Tìm ra số buổi đã học của lớp mục tiêu
                     Integer targetSessionNum = sessionRepository.findLastCompletedSessionNumber(dto.getClassId());
                     // Lớp mới chưa học buổi nào → targetSessionNum = null
                     //Lớp hiện tại chưa hoàn thành buổi nào → currentSessionNum = null → Giữ lại để AA có thể xem xét
@@ -1708,8 +1708,8 @@ public class StudentRequestService {
         log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
                 newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
 
-        // Mark all sessions AFTER lastSessionInOldClass as transferred
-        // This includes any sessions the student hasn't attended yet
+        // DELETE all future sessions from old class (sessions AFTER lastSessionInOldClass)
+        // We delete instead of marking isTransferredOut to simplify queries and logic
         Long lastSessionId = lastSessionInOldClass != null ? lastSessionInOldClass.getId() : 0L;
         List<StudentSession> allOldClassSessions = studentSessionRepository
                 .findByStudentIdAndClassEntityId(studentId, currentClass.getId());
@@ -1718,16 +1718,9 @@ public class StudentRequestService {
                 .filter(ss -> ss.getSession().getId() > lastSessionId)
                 .toList();
 
-        for (StudentSession ss : futureOldSessions) {
-            ss.setAttendanceStatus(AttendanceStatus.ABSENT);
-            ss.setIsTransferredOut(true);
-            ss.setNote(String.format("Student transferred out to class %s. Request ID: %d", 
-                    targetClass.getCode(), request.getId()));
-            ss.setRecordedAt(OffsetDateTime.now());
-        }
-        studentSessionRepository.saveAll(futureOldSessions);
+        studentSessionRepository.deleteAll(futureOldSessions);
 
-        log.info("Marked {} future StudentSessions as transferred from old class", futureOldSessions.size());
+        log.info("Deleted {} future StudentSessions from old class", futureOldSessions.size());
 
         // Create StudentSessions for new class
         List<Session> newClassSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
@@ -1949,8 +1942,8 @@ public class StudentRequestService {
         log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
                 newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
 
-        // 4. Mark all sessions AFTER lastSessionInOldClass as transferred
-        // This includes any sessions the student hasn't attended yet
+        // 4. DELETE all future sessions from old class (sessions AFTER lastSessionInOldClass)
+        // We delete instead of marking isTransferredOut to simplify queries and logic
         Long lastSessionId = lastSessionInOldClass != null ? lastSessionInOldClass.getId() : 0L;
         List<StudentSession> allOldClassSessions = studentSessionRepository
                 .findByStudentIdAndClassEntityId(studentId, currentClass.getId());
@@ -1959,16 +1952,9 @@ public class StudentRequestService {
                 .filter(ss -> ss.getSession().getId() > lastSessionId)
                 .toList();
 
-        for (StudentSession ss : futureOldSessions) {
-            ss.setAttendanceStatus(AttendanceStatus.ABSENT);
-            ss.setIsTransferredOut(true);
-            ss.setNote(String.format("Student transferred out to class %s. Request ID: %d", 
-                    targetClass.getCode(), request.getId()));
-            ss.setRecordedAt(OffsetDateTime.now());
-        }
-        studentSessionRepository.saveAll(futureOldSessions);
+        studentSessionRepository.deleteAll(futureOldSessions);
 
-        log.info("Marked {} future StudentSessions as transferred from old class", futureOldSessions.size());
+        log.info("Deleted {} future StudentSessions from old class", futureOldSessions.size());
 
         // 5. Create StudentSessions for new class (future sessions from effectiveDate)
         List<Session> newClassSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
