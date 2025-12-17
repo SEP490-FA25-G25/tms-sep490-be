@@ -787,9 +787,26 @@ INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date
 -- IELTS Intermediate (Subject 2) - 5 classes (24 sessions each)
 (6, 1, 2, 'HN-IELTS-I1', 'HN IELTS Intermediate 1 (Early)', 'OFFLINE', '2025-11-17', '2026-01-09', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07', '2025-11-10 10:00:00+07', NOW()),
 (7, 1, 2, 'HN-IELTS-I2', 'HN IELTS Intermediate 2 (Parallel A)', 'OFFLINE', '2025-12-02', '2026-01-24', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', NOW()),
+<<<<<<< Updated upstream
 (8, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Parallel B)', 'OFFLINE', '2025-12-04', '2026-01-28', NULL, ARRAY[1,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-27 10:00:00+07', '2025-11-28 14:00:00+07', '2025-11-27 10:00:00+07', NOW()),
 (9, 1, 2, 'HN-IELTS-I4', 'HN IELTS Intermediate 4 (Parallel C)', 'ONLINE', '2025-12-06', '2026-01-30', NULL, ARRAY[0,2,4]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', NOW()),
 (10, 1, 2, 'HN-IELTS-I5', 'HN IELTS Intermediate 5 (Late)', 'OFFLINE', '2025-12-16', '2026-02-07', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-09 10:00:00+07', '2025-12-10 14:00:00+07', '2025-12-09 10:00:00+07', NOW());
+=======
+(8, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Parallel B)', 'OFFLINE', '2025-12-04', '2026-01-28', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-27 10:00:00+07', '2025-11-28 14:00:00+07', '2025-11-27 10:00:00+07', NOW()),
+(9, 1, 2, 'HN-IELTS-I4', 'HN IELTS Intermediate 4 (Parallel C)', 'ONLINE', '2025-12-06', '2026-01-30', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', NOW()),
+(10, 1, 2, 'HN-IELTS-I5', 'HN IELTS Intermediate 5 (Late)', 'OFFLINE', '2025-12-16', '2026-02-07', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-09 10:00:00+07', '2025-12-10 14:00:00+07', '2025-12-09 10:00:00+07', NOW()),
+
+-- Ho Chi Minh Branch Classes
+-- IELTS Foundation (Subject 1) - 3 classes
+(11, 2, 1, 'HCM-IELTS-F1', 'HCM IELTS Foundation 1', 'OFFLINE', '2025-12-18', '2026-02-10', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-11 10:00:00+07', '2025-12-12 14:00:00+07', '2025-12-11 10:00:00+07', NOW()),
+(12, 2, 1, 'HCM-IELTS-F2', 'HCM IELTS Foundation 2', 'OFFLINE', '2025-12-20', '2026-02-12', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-13 10:00:00+07', '2025-12-14 14:00:00+07', '2025-12-13 10:00:00+07', NOW()),
+(13, 2, 1, 'HCM-IELTS-F3', 'HCM IELTS Foundation 3 (Online)', 'ONLINE', '2025-12-22', '2026-02-14', NULL, ARRAY[1,3,5]::smallint[], 25, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-15 10:00:00+07', '2025-12-16 14:00:00+07', '2025-12-15 10:00:00+07', NOW()),
+
+-- IELTS Intermediate (Subject 2) - 3 classes
+(14, 2, 2, 'HCM-IELTS-I1', 'HCM IELTS Intermediate 1', 'OFFLINE', '2025-12-19', '2026-02-11', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-12 10:00:00+07', '2025-12-13 14:00:00+07', '2025-12-12 10:00:00+07', NOW()),
+(15, 2, 2, 'HCM-IELTS-I2', 'HCM IELTS Intermediate 2', 'OFFLINE', '2025-12-21', '2026-02-13', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-14 10:00:00+07', '2025-12-15 14:00:00+07', '2025-12-14 10:00:00+07', NOW()),
+(16, 2, 2, 'HCM-IELTS-I3', 'HCM IELTS Intermediate 3 (Online)', 'ONLINE', '2025-12-23', '2026-02-15', NULL, ARRAY[2,4,6]::smallint[], 25, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-16 10:00:00+07', '2025-12-17 14:00:00+07', '2025-12-16 10:00:00+07', NOW());
+>>>>>>> Stashed changes
 
 -- Class 1: HN IELTS Foundation 1 (Early) - Mon/Wed/Fri, starts 2025-11-17 (2 weeks ahead)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
@@ -869,6 +886,48 @@ FROM generate_series(1, 24) AS s(idx);
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 3 FROM session WHERE class_id = 10;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 10, 'SCHEDULED' FROM session WHERE class_id = 10;
 
+-- Class 11: HCM IELTS Foundation 1 - Mon/Wed/Fri, starts 2025-12-18
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT 1000 + s.idx, 11, s.idx, 10, ('2025-12-18'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'PLANNED', '2025-12-11 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 5 FROM session WHERE class_id = 11;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 9, 'SCHEDULED' FROM session WHERE class_id = 11;
+
+-- Class 12: HCM IELTS Foundation 2 - Tue/Thu/Sat, starts 2025-12-20
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT 1100 + s.idx, 12, s.idx, 11, ('2025-12-20'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS', 'PLANNED', '2025-12-13 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 6 FROM session WHERE class_id = 12;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 10, 'SCHEDULED' FROM session WHERE class_id = 12;
+
+-- Class 13: HCM IELTS Foundation 3 (Online) - Mon/Wed/Fri, starts 2025-12-22
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT 1200 + s.idx, 13, s.idx, 13, ('2025-12-22'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'PLANNED', '2025-12-15 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 8 FROM session WHERE class_id = 13;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 11, 'SCHEDULED' FROM session WHERE class_id = 13;
+
+-- Class 14: HCM IELTS Intermediate 1 - Tue/Thu/Sat, starts 2025-12-19
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT 1300 + s.idx, 14, 24 + s.idx, 11, ('2025-12-19'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS', 'PLANNED', '2025-12-12 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 7 FROM session WHERE class_id = 14;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 12, 'SCHEDULED' FROM session WHERE class_id = 14;
+
+-- Class 15: HCM IELTS Intermediate 2 - Mon/Wed/Fri, starts 2025-12-21
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT 1400 + s.idx, 15, 24 + s.idx, 10, ('2025-12-21'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 2 ELSE 4 END), 'CLASS', 'PLANNED', '2025-12-14 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 5 FROM session WHERE class_id = 15;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 13, 'SCHEDULED' FROM session WHERE class_id = 15;
+
+-- Class 16: HCM IELTS Intermediate 3 (Online) - Tue/Thu/Sat, starts 2025-12-23
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT 1500 + s.idx, 16, 24 + s.idx, 13, ('2025-12-23'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 1 WHEN 1 THEN 3 ELSE 5 END), 'CLASS', 'PLANNED', '2025-12-16 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 8 FROM session WHERE class_id = 16;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 14, 'SCHEDULED' FROM session WHERE class_id = 16;
+
 -- Enrollments for Class 1 (HN-IELTS-F1 - Early) - 15 students (IDs 1-15)
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
 SELECT (100 + s.id), 1, s.id, 'ENROLLED', '2025-11-10 09:00:00+07', 6, 1, '2025-11-10 09:00:00+07', NOW()
@@ -917,6 +976,37 @@ FROM generate_series(1, 5) AS s(id);
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
 SELECT (1000 + s.id), 10, s.id + 5, 'ENROLLED', '2025-12-09 09:00:00+07', 6, 901, '2025-12-09 09:00:00+07', NOW()
 FROM generate_series(1, 5) AS s(id);
+
+-- Enrollments for HCM Classes
+-- Enrollments for Class 11 (HCM-IELTS-F1) - 15 students (IDs 151-165)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT (1100 + s.id), 11, s.id + 150, 'ENROLLED', '2025-12-11 09:00:00+07', 8, 1001, '2025-12-11 09:00:00+07', NOW()
+FROM generate_series(1, 15) AS s(id);
+
+-- Enrollments for Class 12 (HCM-IELTS-F2) - 15 students (IDs 166-180)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT (1200 + s.id), 12, s.id + 165, 'ENROLLED', '2025-12-13 09:00:00+07', 8, 1101, '2025-12-13 09:00:00+07', NOW()
+FROM generate_series(1, 15) AS s(id);
+
+-- Enrollments for Class 13 (HCM-IELTS-F3 - Online) - 20 students (IDs 181-200)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT (1300 + s.id), 13, s.id + 180, 'ENROLLED', '2025-12-15 09:00:00+07', 8, 1201, '2025-12-15 09:00:00+07', NOW()
+FROM generate_series(1, 20) AS s(id);
+
+-- Enrollments for Class 14 (HCM-IELTS-I1) - 12 students (IDs 151-162)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT (1400 + s.id), 14, s.id + 150, 'ENROLLED', '2025-12-12 09:00:00+07', 8, 1301, '2025-12-12 09:00:00+07', NOW()
+FROM generate_series(1, 12) AS s(id);
+
+-- Enrollments for Class 15 (HCM-IELTS-I2) - 12 students (IDs 163-174)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT (1500 + s.id), 15, s.id + 162, 'ENROLLED', '2025-12-14 09:00:00+07', 8, 1401, '2025-12-14 09:00:00+07', NOW()
+FROM generate_series(1, 12) AS s(id);
+
+-- Enrollments for Class 16 (HCM-IELTS-I3 - Online) - 18 students (IDs 175-192)
+INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)
+SELECT (1600 + s.id), 16, s.id + 174, 'ENROLLED', '2025-12-16 09:00:00+07', 8, 1501, '2025-12-16 09:00:00+07', NOW()
+FROM generate_series(1, 18) AS s(id);
 
 -- Student Sessions (Attendance) for ALL classes
 -- Generates attendance records for ALL sessions (DONE, PLANNED, IN_PROGRESS)
