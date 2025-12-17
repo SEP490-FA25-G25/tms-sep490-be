@@ -12,7 +12,5 @@ import lombok.NoArgsConstructor;
 public class StudentFeedbackQuestionDTO {
     private Long id;
     private String questionText;
-    private String questionType;  // 'rating' or 'text'
-    private String[] options;
     private Integer displayOrder;
 }

@@ -232,14 +232,12 @@ INSERT INTO user_account (id, email, phone, full_name, gender, dob, address, pas
 (200, 'vuthithu100@gmail.com', '0900000100', 'Vu Thi Thu', 'FEMALE', '2000-04-10', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
 
 -- Feedback Questions (for student feedback feature)
-INSERT INTO feedback_question (id, question_text, question_type, options, display_order, created_at, updated_at) VALUES
-(1, 'Mức hài lòng với chất lượng giảng dạy tổng thể', 'rating', NULL, 1, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(2, 'Bài giảng có rõ ràng và mạch lạc không?', 'rating', NULL, 2, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(3, 'Tài liệu và nguồn lực hỗ trợ học tập hữu ích ở mức nào?', 'rating', NULL, 3, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(4, 'Lịch học và quản lý lớp có hiệu quả không?', 'rating', NULL, 4, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(5, 'Bạn có sẵn sàng giới thiệu khóa học này cho người khác?', 'rating', NULL, 5, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(6, 'Điều bạn hài lòng nhất ở phase này là gì?', 'text', NULL, 6, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(7, 'Bạn muốn cải thiện điều gì cho phase tiếp theo?', 'text', NULL, 7, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07');
+INSERT INTO feedback_question (id, question_text, display_order, status, created_at, updated_at) VALUES
+(1, 'Giáo viên giảng dạy rõ ràng, dễ hiểu', 1, 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(2, 'Tài liệu học tập và bài tập phù hợp với nội dung giảng dạy', 2, 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(3, 'Giáo viên nhiệt tình, tương tác tốt với học viên', 3, 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(4, 'Lớp học có đủ thiết bị và điều kiện học tập tốt', 4, 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(5, 'Thời gian và tốc độ học phù hợp với khả năng tiếp thu', 5, 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07');
 
 -- Branches
 INSERT INTO branch (id, center_id, code, name, address, phone, email, district, city, status, opening_date, created_at, updated_at) VALUES
@@ -1385,40 +1383,32 @@ INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, s
 SELECT 100 + s.id, s.id, 1, 1, true, '2025-12-01 10:00:00+07', 'Học viên rất hài lòng với chất lượng giảng dạy.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
-SELECT f.id, q.id, 
-    CASE WHEN q.question_type = 'rating' THEN 5 ELSE NULL END,
-    NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 1;
+SELECT f.id, q.id, 5, NOW(), NOW()
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 1 AND q.status = 'ACTIVE';
 
 -- Class 6 (Intermediate Early): Mixed feedback from students 76-83 (Le Thi Cuc -> Tran Van Bach)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
 SELECT 200 + s.id, 75 + s.id, 6, 3, true, '2025-12-02 10:00:00+07', 'Cần cải thiện tốc độ giảng dạy.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
-SELECT f.id, q.id, 
-    CASE WHEN q.question_type = 'rating' THEN 3 + (f.id % 2) ELSE NULL END, -- Rating 3 or 4
-    NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 6;
+SELECT f.id, q.id, 3 + (f.id % 2), NOW(), NOW() -- Rating 3 or 4
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 6 AND q.status = 'ACTIVE';
 
 -- Class 3 (Foundation Parallel B): Average feedback from students 31-38 (Bui Xuan Hoang -> Do Thi Quyen)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
 SELECT 300 + s.id, 30 + s.id, 3, 1, true, '2025-12-03 10:00:00+07', 'Giáo viên thường xuyên giải đáp thắc mắc.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
-SELECT f.id, q.id, 
-    CASE WHEN q.question_type = 'rating' THEN 4 ELSE NULL END,
-    NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 3;
+SELECT f.id, q.id, 4, NOW(), NOW()
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 3 AND q.status = 'ACTIVE';
 
 -- Class 2 (Foundation Parallel A): Recent feedback from students 16-20 (Vuong Thi Loan -> Nguyen Thi Linh)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
 SELECT 400 + s.id, 15 + s.id, 2, 1, true, '2025-12-08 10:00:00+07', 'Rất thích cách cô giáo tổ chức trò chơi.', NOW(), NOW() FROM generate_series(1, 5) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
-SELECT f.id, q.id, 
-    CASE WHEN q.question_type = 'rating' THEN 5 ELSE NULL END,
-    NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 2;
+SELECT f.id, q.id, 5, NOW(), NOW()
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 2 AND q.status = 'ACTIVE';
 
 -- Reset feedback 401 (student 16 - Vuong Thi Loan, class 2, phase 1) to pending for demo
 DELETE FROM student_feedback_response WHERE feedback_id = 401;
@@ -1428,6 +1418,11 @@ SET is_feedback = false,
     response = NULL,
     updated_at = NOW()
 WHERE id = 401;
+
+-- DEMO: Pending feedback for student 1 (Nguyen Van An) - Class 1, Phase 2
+-- This simulates cronjob creating feedback waiting for student submission
+INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at) VALUES
+(500, 1, 1, 2, false, NULL, NULL, NOW(), NOW());
 
 -- 1. Classroom Observation (Dự giờ) - Class 2 (Good)
 INSERT INTO qa_report (id, class_id, session_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
