@@ -120,6 +120,8 @@ public class CurriculumService {
                                 .status(curriculum.getStatus().name())
                                 .createdAt(curriculum.getCreatedAt() != null ? curriculum.getCreatedAt().toString()
                                                 : null)
+                                .updatedAt(curriculum.getUpdatedAt() != null ? curriculum.getUpdatedAt().toString()
+                                                : null)
                                 .levelCount(curriculum.getLevels().size())
                                 .plos(curriculum.getPlos().stream()
                                                 .map(plo -> CreatePLODTO.builder()

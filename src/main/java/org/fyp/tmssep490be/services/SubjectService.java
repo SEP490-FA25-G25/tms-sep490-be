@@ -1101,8 +1101,12 @@ public class SubjectService {
                 List<PLOCLOMapping> oldMappings = ploCloMappingRepository.findByCloId(oldClo.getId());
                 for (PLOCLOMapping oldMapping : oldMappings) {
                     PLOCLOMapping newMapping = new PLOCLOMapping();
+                    // Must initialize EmbeddedId before setting entities with @MapsId
+                    newMapping.setId(new PLOCLOMapping.PLOCLOMappingId(
+                            oldMapping.getPlo().getId(), newClo.getId()));
                     newMapping.setClo(newClo);
                     newMapping.setPlo(oldMapping.getPlo());
+                    newMapping.setStatus(oldMapping.getStatus());
                     ploCloMappingRepository.save(newMapping);
                 }
             }
@@ -1140,8 +1144,12 @@ public class SubjectService {
                             CLO newClo = oldToNewCloMap.get(oldMapping.getClo().getId());
                             if (newClo != null) {
                                 SubjectSessionCLOMapping newMapping = new SubjectSessionCLOMapping();
+                                // Must initialize EmbeddedId before setting entities with @MapsId
+                                newMapping.setId(new SubjectSessionCLOMapping.SubjectSessionCLOMappingId(
+                                        savedNewSession.getId(), newClo.getId()));
                                 newMapping.setSubjectSession(savedNewSession);
                                 newMapping.setClo(newClo);
+                                newMapping.setStatus(oldMapping.getStatus());
                                 subjectSessionCLOMappingRepository.save(newMapping);
                             }
                         }
@@ -1236,8 +1244,10 @@ public class SubjectService {
                 .id(savedNewSubject.getId())
                 .code(savedNewSubject.getCode())
                 .name(savedNewSubject.getName())
-                .subjectName(savedNewSubject.getName())
+                .subjectName(savedNewSubject.getCurriculum() != null ? savedNewSubject.getCurriculum().getName() : null)
+                .subjectId(savedNewSubject.getCurriculum() != null ? savedNewSubject.getCurriculum().getId() : null)
                 .levelName(savedNewSubject.getLevel() != null ? savedNewSubject.getLevel().getName() : null)
+                .levelId(savedNewSubject.getLevel() != null ? savedNewSubject.getLevel().getId() : null)
                 .status(savedNewSubject.getStatus().name())
                 .effectiveDate(savedNewSubject.getEffectiveDate())
                 .createdAt(savedNewSubject.getCreatedAt())

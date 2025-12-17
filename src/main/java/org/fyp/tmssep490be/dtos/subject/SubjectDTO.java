@@ -28,4 +28,6 @@ public class SubjectDTO {
     private Integer numberOfSessions;
     private String subjectName;
     private String levelName;
+    private Long subjectId; // Curriculum ID
+    private Long levelId;
 }

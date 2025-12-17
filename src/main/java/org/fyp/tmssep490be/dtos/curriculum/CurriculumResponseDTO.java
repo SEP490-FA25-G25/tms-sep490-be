@@ -4,7 +4,10 @@ import lombok.*;
 
 import java.util.List;
 
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CurriculumResponseDTO {
     private String id;
     private String code;
@@ -14,6 +17,7 @@ public class CurriculumResponseDTO {
     private int levelCount;
     private String status;
     private String createdAt;
+    private String updatedAt;
     private List<CreatePLODTO> plos;
     private List<LevelResponseDTO> levels;
 }
