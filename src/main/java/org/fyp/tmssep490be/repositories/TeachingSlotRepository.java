@@ -12,7 +12,8 @@ import java.util.List;
 @Repository
 public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, TeachingSlot.TeachingSlotId> {
 
-    //Tìm kiếm tất cả lớp học được phân công cho giáo viên theo teacherId
+    //Tìm kiếm tất cả lớp học được phân công chính thức cho giáo viên theo teacherId
+    // Chỉ lấy SCHEDULED (giáo viên dạy đúng lịch), loại bỏ SUBSTITUTED (giáo viên dạy thay)
     @Query("""
         SELECT DISTINCT c FROM TeachingSlot ts
         JOIN ts.session s
@@ -20,7 +21,7 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
         JOIN FETCH c.subject
         JOIN FETCH c.branch
         WHERE ts.teacher.id = :teacherId
-          AND ts.status IN ('SCHEDULED', 'SUBSTITUTED')
+          AND ts.status = 'SCHEDULED'
         ORDER BY c.code ASC
         """)
     List<org.fyp.tmssep490be.entities.ClassEntity> findDistinctClassesByTeacherId(

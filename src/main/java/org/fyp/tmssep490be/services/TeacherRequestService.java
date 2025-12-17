@@ -1160,6 +1160,15 @@ public class TeacherRequestService {
             request = teacherRequestRepository.save(request);
             log.info("Created REPLACEMENT request {} for teacher {} by academic staff {}. Status: WAITING_CONFIRM (waiting for replacement teacher confirmation)",
                     request.getId(), teacher.getId(), academicStaffUserId);
+            
+            // Gửi thông báo và email cho giáo viên dạy thay
+            try {
+                sendNotificationToReplacementTeacher(request);
+                sendEmailNotificationForReplacementInvitation(request);
+            } catch (Exception e) {
+                log.error("Lỗi khi gửi thông báo cho replacement teacher: {}", e.getMessage());
+            }
+            
             return mapToResponseDTO(request);
         }
 
@@ -2017,11 +2026,18 @@ public class TeacherRequestService {
 
         org.fyp.tmssep490be.entities.Subject subject = classEntity.getSubject();
 
-        // Lấy tất cả teachers (trừ teacher hiện tại)
-        List<Teacher> allTeachers = teacherRepository.findAll();
-        List<Teacher> candidateTeachers = allTeachers.stream()
-                .filter(teacher -> !teacher.getId().equals(requestingTeacher.getId()))
-                .collect(Collectors.toList());
+        // Lấy branch của giáo viên tạo yêu cầu
+        List<Long> requestingTeacherBranchIds = userBranchesRepository.findBranchIdsByUserId(requestingTeacher.getUserAccount().getId());
+        
+        // Lấy các giáo viên cùng branch với giáo viên tạo yêu cầu (trừ teacher hiện tại)
+        List<Teacher> candidateTeachers;
+        if (requestingTeacherBranchIds.isEmpty()) {
+            candidateTeachers = List.of();
+        } else {
+            candidateTeachers = teacherRepository.findByBranchIds(requestingTeacherBranchIds).stream()
+                    .filter(teacher -> !teacher.getId().equals(requestingTeacher.getId()))
+                    .collect(Collectors.toList());
+        }
 
         // Loại trừ các teacher đã từ chối request này (nếu có requestId)
 
@@ -2627,37 +2643,41 @@ public class TeacherRequestService {
         if (session == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Request has no associated session");
         }
-
-        // Tìm TeachingSlot với teacher cũ (teacher tạo request)
+        // - Original teacher slot → ON_LEAVE
+        // - Replacement teacher slot → SUBSTITUTED
         Teacher originalTeacher = request.getTeacher();
-        TeachingSlot oldSlot = session.getTeachingSlots().stream()
-                .filter(ts -> ts.getTeacher() != null && ts.getTeacher().getId().equals(originalTeacher.getId()))
-                .findFirst()
-                .orElse(null);
+        Teacher replacementTeacher = request.getReplacementTeacher();
 
-        if (oldSlot == null) {
+        // Original teacher slot → ON_LEAVE
+        TeachingSlot.TeachingSlotId originalSlotId = new TeachingSlot.TeachingSlotId();
+        originalSlotId.setSessionId(session.getId());
+        originalSlotId.setTeacherId(originalTeacher.getId());
+        TeachingSlot originalSlot = teachingSlotRepository.findById(originalSlotId).orElse(null);
+        
+        if (originalSlot == null) {
             log.warn("No TeachingSlot found for original teacher {} in session {}", originalTeacher.getId(), session.getId());
         } else {
-            // Xóa TeachingSlot cũ
-            teachingSlotRepository.delete(oldSlot);
-            session.getTeachingSlots().remove(oldSlot);
+            originalSlot.setStatus(TeachingSlotStatus.ON_LEAVE);
+            teachingSlotRepository.save(originalSlot);
         }
 
-        // Tạo TeachingSlot mới với replacement teacher
-        TeachingSlot newSlot = new TeachingSlot();
-        TeachingSlot.TeachingSlotId newSlotId = new TeachingSlot.TeachingSlotId();
-        newSlotId.setSessionId(session.getId());
-        newSlotId.setTeacherId(request.getReplacementTeacher().getId());
-        newSlot.setId(newSlotId);
-        newSlot.setSession(session);
-        newSlot.setTeacher(request.getReplacementTeacher());
-        newSlot.setStatus(TeachingSlotStatus.SCHEDULED);
-
-        // Thêm vào session
-        session.getTeachingSlots().add(newSlot);
-
-        // Lưu session (cascade sẽ lưu TeachingSlot mới)
-        sessionRepository.save(session);
+        // Replacement teacher slot → SUBSTITUTED
+        TeachingSlot.TeachingSlotId replacementSlotId = new TeachingSlot.TeachingSlotId();
+        replacementSlotId.setSessionId(session.getId());
+        replacementSlotId.setTeacherId(replacementTeacher.getId());
+        TeachingSlot replacementSlot = teachingSlotRepository.findById(replacementSlotId).orElse(null);
+        
+        if (replacementSlot == null) {
+            // Tạo mới nếu chưa có
+            replacementSlot = new TeachingSlot();
+            replacementSlot.setId(replacementSlotId);
+            replacementSlot.setSession(session);
+            replacementSlot.setTeacher(replacementTeacher);
+            replacementSlot.setStatus(TeachingSlotStatus.SUBSTITUTED);
+        } else {
+            replacementSlot.setStatus(TeachingSlotStatus.SUBSTITUTED);
+        }
+        teachingSlotRepository.save(replacementSlot);
 
         request = teacherRequestRepository.save(request);
         log.info("Replacement request {} confirmed successfully by teacher {}. Session {} updated: teacher {} -> {}", 
@@ -2776,8 +2796,16 @@ public class TeacherRequestService {
         // Lấy skills yêu cầu của session từ SubjectSession
         Set<org.fyp.tmssep490be.entities.enums.Skill> sessionRequiredSkills = getSessionRequiredSkills(session);
 
-        // Lấy tất cả teachers (trừ teacher hiện tại)
-        List<Teacher> allTeachers = teacherRepository.findAll();
+        // Lấy branch của giáo viên được tạo yêu cầu hộ
+        List<Long> requestTeacherBranchIds = teacherBranches;
+        
+        // Lấy các giáo viên cùng branch với giáo viên được tạo yêu cầu hộ
+        List<Teacher> branchTeachers;
+        if (requestTeacherBranchIds.isEmpty()) {
+            branchTeachers = List.of();
+        } else {
+            branchTeachers = teacherRepository.findByBranchIds(requestTeacherBranchIds);
+        }
         
         // Lấy danh sách teacher IDs đã từ chối request này
         // Parse note để lấy các teacher ID đã từ chối
@@ -2826,8 +2854,8 @@ public class TeacherRequestService {
         LocalDate sessionDate = session.getDate();
         TimeSlotTemplate sessionTimeSlot = session.getTimeSlotTemplate();
 
-        // Lọc candidates
-        List<Teacher> candidateTeachers = allTeachers.stream()
+        // Lọc candidates từ giáo viên cùng branch
+        List<Teacher> candidateTeachers = branchTeachers.stream()
                 .filter(teacher -> !excludedTeacherIds.contains(teacher.getId()))
                 .filter(teacher -> !hasTeacherTimeConflict(teacher.getId(), sessionDate, sessionTimeSlot, session.getId()))
                 .collect(Collectors.toList());
@@ -2913,8 +2941,16 @@ public class TeacherRequestService {
         // Lấy skills yêu cầu của session từ SubjectSession
         Set<org.fyp.tmssep490be.entities.enums.Skill> sessionRequiredSkills = getSessionRequiredSkills(session);
 
-        // Lấy tất cả teachers (trừ teacher hiện tại)
-        List<Teacher> allTeachers = teacherRepository.findAll();
+        // Lấy branch của giáo viên được tạo yêu cầu hộ
+        List<Long> teacherBranchIds = userBranchesRepository.findBranchIdsByUserId(teacher.getUserAccount().getId());
+        
+        // Lấy các giáo viên cùng branch với giáo viên được tạo yêu cầu hộ (trừ teacher hiện tại)
+        List<Teacher> branchTeachers;
+        if (teacherBranchIds.isEmpty()) {
+            branchTeachers = List.of();
+        } else {
+            branchTeachers = teacherRepository.findByBranchIds(teacherBranchIds);
+        }
 
         // Loại trừ teacher hiện tại
         Set<Long> excludedTeacherIds = new java.util.HashSet<>();
@@ -2925,7 +2961,7 @@ public class TeacherRequestService {
         TimeSlotTemplate sessionTimeSlot = session.getTimeSlotTemplate();
 
         // Lọc candidates
-        List<Teacher> candidateTeachers = allTeachers.stream()
+        List<Teacher> candidateTeachers = branchTeachers.stream()
                 .filter(t -> !excludedTeacherIds.contains(t.getId()))
                 .filter(t -> !hasTeacherTimeConflict(t.getId(), sessionDate, sessionTimeSlot, session.getId()))
                 .collect(Collectors.toList());

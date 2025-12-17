@@ -29,6 +29,8 @@ public class StudentAttendanceMatrixDTO {
         private AttendanceStatus attendanceStatus;
         private HomeworkStatus homeworkStatus;
         private Boolean makeup;
+        private Boolean hasMakeupPlanned;
+        private Boolean hasMakeupCompleted;
     }
 }
 

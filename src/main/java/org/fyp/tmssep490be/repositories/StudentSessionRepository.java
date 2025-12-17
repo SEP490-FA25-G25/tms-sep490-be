@@ -132,6 +132,14 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             """)
     List<StudentSession> findBySessionIds(@Param("sessionIds") List<Long> sessionIds);
 
+    @Query("""
+            SELECT ss FROM StudentSession ss
+            JOIN ss.originalSession os
+            WHERE os.id IN :sessionIds
+              AND ss.isMakeup = true
+            """)
+    List<StudentSession> findMakeupSessionsByOriginalSessionIds(@Param("sessionIds") List<Long> sessionIds);
+
     @Query("SELECT ss FROM StudentSession ss " +
            "JOIN ss.session s " +
            "WHERE ss.student.id = :studentId " +
