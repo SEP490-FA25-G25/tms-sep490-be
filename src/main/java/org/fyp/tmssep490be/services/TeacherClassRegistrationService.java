@@ -8,6 +8,7 @@ import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.NotificationType;
 import org.fyp.tmssep490be.entities.enums.RegistrationStatus;
+import org.fyp.tmssep490be.entities.enums.RegistrationWindowStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
@@ -20,8 +21,11 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -54,11 +58,9 @@ public class TeacherClassRegistrationService {
             return List.of();
         }
 
-        OffsetDateTime now = OffsetDateTime.now();
-
-        // Lấy các lớp đang mở đăng ký
+        // Lấy các lớp có registration dates được set (includes PENDING_OPEN và OPEN)
         List<ClassEntity> availableClasses = classRepository.findAvailableForTeacherRegistration(
-                branchIds, now, ApprovalStatus.APPROVED, ClassStatus.SCHEDULED);
+                branchIds, ApprovalStatus.APPROVED, ClassStatus.SCHEDULED);
 
         // Lấy teacher skills để matching
         List<TeacherSkill> teacherSkills = teacherSkillRepository.findByTeacherId(teacher.getId());
@@ -73,10 +75,18 @@ public class TeacherClassRegistrationService {
                 .map(String::toLowerCase)
                 .collect(Collectors.toSet());
 
+        OffsetDateTime now = OffsetDateTime.now();
+
         return availableClasses.stream()
-                .map(c -> mapToAvailableClassDTO(c, teacher.getId(), teacherSpecializations, teacherLanguages))
-                // Sort by matched (matched first), then by registration close date
-                .sorted(Comparator.comparing((AvailableClassDTO dto) -> !Boolean.TRUE.equals(dto.getIsMatch()))
+                .map(c -> mapToAvailableClassDTO(c, teacher.getId(), teacherSpecializations, teacherLanguages, now))
+                // Filter out CLOSED classes - only show PENDING_OPEN and OPEN
+                .filter(dto -> dto.getRegistrationStatus() != RegistrationWindowStatus.CLOSED)
+                // Sort: OPEN first, then PENDING_OPEN, then by matched, then by close date
+                .sorted(Comparator
+                        .comparing(
+                                (AvailableClassDTO dto) -> dto.getRegistrationStatus() != RegistrationWindowStatus.OPEN) // OPEN
+                                                                                                                         // first
+                        .thenComparing(dto -> !Boolean.TRUE.equals(dto.getIsMatch())) // matched second
                         .thenComparing(AvailableClassDTO::getRegistrationCloseDate))
                 .collect(Collectors.toList());
     }
@@ -344,16 +354,35 @@ public class TeacherClassRegistrationService {
 
             // Format dates for notification
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            String openDate = classEntity.getRegistrationOpenDate().format(formatter);
             String closeDate = classEntity.getRegistrationCloseDate().format(formatter);
 
+            // Check if registration is already open or pending
+            OffsetDateTime now = OffsetDateTime.now();
+            boolean isAlreadyOpen = !now.isBefore(classEntity.getRegistrationOpenDate());
+
             String title = "Mở đăng ký dạy lớp: " + className;
-            String message = String.format(
-                    "Lớp %s (%s) - Môn %s đang mở đăng ký dạy. Hạn đăng ký: %s. " +
-                            "Vào mục 'Đăng ký dạy' để đăng ký ngay!",
-                    className,
-                    classCode,
-                    subjectName,
-                    closeDate);
+            String message;
+            if (isAlreadyOpen) {
+                // Registration is already open
+                message = String.format(
+                        "Lớp %s (%s) - Môn %s đang mở đăng ký dạy. Hạn đăng ký: %s. " +
+                                "Vào mục 'Đăng ký dạy' để đăng ký ngay!",
+                        className,
+                        classCode,
+                        subjectName,
+                        closeDate);
+            } else {
+                // Registration will open in the future
+                message = String.format(
+                        "Lớp %s (%s) - Môn %s sẽ mở đăng ký dạy từ %s đến %s. " +
+                                "Vào mục 'Đăng ký dạy' để theo dõi!",
+                        className,
+                        classCode,
+                        subjectName,
+                        openDate,
+                        closeDate);
+            }
 
             notificationService.sendBulkNotifications(
                     teacherUserIds,
@@ -379,8 +408,8 @@ public class TeacherClassRegistrationService {
 
         // Validate and use requestedBranchId if provided
         if (requestedBranchId != null && !branchIds.contains(requestedBranchId)) {
-            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED, 
-                "Access denied to branch ID: " + requestedBranchId);
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED,
+                    "Access denied to branch ID: " + requestedBranchId);
         }
 
         Long branchId = requestedBranchId != null ? requestedBranchId : branchIds.get(0);
@@ -412,12 +441,11 @@ public class TeacherClassRegistrationService {
 
         // Validate and use requestedBranchId if provided
         if (requestedBranchId != null && !branchIds.contains(requestedBranchId)) {
-            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED, 
-                "Access denied to branch ID: " + requestedBranchId);
+            throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED,
+                    "Access denied to branch ID: " + requestedBranchId);
         }
 
-        List<Long> targetBranchIds = requestedBranchId != null ? 
-            List.of(requestedBranchId) : branchIds;
+        List<Long> targetBranchIds = requestedBranchId != null ? List.of(requestedBranchId) : branchIds;
 
         // Lấy các lớp APPROVED + SCHEDULED chưa có teacher
         List<ClassEntity> classes = classRepository.findClassesNeedingTeacher(targetBranchIds);
@@ -640,10 +668,13 @@ public class TeacherClassRegistrationService {
     // ==================== MAPPING METHODS ====================
 
     private AvailableClassDTO mapToAvailableClassDTO(ClassEntity c, Long teacherId,
-            Set<String> teacherSpecializations, Set<String> teacherLanguages) {
+            Set<String> teacherSpecializations, Set<String> teacherLanguages, OffsetDateTime now) {
         int totalRegistrations = (int) registrationRepository.countByClassEntityIdAndStatus(
                 c.getId(), RegistrationStatus.PENDING);
         boolean alreadyRegistered = registrationRepository.existsByTeacherIdAndClassEntityId(teacherId, c.getId());
+
+        // Calculate registration status (real-time, not stored in DB)
+        RegistrationWindowStatus registrationStatus = calculateRegistrationStatus(c, now);
 
         // Get curriculum info for matching
         // Use curriculum.code for matching (e.g. 'IELTS', 'TOEIC') as it matches
@@ -676,7 +707,7 @@ public class TeacherClassRegistrationService {
             }
         }
 
-        // Get time slot from first session (assumes all sessions have same time slot)
+        // Get time slot from first session (legacy - for backward compatibility)
         String timeSlotStart = null;
         String timeSlotEnd = null;
         List<Session> sessions = sessionRepository.findByClassEntityId(c.getId());
@@ -685,6 +716,9 @@ public class TeacherClassRegistrationService {
             timeSlotStart = slot.getStartTime() != null ? slot.getStartTime().toString() : null;
             timeSlotEnd = slot.getEndTime() != null ? slot.getEndTime().toString() : null;
         }
+
+        // Calculate time slots grouped by day of week
+        Map<String, String> timeSlotsByDay = calculateTimeSlotsByDay(sessions);
 
         return AvailableClassDTO.builder()
                 .classId(c.getId())
@@ -701,13 +735,109 @@ public class TeacherClassRegistrationService {
                 .registrationCloseDate(c.getRegistrationCloseDate())
                 .totalRegistrations(totalRegistrations)
                 .alreadyRegistered(alreadyRegistered)
+                .registrationStatus(registrationStatus)
                 .isMatch(isMatch)
                 .matchReason(matchReason)
                 .curriculumName(curriculumCode)
                 .curriculumLanguage(curriculumLanguage)
                 .timeSlotStart(timeSlotStart)
                 .timeSlotEnd(timeSlotEnd)
+                .timeSlotsByDay(timeSlotsByDay)
                 .build();
+    }
+
+    /**
+     * Calculate time slots grouped by day of week.
+     * Groups days that have the same time slot together.
+     * 
+     * Example output:
+     * - If T2, T4 both have 07:00-08:30 and T6 has 08:00-10:30:
+     * {"T2, T4": "07:00 - 08:30", "T6": "08:00 - 10:30"}
+     * - If all days have same time slot:
+     * {"T2, T4, T6": "07:00 - 08:30"}
+     */
+    private Map<String, String> calculateTimeSlotsByDay(List<Session> sessions) {
+        if (sessions == null || sessions.isEmpty()) {
+            return Map.of();
+        }
+
+        // Map: timeSlotKey ("07:00-08:30") -> Set of day numbers (1, 3, 5)
+        Map<String, Set<Integer>> timeSlotToDays = new HashMap<>();
+        // Map: timeSlotKey -> formatted time string ("07:00 - 08:30")
+        Map<String, String> timeSlotFormatted = new HashMap<>();
+
+        for (Session session : sessions) {
+            if (session.getTimeSlotTemplate() == null || session.getDate() == null) {
+                continue;
+            }
+
+            TimeSlotTemplate slot = session.getTimeSlotTemplate();
+            if (slot.getStartTime() == null || slot.getEndTime() == null) {
+                continue;
+            }
+
+            // Create a key for this time slot
+            String timeKey = slot.getStartTime().toString() + "-" + slot.getEndTime().toString();
+            String timeFormatted = slot.getStartTime().toString() + " - " + slot.getEndTime().toString();
+
+            // Get day of week (1 = Monday, 7 = Sunday)
+            int dayOfWeek = session.getDate().getDayOfWeek().getValue();
+
+            timeSlotToDays.computeIfAbsent(timeKey, k -> new HashSet<>()).add(dayOfWeek);
+            timeSlotFormatted.putIfAbsent(timeKey, timeFormatted);
+        }
+
+        if (timeSlotToDays.isEmpty()) {
+            return Map.of();
+        }
+
+        // Now invert: group days by their time slot
+        // Result: "T2, T4" -> "07:00 - 08:30", "T6" -> "08:00 - 10:30"
+        Map<String, String> result = new LinkedHashMap<>();
+
+        // Sort time slots by start time for consistent ordering
+        List<String> sortedTimeKeys = new ArrayList<>(timeSlotToDays.keySet());
+        sortedTimeKeys.sort(Comparator.naturalOrder());
+
+        for (String timeKey : sortedTimeKeys) {
+            Set<Integer> days = timeSlotToDays.get(timeKey);
+            String dayLabel = formatDayLabels(days);
+            String timeValue = timeSlotFormatted.get(timeKey);
+            result.put(dayLabel, timeValue);
+        }
+
+        return result;
+    }
+
+    /**
+     * Format a set of day numbers into Vietnamese day labels.
+     * Days are sorted and joined with ", ".
+     */
+    private String formatDayLabels(Set<Integer> days) {
+        return days.stream()
+                .sorted()
+                .map(this::getDayOfWeekVietnamese)
+                .collect(Collectors.joining(", "));
+    }
+
+    /**
+     * Calculate registration window status based on current time.
+     * This is computed in real-time and NOT stored in the database.
+     */
+    private RegistrationWindowStatus calculateRegistrationStatus(ClassEntity c, OffsetDateTime now) {
+        if (c.getRegistrationOpenDate() == null) {
+            return RegistrationWindowStatus.NOT_OPENED;
+        }
+
+        if (now.isBefore(c.getRegistrationOpenDate())) {
+            return RegistrationWindowStatus.PENDING_OPEN;
+        }
+
+        if (c.getRegistrationCloseDate() != null && now.isAfter(c.getRegistrationCloseDate())) {
+            return RegistrationWindowStatus.CLOSED;
+        }
+
+        return RegistrationWindowStatus.OPEN;
     }
 
     private TeacherRegistrationResponse mapToResponse(TeacherClassRegistration reg) {

@@ -77,7 +77,7 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
         boolean existsByBranchIdAndNameIgnoreCaseAndIdNot(@Param("branchId") Long branchId, @Param("name") String name,
                         @Param("excludeId") Long excludeId);
 
-        // Lấy các lớp đang mở đăng ký cho giáo viên
+        // Lấy các lớp đang mở đăng ký cho giáo viên (includes PENDING_OPEN classes)
         @Query("SELECT c FROM ClassEntity c " +
                         "LEFT JOIN FETCH c.subject s " +
                         "LEFT JOIN FETCH c.branch b " +
@@ -87,12 +87,9 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
                         "AND c.assignedTeacher IS NULL " +
                         "AND c.registrationOpenDate IS NOT NULL " +
                         "AND c.registrationCloseDate IS NOT NULL " +
-                        "AND c.registrationOpenDate <= :now " +
-                        "AND c.registrationCloseDate >= :now " +
                         "ORDER BY c.registrationCloseDate ASC")
         List<ClassEntity> findAvailableForTeacherRegistration(
                         @Param("branchIds") List<Long> branchIds,
-                        @Param("now") java.time.OffsetDateTime now,
                         @Param("approvalStatus") ApprovalStatus approvalStatus,
                         @Param("status") ClassStatus status);
 
@@ -106,7 +103,6 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
                         "AND c.assignedTeacher IS NULL " +
                         "ORDER BY c.startDate ASC")
         List<ClassEntity> findClassesNeedingTeacher(@Param("branchIds") List<Long> branchIds);
-
 
         // Lấy các lớp đang active mà teacher đang được assign (cho conflict detection)
         @Query("SELECT c FROM ClassEntity c " +
