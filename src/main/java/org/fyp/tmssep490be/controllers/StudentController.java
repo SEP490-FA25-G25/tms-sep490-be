@@ -318,29 +318,16 @@ public class StudentController {
     // Student tự lấy danh sách lớp của mình
     @GetMapping("/me/classes")
     @PreAuthorize("hasRole('ROLE_STUDENT')")
-    public ResponseEntity<ResponseObject<Page<StudentClassDTO>>> getMyClasses(
-            @RequestParam(required = false) List<String> enrollmentStatus,
-            @RequestParam(required = false) List<String> classStatus,
-            @RequestParam(required = false) List<Long> branchId,
-            @RequestParam(required = false) List<Long> courseId,
-            @RequestParam(required = false) List<String> modality,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "enrollmentDate") String sort,
-            @RequestParam(defaultValue = "desc") String direction,
+    public ResponseEntity<ResponseObject<List<StudentClassDTO>>> getMyClasses(
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
         Long studentId = studentContextHelper.getStudentId(currentUser);
         log.info("Student {} retrieving own classes", studentId);
 
-        Sort.Direction sortDirection = direction.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
+        // Get ALL student classes (no pagination - realistic: 15-30 classes max)
+        List<StudentClassDTO> classes = studentPortalService.getStudentClasses(studentId);
 
-        Page<StudentClassDTO> classes = studentPortalService.getStudentClasses(
-                studentId, enrollmentStatus, classStatus, branchId, courseId, modality, pageable
-        );
-
-        return ResponseEntity.ok(ResponseObject.<Page<StudentClassDTO>>builder()
+        return ResponseEntity.ok(ResponseObject.<List<StudentClassDTO>>builder()
                 .success(true)
                 .message("Lấy danh sách lớp thành công")
                 .data(classes)
