@@ -107,19 +107,20 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
 
     // Học viên chọn buổi học bù -> join với class để kiểm tra chi nhánh và hình
     // thức điều kiện cùng môn
-    // Kiểm tra date trong vài tuần từ ngày hiện tại, trạng thái PLANNED, không phải
+    // Kiểm tra date trong vài tuần KỂ TỪ NGÀY BUỔI MISSED, trạng thái PLANNED, không phải
     // buổi học bị bỏ
     // Loại trừ buổi học bị mà học viên đã bỏ qua (excludeSessionId) tức là học viên
     // đang chọn buổi bị missed thì phỉa bỏ ra
     // CHỈ cho phép cùng chi nhánh (same-branch only) - không cho phép khác branch
     // dù là ONLINE
-    // weeksLimit: số tuần tối đa để tìm buổi học bù (hardcoded constant)
+    // weeksLimit: số tuần tối đa để tìm buổi học bù kể từ ngày buổi missed
+    // endDate được tính sẵn từ Java (missedSessionDate + weeksLimit weeks)
     @Query(value = """
             SELECT s.* FROM session s
             JOIN class c ON s.class_id = c.id
             WHERE s.subject_session_id = :subjectSessionId
-              AND s.date >= CURRENT_DATE
-              AND s.date <= CURRENT_DATE + CAST((:weeksLimit || ' weeks') AS INTERVAL)
+              AND s.date >= :missedSessionDate
+              AND s.date <= :endDate
               AND s.status = 'PLANNED'
               AND s.id != :excludeSessionId
               AND c.branch_id = :targetBranchId
@@ -129,7 +130,8 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("subjectSessionId") Long subjectSessionId,
             @Param("excludeSessionId") Long excludeSessionId,
             @Param("targetBranchId") Long targetBranchId,
-            @Param("weeksLimit") Integer weeksLimit);
+            @Param("missedSessionDate") LocalDate missedSessionDate,
+            @Param("endDate") LocalDate endDate);
 
     @Query("""
             SELECT s FROM Session s

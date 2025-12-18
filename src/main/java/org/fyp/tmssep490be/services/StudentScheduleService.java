@@ -425,6 +425,9 @@ public class StudentScheduleService {
         }
 
         TimeSlotTemplate originalTimeSlot = originalSession.getTimeSlotTemplate();
+        ClassEntity originalClass = originalSession.getClassEntity();
+        SubjectSession originalSubjectSession = originalSession.getSubjectSession();
+        
         return MakeupInfoDTO.builder()
                 .isMakeup(true)
                 .originalSessionId(originalSession.getId())
@@ -434,6 +437,11 @@ public class StudentScheduleService {
                 .originalStatus(originalSession.getStatus())
                 .reason("Session rescheduled")
                 .makeupDate(studentSession.getSession().getDate())
+                // NEW: Enrich với class và session info
+                .originalClassCode(originalClass != null ? originalClass.getCode() : null)
+                .originalClassName(originalClass != null ? originalClass.getName() : null)
+                .originalSequenceNo(originalSubjectSession != null ? originalSubjectSession.getSequenceNo() : null)
+                .originalTopic(originalSubjectSession != null ? originalSubjectSession.getTopic() : null)
                 .build();
     }
 

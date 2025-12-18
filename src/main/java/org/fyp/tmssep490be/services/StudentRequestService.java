@@ -907,6 +907,54 @@ public class StudentRequestService {
         studentSessionRepository.save(makeupStudentSession);
         log.info("Created makeup StudentSession for student {} session {}", 
                 request.getStudent().getId(), request.getMakeupSession().getId());
+
+        // 4. Update target session attendance: ABSENT -> EXCUSED (if not already EXCUSED)
+        StudentSession.StudentSessionId targetSsId = new StudentSession.StudentSessionId(
+                request.getStudent().getId(),
+                request.getTargetSession().getId()
+        );
+        StudentSession targetStudentSession = studentSessionRepository.findById(targetSsId)
+                .orElseThrow(() -> new ResourceNotFoundException("Target student session not found"));
+
+        if (targetStudentSession.getAttendanceStatus() == AttendanceStatus.ABSENT) {
+            targetStudentSession.setAttendanceStatus(AttendanceStatus.EXCUSED);
+            targetStudentSession.setMakeupSession(request.getMakeupSession());
+            
+            // APPEND makeup info đầy đủ thay vì OVERRIDE teacher's note
+            String existingNote = targetStudentSession.getNote();
+            String makeupInfo = formatMakeupInfo(request.getMakeupSession());
+            String makeupNote = "Excused - học bù tại " + makeupInfo;
+            
+            if (existingNote != null && !existingNote.trim().isEmpty()) {
+                targetStudentSession.setNote(existingNote + "\n---\n" + makeupNote);
+            } else {
+                targetStudentSession.setNote(makeupNote);
+            }
+            
+            studentSessionRepository.save(targetStudentSession);
+            log.info("Updated target session attendance {} from ABSENT to EXCUSED (preserved existing note)", targetStudentSession.getId());
+        } else if (targetStudentSession.getAttendanceStatus() == AttendanceStatus.EXCUSED) {
+            // Already EXCUSED, just update makeup link if not set
+            if (targetStudentSession.getMakeupSession() == null) {
+                targetStudentSession.setMakeupSession(request.getMakeupSession());
+                
+                // APPEND makeup info đầy đủ
+                String existingNote = targetStudentSession.getNote();
+                String makeupInfo = formatMakeupInfo(request.getMakeupSession());
+                String makeupNote = "Học bù tại " + makeupInfo;
+                
+                if (existingNote != null && !existingNote.trim().isEmpty()) {
+                    targetStudentSession.setNote(existingNote + "\n---\n" + makeupNote);
+                } else {
+                    targetStudentSession.setNote(makeupNote);
+                }
+                
+                studentSessionRepository.save(targetStudentSession);
+                log.info("Updated EXCUSED session {} with makeup link (preserved existing note)", targetStudentSession.getId());
+            } else {
+                log.info("Target session {} already EXCUSED with makeup session, no update needed", targetStudentSession.getId());
+            }
+        }
     }
 
     private StudentRequestDetailDTO mapToDetailDTO(StudentRequest request) {
@@ -1118,12 +1166,16 @@ public class StudentRequestService {
 
         // Business Rule: SAME-BRANCH ONLY - không cho phép học bù ở branch khác
 
-        // Tìm các buổi cùng subject trong cùng chi nhánh, trong giới hạn thời gian
+        // Tìm các buổi cùng subject trong cùng chi nhánh, trong vòng 2 tuần kể từ buổi missed
+        LocalDate missedDate = targetSession.getDate();
+        LocalDate endDate = missedDate.plusWeeks(MAKEUP_WEEKS_LIMIT);
+        
         List<Session> makeupOptions = sessionRepository.findMakeupSessionOptions(
                 targetSession.getSubjectSession().getId(),
                 targetSessionId,
                 targetSession.getClassEntity().getBranch().getId(),
-                MAKEUP_WEEKS_LIMIT
+                missedDate,
+                endDate
         );
 
         List<MakeupOptionDTO> rankedOptions = makeupOptions.stream()
@@ -1532,7 +1584,52 @@ public class StudentRequestService {
         return (double) unexcusedAbsences / pastSessions.size() * 100;
     }
 
-    private void markSessionAsExcused(Student student, Session session, String note) {
+    /**
+     * VD: "SE1742 - Buổi 15 (Java Backend) ngày 15/12/2024 15:30-17:00"
+     */
+    private String formatMakeupInfo(Session makeupSession) {
+        ClassEntity makeupClass = makeupSession.getClassEntity();
+        SubjectSession subjectSession = makeupSession.getSubjectSession();
+        TimeSlotTemplate timeSlot = makeupSession.getTimeSlotTemplate();
+        
+        StringBuilder info = new StringBuilder();
+        
+        // Lớp học
+        info.append(makeupClass.getCode());
+        
+        // Buổi học số mấy
+        if (subjectSession != null) {
+            info.append(" - Buổi ").append(subjectSession.getSequenceNo());
+            
+            // Topic nếu có
+            if (subjectSession.getTopic() != null && !subjectSession.getTopic().trim().isEmpty()) {
+                info.append(" (").append(subjectSession.getTopic()).append(")");
+            }
+        }
+        
+        // Ngày giờ
+        if (makeupSession.getDate() != null) {
+            info.append(" ngày ").append(makeupSession.getDate().format(
+                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+            ));
+        }
+        
+        // Giờ học
+        if (timeSlot != null && timeSlot.getStartTime() != null && timeSlot.getEndTime() != null) {
+            info.append(" ")
+                .append(timeSlot.getStartTime().format(
+                    java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                ))
+                .append("-")
+                .append(timeSlot.getEndTime().format(
+                    java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                ));
+        }
+        
+        return info.toString();
+    }
+
+    private void markSessionAsExcused(Student student, Session session, String systemNote) {
         StudentSession.StudentSessionId id = new StudentSession.StudentSessionId(student.getId(), session.getId());
         StudentSession ss = studentSessionRepository.findById(id)
                 .orElseGet(() -> StudentSession.builder()
@@ -1542,7 +1639,15 @@ public class StudentRequestService {
                         .build());
 
         ss.setAttendanceStatus(AttendanceStatus.EXCUSED);
-        ss.setNote(note);
+        
+        // APPEND system note thay vì OVERRIDE teacher's note
+        String existingNote = ss.getNote();
+        if (existingNote != null && !existingNote.trim().isEmpty()) {
+            ss.setNote(existingNote + "\n---\n" + systemNote);
+        } else {
+            ss.setNote(systemNote);
+        }
+        
         ss.setRecordedAt(OffsetDateTime.now());
 
         studentSessionRepository.save(ss);

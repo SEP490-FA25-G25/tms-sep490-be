@@ -40,4 +40,16 @@ public class MakeupInfoDTO {
 
     @Schema(description = "Date when makeup is scheduled", example = "2025-11-04")
     private LocalDate makeupDate;
+
+    @Schema(description = "Class code of the original session", example = "SE1742")
+    private String originalClassCode;
+
+    @Schema(description = "Class name of the original session", example = "Java Backend Development")
+    private String originalClassName;
+
+    @Schema(description = "Sequence number of the original session", example = "15")
+    private Integer originalSequenceNo;
+
+    @Schema(description = "Topic of the original session", example = "Spring Boot REST API")
+    private String originalTopic;
 }
