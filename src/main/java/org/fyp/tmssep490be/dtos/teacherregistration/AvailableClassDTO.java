@@ -48,4 +48,8 @@ public class AvailableClassDTO {
     // Key: day label (e.g., "T2", "T4, T6"), Value: time range (e.g., "07:00 -
     // 08:30")
     private Map<String, String> timeSlotsByDay;
+
+    // Schedule conflict info
+    private Boolean hasScheduleConflict;
+    private String conflictDetails;
 }

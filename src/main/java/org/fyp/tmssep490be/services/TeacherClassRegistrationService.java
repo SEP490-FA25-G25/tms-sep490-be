@@ -78,14 +78,16 @@ public class TeacherClassRegistrationService {
         OffsetDateTime now = OffsetDateTime.now();
 
         return availableClasses.stream()
-                .map(c -> mapToAvailableClassDTO(c, teacher.getId(), teacherSpecializations, teacherLanguages, now))
+                .map(c -> mapToAvailableClassDTO(c, teacher, teacherSpecializations, teacherLanguages, now))
                 // Filter out CLOSED classes - only show PENDING_OPEN and OPEN
                 .filter(dto -> dto.getRegistrationStatus() != RegistrationWindowStatus.CLOSED)
-                // Sort: OPEN first, then PENDING_OPEN, then by matched, then by close date
+                // Sort: no conflict first, then OPEN, then matched, then by close date
                 .sorted(Comparator
-                        .comparing(
-                                (AvailableClassDTO dto) -> dto.getRegistrationStatus() != RegistrationWindowStatus.OPEN) // OPEN
-                                                                                                                         // first
+                        .comparing((AvailableClassDTO dto) -> Boolean.TRUE.equals(dto.getHasScheduleConflict())) // No
+                                                                                                                 // conflict
+                                                                                                                 // first
+                        .thenComparing(dto -> dto.getRegistrationStatus() != RegistrationWindowStatus.OPEN) // OPEN
+                                                                                                            // first
                         .thenComparing(dto -> !Boolean.TRUE.equals(dto.getIsMatch())) // matched second
                         .thenComparing(AvailableClassDTO::getRegistrationCloseDate))
                 .collect(Collectors.toList());
@@ -166,7 +168,7 @@ public class TeacherClassRegistrationService {
     @Transactional(readOnly = true)
     public ScheduleConflictDTO checkScheduleConflict(Long classId, Long userId) {
         Teacher teacher = getTeacherByUserId(userId);
-        ClassEntity targetClass = getClassById(classId);
+        getClassById(classId); // Validate class exists
 
         // Lấy sessions của lớp muốn đăng ký
         List<Session> targetSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
@@ -288,7 +290,7 @@ public class TeacherClassRegistrationService {
     @Transactional
     public void openRegistration(OpenRegistrationRequest request, Long userId) {
         ClassEntity classEntity = getClassById(request.getClassId());
-        UserAccount user = getUserById(userId);
+        getUserById(userId); // Validate user exists
 
         // Validate quyền truy cập branch
         validateBranchAccess(userId, classEntity.getBranch().getId());
@@ -538,6 +540,43 @@ public class TeacherClassRegistrationService {
         // Tạo teaching slots cho tất cả sessions
         createTeachingSlotsForClass(classEntity, teacher);
 
+        // Gửi thông báo cho giáo viên được chọn
+        try {
+            String subjectName = classEntity.getSubject() != null ? classEntity.getSubject().getName() : "N/A";
+            String startDate = classEntity.getStartDate() != null
+                    ? classEntity.getStartDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    : "N/A";
+
+            notificationService.createNotification(
+                    teacher.getUserAccount().getId(),
+                    NotificationType.NOTIFICATION,
+                    "Đăng ký dạy lớp đã được duyệt",
+                    String.format(
+                            "Chúc mừng! Đăng ký dạy lớp %s (%s) - Môn %s, bắt đầu từ %s đã được duyệt. " +
+                                    "Vào mục 'Lịch dạy' để xem chi tiết!",
+                            classEntity.getName(),
+                            classEntity.getCode(),
+                            subjectName,
+                            startDate));
+            log.info("Sent approval notification to teacher {}", teacher.getId());
+
+            // Gửi thông báo cho các giáo viên bị từ chối
+            for (TeacherClassRegistration other : otherRegistrations) {
+                notificationService.createNotification(
+                        other.getTeacher().getUserAccount().getId(),
+                        NotificationType.NOTIFICATION,
+                        "Đăng ký dạy lớp không được chọn",
+                        String.format(
+                                "Đăng ký dạy lớp %s (%s) của bạn không được chọn vì đã có giáo viên khác được gán. " +
+                                        "Cảm ơn bạn đã quan tâm đến lớp học này!",
+                                classEntity.getName(),
+                                classEntity.getCode()));
+            }
+            log.info("Sent rejection notifications to {} teachers", otherRegistrations.size());
+        } catch (Exception e) {
+            log.error("Failed to send registration approval notifications: {}", e.getMessage());
+        }
+
         log.info("AA {} approved registration {} for class {}, teacher {}",
                 userId, registration.getId(), classEntity.getId(), teacher.getId());
     }
@@ -559,6 +598,53 @@ public class TeacherClassRegistrationService {
         }
         if (classEntity.getAssignedTeacher() != null) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Lớp đã có giáo viên được gán");
+        }
+
+        // Validate schedule conflict (check thời gian overlap)
+        List<Session> targetSessions = sessionRepository.findByClassEntityId(classEntity.getId());
+
+        for (ClassEntity assignedClass : teacher.getAssignedClasses()) {
+            if (assignedClass.getStatus() == ClassStatus.COMPLETED ||
+                    assignedClass.getStatus() == ClassStatus.CANCELLED) {
+                continue;
+            }
+
+            List<Session> assignedSessions = sessionRepository.findByClassEntityId(assignedClass.getId());
+
+            for (Session targetSession : targetSessions) {
+                if (targetSession.getDate() == null || targetSession.getTimeSlotTemplate() == null) {
+                    continue;
+                }
+
+                LocalTime targetStart = targetSession.getTimeSlotTemplate().getStartTime();
+                LocalTime targetEnd = targetSession.getTimeSlotTemplate().getEndTime();
+
+                for (Session assignedSession : assignedSessions) {
+                    if (assignedSession.getDate() == null || assignedSession.getTimeSlotTemplate() == null) {
+                        continue;
+                    }
+
+                    // Check same date
+                    if (!targetSession.getDate().equals(assignedSession.getDate())) {
+                        continue;
+                    }
+
+                    LocalTime assignedStart = assignedSession.getTimeSlotTemplate().getStartTime();
+                    LocalTime assignedEnd = assignedSession.getTimeSlotTemplate().getEndTime();
+
+                    // Check time overlap: (start1 < end2) AND (start2 < end1)
+                    boolean hasOverlap = targetStart.isBefore(assignedEnd) && assignedStart.isBefore(targetEnd);
+
+                    if (hasOverlap) {
+                        throw new CustomException(ErrorCode.INVALID_INPUT,
+                                String.format("Giáo viên có lịch trùng với lớp %s: Ngày %s - %s~%s overlap với %s~%s",
+                                        assignedClass.getName(),
+                                        targetSession.getDate(),
+                                        targetStart, targetEnd,
+                                        assignedStart, assignedEnd));
+                    }
+                }
+            }
         }
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -585,6 +671,30 @@ public class TeacherClassRegistrationService {
 
         // Tạo teaching slots
         createTeachingSlotsForClass(classEntity, teacher);
+
+        // Gửi thông báo cho giáo viên được gán
+        try {
+            String subjectName = classEntity.getSubject() != null ? classEntity.getSubject().getName() : "N/A";
+            String startDate = classEntity.getStartDate() != null
+                    ? classEntity.getStartDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    : "N/A";
+
+            notificationService.createNotification(
+                    teacher.getUserAccount().getId(),
+                    NotificationType.NOTIFICATION,
+                    "Bạn đã được gán dạy lớp mới",
+                    String.format(
+                            "Bạn đã được gán dạy lớp %s (%s) - Môn %s, bắt đầu từ %s. " +
+                                    "Lý do: %s. Vào mục 'Lịch dạy' để xem chi tiết!",
+                            classEntity.getName(),
+                            classEntity.getCode(),
+                            subjectName,
+                            startDate,
+                            request.getReason()));
+            log.info("Sent direct assignment notification to teacher {}", teacher.getId());
+        } catch (Exception e) {
+            log.error("Failed to send direct assignment notification: {}", e.getMessage());
+        }
 
         log.info("AA {} directly assigned teacher {} to class {} with reason: {}",
                 userId, teacher.getId(), classEntity.getId(), request.getReason());
@@ -646,6 +756,53 @@ public class TeacherClassRegistrationService {
         if (registrationRepository.existsByTeacherIdAndClassEntityId(teacher.getId(), classEntity.getId())) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Bạn đã đăng ký lớp này rồi");
         }
+
+        // Kiểm tra schedule conflict với các lớp đang dạy (check thời gian overlap)
+        List<Session> targetSessions = sessionRepository.findByClassEntityId(classEntity.getId());
+
+        for (ClassEntity assignedClass : teacher.getAssignedClasses()) {
+            if (assignedClass.getStatus() == ClassStatus.COMPLETED ||
+                    assignedClass.getStatus() == ClassStatus.CANCELLED) {
+                continue;
+            }
+
+            List<Session> assignedSessions = sessionRepository.findByClassEntityId(assignedClass.getId());
+
+            for (Session targetSession : targetSessions) {
+                if (targetSession.getDate() == null || targetSession.getTimeSlotTemplate() == null) {
+                    continue;
+                }
+
+                LocalTime targetStart = targetSession.getTimeSlotTemplate().getStartTime();
+                LocalTime targetEnd = targetSession.getTimeSlotTemplate().getEndTime();
+
+                for (Session assignedSession : assignedSessions) {
+                    if (assignedSession.getDate() == null || assignedSession.getTimeSlotTemplate() == null) {
+                        continue;
+                    }
+
+                    // Check same date
+                    if (!targetSession.getDate().equals(assignedSession.getDate())) {
+                        continue;
+                    }
+
+                    LocalTime assignedStart = assignedSession.getTimeSlotTemplate().getStartTime();
+                    LocalTime assignedEnd = assignedSession.getTimeSlotTemplate().getEndTime();
+
+                    // Check time overlap: (start1 < end2) AND (start2 < end1)
+                    boolean hasOverlap = targetStart.isBefore(assignedEnd) && assignedStart.isBefore(targetEnd);
+
+                    if (hasOverlap) {
+                        throw new CustomException(ErrorCode.INVALID_INPUT,
+                                String.format("Lịch dạy trùng với lớp %s: Ngày %s - %s~%s overlap với %s~%s",
+                                        assignedClass.getName(),
+                                        targetSession.getDate(),
+                                        targetStart, targetEnd,
+                                        assignedStart, assignedEnd));
+                    }
+                }
+            }
+        }
     }
 
     private void createTeachingSlotsForClass(ClassEntity classEntity, Teacher teacher) {
@@ -655,7 +812,13 @@ public class TeacherClassRegistrationService {
             // Kiểm tra đã có teaching slot chưa
             boolean hasSlot = teachingSlotRepository.existsBySessionId(session.getId());
             if (!hasSlot) {
+                // Create composite key explicitly
+                TeachingSlot.TeachingSlotId slotId = new TeachingSlot.TeachingSlotId(
+                        session.getId(),
+                        teacher.getId());
+
                 TeachingSlot slot = TeachingSlot.builder()
+                        .id(slotId)
                         .session(session)
                         .teacher(teacher)
                         .status(org.fyp.tmssep490be.entities.enums.TeachingSlotStatus.SCHEDULED)
@@ -667,8 +830,9 @@ public class TeacherClassRegistrationService {
 
     // ==================== MAPPING METHODS ====================
 
-    private AvailableClassDTO mapToAvailableClassDTO(ClassEntity c, Long teacherId,
+    private AvailableClassDTO mapToAvailableClassDTO(ClassEntity c, Teacher teacher,
             Set<String> teacherSpecializations, Set<String> teacherLanguages, OffsetDateTime now) {
+        Long teacherId = teacher.getId();
         int totalRegistrations = (int) registrationRepository.countByClassEntityIdAndStatus(
                 c.getId(), RegistrationStatus.PENDING);
         boolean alreadyRegistered = registrationRepository.existsByTeacherIdAndClassEntityId(teacherId, c.getId());
@@ -707,10 +871,12 @@ public class TeacherClassRegistrationService {
             }
         }
 
+        // Get sessions for this class
+        List<Session> sessions = sessionRepository.findByClassEntityId(c.getId());
+
         // Get time slot from first session (legacy - for backward compatibility)
         String timeSlotStart = null;
         String timeSlotEnd = null;
-        List<Session> sessions = sessionRepository.findByClassEntityId(c.getId());
         if (!sessions.isEmpty() && sessions.get(0).getTimeSlotTemplate() != null) {
             TimeSlotTemplate slot = sessions.get(0).getTimeSlotTemplate();
             timeSlotStart = slot.getStartTime() != null ? slot.getStartTime().toString() : null;
@@ -719,6 +885,66 @@ public class TeacherClassRegistrationService {
 
         // Calculate time slots grouped by day of week
         Map<String, String> timeSlotsByDay = calculateTimeSlotsByDay(sessions);
+
+        // Check schedule conflict with teacher's assigned classes (time overlap check)
+        boolean hasConflict = false;
+        StringBuilder conflictBuilder = new StringBuilder();
+
+        for (ClassEntity assignedClass : teacher.getAssignedClasses()) {
+            // Skip completed/cancelled classes
+            if (assignedClass.getStatus() == ClassStatus.COMPLETED ||
+                    assignedClass.getStatus() == ClassStatus.CANCELLED) {
+                continue;
+            }
+
+            // Get sessions of assigned class
+            List<Session> assignedSessions = sessionRepository.findByClassEntityId(assignedClass.getId());
+            boolean foundConflictWithThisClass = false;
+
+            for (Session targetSession : sessions) {
+                if (targetSession.getDate() == null || targetSession.getTimeSlotTemplate() == null) {
+                    continue;
+                }
+
+                LocalTime targetStart = targetSession.getTimeSlotTemplate().getStartTime();
+                LocalTime targetEnd = targetSession.getTimeSlotTemplate().getEndTime();
+
+                for (Session assignedSession : assignedSessions) {
+                    if (assignedSession.getDate() == null || assignedSession.getTimeSlotTemplate() == null) {
+                        continue;
+                    }
+
+                    // Check same date
+                    if (!targetSession.getDate().equals(assignedSession.getDate())) {
+                        continue;
+                    }
+
+                    LocalTime assignedStart = assignedSession.getTimeSlotTemplate().getStartTime();
+                    LocalTime assignedEnd = assignedSession.getTimeSlotTemplate().getEndTime();
+
+                    // Check time overlap: (start1 < end2) AND (start2 < end1)
+                    boolean hasOverlap = targetStart.isBefore(assignedEnd) && assignedStart.isBefore(targetEnd);
+
+                    if (hasOverlap) {
+                        hasConflict = true;
+                        foundConflictWithThisClass = true;
+                        if (conflictBuilder.length() == 0) {
+                            conflictBuilder.append("Trùng lịch với: ");
+                        }
+                        conflictBuilder.append(assignedClass.getName())
+                                .append(" (").append(targetSession.getDate())
+                                .append(" ").append(targetStart).append("-").append(targetEnd)
+                                .append(" vs ").append(assignedStart).append("-").append(assignedEnd)
+                                .append("); ");
+                        break;
+                    }
+                }
+
+                if (foundConflictWithThisClass) {
+                    break; // Found conflict with this class, move to next class
+                }
+            }
+        }
 
         return AvailableClassDTO.builder()
                 .classId(c.getId())
@@ -743,6 +969,8 @@ public class TeacherClassRegistrationService {
                 .timeSlotStart(timeSlotStart)
                 .timeSlotEnd(timeSlotEnd)
                 .timeSlotsByDay(timeSlotsByDay)
+                .hasScheduleConflict(hasConflict)
+                .conflictDetails(hasConflict ? conflictBuilder.toString() : null)
                 .build();
     }
 
@@ -974,10 +1202,8 @@ public class TeacherClassRegistrationService {
 
         // Get curriculum info for matching
         String curriculumCode = null;
-        String curriculumLanguage = null;
         if (classEntity.getSubject() != null && classEntity.getSubject().getCurriculum() != null) {
             curriculumCode = classEntity.getSubject().getCurriculum().getCode(); // e.g., "IELTS"
-            curriculumLanguage = classEntity.getSubject().getCurriculum().getLanguage(); // e.g., "English"
         }
 
         // Get all teachers in this branch
@@ -1011,9 +1237,11 @@ public class TeacherClassRegistrationService {
         }
 
         final String finalCurriculumCode = curriculumCode;
-        final String finalCurriculumLanguage = curriculumLanguage;
 
-        // Map to DTOs with match scoring
+        // Get target class sessions for schedule conflict detection
+        List<Session> targetClassSessions = sessionRepository.findByClassEntityId(classId);
+
+        // Map to DTOs with match scoring, workload, and schedule conflict
         List<QualifiedTeacherDTO> result = teachers.stream()
                 .map(teacher -> {
                     UserAccount user = teacher.getUserAccount();
@@ -1039,6 +1267,77 @@ public class TeacherClassRegistrationService {
                         matchReason = "Chưa có thông tin kỹ năng";
                     }
 
+                    // Calculate workload (SCHEDULED + ONGOING classes)
+                    int workload = teacherRepository.countAssignedClassesByTeacherIdAndStatuses(
+                            teacher.getId(),
+                            List.of(ClassStatus.SCHEDULED, ClassStatus.ONGOING));
+
+                    // Check schedule conflict with assigned classes (time overlap check)
+                    boolean hasConflict = false;
+                    StringBuilder conflictBuilder = new StringBuilder();
+
+                    // Debug logging
+                    Set<ClassEntity> assignedClasses = teacher.getAssignedClasses();
+                    log.info("Teacher {} (ID={}) has {} assigned classes, workload count={}",
+                            teacher.getEmployeeCode(), teacher.getId(),
+                            assignedClasses != null ? assignedClasses.size() : "null", workload);
+
+                    for (ClassEntity assignedClass : assignedClasses) {
+                        log.info("  - Assigned class: {} (ID={}, status={})",
+                                assignedClass.getName(), assignedClass.getId(), assignedClass.getStatus());
+                        // Skip completed/cancelled classes
+                        if (assignedClass.getStatus() == ClassStatus.COMPLETED ||
+                                assignedClass.getStatus() == ClassStatus.CANCELLED) {
+                            continue;
+                        }
+
+                        // Get sessions of assigned class
+                        List<Session> assignedSessions = sessionRepository.findByClassEntityId(assignedClass.getId());
+                        boolean foundConflictWithThisClass = false;
+
+                        for (Session targetSession : targetClassSessions) {
+                            if (targetSession.getDate() == null || targetSession.getTimeSlotTemplate() == null) {
+                                continue;
+                            }
+
+                            LocalTime targetStart = targetSession.getTimeSlotTemplate().getStartTime();
+                            LocalTime targetEnd = targetSession.getTimeSlotTemplate().getEndTime();
+
+                            for (Session assignedSession : assignedSessions) {
+                                if (assignedSession.getDate() == null
+                                        || assignedSession.getTimeSlotTemplate() == null) {
+                                    continue;
+                                }
+
+                                // Check same date
+                                if (!targetSession.getDate().equals(assignedSession.getDate())) {
+                                    continue;
+                                }
+
+                                LocalTime assignedStart = assignedSession.getTimeSlotTemplate().getStartTime();
+                                LocalTime assignedEnd = assignedSession.getTimeSlotTemplate().getEndTime();
+
+                                // Check time overlap: (start1 < end2) AND (start2 < end1)
+                                boolean hasOverlap = targetStart.isBefore(assignedEnd)
+                                        && assignedStart.isBefore(targetEnd);
+
+                                if (hasOverlap) {
+                                    hasConflict = true;
+                                    foundConflictWithThisClass = true;
+                                    if (conflictBuilder.length() == 0) {
+                                        conflictBuilder.append("Trùng lịch với: ");
+                                    }
+                                    conflictBuilder.append(assignedClass.getName()).append("; ");
+                                    break;
+                                }
+                            }
+
+                            if (foundConflictWithThisClass) {
+                                break;
+                            }
+                        }
+                    }
+
                     return QualifiedTeacherDTO.builder()
                             .teacherId(teacher.getId())
                             .fullName(user.getFullName())
@@ -1046,15 +1345,23 @@ public class TeacherClassRegistrationService {
                             .phone(user.getPhone())
                             .avatarUrl(user.getAvatarUrl())
                             .employeeCode(teacher.getEmployeeCode())
+                            .contractType(teacher.getContractType())
                             .skills(skills)
                             .totalSkills(skills.size())
                             .isMatch(matchScore >= 100)
                             .matchReason(matchReason)
                             .matchScore(matchScore)
+                            .hasScheduleConflict(hasConflict)
+                            .conflictDetails(hasConflict ? conflictBuilder.toString() : null)
+                            .currentWorkload(workload)
                             .build();
                 })
-                // Sort by match score descending, then by name
-                .sorted(Comparator.comparing(QualifiedTeacherDTO::getMatchScore).reversed()
+                // Sort by: no conflict first, then match score descending, then workload
+                // ascending, then name
+                .sorted(Comparator
+                        .comparing(QualifiedTeacherDTO::getHasScheduleConflict)
+                        .thenComparing(Comparator.comparing(QualifiedTeacherDTO::getMatchScore).reversed())
+                        .thenComparing(QualifiedTeacherDTO::getCurrentWorkload)
                         .thenComparing(QualifiedTeacherDTO::getFullName))
                 .collect(Collectors.toList());
 
