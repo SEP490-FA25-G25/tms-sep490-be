@@ -458,7 +458,7 @@ public class ClassController {
         @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('TEACHER') or hasRole('MANAGER')")
         public ResponseEntity<ResponseObject<Page<ClassListItemDTO>>> getClasses(
                         @RequestParam(required = false) List<Long> branchIds,
-                        @RequestParam(required = false) Long courseId,
+                        @RequestParam(required = false) Long subjectId,
                         @RequestParam(required = false) ClassStatus status,
                         @RequestParam(required = false) ApprovalStatus approvalStatus,
                         @RequestParam(required = false) Modality modality,
@@ -469,14 +469,14 @@ public class ClassController {
                         @RequestParam(defaultValue = "asc") String sortDir,
                         @AuthenticationPrincipal UserPrincipal currentUser) {
                 log.info(
-                                "User {} requesting classes list with filters: branchIds={}, courseId={}, status={}, approvalStatus={}, modality={}, search={}",
-                                currentUser.getId(), branchIds, courseId, status, approvalStatus, modality, search);
+                                "User {} requesting classes list with filters: branchIds={}, subjectId={}, status={}, approvalStatus={}, modality={}, search={}",
+                                currentUser.getId(), branchIds, subjectId, status, approvalStatus, modality, search);
 
                 Sort.Direction direction = sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
                 Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sort));
 
                 Page<ClassListItemDTO> classes = classService.getClasses(
-                                branchIds, courseId, status, approvalStatus, modality, search, pageable,
+                                branchIds, subjectId, status, approvalStatus, modality, search, pageable,
                                 currentUser.getId());
 
                 return ResponseEntity.ok(ResponseObject.<Page<ClassListItemDTO>>builder()
