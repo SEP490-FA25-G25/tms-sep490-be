@@ -572,11 +572,11 @@ CREATE TABLE score (
 CREATE TABLE feedback_question (
   id BIGSERIAL PRIMARY KEY,
   question_text TEXT NOT NULL,
-  question_type VARCHAR(100), -- ví dụ: rating, text, multiple_choice, etc.
-  options TEXT[], -- nếu là multiple_choice thì lưu các lựa chọn
   display_order INT,
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  CONSTRAINT chk_feedback_question_status CHECK (status IN ('ACTIVE', 'INACTIVE'))
 );
 
 CREATE TABLE student_feedback (
@@ -779,6 +779,7 @@ CREATE INDEX idx_assessment_subject_assessment ON assessment(subject_assessment_
 CREATE INDEX idx_score_assessment ON score(assessment_id);
 CREATE INDEX idx_score_student ON score(student_id);
 CREATE INDEX idx_score_graded_by ON score(graded_by);
+CREATE INDEX idx_feedback_question_status_order ON feedback_question(status, display_order);
 CREATE INDEX idx_student_feedback_student ON student_feedback(student_id);
 CREATE INDEX idx_student_feedback_class ON student_feedback(class_id);
 CREATE INDEX idx_student_feedback_phase ON student_feedback(phase_id);

@@ -1599,7 +1599,7 @@ public class StudentRequestService {
             throw new BusinessRuleException("PENDING_TRANSFER_EXISTS", "You already have a pending transfer request");
         }
 
-        ClassEntity targetClass = classRepository.findById(dto.getTargetClassId())
+        ClassEntity targetClass = classRepository.findByIdWithLock(dto.getTargetClassId())
                 .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
 
         // Must be same subject
@@ -1621,7 +1621,8 @@ public class StudentRequestService {
             throw new BusinessRuleException("INVALID_CLASS_STATUS", "Target class must be SCHEDULED or ONGOING");
         }
 
-        // 5. Check capacity (allow AA override when autoApprove is true)
+        // 5. Check capacity with pessimistic lock (prevent race condition)
+        // Lock is already acquired above via findByIdWithLock()
         Integer enrolledCount = classRepository.countEnrolledStudents(dto.getTargetClassId());
         int enrolled = enrolledCount != null ? enrolledCount : 0;
         
@@ -1630,9 +1631,14 @@ public class StudentRequestService {
                 log.warn("AA override: Transferring student {} to full class {} ({}/{} enrolled)",
                         studentId, targetClass.getCode(), enrolled, targetClass.getMaxCapacity());
             } else {
-                throw new BusinessRuleException("CLASS_FULL", "Target class is full");
+                throw new BusinessRuleException("CLASS_FULL", 
+                    String.format("Target class is full (%d/%d enrolled). Please contact Academic Affairs if you need to override capacity.",
+                        enrolled, targetClass.getMaxCapacity()));
             }
         }
+
+        log.debug("Pessimistic lock acquired for target class {} - current capacity: {}/{}",
+                targetClass.getCode(), enrolled, targetClass.getMaxCapacity());
 
         // 6. Validate target session (Session-Centric approach - single source of truth)
         Session targetSession = sessionRepository.findById(dto.getTargetSessionId())

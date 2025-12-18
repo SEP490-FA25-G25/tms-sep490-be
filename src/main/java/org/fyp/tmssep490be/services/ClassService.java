@@ -191,18 +191,18 @@ public class ClassService {
                 Map<Integer, String> dayTimeSlots = ScheduleUtils.extractScheduleFromSessions(sessions);
 
                 return dayTimeSlots.entrySet().stream()
-                        .sorted(Map.Entry.comparingByKey())
-                        .map(entry -> {
-                                String dayName = ScheduleUtils.getDayNameVietnamese(entry.getKey());
-                                String[] times = ScheduleUtils.parseTimeSlot(entry.getValue());
-                                
-                                return ClassDetailDTO.ScheduleDetailDTO.builder()
-                                        .day(dayName)
-                                        .startTime(times[0])
-                                        .endTime(times[1])
-                                        .build();
-                        })
-                        .collect(Collectors.toList());
+                                .sorted(Map.Entry.comparingByKey())
+                                .map(entry -> {
+                                        String dayName = ScheduleUtils.getDayNameVietnamese(entry.getKey());
+                                        String[] times = ScheduleUtils.parseTimeSlot(entry.getValue());
+
+                                        return ClassDetailDTO.ScheduleDetailDTO.builder()
+                                                        .day(dayName)
+                                                        .startTime(times[0])
+                                                        .endTime(times[1])
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
         }
 
         private List<TeacherSummaryDTO> getTeachersForClass(Long classId) {
@@ -1780,10 +1780,18 @@ public class ClassService {
                         }
                 }
 
-                // PHASE 1: SQL Bulk Insert (Fast Path - conflict check built into SQL)
+                // PHASE 1: Delete existing + SQL Bulk Insert (Replace resources)
                 int totalSuccessCount = 0;
                 for (org.fyp.tmssep490be.dtos.classcreation.AssignResourcesRequest.ResourceAssignment assignment : request
                                 .getPattern()) {
+                        // First, delete existing resources for this day of week
+                        int deletedCount = sessionResourceRepository.deleteResourcesForDayOfWeek(
+                                        classId,
+                                        assignment.getDayOfWeek().intValue());
+                        log.debug("Phase 1 - Day {}: Deleted {} existing resource assignments",
+                                        assignment.getDayOfWeek(), deletedCount);
+
+                        // Then, insert the new resource
                         int assignedCount = sessionResourceRepository.bulkInsertResourcesForDayOfWeek(
                                         classId,
                                         assignment.getDayOfWeek().intValue(),

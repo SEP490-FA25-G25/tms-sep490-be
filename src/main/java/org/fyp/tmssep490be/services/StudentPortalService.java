@@ -79,76 +79,34 @@ public class StudentPortalService {
     private final AssessmentRepository assessmentRepository;
     private final ScoreRepository scoreRepository;
 
-    public Page<StudentClassDTO> getStudentClasses(
-            Long studentId,
-            List<String> enrollmentStatusFilters,
-            List<String> classStatusFilters,
-            List<Long> branchFilters,
-            List<Long> subjectFilters, // Note: called courseId in API but refers to subject in new schema
-            List<String> modalityFilters,
-            Pageable pageable
-    ) {
-        log.info("Getting classes for student: {} with filters", studentId);
+    public List<StudentClassDTO> getStudentClasses(Long studentId) {
+        log.info("Getting all classes for student: {}", studentId);
 
         // Validate student exists
         if (!studentRepository.existsById(studentId)) {
             throw new CustomException(ErrorCode.STUDENT_NOT_FOUND);
         }
 
-        List<EnrollmentStatus> enrollmentStatuses = resolveEnrollmentStatuses(enrollmentStatusFilters);
-        List<ClassStatus> classStatuses = resolveClassStatuses(classStatusFilters);
-        Set<Modality> modalities = resolveModalities(modalityFilters);
-
-        List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatusIn(studentId, enrollmentStatuses);
-
-        List<Enrollment> filteredEnrollments = enrollments.stream()
-                .filter(enrollment -> {
-                    ClassEntity classEntity = enrollment.getClassEntity();
-
-                    // Class status filter
-                    boolean classStatusMatch = classStatuses.isEmpty() || classStatuses.contains(classEntity.getStatus());
-                    if (!classStatusMatch) return false;
-
-                    // Branch filter
-                    if (branchFilters != null && !branchFilters.isEmpty()) {
-                        if (!branchFilters.contains(classEntity.getBranch().getId())) {
-                            return false;
-                        }
-                    }
-
-                    // Subject filter (frontend sends as courseId)
-                    if (subjectFilters != null && !subjectFilters.isEmpty()) {
-                        if (classEntity.getSubject() == null || !subjectFilters.contains(classEntity.getSubject().getId())) {
-                            return false;
-                        }
-                    }
-
-                    // Modality filter
-                    if (!modalities.isEmpty() && !modalities.contains(classEntity.getModality())) {
-                        return false;
-                    }
-
-                    return true;
-                })
-                .collect(Collectors.toList());
+        // Load ALL enrollments (ENROLLED, COMPLETED, TRANSFERRED)
+        // Realistic scenario: Student has 15-30 classes max in a language center
+        // Loading all at once is faster than pagination (single query, ~15KB data)
+        List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatusIn(
+                studentId,
+                Arrays.asList(
+                    EnrollmentStatus.ENROLLED,     // Đang học
+                    EnrollmentStatus.COMPLETED,    // Đã hoàn thành (để xem transcript)
+                    EnrollmentStatus.TRANSFERRED   // Đã chuyển lớp (để xem lịch sử)
+                )
+        );
 
         // Convert to DTOs
-        List<StudentClassDTO> studentClassDTOs = filteredEnrollments.stream()
+        List<StudentClassDTO> result = enrollments.stream()
                 .map(this::convertToStudentClassDTO)
                 .collect(Collectors.toList());
 
-        // Apply pagination manually (since we're filtering in memory)
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), studentClassDTOs.size());
-        
-        // Handle case where start is beyond list size
-        if (start >= studentClassDTOs.size()) {
-            return new PageImpl<>(new ArrayList<>(), pageable, studentClassDTOs.size());
-        }
-        
-        List<StudentClassDTO> pagedContent = studentClassDTOs.subList(start, end);
+        log.debug("Found {} classes for student {}", result.size(), studentId);
 
-        return new PageImpl<>(pagedContent, pageable, studentClassDTOs.size());
+        return result;
     }
 
     public ClassSessionsResponseDTO getClassSessions(Long classId, Long studentId) {
@@ -575,9 +533,9 @@ public class StudentPortalService {
         return ScheduleUtils.generateScheduleSummary(sessions);
     }
 
+    // Helper methods for status resolution (kept for backward compatibility if needed elsewhere)
     private List<EnrollmentStatus> resolveEnrollmentStatuses(List<String> filters) {
         if (filters == null || filters.isEmpty()) {
-            // Default: show all relevant enrollments including transferred (UI will distinguish with badges)
             return Arrays.asList(EnrollmentStatus.ENROLLED, EnrollmentStatus.COMPLETED, EnrollmentStatus.TRANSFERRED);
         }
 

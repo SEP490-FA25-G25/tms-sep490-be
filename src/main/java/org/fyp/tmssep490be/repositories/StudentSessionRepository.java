@@ -74,8 +74,9 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             "AND s.date BETWEEN :startDate AND :endDate " +
             "AND s.status != 'CANCELLED' " +
             "AND (" +
-            "  EXISTS (SELECT 1 FROM Enrollment e WHERE e.studentId = :studentId AND e.classId = s.classEntity.id AND e.status = 'ENROLLED') " +
-            "  OR s.status = 'DONE' " +
+            "  EXISTS (SELECT 1 FROM Enrollment e WHERE e.studentId = :studentId " +
+            "          AND e.classId = s.classEntity.id " +
+            "          AND e.status IN ('ENROLLED', 'TRANSFERRED', 'COMPLETED')) " +
             "  OR ss.isMakeup = true" +
             ") " +
             "AND (:classId IS NULL OR s.classEntity.id = :classId) " +

@@ -47,6 +47,9 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
 
         List<ClassEntity> findBySubjectIdAndStatusIn(Long subjectId, List<ClassStatus> statuses);
 
+        // Check if any active classes exist for a subject
+        boolean existsBySubjectIdAndStatusIn(Long subjectId, List<ClassStatus> statuses);
+
         @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.classEntity.id = :classId AND e.status = 'ENROLLED'")
         Integer countEnrolledStudents(@Param("classId") Long classId);
 

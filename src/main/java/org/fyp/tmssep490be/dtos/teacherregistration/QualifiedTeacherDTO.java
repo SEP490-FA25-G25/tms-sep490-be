@@ -21,6 +21,7 @@ public class QualifiedTeacherDTO {
     private String phone;
     private String avatarUrl;
     private String employeeCode;
+    private String contractType;
 
     // Skills info
     private List<TeacherSkillInfo> skills;
@@ -30,6 +31,11 @@ public class QualifiedTeacherDTO {
     private Boolean isMatch;
     private String matchReason;
     private Integer matchScore; // Higher = better match
+
+    // Schedule & Workload info
+    private Boolean hasScheduleConflict;
+    private String conflictDetails;
+    private Integer currentWorkload; // Number of SCHEDULED + ONGOING classes
 
     @Data
     @Builder

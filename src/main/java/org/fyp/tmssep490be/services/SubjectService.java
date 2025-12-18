@@ -40,6 +40,7 @@ public class SubjectService {
     private final SubjectAssessmentCLOMappingRepository subjectAssessmentCLOMappingRepository;
     private final SubjectMaterialRepository subjectMaterialRepository;
     private final UserAccountRepository userAccountRepository;
+    private final ClassRepository classRepository;
     private final NotificationService notificationService;
     private final EntityManager entityManager;
 
@@ -573,6 +574,8 @@ public class SubjectService {
                             .description(phase.getLearningFocus())
                             .sessions(sessions)
                             .materials(phaseMaterials)
+                            .totalSessions(sessions.size())
+                            .totalMaterials(phaseMaterials.size())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -823,7 +826,7 @@ public class SubjectService {
     }
 
     /**
-     * Approve a subject
+     * Approve a subject for publication
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void approveSubject(Long id, Long managerId) {
@@ -836,9 +839,25 @@ public class SubjectService {
         }
 
         // Set approval status
-        subject.setStatus(SubjectStatus.PENDING_ACTIVATION);
         subject.setApprovalStatus(ApprovalStatus.APPROVED);
         subject.setDecidedAt(OffsetDateTime.now());
+
+        // Check if effectiveDate <= today -> ACTIVE immediately, else
+        // PENDING_ACTIVATION
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate effectiveDate = subject.getEffectiveDate();
+
+        if (effectiveDate != null && !effectiveDate.isAfter(today)) {
+            // effectiveDate <= today -> Active immediately
+            subject.setStatus(SubjectStatus.ACTIVE);
+            log.info("Subject {} approved and activated immediately (effectiveDate: {} <= today: {})",
+                    id, effectiveDate, today);
+        } else {
+            // effectiveDate > today -> Wait for scheduler
+            subject.setStatus(SubjectStatus.PENDING_ACTIVATION);
+            log.info("Subject {} approved. Will be activated on effective date: {}",
+                    id, effectiveDate);
+        }
 
         // Set decided by manager
         if (managerId != null) {
@@ -850,9 +869,6 @@ public class SubjectService {
 
         // Send notification to Subject Leader (creator)
         sendApprovalNotificationToCreator(subject, true, null);
-
-        log.info("Subject {} approved successfully. Will be activated on effective date: {}",
-                id, subject.getEffectiveDate());
     }
 
     /**
@@ -992,9 +1008,20 @@ public class SubjectService {
         Subject subject = subjectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
 
-        if (subject.getStatus() != SubjectStatus.ACTIVE && subject.getStatus() != SubjectStatus.PENDING_ACTIVATION) {
+        // Only allow deactivating ACTIVE subjects
+        if (subject.getStatus() != SubjectStatus.ACTIVE) {
             throw new IllegalStateException(
-                    "Chỉ có thể vô hiệu hóa môn học đang ở trạng thái HOẠT ĐỘNG hoặc CHỜ KÍCH HOẠT");
+                    "Chỉ có thể vô hiệu hóa môn học đang ở trạng thái HOẠT ĐỘNG");
+        }
+
+        // Check if any classes are using this subject with SCHEDULED or ONGOING status
+        boolean hasActiveClasses = classRepository.existsBySubjectIdAndStatusIn(
+                id,
+                java.util.List.of(ClassStatus.SCHEDULED, ClassStatus.ONGOING));
+
+        if (hasActiveClasses) {
+            throw new IllegalStateException(
+                    "Không thể vô hiệu hóa môn học vì đang có lớp học đã lên lịch hoặc đang diễn ra");
         }
 
         subject.setStatus(SubjectStatus.INACTIVE);
