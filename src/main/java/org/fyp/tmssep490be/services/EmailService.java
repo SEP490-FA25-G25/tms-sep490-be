@@ -231,7 +231,7 @@ public class EmailService {
     @Async
     public void sendSessionCancelledAsync(String to, String studentName, String className, 
                                           String subjectName, String sessionDate, String sessionTime,
-                                          String originalTeacher, String reason) {
+                                          String originalTeacher, String replacementTeacher, String reason) {
         String subject = "Thông báo hủy buổi học - " + className;
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("studentName", studentName);
@@ -240,6 +240,7 @@ public class EmailService {
         templateData.put("sessionDate", sessionDate);
         templateData.put("sessionTime", sessionTime);
         templateData.put("originalTeacher", originalTeacher);
+        templateData.put("replacementTeacher", replacementTeacher);
         templateData.put("reason", reason);
         templateData.put("scheduleUrl", frontendUrl + "/student/schedule");
         templateData.put("frontendUrl", frontendUrl);

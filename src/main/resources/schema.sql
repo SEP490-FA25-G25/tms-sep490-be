@@ -557,7 +557,7 @@ CREATE TABLE score (
   id BIGSERIAL PRIMARY KEY,
   assessment_id BIGINT NOT NULL,
   student_id BIGINT NOT NULL,
-  score DECIMAL(5,2) NOT NULL,
+  score DECIMAL(5,2),
   feedback TEXT,
   graded_by BIGINT,
   graded_at TIMESTAMPTZ,

@@ -17,6 +17,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -26,7 +27,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional(readOnly = true)
 @Slf4j
 public class NotificationService {
 
@@ -34,6 +35,7 @@ public class NotificationService {
     private final UserAccountRepository userAccountRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Notification createNotification(Long recipientId, NotificationType type, String title, String message) {
         log.info("Tạo notification cho user {}: {}", recipientId, title);
 
@@ -56,11 +58,13 @@ public class NotificationService {
         return saved;
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Notification createNotificationFromRequest(NotificationRequestDTO request) {
         return createNotification(request.getRecipientId(), request.getType(), 
                                  request.getTitle(), request.getMessage());
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public NotificationDTO updateNotification(Long notificationId, NotificationRequestDTO request) {
         log.info("Cập nhật notification {}: {}", notificationId, request.getTitle());
 
@@ -75,6 +79,7 @@ public class NotificationService {
         return NotificationDTO.fromEntity(saved);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void deleteNotification(Long notificationId, Long userId) {
         log.info("Xóa notification {} cho user {}", notificationId, userId);
 
@@ -118,6 +123,7 @@ public class NotificationService {
         return notifications.map(NotificationDTO::fromEntity);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markAsRead(Long notificationId, Long userId) {
         log.info("Đánh dấu đã đọc notification {} cho user {}", notificationId, userId);
 
@@ -134,12 +140,14 @@ public class NotificationService {
         }
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int markAllAsRead(Long userId) {
         log.info("Đánh dấu đã đọc tất cả notifications cho user {}", userId);
         return notificationRepository.markAllAsRead(userId, NotificationStatus.UNREAD,
                 NotificationStatus.READ, LocalDateTime.now());
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int archiveNotifications(Long userId, List<Long> notificationIds) {
         log.info("Lưu trữ {} notifications cho user {}", notificationIds.size(), userId);
         return notificationRepository.archiveNotifications(userId, notificationIds);
@@ -208,6 +216,7 @@ public class NotificationService {
         return notificationRepository.countByRecipientIdAndStatus(userId, NotificationStatus.UNREAD);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendBulkNotifications(List<Long> recipientIds, NotificationType type, String title, String message) {
         log.info("Gửi bulk notifications cho {} users (IDs: {})", recipientIds.size(), recipientIds);
 
@@ -247,6 +256,7 @@ public class NotificationService {
         });
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createFeedbackReminderNotification(Long studentId, String phaseName, String subjectName, String className) {
         String title = "Nhắc nhở: Đánh giá sau phase " + phaseName;
         String message = String.format(
