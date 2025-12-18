@@ -40,7 +40,6 @@ public class EmailService {
     public void sendEmailAsync(String to, String subject, String htmlContent) {
         if (mailSender == null) {
             log.warn("Email service is not configured. Skipping email to: {}", to);
-            CompletableFuture.completedFuture(null);
             return;
         }
 
@@ -55,11 +54,9 @@ public class EmailService {
 
             mailSender.send(mimeMessage);
             log.info("Email sent successfully to: {}", to);
-            CompletableFuture.completedFuture(null);
 
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
-            CompletableFuture.failedFuture(e);
         }
     }
 
@@ -99,7 +96,6 @@ public class EmailService {
 
         } catch (Exception e) {
             log.error("Failed to process email template {} for recipient {}: {}", templateName, to, e.getMessage(), e);
-            CompletableFuture.failedFuture(e);
         }
     }
 

@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -1580,11 +1581,6 @@ public class StudentRequestService {
                 .build();
     }
 
-    /**
-     * Submit transfer request on behalf of student by AA (auto-approved).
-     * Note: Transfer requests can ONLY be created by Academic Affairs on behalf of students.
-     * Students cannot submit transfer requests directly - they must contact AA.
-     */
     @Transactional
     public StudentRequestResponseDTO submitTransferRequestOnBehalf(Long decidedById, TransferRequestDTO dto) {
         log.info("AA submitting transfer request on behalf of student {} from class {} to class {}",
@@ -2112,6 +2108,7 @@ public class StudentRequestService {
     /**
      * Send notification to student when transfer is executed successfully
      */
+    @Async("emailTaskExecutor")
     private void sendTransferExecutionNotifications(StudentRequest request) {
         String oldClassCode = request.getCurrentClass().getCode();
         String newClassCode = request.getTargetClass().getCode();
@@ -2212,6 +2209,7 @@ public class StudentRequestService {
     /**
      * Send notification and email to student when request is approved
      */
+    @Async("emailTaskExecutor")
     private void sendApprovalNotificationsToStudent(StudentRequest request) {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
@@ -2286,6 +2284,7 @@ public class StudentRequestService {
     /**
      * Send notification and email to student when request is rejected
      */
+    @Async("emailTaskExecutor")
     private void sendRejectionNotificationsToStudent(StudentRequest request, String rejectionReason) {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();

@@ -46,6 +46,7 @@ import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.fyp.tmssep490be.entities.enums.StudentRequestType;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.services.EmailService;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -1356,6 +1357,7 @@ public class TeacherRequestService {
     }
 
     // Gửi email cho teacher khi request được approve (MODALITY_CHANGE/RESCHEDULE)
+    @Async("emailTaskExecutor")
     private void sendEmailNotificationForApproval(TeacherRequest request) {
         try {
             UserAccount teacherAccount = request.getTeacher() != null ? request.getTeacher().getUserAccount() : null;
@@ -1429,6 +1431,7 @@ public class TeacherRequestService {
     }
 
     // Gửi email mời giáo viên dạy thay khi request REPLACEMENT được approve (WAITING_CONFIRM)
+    @Async("emailTaskExecutor")
     private void sendEmailNotificationForReplacementInvitation(TeacherRequest request) {
         try {
             if (request.getReplacementTeacher() == null || request.getReplacementTeacher().getUserAccount() == null) {
@@ -1504,6 +1507,7 @@ public class TeacherRequestService {
     }
 
     // Gửi email cho teacher khi request bị reject
+    @Async("emailTaskExecutor")
     private void sendEmailNotificationForRejection(TeacherRequest request, String reason) {
         try {
             UserAccount teacherAccount = request.getTeacher() != null ? request.getTeacher().getUserAccount() : null;
@@ -1596,6 +1600,7 @@ public class TeacherRequestService {
     }
 
     // Gửi email cho teacher khi tự tạo request (teacher side)
+    @Async("emailTaskExecutor")
     private void sendEmailNotificationForCreatedRequest(TeacherRequest request) {
         try {
             UserAccount teacherAccount = request.getTeacher() != null ? request.getTeacher().getUserAccount() : null;
@@ -3246,6 +3251,7 @@ public class TeacherRequestService {
     }
 
     // Helper: Gửi notification + email cho students khi session bị cancel (teacher replacement)
+    @Async("emailTaskExecutor")
     private void sendSessionCancelledNotificationToStudents(TeacherRequest request) {
         try {
             Session session = request.getSession();
@@ -3318,6 +3324,7 @@ public class TeacherRequestService {
     }
 
     // Helper: Gửi notification + email cho students khi schedule thay đổi (RESCHEDULE/MODALITY_CHANGE)
+    @Async("emailTaskExecutor")
     private void sendScheduleChangedNotificationToStudents(TeacherRequest request) {
         try {
             Session oldSession = request.getSession();

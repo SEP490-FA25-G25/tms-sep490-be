@@ -95,8 +95,8 @@ server:
         max-attempts: ${GMAIL_RETRY_MAX_ATTEMPTS:3}
         delay: ${GMAIL_RETRY_DELAY:1000} # 1 second
   async:
-    pool-size: ${EMAIL_ASYNC_POOL_SIZE:10}
-    queue-capacity: ${EMAIL_ASYNC_QUEUE_CAPACITY:100}
+    pool-size: ${EMAIL_ASYNC_POOL_SIZE:15}
+    queue-capacity: ${EMAIL_ASYNC_QUEUE_CAPACITY:500}
     thread-name-prefix: ${EMAIL_ASYNC_THREAD_PREFIX:EmailAsync-}
 
 # Scheduler Configuration

@@ -16,6 +16,7 @@ import org.fyp.tmssep490be.services.EmailService;
 import org.fyp.tmssep490be.services.NotificationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -255,6 +256,7 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
     }
 
     // Gửi notification + (tuỳ chọn) email cho giáo viên
+    @Async("emailTaskExecutor")
     private void sendReminderToTeachers(Session session, String title, String message) {
         if (session.getTeachingSlots() == null || session.getTeachingSlots().isEmpty()) {
             return;

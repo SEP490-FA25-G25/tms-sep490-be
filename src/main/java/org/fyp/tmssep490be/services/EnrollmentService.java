@@ -11,6 +11,7 @@ import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
 import org.fyp.tmssep490be.utils.ScheduleUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -373,24 +374,8 @@ public class EnrollmentService {
         // 5. Send notifications cho students và Academic Affairs
         sendEnrollmentNotifications(enrollments, classEntity);
 
-        // 6. Send enrollment confirmation emails (async)
-        for (Long studentId : studentIds) {
-            try {
-                Student student = studentRepository.findById(studentId).orElse(null);
-                if (student != null && student.getUserAccount() != null) {
-                    String centerName = classEntity.getBranch() != null ? classEntity.getBranch().getName() : "TMS";
-                    emailService.sendClassEnrollmentNotificationAsync(
-                            student.getUserAccount().getEmail(),
-                            student.getUserAccount().getFullName(),
-                            classEntity.getCode(),
-                            centerName);
-                }
-            } catch (Exception e) {
-                log.warn("Failed to send enrollment email to student {}: {}", studentId, e.getMessage());
-                // Don't fail the enrollment process if email fails
-            }
-        }
-        log.info("Enrollment confirmation emails sent to {} students", studentIds.size());
+        // 6. Send enrollment confirmation emails (async batch)
+        sendEnrollmentEmailsAsync(studentIds, classEntity);
 
         // 7. Return result
         List<String> warnings = new ArrayList<>();
@@ -406,6 +391,7 @@ public class EnrollmentService {
                 .build();
     }
 
+    @Async("emailTaskExecutor")
     private void sendEnrollmentNotificationToStudent(Enrollment enrollment, ClassEntity classEntity) {
         try {
             Long studentUserId = enrollment.getStudent().getUserAccount().getId();
@@ -434,6 +420,7 @@ public class EnrollmentService {
     }
 
 
+    @Async("emailTaskExecutor")
     private void sendEnrollmentNotifications(List<Enrollment> enrollments, ClassEntity classEntity) {
         try {
             if (enrollments.isEmpty()) {
@@ -457,6 +444,7 @@ public class EnrollmentService {
         }
     }
 
+    @Async("emailTaskExecutor")
     private void sendEnrollmentNotificationToAcademicAffairs(List<Enrollment> enrollments, ClassEntity classEntity) {
         try {
             // Lấy branch của class để gửi cho Academic Affairs tương ứng
@@ -829,6 +817,32 @@ public class EnrollmentService {
                     throw new CustomException(ErrorCode.ENROLLMENT_SCHEDULE_CONFLICT, errorMsg);
                 }
             }
+        }
+    }
+
+    @Async("emailTaskExecutor")
+    private void sendEnrollmentEmailsAsync(List<Long> studentIds, ClassEntity classEntity) {
+        try {
+            String centerName = classEntity.getBranch() != null ? classEntity.getBranch().getName() : "TMS";
+            
+            for (Long studentId : studentIds) {
+                try {
+                    Student student = studentRepository.findById(studentId).orElse(null);
+                    if (student != null && student.getUserAccount() != null) {
+                        emailService.sendClassEnrollmentNotificationAsync(
+                                student.getUserAccount().getEmail(),
+                                student.getUserAccount().getFullName(),
+                                classEntity.getCode(),
+                                centerName);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to send enrollment email to student {}: {}", studentId, e.getMessage());
+                    // Don't fail if email fails
+                }
+            }
+            log.info("Enrollment confirmation emails processing completed for {} students", studentIds.size());
+        } catch (Exception e) {
+            log.error("Error in sendEnrollmentEmailsAsync for class {}: {}", classEntity.getId(), e.getMessage(), e);
         }
     }
 }
