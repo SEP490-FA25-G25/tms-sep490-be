@@ -232,4 +232,48 @@ public class EmailService {
         sendEmailWithTemplateAsync(to, subject, "emails/attendance-warning", templateData);
     }
 
+    @Async
+    public void sendSessionCancelledAsync(String to, String studentName, String className, 
+                                          String subjectName, String sessionDate, String sessionTime,
+                                          String originalTeacher, String reason) {
+        String subject = "Thông báo hủy buổi học - " + className;
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("className", className);
+        templateData.put("subjectName", subjectName);
+        templateData.put("sessionDate", sessionDate);
+        templateData.put("sessionTime", sessionTime);
+        templateData.put("originalTeacher", originalTeacher);
+        templateData.put("reason", reason);
+        templateData.put("scheduleUrl", frontendUrl + "/student/schedule");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/session-cancelled", templateData);
+    }
+
+    @Async
+    public void sendScheduleChangedAsync(String to, String studentName, String className,
+                                         String subjectName, String oldDate, String oldTime,
+                                         String oldRoom, String oldModality, String newDate,
+                                         String newTime, String newRoom, String newModality, String reason) {
+        String subject = "Thông báo thay đổi lịch học - " + className;
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("className", className);
+        templateData.put("subjectName", subjectName);
+        templateData.put("oldDate", oldDate);
+        templateData.put("oldTime", oldTime);
+        templateData.put("oldRoom", oldRoom);
+        templateData.put("oldModality", oldModality);
+        templateData.put("newDate", newDate);
+        templateData.put("newTime", newTime);
+        templateData.put("newRoom", newRoom);
+        templateData.put("newModality", newModality);
+        templateData.put("reason", reason);
+        templateData.put("scheduleUrl", frontendUrl + "/student/schedule");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/schedule-changed", templateData);
+    }
+
 }

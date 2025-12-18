@@ -16,6 +16,7 @@ import org.fyp.tmssep490be.dtos.schedule.TimeSlotDTO;
 import org.fyp.tmssep490be.entities.Resource;
 import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.SessionResource;
+import org.fyp.tmssep490be.entities.Student;
 import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.Teacher;
 import org.fyp.tmssep490be.entities.TeacherRequest;
@@ -2243,6 +2244,12 @@ public class TeacherRequestService {
                 sendNotificationToTeacherForApproval(request);
                 // Email cho teacher về việc request đã được duyệt
                 sendEmailNotificationForApproval(request);
+                
+                // NEW: Gửi notification + email cho STUDENTS về schedule change
+                if (request.getRequestType() == TeacherRequestType.RESCHEDULE || 
+                    request.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
+                    sendScheduleChangedNotificationToStudents(request);
+                }
             }
         } catch (Exception e) {
             log.error("Lỗi khi gửi notification/email cho teacher về request {}: {}", requestId, e.getMessage());
@@ -2683,10 +2690,12 @@ public class TeacherRequestService {
         log.info("Replacement request {} confirmed successfully by teacher {}. Session {} updated: teacher {} -> {}", 
                 requestId, userId, session.getId(), originalTeacher.getId(), request.getReplacementTeacher().getId());
 
-        // Gửi thông báo cho giáo vụ và teacher gốc
+        // Gửi thông báo cho giáo vụ, teacher gốc và STUDENTS
         try {
             sendNotificationToAcademicStaffForReplacementConfirmation(request);
             sendNotificationToOriginalTeacherForReplacementConfirmation(request);
+            // NEW: Gửi notification + email cho students về việc teacher thay đổi
+            sendSessionCancelledNotificationToStudents(request);
         } catch (Exception e) {
             log.error("Lỗi khi gửi notification về replacement confirmation cho request {}: {}", requestId, e.getMessage());
             // Không throw exception - notification failure không nên block việc confirm
@@ -3085,6 +3094,188 @@ public class TeacherRequestService {
                 requestId, replacementTeacherId, academicStaffUserId);
 
         return mapToResponseDTO(request);
+    }
+
+    // Helper: Gửi notification + email cho students khi session bị cancel (teacher replacement)
+    private void sendSessionCancelledNotificationToStudents(TeacherRequest request) {
+        try {
+            Session session = request.getSession();
+            if (session == null) {
+                return;
+            }
+
+            // Lấy danh sách students enrolled trong session
+            List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(session.getId());
+            if (studentSessions.isEmpty()) {
+                log.info("No students found in session {} - skip notification", session.getId());
+                return;
+            }
+
+            // Prepare notification data
+            String className = session.getClassEntity().getName();
+            String subjectName = session.getClassEntity().getSubject().getName();
+            String sessionDate = session.getDate().toString();
+            String sessionTime = session.getTimeSlotTemplate() != null 
+                ? String.format("%s - %s", 
+                    session.getTimeSlotTemplate().getStartTime(), 
+                    session.getTimeSlotTemplate().getEndTime())
+                : "N/A";
+            String originalTeacherName = request.getTeacher() != null && request.getTeacher().getUserAccount() != null
+                ? request.getTeacher().getUserAccount().getFullName()
+                : "Giáo viên";
+            String reason = request.getRequestReason() != null ? request.getRequestReason() : "Giáo viên có việc đột xuất";
+
+            // Internal notification title & message
+            String notificationTitle = "Thay đổi giáo viên";
+            String notificationMessage = String.format(
+                "Giáo viên %s sẽ không dạy buổi %s (%s). Giáo viên dạy thay đã được xác nhận.",
+                originalTeacherName, sessionDate, className
+            );
+
+            // Send bulk internal notifications
+            List<Long> studentUserIds = studentSessions.stream()
+                .map(ss -> ss.getStudent().getUserAccount().getId())
+                .toList();
+
+            notificationService.sendBulkNotifications(
+                studentUserIds,
+                NotificationType.NOTIFICATION,
+                notificationTitle,
+                notificationMessage
+            );
+
+            // Send individual emails
+            for (StudentSession ss : studentSessions) {
+                Student student = ss.getStudent();
+                if (student.getUserAccount() != null && student.getUserAccount().getEmail() != null) {
+                    emailService.sendSessionCancelledAsync(
+                        student.getUserAccount().getEmail(),
+                        student.getUserAccount().getFullName(),
+                        className,
+                        subjectName,
+                        sessionDate,
+                        sessionTime,
+                        originalTeacherName,
+                        reason
+                    );
+                }
+            }
+
+            log.info("Sent session cancelled notifications to {} students for session {}", studentSessions.size(), session.getId());
+        } catch (Exception e) {
+            log.error("Error sending session cancelled notifications for request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
+    }
+
+    // Helper: Gửi notification + email cho students khi schedule thay đổi (RESCHEDULE/MODALITY_CHANGE)
+    private void sendScheduleChangedNotificationToStudents(TeacherRequest request) {
+        try {
+            Session oldSession = request.getSession();
+            Session newSession = request.getNewSession();
+            
+            if (oldSession == null) {
+                return;
+            }
+
+            // Lấy danh sách students
+            List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(oldSession.getId());
+            if (studentSessions.isEmpty()) {
+                log.info("No students found in session {} - skip schedule change notification", oldSession.getId());
+                return;
+            }
+
+            // Prepare notification data
+            String className = oldSession.getClassEntity().getName();
+            String subjectName = oldSession.getClassEntity().getSubject().getName();
+            
+            // Old schedule info
+            String oldDate = oldSession.getDate().toString();
+            String oldTime = oldSession.getTimeSlotTemplate() != null
+                ? String.format("%s - %s", 
+                    oldSession.getTimeSlotTemplate().getStartTime(),
+                    oldSession.getTimeSlotTemplate().getEndTime())
+                : "N/A";
+            String oldRoom = "N/A";
+            String oldModality = "N/A";
+            if (!oldSession.getSessionResources().isEmpty()) {
+                Resource oldResource = oldSession.getSessionResources().iterator().next().getResource();
+                oldRoom = oldResource.getName();
+                // Modality không có trong Resource entity - skip
+            }
+
+            // New schedule info
+            String newDate = oldDate; // default to old if not changed
+            String newTime = oldTime;
+            String newRoom = oldRoom;
+            String newModality = oldModality;
+            
+            if (request.getRequestType() == TeacherRequestType.RESCHEDULE && newSession != null) {
+                newDate = newSession.getDate().toString();
+                newTime = newSession.getTimeSlotTemplate() != null
+                    ? String.format("%s - %s",
+                        newSession.getTimeSlotTemplate().getStartTime(),
+                        newSession.getTimeSlotTemplate().getEndTime())
+                    : oldTime;
+                if (!newSession.getSessionResources().isEmpty()) {
+                    Resource newResource = newSession.getSessionResources().iterator().next().getResource();
+                    newRoom = newResource.getName();
+                    // Modality không có trong Resource entity - skip
+                }
+            } else if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE && request.getNewResource() != null) {
+                // MODALITY_CHANGE: only resource changes, date/time stay same
+                newRoom = request.getNewResource().getName();
+                // Modality không có trong Resource entity - skip
+            }
+
+            String reason = request.getRequestReason() != null ? request.getRequestReason() : "Thay đổi lịch học";
+
+            // Internal notification
+            String notificationTitle = "Thay đổi lịch học";
+            String notificationMessage = String.format(
+                "Lịch học lớp %s đã thay đổi. Từ %s %s thành %s %s",
+                className, oldDate, oldTime, newDate, newTime
+            );
+
+            // Send bulk internal notifications
+            List<Long> studentUserIds = studentSessions.stream()
+                .map(ss -> ss.getStudent().getUserAccount().getId())
+                .toList();
+
+            notificationService.sendBulkNotifications(
+                studentUserIds,
+                NotificationType.NOTIFICATION,
+                notificationTitle,
+                notificationMessage
+            );
+
+            // Send individual emails
+            for (StudentSession ss : studentSessions) {
+                Student student = ss.getStudent();
+                if (student.getUserAccount() != null && student.getUserAccount().getEmail() != null) {
+                    emailService.sendScheduleChangedAsync(
+                        student.getUserAccount().getEmail(),
+                        student.getUserAccount().getFullName(),
+                        className,
+                        subjectName,
+                        oldDate,
+                        oldTime,
+                        oldRoom,
+                        oldModality,
+                        newDate,
+                        newTime,
+                        newRoom,
+                        newModality,
+                        reason
+                    );
+                }
+            }
+
+            log.info("Sent schedule changed notifications to {} students for session {}", studentSessions.size(), oldSession.getId());
+        } catch (Exception e) {
+            log.error("Error sending schedule changed notifications for request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
     }
 
     // Lấy config cho teacher request

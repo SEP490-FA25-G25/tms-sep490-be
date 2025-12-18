@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thông Báo Hủy Buổi Học</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            color: #dc2626;
+            font-size: 24px;
+            margin: 0;
+        }
+        .info-box {
+            background-color: #fef2f2;
+            border-left: 4px solid #dc2626;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .info-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            min-width: 140px;
+            color: #666;
+        }
+        .info-value {
+            color: #333;
+            flex: 1;
+        }
+        .reason-box {
+            background-color: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .reason-title {
+            font-weight: 600;
+            color: #c2410c;
+            margin-bottom: 8px;
+        }
+        .note-box {
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .note-title {
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 8px;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #3b82f6;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        @media only screen and (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 20px;
+            }
+            .info-row {
+                flex-direction: column;
+            }
+            .info-label {
+                min-width: auto;
+                margin-bottom: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">❌</div>
+            <h1>Thông Báo Hủy Buổi Học</h1>
+        </div>
+
+        <p>Xin chào <strong th:text="${studentName}">Sinh viên</strong>,</p>
+
+        <p>Chúng tôi xin thông báo rằng buổi học dưới đây đã bị <strong style="color: #dc2626;">HỦY</strong>:</p>
+
+        <div class="info-box">
+            <div class="info-row">
+                <span class="info-label">Lớp học:</span>
+                <span class="info-value" th:text="${className}">SE1801</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Môn học:</span>
+                <span class="info-value" th:text="${subjectName}">Software Engineering</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Ngày học:</span>
+                <span class="info-value" th:text="${sessionDate}">20/12/2025</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Giờ học:</span>
+                <span class="info-value" th:text="${sessionTime}">07:30 - 09:30</span>
+            </div>
+            <div class="info-row" th:if="${originalTeacher}">
+                <span class="info-label">Giáo viên:</span>
+                <span class="info-value" th:text="${originalTeacher}">Nguyễn Văn A</span>
+            </div>
+        </div>
+
+        <div class="reason-box" th:if="${reason}">
+            <div class="reason-title">📝 Lý do hủy:</div>
+            <div th:text="${reason}">Giáo viên có việc đột xuất không thể tham gia</div>
+        </div>
+
+        <div class="note-box">
+            <div class="note-title">ℹ️ Lưu ý quan trọng:</div>
+            <ul style="margin: 8px 0; padding-left: 20px;">
+                <li>Buổi học này sẽ không được tính vào điểm danh</li>
+                <li>Vui lòng theo dõi thông báo về lịch học bù hoặc thay đổi lịch học</li>
+                <li>Nếu có thắc mắc, vui lòng liên hệ phòng Đào tạo</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center;">
+            <a th:href="${scheduleUrl}" class="cta-button">Xem Lịch Học</a>
+        </div>
+
+        <div class="footer">
+            <p>Trân trọng,<br><strong>Hệ thống TMS</strong></p>
+            <p style="font-size: 12px; color: #9ca3af;">
+                Đây là email tự động, vui lòng không trả lời email này.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

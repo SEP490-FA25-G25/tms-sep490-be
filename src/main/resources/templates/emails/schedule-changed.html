@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thông Báo Thay Đổi Lịch Học</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            color: #f59e0b;
+            font-size: 24px;
+            margin: 0;
+        }
+        .comparison-box {
+            margin: 20px 0;
+        }
+        .schedule-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .schedule-card.old {
+            background-color: #fef2f2;
+            border-color: #fecaca;
+            position: relative;
+        }
+        .schedule-card.old::after {
+            content: "CŨ";
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #dc2626;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .schedule-card.new {
+            background-color: #f0fdf4;
+            border-color: #86efac;
+            position: relative;
+        }
+        .schedule-card.new::after {
+            content: "MỚI";
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #16a34a;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .schedule-row {
+            display: flex;
+            padding: 6px 0;
+        }
+        .schedule-label {
+            font-weight: 600;
+            min-width: 100px;
+            color: #666;
+        }
+        .schedule-value {
+            color: #333;
+            flex: 1;
+        }
+        .arrow {
+            text-align: center;
+            font-size: 24px;
+            color: #3b82f6;
+            margin: 10px 0;
+        }
+        .class-info {
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .reason-box {
+            background-color: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .reason-title {
+            font-weight: 600;
+            color: #c2410c;
+            margin-bottom: 8px;
+        }
+        .highlight {
+            background-color: #fef08a;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #3b82f6;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        @media only screen and (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 20px;
+            }
+            .schedule-row {
+                flex-direction: column;
+            }
+            .schedule-label {
+                min-width: auto;
+                margin-bottom: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">🔄</div>
+            <h1>Thông Báo Thay Đổi Lịch Học</h1>
+        </div>
+
+        <p>Xin chào <strong th:text="${studentName}">Sinh viên</strong>,</p>
+
+        <p>Lịch học của bạn đã được <span class="highlight">THAY ĐỔI</span>. Vui lòng xem chi tiết dưới đây:</p>
+
+        <div class="class-info">
+            <div style="font-weight: 600; margin-bottom: 8px;">Thông tin lớp học:</div>
+            <div><strong>Lớp:</strong> <span th:text="${className}">SE1801</span></div>
+            <div><strong>Môn:</strong> <span th:text="${subjectName}">Software Engineering</span></div>
+        </div>
+
+        <div class="comparison-box">
+            <div class="schedule-card old">
+                <div class="schedule-row">
+                    <span class="schedule-label">📅 Ngày:</span>
+                    <span class="schedule-value" th:text="${oldDate}">20/12/2025</span>
+                </div>
+                <div class="schedule-row">
+                    <span class="schedule-label">⏰ Giờ:</span>
+                    <span class="schedule-value" th:text="${oldTime}">07:30 - 09:30</span>
+                </div>
+                <div class="schedule-row" th:if="${oldRoom}">
+                    <span class="schedule-label">📍 Phòng:</span>
+                    <span class="schedule-value" th:text="${oldRoom}">A101</span>
+                </div>
+                <div class="schedule-row" th:if="${oldModality}">
+                    <span class="schedule-label">💻 Hình thức:</span>
+                    <span class="schedule-value" th:text="${oldModality}">Offline</span>
+                </div>
+            </div>
+
+            <div class="arrow">⬇️</div>
+
+            <div class="schedule-card new">
+                <div class="schedule-row">
+                    <span class="schedule-label">📅 Ngày:</span>
+                    <span class="schedule-value" th:text="${newDate}">22/12/2025</span>
+                </div>
+                <div class="schedule-row">
+                    <span class="schedule-label">⏰ Giờ:</span>
+                    <span class="schedule-value" th:text="${newTime}">09:30 - 11:30</span>
+                </div>
+                <div class="schedule-row" th:if="${newRoom}">
+                    <span class="schedule-label">📍 Phòng:</span>
+                    <span class="schedule-value" th:text="${newRoom}">B205</span>
+                </div>
+                <div class="schedule-row" th:if="${newModality}">
+                    <span class="schedule-label">💻 Hình thức:</span>
+                    <span class="schedule-value" th:text="${newModality}">Online</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="reason-box" th:if="${reason}">
+            <div class="reason-title">📝 Lý do thay đổi:</div>
+            <div th:text="${reason}">Thay đổi phòng học do bảo trì hệ thống</div>
+        </div>
+
+        <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; padding: 15px; margin: 20px 0;">
+            <div style="font-weight: 600; color: #92400e; margin-bottom: 8px;">⚠️ Lưu ý quan trọng:</div>
+            <ul style="margin: 8px 0; padding-left: 20px; color: #78350f;">
+                <li>Vui lòng cập nhật lịch cá nhân của bạn</li>
+                <li>Đảm bảo có mặt đúng giờ theo lịch mới</li>
+                <li>Kiểm tra thông tin phòng học/link online mới</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center;">
+            <a th:href="${scheduleUrl}" class="cta-button">Xem Lịch Học Đầy Đủ</a>
+        </div>
+
+        <div class="footer">
+            <p>Trân trọng,<br><strong>Hệ thống TMS</strong></p>
+            <p style="font-size: 12px; color: #9ca3af;">
+                Đây là email tự động, vui lòng không trả lời email này.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
