@@ -15,6 +15,7 @@ import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserAccountRepository userAccountRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public Notification createNotification(Long recipientId, NotificationType type, String title, String message) {
         log.info("Tạo notification cho user {}: {}", recipientId, title);
@@ -46,7 +48,12 @@ public class NotificationService {
                 .status(NotificationStatus.UNREAD)
                 .build();
 
-        return notificationRepository.save(notification);
+        Notification saved = notificationRepository.save(notification);
+        
+        // Broadcast notification via WebSocket in real-time
+        sendWebSocketNotification(recipientId, NotificationDTO.fromEntity(saved));
+        
+        return saved;
     }
 
     public Notification createNotificationFromRequest(NotificationRequestDTO request) {
@@ -230,6 +237,14 @@ public class NotificationService {
         log.info("Tạo {} notifications để lưu", notifications.size());
         List<Notification> saved = notificationRepository.saveAll(notifications);
         log.info("Đã lưu thành công {} notifications", saved.size());
+        
+        // Broadcast to each recipient via WebSocket
+        saved.forEach(notification -> {
+            sendWebSocketNotification(
+                notification.getRecipient().getId(), 
+                NotificationDTO.fromEntity(notification)
+            );
+        });
     }
 
     public void createFeedbackReminderNotification(Long studentId, String phaseName, String subjectName, String className) {
@@ -241,5 +256,24 @@ public class NotificationService {
         );
         
         createNotification(studentId, NotificationType.FEEDBACK_REMINDER, title, message);
+    }
+    
+    /**
+     * Send notification to specific user via WebSocket
+     * Uses user-specific queue: /user/{userId}/queue/notifications
+     */
+    private void sendWebSocketNotification(Long recipientId, NotificationDTO notificationDTO) {
+        try {
+            String destination = "/queue/notifications";
+            messagingTemplate.convertAndSendToUser(
+                recipientId.toString(),
+                destination,
+                notificationDTO
+            );
+            log.debug("Sent WebSocket notification to user {} at {}", recipientId, destination);
+        } catch (Exception e) {
+            log.error("Failed to send WebSocket notification to user {}: {}", recipientId, e.getMessage());
+            // Don't throw exception - notification is already saved in DB
+        }
     }
 }
