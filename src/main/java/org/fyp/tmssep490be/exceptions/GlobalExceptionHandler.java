@@ -38,26 +38,30 @@ public class GlobalExceptionHandler {
                                                 fieldError -> fieldError.getDefaultMessage(),
                                                 (existing, replacement) -> existing + "; " + replacement));
 
+                // Build a descriptive error message from all validation errors
+                String detailedMessage = errors.values().stream()
+                                .collect(Collectors.joining("; "));
+
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                                 .body(ResponseObject.<Map<String, String>>builder()
                                                 .success(false)
-                                                .message("Xác thực thất bại")
+                                                .message(detailedMessage)
                                                 .data(errors)
                                                 .build());
         }
 
-    @ExceptionHandler(NullPointerException.class)
-    public ResponseEntity<ResponseObject<Void>> handleNullPointerException(NullPointerException e) {
-        log.error("NullPointerException occurred: {}", e.getMessage(), e);
+        @ExceptionHandler(NullPointerException.class)
+        public ResponseEntity<ResponseObject<Void>> handleNullPointerException(NullPointerException e) {
+                log.error("NullPointerException occurred: {}", e.getMessage(), e);
 
-        String errorMessage = "Đã xảy ra lỗi giá trị null trong ứng dụng";
-        if (e.getMessage() != null && !e.getMessage().isEmpty()) {
-            errorMessage += ": " + e.getMessage();
+                String errorMessage = "Đã xảy ra lỗi giá trị null trong ứng dụng";
+                if (e.getMessage() != null && !e.getMessage().isEmpty()) {
+                        errorMessage += ": " + e.getMessage();
+                }
+
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .body(ResponseObject.error(errorMessage));
         }
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ResponseObject.error(errorMessage));
-    }
 
         @ExceptionHandler(IllegalArgumentException.class)
         public ResponseEntity<ResponseObject<Void>> handleIllegalArgumentException(IllegalArgumentException e) {
@@ -67,11 +71,11 @@ public class GlobalExceptionHandler {
 
         @ExceptionHandler(CustomException.class)
         public ResponseEntity<ResponseObject<Void>> handleCustomException(CustomException e) {
-            boolean isNotFound = e.getErrorCode().name().startsWith("NOT_FOUND_");
+                boolean isNotFound = e.getErrorCode().name().startsWith("NOT_FOUND_");
 
-            HttpStatus status = isNotFound
-                    ? HttpStatus.NOT_FOUND
-                    : HttpStatus.BAD_REQUEST;
+                HttpStatus status = isNotFound
+                                ? HttpStatus.NOT_FOUND
+                                : HttpStatus.BAD_REQUEST;
 
                 return ResponseEntity.status(status)
                                 .body(ResponseObject.error(e.getMessage()));
@@ -83,11 +87,11 @@ public class GlobalExceptionHandler {
                                 .body(ResponseObject.error(e.getMessage()));
         }
 
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ResponseObject<Void>> handleBadCredentialsException(BadCredentialsException e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ResponseObject.error("Tên đăng nhập hoặc mật khẩu không đúng"));
-    }
+        @ExceptionHandler(BadCredentialsException.class)
+        public ResponseEntity<ResponseObject<Void>> handleBadCredentialsException(BadCredentialsException e) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                .body(ResponseObject.error("Tên đăng nhập hoặc mật khẩu không đúng"));
+        }
 
         @ExceptionHandler(UsernameNotFoundException.class)
         public ResponseEntity<ResponseObject<Void>> handleUsernameNotFoundException(UsernameNotFoundException e) {
@@ -107,11 +111,11 @@ public class GlobalExceptionHandler {
                                 .body(ResponseObject.error("Tài khoản đã bị khóa"));
         }
 
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ResponseObject<Void>> handleAccessDeniedException(AccessDeniedException e) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ResponseObject.error("Từ chối truy cập - không đủ quyền hạn"));
-    }
+        @ExceptionHandler(AccessDeniedException.class)
+        public ResponseEntity<ResponseObject<Void>> handleAccessDeniedException(AccessDeniedException e) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(ResponseObject.error("Từ chối truy cập - không đủ quyền hạn"));
+        }
 
         @ExceptionHandler(InvalidTokenException.class)
         public ResponseEntity<ResponseObject<Void>> handleInvalidTokenException(InvalidTokenException e) {

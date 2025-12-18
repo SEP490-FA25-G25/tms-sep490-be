@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.classcreation.SubmitClassResponse;
 import org.fyp.tmssep490be.dtos.classcreation.ValidateClassResponse;
+import org.fyp.tmssep490be.entities.Assessment;
 import org.fyp.tmssep490be.entities.ClassEntity;
+import org.fyp.tmssep490be.entities.SubjectAssessment;
 import org.fyp.tmssep490be.entities.UserAccount;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
 import org.fyp.tmssep490be.entities.enums.ClassStatus;
@@ -12,12 +14,15 @@ import org.fyp.tmssep490be.entities.enums.NotificationType;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.utils.ScheduleUtils;
+import org.fyp.tmssep490be.repositories.AssessmentRepository;
 import org.fyp.tmssep490be.repositories.ClassRepository;
+import org.fyp.tmssep490be.repositories.SubjectAssessmentRepository;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,8 +35,9 @@ public class ApprovalService {
     private final UserAccountRepository userAccountRepository;
     private final ValidationService validationService;
     private final NotificationService notificationService;
+    private final SubjectAssessmentRepository subjectAssessmentRepository;
+    private final AssessmentRepository assessmentRepository;
 
- 
     @Transactional
     public SubmitClassResponse submitForApproval(Long classId, Long submitterUserId) {
         log.info("Submitting class ID: {} for approval by user: {}", classId, submitterUserId);
@@ -87,7 +93,6 @@ public class ApprovalService {
         }
     }
 
- 
     @Transactional
     public void approveClass(Long classId, Long approverUserId) {
         log.info("Approving class ID: {} by user: {}", classId, approverUserId);
@@ -122,6 +127,9 @@ public class ApprovalService {
             classEntity.setRejectionReason(null); // Clear any previous rejection reason
 
             ClassEntity savedClass = classRepository.save(classEntity);
+
+            // Create assessments for the class from subject assessment templates
+            createAssessmentsForClass(savedClass);
 
             // Send notification to class creator
             sendNotificationForClassApproval(savedClass);
@@ -197,9 +205,68 @@ public class ApprovalService {
         }
     }
 
+    // ==================== ASSESSMENT CREATION ====================
+
+    /**
+     * Creates Assessment records for the class based on SubjectAssessment
+     * templates.
+     * Scheduled date defaults to planned_end_date - teachers can edit later.
+     */
+    private void createAssessmentsForClass(ClassEntity classEntity) {
+        try {
+            if (classEntity.getSubject() == null) {
+                log.warn("Class {} has no subject, skipping assessment creation", classEntity.getId());
+                return;
+            }
+
+            Long subjectId = classEntity.getSubject().getId();
+            List<SubjectAssessment> templates = subjectAssessmentRepository.findBySubjectId(subjectId);
+
+            if (templates.isEmpty()) {
+                log.info("No SubjectAssessment templates found for subject {}, skipping", subjectId);
+                return;
+            }
+
+            // Default scheduled date: use planned_end_date or start_date + 30 days
+            OffsetDateTime defaultScheduledDate;
+            if (classEntity.getPlannedEndDate() != null) {
+                defaultScheduledDate = classEntity.getPlannedEndDate()
+                        .atStartOfDay()
+                        .atOffset(ZoneOffset.UTC);
+            } else if (classEntity.getStartDate() != null) {
+                defaultScheduledDate = classEntity.getStartDate()
+                        .plusDays(30)
+                        .atStartOfDay()
+                        .atOffset(ZoneOffset.UTC);
+            } else {
+                defaultScheduledDate = OffsetDateTime.now().plusDays(30);
+            }
+
+            int createdCount = 0;
+            for (SubjectAssessment template : templates) {
+                Assessment assessment = Assessment.builder()
+                        .classEntity(classEntity)
+                        .subjectAssessment(template)
+                        .scheduledDate(defaultScheduledDate)
+                        .createdAt(OffsetDateTime.now())
+                        .updatedAt(OffsetDateTime.now())
+                        .build();
+                assessmentRepository.save(assessment);
+                createdCount++;
+            }
+
+            log.info("Created {} assessments for class {} from subject {} templates",
+                    createdCount, classEntity.getId(), subjectId);
+
+        } catch (Exception e) {
+            log.error("Error creating assessments for class {}: {}",
+                    classEntity.getId(), e.getMessage(), e);
+            // Don't throw - assessment creation failure shouldn't block class approval
+        }
+    }
+
     // ==================== NOTIFICATION METHODS ====================
 
- 
     private void sendNotificationForClassSubmission(ClassEntity classEntity) {
         try {
             Long branchId = classEntity.getBranch().getId();
@@ -262,7 +329,6 @@ public class ApprovalService {
                     classEntity.getId(), e.getMessage(), e);
         }
     }
-
 
     private void sendNotificationForClassRejection(ClassEntity classEntity, String reason) {
         try {
