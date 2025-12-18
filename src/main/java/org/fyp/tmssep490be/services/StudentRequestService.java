@@ -1070,7 +1070,6 @@ public class StudentRequestService {
 
         //Là hôm nay - số tuần -> ra cái ngày cũ nhất
         LocalDate cutoffDate = LocalDate.now().minusWeeks(lookbackWeeks);
-        LocalDate today = LocalDate.now();
 
         List<StudentSession> allSessions = studentSessionRepository.findAllByStudentId(studentId);
         
@@ -1080,7 +1079,8 @@ public class StudentRequestService {
                            || ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
                 .filter(ss -> {
                     LocalDate sessionDate = ss.getSession().getDate();
-                    return !sessionDate.isBefore(cutoffDate) && !sessionDate.isAfter(today);
+                    // Chỉ filter cutoffDate, KHÔNG filter tương lai (cho phép EXCUSED sessions trong tương lai)
+                    return !sessionDate.isBefore(cutoffDate);
                 })
                 .filter(ss -> ss.getSession().getStatus() != SessionStatus.CANCELLED)
                 .map(ss -> mapToMissedSessionDTO(ss, excludeRequestedSessions))
