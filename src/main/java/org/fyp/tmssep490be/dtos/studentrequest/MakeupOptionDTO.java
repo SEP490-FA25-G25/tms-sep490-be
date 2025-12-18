@@ -71,6 +71,18 @@ public class MakeupOptionDTO {
         private String resourceType;
 
         private String onlineLink;
+
+        private String teacherName;
+
+        private Integer sequenceNo;
+
+        private Integer totalSessions;
+
+        private Integer phaseNumber;
+
+        private String phaseName;
+
+        private java.util.List<String> skills;
     }
 
     @Data

@@ -1201,6 +1201,36 @@ public class StudentRequestService {
             }
         }
 
+        String teacherName = null;
+        if (session.getTeachingSlots() != null && !session.getTeachingSlots().isEmpty()) {
+            Teacher teacher = session.getTeachingSlots().iterator().next().getTeacher();
+            if (teacher != null && teacher.getUserAccount() != null) {
+                teacherName = teacher.getUserAccount().getFullName();
+            }
+        }
+
+        Integer phaseNumber = null;
+        String phaseName = null;
+        Integer totalSessions = null;
+        if (subjectSession != null && subjectSession.getPhase() != null) {
+            SubjectPhase phase = subjectSession.getPhase();
+            phaseNumber = phase.getPhaseNumber();
+            phaseName = phase.getName();
+            // Count total sessions in the subject (across all phases)
+            if (phase.getSubject() != null) {
+                totalSessions = phase.getSubject().getSubjectPhases().stream()
+                        .mapToInt(p -> p.getSubjectSessions().size())
+                        .sum();
+            }
+        }
+
+        List<String> skillsList = null;
+        if (subjectSession != null && subjectSession.getSkills() != null && !subjectSession.getSkills().isEmpty()) {
+            skillsList = subjectSession.getSkills().stream()
+                    .map(Enum::name)
+                    .collect(Collectors.toList());
+        }
+
         return MissedSessionDTO.builder()
                 .sessionId(session.getId())
                 .date(session.getDate())
@@ -1219,6 +1249,12 @@ public class StudentRequestService {
                         .resourceName(resourceName)
                         .resourceType(resourceType)
                         .onlineLink(onlineLink)
+                        .teacherName(teacherName)
+                        .sequenceNo(subjectSession != null ? subjectSession.getSequenceNo() : null)
+                        .totalSessions(totalSessions)
+                        .phaseNumber(phaseNumber)
+                        .phaseName(phaseName)
+                        .skills(skillsList)
                         .build())
                 .timeSlotInfo(MissedSessionDTO.TimeSlotInfo.builder()
                         .startTime(timeSlot != null ? timeSlot.getStartTime().toString() : null)
@@ -1280,6 +1316,39 @@ public class StudentRequestService {
             }
         }
 
+        // Get teacher name
+        String teacherName = null;
+        if (session.getTeachingSlots() != null && !session.getTeachingSlots().isEmpty()) {
+            Teacher teacher = session.getTeachingSlots().iterator().next().getTeacher();
+            if (teacher != null && teacher.getUserAccount() != null) {
+                teacherName = teacher.getUserAccount().getFullName();
+            }
+        }
+
+        // Get phase info and total sessions
+        Integer phaseNumber = null;
+        String phaseName = null;
+        Integer totalSessions = null;
+        if (subjectSession != null && subjectSession.getPhase() != null) {
+            SubjectPhase phase = subjectSession.getPhase();
+            phaseNumber = phase.getPhaseNumber();
+            phaseName = phase.getName();
+            // Count total sessions in the subject (across all phases)
+            if (phase.getSubject() != null) {
+                totalSessions = phase.getSubject().getSubjectPhases().stream()
+                        .mapToInt(p -> p.getSubjectSessions().size())
+                        .sum();
+            }
+        }
+
+        // Get skills as strings
+        List<String> skillsList = null;
+        if (subjectSession != null && subjectSession.getSkills() != null && !subjectSession.getSkills().isEmpty()) {
+            skillsList = subjectSession.getSkills().stream()
+                    .map(Enum::name)
+                    .collect(Collectors.toList());
+        }
+
         return MakeupOptionDTO.builder()
                 .sessionId(session.getId())
                 .date(session.getDate())
@@ -1300,6 +1369,12 @@ public class StudentRequestService {
                         .resourceName(resourceName)
                         .resourceType(resourceType)
                         .onlineLink(onlineLink)
+                        .teacherName(teacherName)
+                        .sequenceNo(subjectSession != null ? subjectSession.getSequenceNo() : null)
+                        .totalSessions(totalSessions)
+                        .phaseNumber(phaseNumber)
+                        .phaseName(phaseName)
+                        .skills(skillsList)
                         .build())
                 .timeSlotInfo(MakeupOptionDTO.TimeSlotInfo.builder()
                         .startTime(timeSlot != null ? timeSlot.getStartTime().toString() : null)
