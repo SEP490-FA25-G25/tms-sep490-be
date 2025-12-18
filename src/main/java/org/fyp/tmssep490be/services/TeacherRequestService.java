@@ -2397,8 +2397,10 @@ public class TeacherRequestService {
                     });
             
             if (hasConflictWithApprovedSessions) {
-                throw new CustomException(ErrorCode.INVALID_INPUT, 
-                        "Resource is already booked by another approved session at overlapping time");
+                throw new CustomException(
+                        ErrorCode.INVALID_INPUT,
+                        "Phòng/phương tiện này đã được đặt cho một buổi học khác trong khung giờ trùng nhau"
+                );
             }
             
             // Kiểm tra conflict với các request đang pending (MODALITY_CHANGE hoặc RESCHEDULE)
