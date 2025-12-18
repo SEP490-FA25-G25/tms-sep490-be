@@ -29,7 +29,7 @@ public class AcademicTeacherController {
     // Lấy danh sách giáo viên trong các branch mà user có quyền truy cập
     // Hỗ trợ lọc theo từ khóa tìm kiếm và trạng thái có skills
     @GetMapping
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('ADMIN')")
     public ResponseEntity<ResponseObject<List<AcademicTeacherListItemDTO>>> getTeachers(
             @RequestParam(required = false) String search, // Từ khóa tìm kiếm theo tên, email, mã nhân viên, hoặc số điện thoại
             @RequestParam(required = false) Boolean hasSkills, // Lọc theo trạng thái có skills: true = có skills, false = không có skills, null = tất cả
@@ -52,7 +52,7 @@ public class AcademicTeacherController {
 
     // Lấy thông tin chi tiết giáo viên bao gồm tất cả skills
     @GetMapping("/{teacherId}")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('ADMIN')")
     public ResponseEntity<ResponseObject<AcademicTeacherDetailDTO>> getTeacherDetail(
             @PathVariable Long teacherId,
             @AuthenticationPrincipal UserPrincipal currentUser
@@ -72,7 +72,7 @@ public class AcademicTeacherController {
 
     // Lấy danh sách skills của giáo viên
     @GetMapping("/{teacherId}/skills")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('ADMIN')")
     public ResponseEntity<ResponseObject<List<TeacherSkillDTO>>> getTeacherSkills(
             @PathVariable Long teacherId,
             @AuthenticationPrincipal UserPrincipal currentUser
@@ -93,7 +93,7 @@ public class AcademicTeacherController {
     // Cập nhật skills của giáo viên (thay thế toàn bộ)
     // Thay thế tất cả skills hiện tại bằng danh sách mới được cung cấp
     @PostMapping("/{teacherId}/skills")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('ADMIN')")
     public ResponseEntity<ResponseObject<List<TeacherSkillDTO>>> updateTeacherSkills(
             @PathVariable Long teacherId,
             @Valid @RequestBody UpdateTeacherSkillsRequest request,
@@ -116,7 +116,7 @@ public class AcademicTeacherController {
     // Xóa tất cả skills theo specialization cụ thể
     // Ví dụ: DELETE /api/v1/academic/teachers/1/skills?specialization=IELTS
     @DeleteMapping("/{teacherId}/skills")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('ADMIN')")
     public ResponseEntity<ResponseObject<Void>> deleteTeacherSkillsBySpecialization(
             @PathVariable Long teacherId,
             @RequestParam String specialization, // Specialization cần xóa (ví dụ: IELTS, TOEIC, JLPT)

@@ -35,7 +35,7 @@ public class EnrollmentController {
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     @GetMapping("/classes/{classId}/template")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<Resource> downloadClassTemplate(
             @PathVariable Long classId,
             @AuthenticationPrincipal UserPrincipal currentUser
@@ -56,7 +56,7 @@ public class EnrollmentController {
     }
 
     @PostMapping(value = "/classes/{classId}/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject> previewImport(
             @PathVariable Long classId,
             @RequestParam("file") MultipartFile file,
@@ -101,7 +101,7 @@ public class EnrollmentController {
 
 
     @PostMapping("/classes/{classId}/import/execute")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject> executeImport(
             @PathVariable Long classId,
             @RequestBody @Valid ClassEnrollmentImportExecuteRequest request,
@@ -132,7 +132,7 @@ public class EnrollmentController {
     }
 
     @PostMapping("/classes/{classId}/students")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<EnrollmentResult>> enrollExistingStudents(
             @PathVariable Long classId,
             @RequestBody @Valid EnrollExistingStudentsRequest request,
