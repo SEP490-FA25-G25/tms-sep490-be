@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -624,11 +625,13 @@ public class StudentRequestService {
         log.info("Absence request created and auto-approved with id: {}", request.getId());
 
         // Mark the session as EXCUSED immediately since it's auto-approved
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        OffsetDateTime now = OffsetDateTime.now();
         markSessionAsExcused(
                 student,
                 session,
                 String.format("Vắng có phép được tạo và duyệt bởi AA lúc %s. Request ID: %d",
-                        OffsetDateTime.now(), request.getId())
+                        now.format(formatter), request.getId())
         );
 
         return mapToStudentRequestResponseDTO(request);
@@ -653,11 +656,13 @@ public class StudentRequestService {
         request = studentRequestRepository.save(request);
 
         if (request.getRequestType().equals(StudentRequestType.ABSENCE) && request.getTargetSession() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            OffsetDateTime now = OffsetDateTime.now();
             markSessionAsExcused(
                     request.getStudent(),
                     request.getTargetSession(),
                     String.format("Vắng có phép được duyệt lúc %s. Request ID: %d",
-                            OffsetDateTime.now(), requestId)
+                            now.format(formatter), requestId)
             );
         }
 
