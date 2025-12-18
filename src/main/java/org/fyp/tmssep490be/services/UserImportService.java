@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -144,7 +146,7 @@ public class UserImportService {
                 user.setPasswordHash(defaultPasswordHash);
                 user.setStatus(UserStatus.ACTIVE);
                 user.setGender(Gender.OTHER); // Mặc định
-                user.setDob(LocalDate.now()); // Ngày sinh giả định
+                user.setDob(parseDobString(data.getDob())); // Parse từ Excel, null nếu trống
                 
                 user = userAccountRepository.save(user);
 
@@ -200,5 +202,33 @@ public class UserImportService {
             }
         }
         return count;
+    }
+
+    /**
+     * Parse date string from Excel to LocalDate
+     * Supports formats: dd/MM/yyyy, yyyy-MM-dd, MM/dd/yyyy
+     * Returns null if string is null, empty, or invalid format
+     */
+    private LocalDate parseDobString(String dobString) {
+        if (dobString == null || dobString.trim().isEmpty()) {
+            return null;
+        }
+
+        DateTimeFormatter[] formatters = {
+            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+            DateTimeFormatter.ofPattern("MM/dd/yyyy")
+        };
+
+        for (DateTimeFormatter formatter : formatters) {
+            try {
+                return LocalDate.parse(dobString.trim(), formatter);
+            } catch (DateTimeParseException e) {
+                // Try next formatter
+            }
+        }
+
+        log.warn("Không thể parse ngày sinh: {}", dobString);
+        return null;
     }
 }

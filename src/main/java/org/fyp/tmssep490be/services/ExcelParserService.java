@@ -305,6 +305,7 @@ public class ExcelParserService {
         // 2: Số điện thoại
         // 3: Vai trò (Code)
         // 4: Mã chi nhánh (Tùy chọn)
+        // 5: Ngày sinh (DD/MM/YYYY, tùy chọn)
         
         return org.fyp.tmssep490be.dtos.user.UserImportData.builder()
                 .fullName(getCellValueAsString(row.getCell(0)))
@@ -312,6 +313,7 @@ public class ExcelParserService {
                 .phone(getCellValueAsString(row.getCell(2)))
                 .role(getCellValueAsString(row.getCell(3)))
                 .branchCode(getCellValueAsString(row.getCell(4)))
+                .dob(getCellValueAsString(row.getCell(5)))
                 .status("CREATE") // Trạng thái mặc định
                 .valid(true)
                 .build();
@@ -322,7 +324,7 @@ public class ExcelParserService {
 
             // Tạo dòng tiêu đề
             Row headerRow = sheet.createRow(0);
-            String[] columns = {"Họ và tên", "Email", "Số điện thoại", "Vai trò (Code)", "Mã chi nhánh (Cách nhau dấu , )"};
+            String[] columns = {"Họ và tên", "Email", "Số điện thoại", "Vai trò (Code)", "Mã chi nhánh (Cách nhau dấu , )", "Ngày sinh (DD/MM/YYYY)"};
             
             CellStyle headerStyle = workbook.createCellStyle();
             Font font = workbook.createFont();
@@ -342,7 +344,8 @@ public class ExcelParserService {
             sampleRow.createCell(1).setCellValue("nguyenvana@example.com");
             sampleRow.createCell(2).setCellValue("0901234567");
             sampleRow.createCell(3).setCellValue("TEACHER");
-            sampleRow.createCell(4).setCellValue("BRANCH01, BRANCH02");
+            sampleRow.createCell(4).setCellValue("HN01, HCM01");
+            sampleRow.createCell(5).setCellValue("15/03/1990");
 
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
             workbook.write(out);

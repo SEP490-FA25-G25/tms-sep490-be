@@ -17,6 +17,7 @@ public class UserImportData {
     private String phone;
     private String role; // Role code: TEACHER, ACADEMIC_AFFAIR, etc.
     private String branchCode; // Branch code if applicable
+    private String dob; // Date of birth (DD/MM/YYYY format)
     
     // Status fields for preview
     private String status; // CREATE, ERROR, SKIP
