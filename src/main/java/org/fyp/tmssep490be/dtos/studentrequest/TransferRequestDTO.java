@@ -8,8 +8,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -22,11 +20,12 @@ public class TransferRequestDTO {
     @NotNull(message = "Target class ID is required")
     private Long targetClassId;
 
-    @NotNull(message = "Effective date is required")
-    private LocalDate effectiveDate;
-
-    @NotNull(message = "Session ID is required")
-    private Long sessionId;
+    /**
+     * The first session in target class that student will join.
+     * This is the single source of truth for transfer timing.
+     */
+    @NotNull(message = "Target session ID is required")
+    private Long targetSessionId;
 
     @NotBlank(message = "Reason is required")
     @Size(min = 10, message = "Reason must be at least 10 characters")

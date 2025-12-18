@@ -37,15 +37,13 @@ public class StudentFeedbackService {
 
     @Transactional(readOnly = true)
     public List<StudentFeedbackQuestionDTO> getFeedbackQuestions() {
-        List<FeedbackQuestion> questions = feedbackQuestionRepository.findAll(
-                Sort.by(Sort.Order.asc("displayOrder"), Sort.Order.asc("id")));
+        List<FeedbackQuestion> questions = feedbackQuestionRepository
+                .findAllByStatusOrderByDisplayOrderAsc(org.fyp.tmssep490be.entities.enums.FeedbackQuestionStatus.ACTIVE);
 
         return questions.stream()
                 .map(q -> StudentFeedbackQuestionDTO.builder()
                         .id(q.getId())
                         .questionText(q.getQuestionText())
-                        .questionType(q.getQuestionType())
-                        .options(q.getOptions())
                         .displayOrder(q.getDisplayOrder())
                         .build())
                 .toList();

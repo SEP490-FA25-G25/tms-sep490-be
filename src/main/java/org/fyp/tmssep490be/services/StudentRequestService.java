@@ -284,6 +284,12 @@ public class StudentRequestService {
     }
 
     private StudentRequestResponseDTO mapToStudentRequestResponseDTO(StudentRequest request) {
+        // For TRANSFER requests, effectiveDate is derived from targetSession (session-centric)
+        String effectiveDateStr = null;
+        if (request.getRequestType() == StudentRequestType.TRANSFER && request.getTargetSession() != null) {
+            effectiveDateStr = request.getTargetSession().getDate().toString();
+        }
+        
         return StudentRequestResponseDTO.builder()
                 .id(request.getId())
                 .requestType(request.getRequestType() != null ? request.getRequestType().toString() : null)
@@ -292,7 +298,7 @@ public class StudentRequestService {
                 .targetClass(mapClassToSummary(request.getTargetClass()))
                 .targetSession(mapSessionToSummary(request.getTargetSession()))
                 .makeupSession(mapSessionToSummary(request.getMakeupSession()))
-                .effectiveDate(request.getEffectiveDate() != null ? request.getEffectiveDate().toString() : null)
+                .effectiveDate(effectiveDateStr)
                 .requestReason(request.getRequestReason())
                 .note(request.getNote())
                 .submittedAt(request.getSubmittedAt())
@@ -303,6 +309,12 @@ public class StudentRequestService {
     }
 
     private AARequestResponseDTO mapToAAResponseDTO(StudentRequest request) {
+        // For TRANSFER requests, effectiveDate is derived from targetSession (session-centric)
+        String effectiveDateStr = null;
+        if (request.getRequestType() == StudentRequestType.TRANSFER && request.getTargetSession() != null) {
+            effectiveDateStr = request.getTargetSession().getDate().toString();
+        }
+        
         return AARequestResponseDTO.builder()
                 .id(request.getId())
                 .requestType(request.getRequestType() != null ? request.getRequestType().toString() : null)
@@ -312,7 +324,7 @@ public class StudentRequestService {
                 .targetClass(mapClassToSummaryWithBranch(request.getTargetClass()))
                 .targetSession(mapSessionToSummaryWithTeacher(request.getTargetSession()))
                 .makeupSession(mapSessionToSummaryWithTeacher(request.getMakeupSession()))
-                .effectiveDate(request.getEffectiveDate() != null ? request.getEffectiveDate().toString() : null)
+                .effectiveDate(effectiveDateStr)
                 .requestReason(request.getRequestReason())
                 .note(request.getNote())
                 .submittedAt(request.getSubmittedAt())
@@ -863,14 +875,14 @@ public class StudentRequestService {
     }
 
     private StudentRequestDetailDTO mapToDetailDTO(StudentRequest request) {
-        // For TRANSFER requests, use effectiveSession instead of targetSession
-        Session sessionToMap = request.getRequestType() == StudentRequestType.TRANSFER
-                ? request.getEffectiveSession()
-                : request.getTargetSession();
+        // Session-centric: targetSession is the source of truth for all request types
+        Session sessionToMap = request.getTargetSession();
 
-        String effectiveDateStr = request.getEffectiveDate() != null
-                ? request.getEffectiveDate().toString()
-                : null;
+        // For TRANSFER requests, effectiveDate is derived from targetSession
+        String effectiveDateStr = null;
+        if (request.getRequestType() == StudentRequestType.TRANSFER && request.getTargetSession() != null) {
+            effectiveDateStr = request.getTargetSession().getDate().toString();
+        }
 
         return StudentRequestDetailDTO.builder()
                 .id(request.getId())
@@ -881,7 +893,7 @@ public class StudentRequestService {
                 .targetClass(mapToDetailClassDTO(request.getTargetClass())) // For TRANSFER only
                 .targetSession(mapToDetailSessionDTO(sessionToMap))
                 .makeupSession(mapToDetailSessionDTO(request.getMakeupSession())) // For MAKEUP only
-                .effectiveDate(effectiveDateStr) // For TRANSFER only
+                .effectiveDate(effectiveDateStr) // For TRANSFER only - derived from targetSession
                 .requestReason(request.getRequestReason())
                 .note(request.getNote())
                 .submittedAt(request.getSubmittedAt())
@@ -1539,6 +1551,11 @@ public class StudentRequestService {
                 .build();
     }
 
+    /**
+     * Submit transfer request on behalf of student by AA (auto-approved).
+     * Note: Transfer requests can ONLY be created by Academic Affairs on behalf of students.
+     * Students cannot submit transfer requests directly - they must contact AA.
+     */
     @Transactional
     public StudentRequestResponseDTO submitTransferRequestOnBehalf(Long decidedById, TransferRequestDTO dto) {
         log.info("AA submitting transfer request on behalf of student {} from class {} to class {}",
@@ -1551,207 +1568,8 @@ public class StudentRequestService {
         UserAccount submittedBy = userAccountRepository.findById(decidedById)
                 .orElseThrow(() -> new ResourceNotFoundException("AA user not found"));
 
-        Long studentId = dto.getStudentId();
-        
-        // 1. Validate current enrollment
-        Enrollment currentEnrollment = enrollmentRepository
-                .findByStudentIdAndClassIdAndStatus(studentId, dto.getCurrentClassId(), EnrollmentStatus.ENROLLED);
-
-        if (currentEnrollment == null) {
-            throw new BusinessRuleException("NOT_ENROLLED", "Student is not enrolled in current class");
-        }
-
-        // 2. Check transfer quota (ONE transfer per subject)
-        Long subjectId = currentEnrollment.getClassEntity().getSubject().getId();
-        if (hasExceededTransferLimit(studentId, subjectId)) {
-            throw new BusinessRuleException("TRANSFER_QUOTA_EXCEEDED", 
-                "Transfer quota exceeded. Maximum 1 transfer per subject.");
-        }
-
-        // 3. Check concurrent requests
-        boolean hasPendingTransfer = studentRequestRepository
-                .existsByStudentIdAndRequestTypeAndStatusIn(
-                        studentId,
-                        StudentRequestType.TRANSFER,
-                        List.of(RequestStatus.PENDING));
-
-        if (hasPendingTransfer) {
-            throw new BusinessRuleException("PENDING_TRANSFER_EXISTS", "You already have a pending transfer request");
-        }
-
-        ClassEntity targetClass = classRepository.findById(dto.getTargetClassId())
-                .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
-
-        // 4. Validate same subject
-        if (!targetClass.getSubject().getId().equals(currentEnrollment.getClassEntity().getSubject().getId())) {
-            throw new BusinessRuleException("DIFFERENT_SUBJECT", "Target class must be for the same subject");
-        }
-
-        // 5. Validate same branch (same-branch transfer only)
-        ClassEntity currentClass = currentEnrollment.getClassEntity();
-        if (!targetClass.getBranch().getId().equals(currentClass.getBranch().getId())) {
-            throw new BusinessRuleException("CROSS_BRANCH_NOT_SUPPORTED",
-                "Không thể chuyển sang lớp ở chi nhánh khác. " +
-                "Vui lòng liên hệ Sale để đăng ký lớp mới tại chi nhánh mong muốn.");
-        }
-
-        // 6. Validate class status
-        if (!List.of(org.fyp.tmssep490be.entities.enums.ClassStatus.SCHEDULED, 
-                    org.fyp.tmssep490be.entities.enums.ClassStatus.ONGOING).contains(targetClass.getStatus())) {
-            throw new BusinessRuleException("INVALID_CLASS_STATUS", "Target class must be SCHEDULED or ONGOING");
-        }
-
-        // 7. Check capacity with pessimistic lock
-        ClassEntity targetClassLocked = classRepository.findByIdWithLock(targetClass.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
-        
-        Integer enrolledCount = classRepository.countEnrolledStudents(targetClassLocked.getId());
-        int enrolled = enrolledCount != null ? enrolledCount : 0;
-        
-        boolean isCapacityOverride = enrolled >= targetClassLocked.getMaxCapacity();
-        if (isCapacityOverride) {
-            log.warn("AA override: Transferring student {} to full class {} ({}/{} enrolled)",
-                    studentId, targetClass.getCode(), enrolled, targetClassLocked.getMaxCapacity());
-        }
-
-        // 8. Validate effective date and session
-        if (dto.getEffectiveDate().isBefore(LocalDate.now())) {
-            throw new BusinessRuleException("PAST_EFFECTIVE_DATE", "Effective date must be in the future");
-        }
-
-        Session effectiveSession = sessionRepository.findById(dto.getSessionId())
-                .orElseThrow(() -> new BusinessRuleException("INVALID_SESSION", "Effective session not found"));
-
-        if (!effectiveSession.getClassEntity().getId().equals(dto.getTargetClassId())) {
-            throw new BusinessRuleException("SESSION_CLASS_MISMATCH", "Session does not belong to target class");
-        }
-
-        if (!effectiveSession.getDate().equals(dto.getEffectiveDate())) {
-            throw new BusinessRuleException("SESSION_DATE_MISMATCH", "Session date does not match effective date");
-        }
-
-        // 9. Check schedule conflicts (exclude current class as student will leave it)
-        List<Session> targetClassFutureSessions = sessionRepository
-                .findByClassEntityIdAndDateAfterOrEqual(targetClass.getId(), dto.getEffectiveDate());
-        
-        if (!targetClassFutureSessions.isEmpty()) {
-            validateScheduleConflictsForTransfer(
-                    studentId, 
-                    dto.getCurrentClassId(),  // Exclude this class from conflict check
-                    dto.getTargetClassId(),
-                    targetClassFutureSessions
-            );
-        }
-
-        // 10. Get student entity
-        Student student = studentRepository.findById(studentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
-
-        // 11. Create and save request
-        StudentRequest request = StudentRequest.builder()
-                .student(student)
-                .requestType(StudentRequestType.TRANSFER)
-                .currentClass(currentClass)
-                .targetClass(targetClass)
-                .effectiveDate(dto.getEffectiveDate())
-                .effectiveSession(effectiveSession)
-                .requestReason(dto.getRequestReason())
-                .note(dto.getNote())
-                .status(RequestStatus.APPROVED)  // Auto-approve for AA
-                .submittedBy(submittedBy)
-                .submittedAt(OffsetDateTime.now())
-                .decidedBy(submittedBy)
-                .decidedAt(OffsetDateTime.now())
-                .build();
-
-        request = studentRequestRepository.save(request);
-        
-        log.info("Transfer request created with ID: {} - Status: APPROVED", request.getId());
-
-        // 11. Execute transfer inline (no nested @Transactional)
-        log.info("Executing transfer for request {}", request.getId());
-        
-        // Find the last session the student ACTUALLY attended in the old class
-        // This should be the latest session that is DONE or has a date before today
-        LocalDate today = LocalDate.now();
-        List<Session> oldClassSessions = sessionRepository.findAllByClassIdOrderByDateAndTime(currentClass.getId())
-                .stream()
-                .filter(s -> s.getStatus() == SessionStatus.DONE || s.getDate().isBefore(today))
-                .sorted((s1, s2) -> s2.getDate().compareTo(s1.getDate()))
-                .toList();
-        
-        Session lastSessionInOldClass = oldClassSessions.isEmpty() ? null : oldClassSessions.get(0);
-        
-        // Update old enrollment → TRANSFERRED
-        currentEnrollment.setStatus(EnrollmentStatus.TRANSFERRED);
-        currentEnrollment.setLeftAt(OffsetDateTime.now());
-        currentEnrollment.setLeftSessionId(lastSessionInOldClass != null ? lastSessionInOldClass.getId() : null);
-        currentEnrollment.setLeftSession(lastSessionInOldClass);
-        enrollmentRepository.save(currentEnrollment);
-
-        log.info("Updated old enrollment {} to TRANSFERRED, leftSessionId: {}", 
-                currentEnrollment.getId(), lastSessionInOldClass != null ? lastSessionInOldClass.getId() : "null");
-
-        // Create new enrollment → ENROLLED
-        Enrollment newEnrollment = Enrollment.builder()
-                .studentId(student.getId())
-                .classId(targetClass.getId())
-                .status(EnrollmentStatus.ENROLLED)
-                .enrolledAt(OffsetDateTime.now())
-                .joinSessionId(effectiveSession.getId())
-                .enrolledBy(submittedBy.getId())
-                .capacityOverride(Boolean.TRUE.equals(dto.getCapacityOverride()) || isCapacityOverride)
-                .overrideReason(dto.getOverrideReason())
-                .build();
-        newEnrollment = enrollmentRepository.save(newEnrollment);
-
-        log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
-                newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
-
-        // DELETE all future sessions from old class (sessions AFTER lastSessionInOldClass)
-        // We delete instead of marking isTransferredOut to simplify queries and logic
-        Long lastSessionId = lastSessionInOldClass != null ? lastSessionInOldClass.getId() : 0L;
-        List<StudentSession> allOldClassSessions = studentSessionRepository
-                .findByStudentIdAndClassEntityId(studentId, currentClass.getId());
-        
-        List<StudentSession> futureOldSessions = allOldClassSessions.stream()
-                .filter(ss -> ss.getSession().getId() > lastSessionId)
-                .toList();
-
-        studentSessionRepository.deleteAll(futureOldSessions);
-
-        log.info("Deleted {} future StudentSessions from old class", futureOldSessions.size());
-
-        // Create StudentSessions for new class
-        List<Session> newClassSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
-                targetClass.getId(), dto.getEffectiveDate());
-
-        int createdCount = 0;
-        for (Session session : newClassSessions) {
-            StudentSession.StudentSessionId ssId = new StudentSession.StudentSessionId(studentId, session.getId());
-            
-            if (studentSessionRepository.existsById(ssId)) {
-                log.warn("StudentSession already exists for student {} session {}, skipping", studentId, session.getId());
-                continue;
-            }
-
-            StudentSession ss = StudentSession.builder()
-                    .id(ssId)
-                    .student(student)
-                    .session(session)
-                    .attendanceStatus(AttendanceStatus.PLANNED)
-                    .build();
-            studentSessionRepository.save(ss);
-            createdCount++;
-        }
-
-        log.info("Created {} StudentSessions for new class", createdCount);
-        log.info("Transfer execution completed for request {}", request.getId());
-        
-        // Send notifications
-        sendTransferExecutionNotifications(request);
-
-        return mapToStudentRequestResponseDTO(request);
+        // Delegate to internal method with autoApprove = true
+        return submitTransferRequestInternal(dto.getStudentId(), dto, submittedBy, true);
     }
 
     private StudentRequestResponseDTO submitTransferRequestInternal(Long studentId, TransferRequestDTO dto,
@@ -1781,7 +1599,7 @@ public class StudentRequestService {
             throw new BusinessRuleException("PENDING_TRANSFER_EXISTS", "You already have a pending transfer request");
         }
 
-        ClassEntity targetClass = classRepository.findById(dto.getTargetClassId())
+        ClassEntity targetClass = classRepository.findByIdWithLock(dto.getTargetClassId())
                 .orElseThrow(() -> new ResourceNotFoundException("Target class not found"));
 
         // Must be same subject
@@ -1803,7 +1621,8 @@ public class StudentRequestService {
             throw new BusinessRuleException("INVALID_CLASS_STATUS", "Target class must be SCHEDULED or ONGOING");
         }
 
-        // 5. Check capacity (allow AA override when autoApprove is true)
+        // 5. Check capacity with pessimistic lock (prevent race condition)
+        // Lock is already acquired above via findByIdWithLock()
         Integer enrolledCount = classRepository.countEnrolledStudents(dto.getTargetClassId());
         int enrolled = enrolledCount != null ? enrolledCount : 0;
         
@@ -1812,24 +1631,26 @@ public class StudentRequestService {
                 log.warn("AA override: Transferring student {} to full class {} ({}/{} enrolled)",
                         studentId, targetClass.getCode(), enrolled, targetClass.getMaxCapacity());
             } else {
-                throw new BusinessRuleException("CLASS_FULL", "Target class is full");
+                throw new BusinessRuleException("CLASS_FULL", 
+                    String.format("Target class is full (%d/%d enrolled). Please contact Academic Affairs if you need to override capacity.",
+                        enrolled, targetClass.getMaxCapacity()));
             }
         }
 
-        // 6. Validate effective date and session
-        if (dto.getEffectiveDate().isBefore(LocalDate.now())) {
-            throw new BusinessRuleException("PAST_EFFECTIVE_DATE", "Effective date must be in the future");
-        }
+        log.debug("Pessimistic lock acquired for target class {} - current capacity: {}/{}",
+                targetClass.getCode(), enrolled, targetClass.getMaxCapacity());
 
-        Session effectiveSession = sessionRepository.findById(dto.getSessionId())
-                .orElseThrow(() -> new BusinessRuleException("INVALID_SESSION", "Effective session not found"));
+        // 6. Validate target session (Session-Centric approach - single source of truth)
+        Session targetSession = sessionRepository.findById(dto.getTargetSessionId())
+                .orElseThrow(() -> new BusinessRuleException("INVALID_SESSION", "Target session not found"));
 
-        if (!effectiveSession.getClassEntity().getId().equals(dto.getTargetClassId())) {
+        if (!targetSession.getClassEntity().getId().equals(dto.getTargetClassId())) {
             throw new BusinessRuleException("SESSION_CLASS_MISMATCH", "Session does not belong to target class");
         }
 
-        if (!effectiveSession.getDate().equals(dto.getEffectiveDate())) {
-            throw new BusinessRuleException("SESSION_DATE_MISMATCH", "Session date does not match effective date");
+        // Session must be in the future
+        if (targetSession.getDate().isBefore(LocalDate.now())) {
+            throw new BusinessRuleException("PAST_SESSION", "Target session must be in the future");
         }
 
         // 7. Create request
@@ -1843,8 +1664,7 @@ public class StudentRequestService {
                 .requestType(StudentRequestType.TRANSFER)
                 .currentClass(currentClass)
                 .targetClass(targetClass)
-                .effectiveDate(dto.getEffectiveDate())
-                .effectiveSession(effectiveSession)
+                .targetSession(targetSession) // Session-centric: this is the join session
                 .requestReason(dto.getRequestReason())
                 .note(dto.getNote())
                 .status(autoApprove ? RequestStatus.APPROVED : RequestStatus.PENDING)
@@ -1881,8 +1701,13 @@ public class StudentRequestService {
         Long studentId = request.getStudent().getId();
         ClassEntity currentClass = request.getCurrentClass();
         ClassEntity targetClass = request.getTargetClass();
-        LocalDate effectiveDate = request.getEffectiveDate();
-        Session effectiveSession = request.getEffectiveSession();
+        
+        // Session-centric: targetSession is the join session (first session in new class)
+        Session joinSession = request.getTargetSession();
+        if (joinSession == null) {
+            throw new BusinessRuleException("NO_TARGET_SESSION", "Transfer request has no target session");
+        }
+        LocalDate joinDate = joinSession.getDate();
 
         // 1. Re-validate capacity with pessimistic lock to prevent race condition
         ClassEntity targetClassLocked = classRepository.findByIdWithLock(targetClass.getId())
@@ -1906,13 +1731,12 @@ public class StudentRequestService {
             throw new BusinessRuleException("ENROLLMENT_NOT_FOUND", "Current enrollment not found");
         }
 
-        // Find the last session the student ACTUALLY attended in the old class
-        // This should be the latest session that is DONE or has a date before today
-        LocalDate today = LocalDate.now();
+        // Find the last session BEFORE joinDate in the old class (leftSession)
+        // This is the last session student attended before transferring
         List<Session> oldClassSessions = sessionRepository.findAllByClassIdOrderByDateAndTime(currentClass.getId())
                 .stream()
-                .filter(s -> s.getStatus() == SessionStatus.DONE || s.getDate().isBefore(today))
-                .sorted((s1, s2) -> s2.getDate().compareTo(s1.getDate()))
+                .filter(s -> s.getDate().isBefore(joinDate))
+                .sorted((s1, s2) -> s2.getDate().compareTo(s1.getDate())) // descending by date
                 .toList();
         
         Session lastSessionInOldClass = oldClassSessions.isEmpty() ? null : oldClassSessions.get(0);
@@ -1932,7 +1756,7 @@ public class StudentRequestService {
                 .classId(targetClass.getId())
                 .status(EnrollmentStatus.ENROLLED)
                 .enrolledAt(OffsetDateTime.now())
-                .joinSessionId(effectiveSession.getId())
+                .joinSessionId(joinSession.getId())
                 .enrolledBy(request.getDecidedBy() != null ? request.getDecidedBy().getId() : null)
                 .capacityOverride(Boolean.TRUE.equals(capacityOverride) || isCapacityOverride)
                 .overrideReason(overrideReason)
@@ -1942,23 +1766,23 @@ public class StudentRequestService {
         log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
                 newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
 
-        // 4. DELETE all future sessions from old class (sessions AFTER lastSessionInOldClass)
-        // We delete instead of marking isTransferredOut to simplify queries and logic
-        Long lastSessionId = lastSessionInOldClass != null ? lastSessionInOldClass.getId() : 0L;
+        // 4. DELETE all sessions from old class that are on or after joinDate
+        // These are sessions student won't attend because they've transferred
         List<StudentSession> allOldClassSessions = studentSessionRepository
                 .findByStudentIdAndClassEntityId(studentId, currentClass.getId());
         
         List<StudentSession> futureOldSessions = allOldClassSessions.stream()
-                .filter(ss -> ss.getSession().getId() > lastSessionId)
+                .filter(ss -> !ss.getSession().getDate().isBefore(joinDate)) // date >= joinDate
                 .toList();
 
         studentSessionRepository.deleteAll(futureOldSessions);
 
-        log.info("Deleted {} future StudentSessions from old class", futureOldSessions.size());
+        log.info("Deleted {} future StudentSessions from old class (sessions on/after {})", 
+                futureOldSessions.size(), joinDate);
 
-        // 5. Create StudentSessions for new class (future sessions from effectiveDate)
+        // 5. Create StudentSessions for new class (sessions from joinDate onwards)
         List<Session> newClassSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
-                targetClass.getId(), effectiveDate);
+                targetClass.getId(), joinDate);
 
         int createdCount = 0;
         for (Session session : newClassSessions) {
@@ -1980,7 +1804,7 @@ public class StudentRequestService {
             createdCount++;
         }
 
-        log.info("Created {} StudentSessions for new class", createdCount);
+        log.info("Created {} StudentSessions for new class (sessions on/after {})", createdCount, joinDate);
         log.info("Transfer execution completed for request {}", request.getId());
         
         // 6. Send notifications to student
@@ -2262,8 +2086,10 @@ public class StudentRequestService {
     private void sendTransferExecutionNotifications(StudentRequest request) {
         String oldClassCode = request.getCurrentClass().getCode();
         String newClassCode = request.getTargetClass().getCode();
-        String effectiveDate = request.getEffectiveDate() != null ?
-                request.getEffectiveDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A";
+        
+        // Session-centric: get effective date from targetSession
+        String effectiveDate = request.getTargetSession() != null ?
+                request.getTargetSession().getDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A";
 
         try {
             String title = "Chuyển lớp thành công";

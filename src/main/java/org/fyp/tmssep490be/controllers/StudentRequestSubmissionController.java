@@ -63,8 +63,8 @@ public class StudentRequestSubmissionController {
                 break;
 
             case "TRANSFER":
-                // TODO: Implement transfer request submission
-                throw new UnsupportedOperationException("Transfer requests not yet implemented");
+                // Transfer requests can only be created by Academic Affairs on behalf of students
+                throw new IllegalArgumentException("Yêu cầu chuyển lớp chỉ được tạo bởi Giáo vụ. Vui lòng liên hệ Giáo vụ để được hỗ trợ.");
 
             default:
                 throw new IllegalArgumentException("Invalid request type: " + requestDTO.getRequestType());

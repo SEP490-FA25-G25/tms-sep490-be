@@ -14,6 +14,7 @@ import org.fyp.tmssep490be.entities.UserAccount;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
 import org.fyp.tmssep490be.entities.enums.HomeworkStatus;
+import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.dtos.subject.SubjectDetailDTO;
@@ -57,29 +58,40 @@ public class TeacherClassService {
     
     // Chuyển đổi ClassEntity sang TeacherClassListItemDTO
     private TeacherClassListItemDTO mapToTeacherClassListItemDTO(ClassEntity classEntity) {
-        // Lấy toàn bộ buổi học của lớp
-        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
+        // Lấy toàn bộ buổi học của lớp (không tính CANCELLED)
+        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId())
+                .stream()
+                .filter(s -> s.getStatus() != SessionStatus.CANCELLED)
+                .collect(Collectors.toList());
 
         int totalSessions = sessions.size();
 
-        // Tính tổng điểm danh (present/absent) để lấy attendanceRate
+        // Tính tỷ lệ chuyên cần: tổng PRESENT / (PRESENT + ABSENT) của tất cả các buổi
         long totalPresent = 0;
-        long totalAbsent = 0;
+        long totalRecorded = 0; // PRESENT + ABSENT (không tính PLANNED, EXCUSED, v.v.)
 
         for (Session session : sessions) {
             List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(session.getId());
-            totalPresent += studentSessions.stream()
-                    .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
-                    .count();
-            totalAbsent += studentSessions.stream()
-                    .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
-                    .count();
+            for (StudentSession ss : studentSessions) {
+                // Bỏ qua các bản ghi học bù (isMakeup = true) để không làm tăng tỷ lệ của lớp học bù
+                if (Boolean.TRUE.equals(ss.getIsMakeup())) {
+                    continue;
+                }
+
+                if (ss.getAttendanceStatus() == AttendanceStatus.PRESENT) {
+                    totalPresent++;
+                    totalRecorded++;
+                } else if (ss.getAttendanceStatus() == AttendanceStatus.ABSENT) {
+                    totalRecorded++;
+                }
+                // Không tính PLANNED, EXCUSED, v.v.
+            }
         }
 
         Double attendanceRate = null;
-        long attendanceRecords = totalPresent + totalAbsent;
-        if (attendanceRecords > 0) {
-            attendanceRate = (double) totalPresent / attendanceRecords;
+        if (totalRecorded > 0) {
+            // Trả về dạng 0-1 (frontend sẽ nhân 100 để hiển thị %)
+            attendanceRate = (double) totalPresent / totalRecorded;
         }
 
         return TeacherClassListItemDTO.builder()
@@ -170,8 +182,11 @@ public class TeacherClassService {
             throw new CustomException(ErrorCode.FORBIDDEN, "Teacher is not assigned to this class");
         }
 
-        // Lấy tất cả buổi học của lớp học
-        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
+        // Lấy tất cả buổi học của lớp học (không tính CANCELLED)
+        List<Session> sessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId)
+                .stream()
+                .filter(s -> s.getStatus() != SessionStatus.CANCELLED)
+                .collect(Collectors.toList());
 
         // Map từng Session sang QASessionItemDTO với metrics thực tế
         List<QASessionListResponse.QASessionItemDTO> sessionItems = sessions.stream()

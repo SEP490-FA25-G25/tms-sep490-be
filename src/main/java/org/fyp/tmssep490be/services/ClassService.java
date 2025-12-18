@@ -208,9 +208,11 @@ public class ClassService {
                 List<TeachingSlot> teachingSlots = teachingSlotRepository
                                 .findByClassEntityId(classId);
 
+                // Chỉ lấy các slot có status SCHEDULED (giáo viên dạy đúng lịch)
+                // Loại bỏ SUBSTITUTED (giáo viên dạy thay) và ON_LEAVE (giáo viên nghỉ)
                 Map<Teacher, Long> teacherSessionCounts = teachingSlots.stream()
                                 .filter(slot -> slot.getTeacher() != null)
-                                .filter(slot -> slot.getStatus() != TeachingSlotStatus.SUBSTITUTED)
+                                .filter(slot -> slot.getStatus() == TeachingSlotStatus.SCHEDULED)
                                 .collect(Collectors.groupingBy(
                                                 TeachingSlot::getTeacher,
                                                 Collectors.counting()));

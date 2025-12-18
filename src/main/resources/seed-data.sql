@@ -232,14 +232,12 @@ INSERT INTO user_account (id, email, phone, full_name, gender, dob, address, pas
 (200, 'vuthithu100@gmail.com', '0900000100', 'Vu Thi Thu', 'FEMALE', '2000-04-10', 'TP. HCM', '$2a$12$YNA7sOfjJNXLzHPzolLvkuhVj8EkY85r9OgPUBtb1wpk2gT5g1IV.', 'ACTIVE', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
 
 -- Feedback Questions (for student feedback feature)
-INSERT INTO feedback_question (id, question_text, question_type, options, display_order, created_at, updated_at) VALUES
-(1, 'Mức hài lòng với chất lượng giảng dạy tổng thể', 'rating', NULL, 1, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(2, 'Bài giảng có rõ ràng và mạch lạc không?', 'rating', NULL, 2, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(3, 'Tài liệu và nguồn lực hỗ trợ học tập hữu ích ở mức nào?', 'rating', NULL, 3, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(4, 'Lịch học và quản lý lớp có hiệu quả không?', 'rating', NULL, 4, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(5, 'Bạn có sẵn sàng giới thiệu khóa học này cho người khác?', 'rating', NULL, 5, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(6, 'Điều bạn hài lòng nhất ở phase này là gì?', 'text', NULL, 6, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
-(7, 'Bạn muốn cải thiện điều gì cho phase tiếp theo?', 'text', NULL, 7, '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07');
+INSERT INTO feedback_question (id, question_text, display_order, status, created_at, updated_at) VALUES
+(1, 'Giáo viên giảng dạy rõ ràng, dễ hiểu', 1, 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(2, 'Tài liệu học tập và bài tập phù hợp với nội dung giảng dạy', 2, 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(3, 'Giáo viên nhiệt tình, tương tác tốt với học viên', 3, 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(4, 'Lớp học có đủ thiết bị và điều kiện học tập tốt', 4, 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07'),
+(5, 'Thời gian và tốc độ học phù hợp với khả năng tiếp thu', 5, 'ACTIVE', '2024-01-01 00:00:00+07', '2024-01-01 00:00:00+07');
 
 -- Branches
 INSERT INTO branch (id, center_id, code, name, address, phone, email, district, city, status, opening_date, created_at, updated_at) VALUES
@@ -620,15 +618,50 @@ INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, ski
 (23, 2, 23, 'Review and Feedback', 'Review all skills', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
 (24, 2, 24, 'Final Assessment', 'Complete final test', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
--- Course 2: IELTS Intermediate (30 sessions)
--- Phase 3: 12 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 24 + s.idx, 3, s.idx, 'IELTS Int Skill Building ' || s.idx, 'Practice skills', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 12) AS s(idx);
--- Phase 4: 12 sessions
-INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at)
-SELECT 36 + s.idx, 4, 12 + s.idx, 'IELTS Int Strategies ' || s.idx, 'Learn strategies', 'GENERAL', NOW(), NOW()
-FROM generate_series(1, 12) AS s(idx);
+-- ========== Course 2: IELTS Intermediate (24 sessions) - Band 5.0-5.5 Target ==========
+-- Phase 3: Skill Building (Sessions 1-12) - Focus on developing core IELTS skills
+INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at) VALUES
+-- Week 1-2: Listening Skills Development
+(25, 3, 1, 'Advanced Listening: Section 1 - Conversations', 'Complete Section 1 practice tests and identify key information types', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(26, 3, 2, 'Listening: Section 2 - Monologues & Maps', 'Practice map labeling and note completion in monologue contexts', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(27, 3, 3, 'Listening: Section 3 - Academic Discussions', 'Analyze academic discussions and identify speaker opinions', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+
+-- Week 3-4: Reading Skills Development
+(28, 3, 4, 'Reading: Skimming & Scanning Techniques', 'Apply skimming for main ideas and scanning for specific details', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(29, 3, 5, 'Reading: True/False/Not Given Questions', 'Master T/F/NG question types with academic passages', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(30, 3, 6, 'Reading: Matching Headings & Features', 'Practice heading matching and feature matching questions', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+
+-- Week 5-6: Writing Skills Development
+(31, 3, 7, 'Writing Task 1: Line & Bar Charts', 'Describe trends and comparisons in line and bar graphs', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(32, 3, 8, 'Writing Task 1: Pie Charts & Tables', 'Analyze and describe data from pie charts and tables', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(33, 3, 9, 'Writing Task 2: Essay Structure & Planning', 'Learn essay structures and develop effective planning strategies', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+
+-- Week 7-8: Speaking Skills Development
+(34, 3, 10, 'Speaking Part 1: Personal Topics & Fluency', 'Practice fluent responses to common Part 1 topics', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(35, 3, 11, 'Speaking Part 2: Cue Card Techniques', 'Develop strategies for 2-minute talks using cue cards', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(36, 3, 12, 'Speaking Part 3: Abstract Discussions', 'Practice discussing abstract topics with extended answers', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
+
+-- Phase 4: Test Strategies & Practice (Sessions 13-24) - Exam techniques and mock tests
+INSERT INTO subject_session (id, phase_id, sequence_no, topic, student_task, skill, created_at, updated_at) VALUES
+-- Week 9: Vocabulary & Grammar for Band 5.5
+(37, 4, 13, 'Academic Vocabulary: Word Families & Collocations', 'Build academic word list and practice collocations', 'VOCABULARY', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(38, 4, 14, 'Grammar for IELTS: Complex Sentences', 'Master complex sentence structures for Writing and Speaking', 'GRAMMAR', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+
+-- Week 10: Listening & Reading Test Strategies
+(39, 4, 15, 'Listening: Section 4 - Academic Lectures', 'Practice note-taking and summary completion in lectures', 'LISTENING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(40, 4, 16, 'Reading: Summary Completion & Sentence Matching', 'Apply strategies for summary and sentence completion questions', 'READING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+
+-- Week 11: Writing & Speaking Test Strategies
+(41, 4, 17, 'Writing Task 2: Opinion Essays', 'Write and analyze opinion essay structures and arguments', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(42, 4, 18, 'Writing Task 2: Discussion Essays', 'Practice discussion essay format and balanced arguments', 'WRITING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(43, 4, 19, 'Speaking: Pronunciation & Intonation', 'Improve pronunciation, stress patterns and intonation', 'SPEAKING', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+
+-- Week 12: Mock Tests & Final Review
+(44, 4, 20, 'Full Mock Test 1: Listening & Reading', 'Complete timed practice test under exam conditions', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(45, 4, 21, 'Full Mock Test 1: Writing & Speaking', 'Complete writing tasks and speaking test simulation', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(46, 4, 22, 'Mock Test Review & Error Analysis', 'Analyze mistakes and develop improvement strategies', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(47, 4, 23, 'Final Mock Test: Full IELTS Simulation', 'Complete full IELTS test under timed conditions', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
+(48, 4, 24, 'Course Review & Exam Tips', 'Review key strategies and receive personalized feedback', 'GENERAL', '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07');
 
 
 -- CLOs for Foundation Course
@@ -734,17 +767,140 @@ INSERT INTO subject_material (subject_id, phase_id, subject_session_id, title, d
 -- Session 24
 (1, 2, 24, 'Final Exam Instructions', 'Guidelines for the final assessment.', 'DOCUMENT', '/materials/sessions/24/instructions.docx', 5);
 
--- Course Materials for IELTS Intermediate (Course 2)
+-- ========== Course Materials for IELTS Intermediate (Course 2) - Complete Set ==========
 INSERT INTO subject_material (subject_id, phase_id, subject_session_id, title, description, material_type, url, uploaded_by) VALUES
--- Course Level
-(2, NULL, NULL, 'IELTS Intermediate Syllabus', 'Course syllabus and schedule.', 'DOCUMENT', '/materials/courses/2/syllabus.pdf', 5),
--- Phase 3: Skill Building
-(2, 3, NULL, 'Intermediate Skill Building Guide', 'Overview of intermediate skills.', 'DOCUMENT', '/materials/phases/3/guide.pdf', 5),
-(2, 3, 25, 'Complex Grammar Guide', 'Guide to complex sentences.', 'DOCUMENT', '/materials/sessions/25/grammar.pdf', 5),
-(2, 3, 26, 'Advanced Listening Audio', 'Audio for advanced listening practice.', 'MEDIA', '/materials/sessions/26/audio.mp3', 5),
--- Phase 4: Test Strategies
-(2, 4, NULL, 'IELTS Test Strategies Handbook', 'Strategies for all 4 skills.', 'DOCUMENT', '/materials/phases/4/strategies.pdf', 5),
-(2, 4, 37, 'Speaking Part 2 Cue Cards', 'Practice cue cards for Speaking Part 2.', 'DOCUMENT', '/materials/sessions/37/cue-cards.pdf', 5);
+-- Course Level Materials
+(2, NULL, NULL, 'IELTS Intermediate Syllabus', 'Complete course syllabus with weekly breakdown and learning objectives.', 'DOCUMENT', '/materials/courses/2/syllabus.pdf', 5),
+(2, NULL, NULL, 'IELTS Band 5.0-5.5 Target Guide', 'Comprehensive guide for achieving band 5.0-5.5 with scoring criteria.', 'DOCUMENT', '/materials/courses/2/band-guide.pdf', 5),
+(2, NULL, NULL, 'Academic Word List (AWL)', 'Essential academic vocabulary for IELTS with definitions and examples.', 'DOCUMENT', '/materials/courses/2/awl-vocabulary.pdf', 5),
+
+-- Phase 3: Skill Building Materials
+(2, 3, NULL, 'Skill Building Overview', 'Introduction to intermediate IELTS skills and weekly objectives.', 'DOCUMENT', '/materials/phases/3/overview.pdf', 5),
+(2, 3, NULL, 'Listening Answer Sheet Template', 'Official IELTS listening answer sheet for practice.', 'DOCUMENT', '/materials/phases/3/listening-answer-sheet.pdf', 5),
+
+-- Session 25: Advanced Listening - Section 1
+(2, 3, 25, 'Listening Section 1 Strategies', 'Comprehensive guide to Section 1 question types and techniques.', 'DOCUMENT', '/materials/sessions/25/section1-strategies.pdf', 5),
+(2, 3, 25, 'Section 1 Practice Audio Set', 'Collection of 5 practice conversations with transcripts.', 'MEDIA', '/materials/sessions/25/section1-audio.mp3', 5),
+(2, 3, 25, 'Note Completion Worksheet', 'Practice exercises for note completion questions.', 'DOCUMENT', '/materials/sessions/25/note-completion.docx', 5),
+
+-- Session 26: Listening - Section 2
+(2, 3, 26, 'Map Labeling Techniques', 'Step-by-step guide to map and diagram labeling questions.', 'DOCUMENT', '/materials/sessions/26/map-labeling.pdf', 5),
+(2, 3, 26, 'Section 2 Practice Audio', 'Monologue recordings with map labeling exercises.', 'MEDIA', '/materials/sessions/26/section2-audio.mp3', 5),
+(2, 3, 26, 'Directional Language Reference', 'Vocabulary guide for directions and locations.', 'DOCUMENT', '/materials/sessions/26/directions-vocab.pdf', 5),
+
+-- Session 27: Listening - Section 3
+(2, 3, 27, 'Section 3 Question Types', 'Analysis of academic discussion question formats.', 'DOCUMENT', '/materials/sessions/27/section3-guide.pdf', 5),
+(2, 3, 27, 'Academic Discussion Audio', 'Practice recordings of university-style discussions.', 'MEDIA', '/materials/sessions/27/academic-audio.mp3', 5),
+(2, 3, 27, 'Opinion Matching Exercises', 'Worksheet for identifying speaker opinions and attitudes.', 'DOCUMENT', '/materials/sessions/27/opinion-matching.docx', 5),
+
+-- Session 28: Reading - Skimming & Scanning
+(2, 3, 28, 'Skimming & Scanning Masterclass', 'Video tutorial on speed reading techniques.', 'MEDIA', '/materials/sessions/28/speed-reading.mp4', 5),
+(2, 3, 28, 'Timed Reading Passages', 'Collection of passages with timed reading exercises.', 'DOCUMENT', '/materials/sessions/28/timed-passages.pdf', 5),
+(2, 3, 28, 'Reading Speed Tracker', 'Worksheet to monitor and improve reading speed.', 'DOCUMENT', '/materials/sessions/28/speed-tracker.xlsx', 5),
+
+-- Session 29: Reading - T/F/NG
+(2, 3, 29, 'T/F/NG Question Analysis', 'Detailed guide to distinguishing True, False, and Not Given.', 'DOCUMENT', '/materials/sessions/29/tfng-guide.pdf', 5),
+(2, 3, 29, 'T/F/NG Practice Set', '50 practice questions with detailed explanations.', 'DOCUMENT', '/materials/sessions/29/tfng-practice.pdf', 5),
+(2, 3, 29, 'Common T/F/NG Traps', 'Guide to avoiding common mistakes in T/F/NG questions.', 'DOCUMENT', '/materials/sessions/29/tfng-traps.pdf', 5),
+
+-- Session 30: Reading - Matching
+(2, 3, 30, 'Matching Headings Strategy', 'Techniques for matching headings to paragraphs.', 'DOCUMENT', '/materials/sessions/30/matching-headings.pdf', 5),
+(2, 3, 30, 'Feature Matching Practice', 'Exercises for matching features to categories.', 'DOCUMENT', '/materials/sessions/30/feature-matching.pdf', 5),
+(2, 3, 30, 'Academic Reading Passages', 'Three full-length academic passages with questions.', 'DOCUMENT', '/materials/sessions/30/academic-passages.pdf', 5),
+
+-- Session 31: Writing Task 1 - Line & Bar Charts
+(2, 3, 31, 'Task 1 Line Chart Tutorial', 'Video guide to describing line graph trends.', 'MEDIA', '/materials/sessions/31/line-chart-tutorial.mp4', 5),
+(2, 3, 31, 'Trend Description Vocabulary', 'Essential vocabulary for describing trends and changes.', 'DOCUMENT', '/materials/sessions/31/trend-vocabulary.pdf', 5),
+(2, 3, 31, 'Sample Line & Bar Chart Essays', 'Model answers with examiner comments.', 'DOCUMENT', '/materials/sessions/31/model-answers.pdf', 5),
+
+-- Session 32: Writing Task 1 - Pie Charts & Tables
+(2, 3, 32, 'Pie Chart & Table Strategies', 'Guide to organizing and presenting data effectively.', 'DOCUMENT', '/materials/sessions/32/pie-table-guide.pdf', 5),
+(2, 3, 32, 'Comparison Language Reference', 'Phrases for making comparisons and contrasts.', 'DOCUMENT', '/materials/sessions/32/comparison-phrases.pdf', 5),
+(2, 3, 32, 'Task 1 Practice Exercises', 'Five pie chart and table exercises with model answers.', 'DOCUMENT', '/materials/sessions/32/task1-exercises.pdf', 5),
+
+-- Session 33: Writing Task 2 - Essay Structure
+(2, 3, 33, 'Essay Structure Templates', 'Templates for opinion, discussion, and problem-solution essays.', 'DOCUMENT', '/materials/sessions/33/essay-templates.pdf', 5),
+(2, 3, 33, 'Planning & Brainstorming Guide', 'Techniques for effective essay planning.', 'DOCUMENT', '/materials/sessions/33/planning-guide.pdf', 5),
+(2, 3, 33, 'Introduction Writing Workshop', 'Video tutorial on writing strong introductions.', 'MEDIA', '/materials/sessions/33/intro-workshop.mp4', 5),
+
+-- Session 34: Speaking Part 1
+(2, 3, 34, 'Part 1 Topic Bank', 'Collection of common Part 1 topics with sample answers.', 'DOCUMENT', '/materials/sessions/34/part1-topics.pdf', 5),
+(2, 3, 34, 'Fluency Development Exercises', 'Practice activities to improve speaking fluency.', 'DOCUMENT', '/materials/sessions/34/fluency-exercises.pdf', 5),
+(2, 3, 34, 'Part 1 Model Answers Audio', 'Native speaker model answers for common topics.', 'MEDIA', '/materials/sessions/34/part1-audio.mp3', 5),
+
+-- Session 35: Speaking Part 2
+(2, 3, 35, 'Cue Card Collection', '50 authentic Part 2 cue cards with preparation notes.', 'DOCUMENT', '/materials/sessions/35/cue-cards.pdf', 5),
+(2, 3, 35, 'Part 2 Timing Strategies', 'How to structure a 2-minute response effectively.', 'DOCUMENT', '/materials/sessions/35/timing-guide.pdf', 5),
+(2, 3, 35, 'Sample Part 2 Recordings', 'High-scoring Part 2 response examples.', 'MEDIA', '/materials/sessions/35/part2-samples.mp3', 5),
+
+-- Session 36: Speaking Part 3
+(2, 3, 36, 'Part 3 Discussion Topics', 'Abstract topics with discussion frameworks.', 'DOCUMENT', '/materials/sessions/36/part3-topics.pdf', 5),
+(2, 3, 36, 'Extended Answer Techniques', 'How to extend and develop Part 3 answers.', 'DOCUMENT', '/materials/sessions/36/extension-techniques.pdf', 5),
+(2, 3, 36, 'Opinion & Speculation Language', 'Phrases for expressing opinions and speculating.', 'DOCUMENT', '/materials/sessions/36/opinion-language.pdf', 5),
+
+-- Phase 4: Test Strategies Materials
+(2, 4, NULL, 'Test Strategies Overview', 'Complete guide to IELTS exam strategies and time management.', 'DOCUMENT', '/materials/phases/4/strategies-overview.pdf', 5),
+(2, 4, NULL, 'Band Score Descriptors', 'Official IELTS band score descriptors for all skills.', 'DOCUMENT', '/materials/phases/4/band-descriptors.pdf', 5),
+
+-- Session 37: Academic Vocabulary
+(2, 4, 37, 'Word Families Workbook', 'Exercises on word forms and derivations.', 'DOCUMENT', '/materials/sessions/37/word-families.pdf', 5),
+(2, 4, 37, 'Collocations Dictionary', 'Essential academic collocations for IELTS.', 'DOCUMENT', '/materials/sessions/37/collocations.pdf', 5),
+(2, 4, 37, 'Vocabulary Quiz Set', 'Self-assessment quizzes for academic vocabulary.', 'DOCUMENT', '/materials/sessions/37/vocab-quizzes.pdf', 5),
+
+-- Session 38: Grammar for IELTS
+(2, 4, 38, 'Complex Sentence Workshop', 'Video tutorial on complex sentence structures.', 'MEDIA', '/materials/sessions/38/complex-sentences.mp4', 5),
+(2, 4, 38, 'Grammar Error Analysis', 'Common grammar mistakes and corrections.', 'DOCUMENT', '/materials/sessions/38/error-analysis.pdf', 5),
+(2, 4, 38, 'Sentence Combining Exercises', 'Practice combining simple sentences.', 'DOCUMENT', '/materials/sessions/38/sentence-combining.pdf', 5),
+
+-- Session 39: Listening Section 4
+(2, 4, 39, 'Section 4 Lecture Guide', 'Strategies for academic lecture comprehension.', 'DOCUMENT', '/materials/sessions/39/lecture-guide.pdf', 5),
+(2, 4, 39, 'Academic Lecture Audio Set', 'Collection of university-style lectures.', 'MEDIA', '/materials/sessions/39/lectures.mp3', 5),
+(2, 4, 39, 'Note-taking Templates', 'Templates for effective lecture note-taking.', 'DOCUMENT', '/materials/sessions/39/note-templates.pdf', 5),
+
+-- Session 40: Reading Summary & Sentence
+(2, 4, 40, 'Summary Completion Guide', 'Techniques for summary completion questions.', 'DOCUMENT', '/materials/sessions/40/summary-guide.pdf', 5),
+(2, 4, 40, 'Sentence Matching Strategies', 'How to match sentence endings effectively.', 'DOCUMENT', '/materials/sessions/40/sentence-matching.pdf', 5),
+(2, 4, 40, 'Practice Passage Collection', 'Four passages with mixed question types.', 'DOCUMENT', '/materials/sessions/40/practice-passages.pdf', 5),
+
+-- Session 41: Writing - Opinion Essays
+(2, 4, 41, 'Opinion Essay Masterclass', 'Complete guide to opinion essay structure.', 'DOCUMENT', '/materials/sessions/41/opinion-essay-guide.pdf', 5),
+(2, 4, 41, 'Argument Development Workshop', 'Video on building strong arguments.', 'MEDIA', '/materials/sessions/41/argument-workshop.mp4', 5),
+(2, 4, 41, 'Opinion Essay Band 6 Samples', 'Sample essays with examiner feedback.', 'DOCUMENT', '/materials/sessions/41/sample-essays.pdf', 5),
+
+-- Session 42: Writing - Discussion Essays
+(2, 4, 42, 'Discussion Essay Framework', 'Template for balanced discussion essays.', 'DOCUMENT', '/materials/sessions/42/discussion-framework.pdf', 5),
+(2, 4, 42, 'Presenting Both Sides Guide', 'How to present balanced arguments.', 'DOCUMENT', '/materials/sessions/42/both-sides.pdf', 5),
+(2, 4, 42, 'Practice Essay Topics', 'Ten discussion essay prompts with planning notes.', 'DOCUMENT', '/materials/sessions/42/essay-topics.pdf', 5),
+
+-- Session 43: Speaking - Pronunciation
+(2, 4, 43, 'Pronunciation Guide', 'Guide to common pronunciation issues for Vietnamese speakers.', 'DOCUMENT', '/materials/sessions/43/pronunciation-guide.pdf', 5),
+(2, 4, 43, 'Stress & Intonation Audio', 'Audio exercises for stress and intonation practice.', 'MEDIA', '/materials/sessions/43/stress-intonation.mp3', 5),
+(2, 4, 43, 'Minimal Pairs Practice', 'Exercises for distinguishing similar sounds.', 'DOCUMENT', '/materials/sessions/43/minimal-pairs.pdf', 5),
+
+-- Session 44: Mock Test 1 - Listening & Reading
+(2, 4, 44, 'Mock Test 1: Question Booklet', 'Full listening and reading test questions.', 'DOCUMENT', '/materials/sessions/44/mock1-questions.pdf', 5),
+(2, 4, 44, 'Mock Test 1: Listening Audio', 'Complete 30-minute listening test recording.', 'MEDIA', '/materials/sessions/44/mock1-audio.mp3', 5),
+(2, 4, 44, 'Mock Test 1: Answer Key', 'Answers with explanations for all questions.', 'DOCUMENT', '/materials/sessions/44/mock1-answers.pdf', 5),
+
+-- Session 45: Mock Test 1 - Writing & Speaking
+(2, 4, 45, 'Mock Test 1: Writing Tasks', 'Task 1 and Task 2 prompts with time limits.', 'DOCUMENT', '/materials/sessions/45/writing-tasks.pdf', 5),
+(2, 4, 45, 'Mock Test 1: Speaking Cards', 'Part 1-3 questions for speaking simulation.', 'DOCUMENT', '/materials/sessions/45/speaking-cards.pdf', 5),
+(2, 4, 45, 'Writing Scoring Checklist', 'Self-assessment checklist for writing tasks.', 'DOCUMENT', '/materials/sessions/45/writing-checklist.pdf', 5),
+
+-- Session 46: Mock Test Review
+(2, 4, 46, 'Error Analysis Worksheet', 'Template for analyzing mistakes and patterns.', 'DOCUMENT', '/materials/sessions/46/error-worksheet.pdf', 5),
+(2, 4, 46, 'Improvement Action Plan', 'Guide to creating a personal improvement plan.', 'DOCUMENT', '/materials/sessions/46/action-plan.pdf', 5),
+(2, 4, 46, 'Mock Test Review Video', 'Detailed walkthrough of test solutions.', 'MEDIA', '/materials/sessions/46/review-video.mp4', 5),
+
+-- Session 47: Final Mock Test
+(2, 4, 47, 'Final Mock Test: Complete Set', 'Full IELTS test with all four skills.', 'DOCUMENT', '/materials/sessions/47/final-test.pdf', 5),
+(2, 4, 47, 'Final Mock: Listening Audio', 'Complete listening section recording.', 'MEDIA', '/materials/sessions/47/final-audio.mp3', 5),
+(2, 4, 47, 'Final Mock: Answer Key', 'Complete answer key with score calculator.', 'DOCUMENT', '/materials/sessions/47/final-answers.pdf', 5),
+
+-- Session 48: Course Review & Exam Tips
+(2, 4, 48, 'Course Summary Review', 'Comprehensive review of all course content.', 'DOCUMENT', '/materials/sessions/48/course-summary.pdf', 5),
+(2, 4, 48, 'Exam Day Checklist', 'What to bring and how to prepare for test day.', 'DOCUMENT', '/materials/sessions/48/exam-checklist.pdf', 5),
+(2, 4, 48, 'Final Tips Video', 'Last-minute tips from experienced IELTS instructors.', 'MEDIA', '/materials/sessions/48/final-tips.mp4', 5);
 
 -- Course Assessments for Foundation
 INSERT INTO subject_assessment (id, subject_id, name, kind, duration_minutes, max_score, skill, created_at, updated_at) VALUES
@@ -806,7 +962,6 @@ INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date
 (14, 2, 2, 'HCM-IELTS-I1', 'HCM IELTS Intermediate 1', 'OFFLINE', '2025-12-19', '2026-02-11', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-12 10:00:00+07', '2025-12-13 14:00:00+07', '2025-12-12 10:00:00+07', NOW()),
 (15, 2, 2, 'HCM-IELTS-I2', 'HCM IELTS Intermediate 2', 'OFFLINE', '2025-12-21', '2026-02-13', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-14 10:00:00+07', '2025-12-15 14:00:00+07', '2025-12-14 10:00:00+07', NOW()),
 (16, 2, 2, 'HCM-IELTS-I3', 'HCM IELTS Intermediate 3 (Online)', 'ONLINE', '2025-12-23', '2026-02-15', NULL, ARRAY[2,4,6]::smallint[], 25, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-16 10:00:00+07', '2025-12-17 14:00:00+07', '2025-12-16 10:00:00+07', NOW());
-
 
 -- Class 1: HN IELTS Foundation 1 (Early) - Mon/Wed/Fri, starts 2025-11-17 (2 weeks ahead)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
@@ -1095,16 +1250,19 @@ INSERT INTO student_request (id, student_id, current_class_id, request_type, tar
 (5, 23, 2, 'MAKEUP', 108, 208, 'PENDING', 'Missed session due to work commitment, requesting makeup', 123, '2025-12-04 11:00:00+07');
 
 -- SCENARIO 6: Approved Transfer Request (Class 2 Offline -> Class 4 Online, student 24 - Tran Thi Nga)
-INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
-(6, 24, 2, 4, 'TRANSFER', '2025-12-10', 310, 'APPROVED', 'Need to change to online class due to work schedule conflict', 6, '2025-12-05 10:00:00+07', 6, '2025-12-06 14:00:00+07');
+-- target_session_id=310 means: join Class 4 starting from their session on 2025-12-10
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
+(6, 24, 2, 4, 'TRANSFER', 310, 'APPROVED', 'Need to change to online class due to work schedule conflict', 6, '2025-12-05 10:00:00+07', 6, '2025-12-06 14:00:00+07');
 
 -- SCENARIO 7: Pending Transfer Request (Class 6 Intermediate -> Class 9 Online Intermediate, student 80 - Dinh Thi Thao)
-INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
-(7, 80, 6, 9, 'TRANSFER', '2025-12-15', 810, 'PENDING', 'Need online class due to relocation', 180, '2025-12-08 10:00:00+07', 'Tier 1 self-service request');
+-- target_session_id=810 means: join Class 9 starting from their session on 2025-12-15
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
+(7, 80, 6, 9, 'TRANSFER', 810, 'PENDING', 'Need online class due to relocation', 6, '2025-12-08 10:00:00+07', 'Created by AA on behalf of student');
 
 -- SCENARIO 8: Rejected Transfer - same class (student 25 - Nguyen Van Phuc)
-INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, effective_date, effective_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
-(8, 25, 2, 2, 'TRANSFER', '2025-12-10', 115, 'REJECTED', 'Accidentally selected current class', 125, '2025-12-02 09:00:00+07', 6, '2025-12-02 15:00:00+07', 'Rejected - cannot transfer to the same class');
+-- target_session_id=115 means: attempted to join Class 2 session on 2025-12-10 (invalid - same class)
+INSERT INTO student_request (id, student_id, current_class_id, target_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at, note) VALUES
+(8, 25, 2, 2, 'TRANSFER', 115, 'REJECTED', 'Accidentally selected current class', 6, '2025-12-02 09:00:00+07', 6, '2025-12-02 15:00:00+07', 'Rejected - cannot transfer to the same class. Created by AA.');
 
 -- SCENARIO 9: Request created by Academic Affair on behalf (student 26 - Le Thi Diem, waiting confirmation)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, status, request_reason, submitted_by, submitted_at, note) VALUES
@@ -1238,40 +1396,32 @@ INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, s
 SELECT 100 + s.id, s.id, 1, 1, true, '2025-12-01 10:00:00+07', 'Học viên rất hài lòng với chất lượng giảng dạy.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
-SELECT f.id, q.id, 
-    CASE WHEN q.question_type = 'rating' THEN 5 ELSE NULL END,
-    NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 1;
+SELECT f.id, q.id, 5, NOW(), NOW()
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 1 AND q.status = 'ACTIVE';
 
 -- Class 6 (Intermediate Early): Mixed feedback from students 76-83 (Le Thi Cuc -> Tran Van Bach)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
 SELECT 200 + s.id, 75 + s.id, 6, 3, true, '2025-12-02 10:00:00+07', 'Cần cải thiện tốc độ giảng dạy.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
-SELECT f.id, q.id, 
-    CASE WHEN q.question_type = 'rating' THEN 3 + (f.id % 2) ELSE NULL END, -- Rating 3 or 4
-    NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 6;
+SELECT f.id, q.id, 3 + (f.id % 2), NOW(), NOW() -- Rating 3 or 4
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 6 AND q.status = 'ACTIVE';
 
 -- Class 3 (Foundation Parallel B): Average feedback from students 31-38 (Bui Xuan Hoang -> Do Thi Quyen)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
 SELECT 300 + s.id, 30 + s.id, 3, 1, true, '2025-12-03 10:00:00+07', 'Giáo viên thường xuyên giải đáp thắc mắc.', NOW(), NOW() FROM generate_series(1, 8) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
-SELECT f.id, q.id, 
-    CASE WHEN q.question_type = 'rating' THEN 4 ELSE NULL END,
-    NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 3;
+SELECT f.id, q.id, 4, NOW(), NOW()
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 3 AND q.status = 'ACTIVE';
 
 -- Class 2 (Foundation Parallel A): Recent feedback from students 16-20 (Vuong Thi Loan -> Nguyen Thi Linh)
 INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at)
 SELECT 400 + s.id, 15 + s.id, 2, 1, true, '2025-12-08 10:00:00+07', 'Rất thích cách cô giáo tổ chức trò chơi.', NOW(), NOW() FROM generate_series(1, 5) AS s(id);
 
 INSERT INTO student_feedback_response (feedback_id, question_id, rating, created_at, updated_at)
-SELECT f.id, q.id, 
-    CASE WHEN q.question_type = 'rating' THEN 5 ELSE NULL END,
-    NOW(), NOW()
-FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 2;
+SELECT f.id, q.id, 5, NOW(), NOW()
+FROM student_feedback f CROSS JOIN feedback_question q WHERE f.class_id = 2 AND q.status = 'ACTIVE';
 
 -- Reset feedback 401 (student 16 - Vuong Thi Loan, class 2, phase 1) to pending for demo
 DELETE FROM student_feedback_response WHERE feedback_id = 401;
@@ -1281,6 +1431,11 @@ SET is_feedback = false,
     response = NULL,
     updated_at = NOW()
 WHERE id = 401;
+
+-- DEMO: Pending feedback for student 1 (Nguyen Van An) - Class 1, Phase 2
+-- This simulates cronjob creating feedback waiting for student submission
+INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, submitted_at, response, created_at, updated_at) VALUES
+(500, 1, 1, 2, false, NULL, NULL, NOW(), NOW());
 
 -- 1. Classroom Observation (Dự giờ) - Class 2 (Good)
 INSERT INTO qa_report (id, class_id, session_id, reported_by, report_type, status, content, created_at, updated_at) VALUES

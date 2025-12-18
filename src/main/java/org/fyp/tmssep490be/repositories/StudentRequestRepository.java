@@ -177,16 +177,16 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
            "JOIN FETCH sr.student " +
            "JOIN FETCH sr.currentClass " +
            "JOIN FETCH sr.targetClass " +
-           "JOIN FETCH sr.effectiveSession " +
+           "JOIN FETCH sr.targetSession ts " +
            "LEFT JOIN FETCH sr.decidedBy " +
            "WHERE sr.requestType = :requestType " +
            "AND sr.status = :status " +
-           "AND sr.effectiveDate = :effectiveDate " +
+           "AND ts.date = :targetDate " +
            "ORDER BY sr.id ASC")
-    List<StudentRequest> findApprovedTransferRequestsByEffectiveDate(
+    List<StudentRequest> findApprovedTransferRequestsByTargetDate(
         @Param("requestType") StudentRequestType requestType,
         @Param("status") RequestStatus status,
-        @Param("effectiveDate") LocalDate effectiveDate
+        @Param("targetDate") LocalDate targetDate
     );
 
     @Query("SELECT sr FROM StudentRequest sr " +

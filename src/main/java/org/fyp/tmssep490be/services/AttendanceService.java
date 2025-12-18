@@ -355,10 +355,35 @@ public class AttendanceService {
                 .collect(Collectors.toSet());
 
         List<Long> sessionIds = sessions.stream().map(Session::getId).toList();
+
+        // Map các bản ghi điểm danh theo session gốc trong lớp
         Map<Long, List<StudentSession>> sessionStudentMap = studentSessionRepository.findBySessionIds(sessionIds)
                 .stream()
                 .filter(ss -> enrolledStudentIds.contains(ss.getStudent().getId()))
                 .collect(Collectors.groupingBy(ss -> ss.getSession().getId()));
+
+        // Map thông tin học bù theo (originalSessionId, studentId) để tính cờ xanh/đỏ
+        Map<Long, Map<Long, Boolean>> makeupCompletedMap = new HashMap<>();
+        studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
+                .forEach(ss -> {
+                    Session originalSession = ss.getOriginalSession();
+                    if (originalSession == null || ss.getStudent() == null) {
+                        return;
+                    }
+                    Long originalSessionId = originalSession.getId();
+                    Long studentId = ss.getStudent().getId();
+                    if (originalSessionId == null || studentId == null) {
+                        return;
+                    }
+
+                    makeupCompletedMap
+                            .computeIfAbsent(originalSessionId, k -> new HashMap<>())
+                            .merge(
+                                    studentId,
+                                    ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
+                                    (oldVal, newVal) -> oldVal || newVal
+                            );
+                });
 
         Map<Long, StudentAttendanceMatrixDTO.StudentAttendanceMatrixDTOBuilder> rowBuilders = new LinkedHashMap<>();
         Map<Long, Map<Long, StudentAttendanceMatrixDTO.Cell.CellBuilder>> cellBuilders = new HashMap<>();
@@ -383,12 +408,49 @@ public class AttendanceService {
 
                 AttendanceStatus displayStatus = resolveMatrixDisplayStatus(ss, session);
 
+                 boolean isMakeup = Boolean.TRUE.equals(ss.getIsMakeup());
+
+                 // Mặc định không hiển thị chấm
+                 boolean hasMakeupCompleted = false;
+                 boolean hasMakeupPlanned = false;
+
+                 // Chỉ áp dụng logic chấm cho buổi gốc có phép (E), không phải bản ghi học bù
+                 if (!isMakeup && ss.getAttendanceStatus() == AttendanceStatus.EXCUSED) {
+                     // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
+                     boolean completed = makeupCompletedMap
+                             .getOrDefault(session.getId(), Map.of())
+                             .getOrDefault(studentId, false);
+
+                     hasMakeupCompleted = completed;
+
+                     // Tính xem đã qua thời gian kết thúc buổi học gốc chưa
+                     LocalDate sessionDate = session.getDate();
+                     LocalDateTime now = LocalDateTime.now();
+
+                     LocalDateTime sessionEndDateTime;
+                     if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                         LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                         sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                     } else {
+                         sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+                     }
+
+                     boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
+
+                     // Chỉ tô đỏ khi đã qua giờ kết thúc buổi gốc và chưa có buổi bù PRESENT
+                     if (!completed && isAfterSessionEnd) {
+                         hasMakeupPlanned = true;
+                     }
+                 }
+
                 cellBuilders.get(studentId)
                         .put(session.getId(), StudentAttendanceMatrixDTO.Cell.builder()
                                 .sessionId(session.getId())
                                 .attendanceStatus(displayStatus)
                                 .homeworkStatus(ss.getHomeworkStatus())
-                                .makeup(Boolean.TRUE.equals(ss.getIsMakeup())));
+                                .makeup(isMakeup)
+                                .hasMakeupPlanned(hasMakeupPlanned)
+                                .hasMakeupCompleted(hasMakeupCompleted));
             }
         }
 
@@ -425,6 +487,8 @@ public class AttendanceService {
                                             .attendanceStatus(displayStatus)
                                             .homeworkStatus(null)
                                             .makeup(false)
+                                            .hasMakeupPlanned(false)
+                                            .hasMakeupCompleted(false)
                                             .build();
                                 }
                             })
@@ -630,6 +694,7 @@ public class AttendanceService {
     }
 
     private double calculateClassAttendanceRate(Long classId) {
+        // Chỉ tính các buổi đã điểm danh (đã học), không tính các buổi chưa học
         List<Session> sessions = sessionRepository.findAllByClassIdOrderByDateAndTime(classId).stream()
                 .filter(session -> session.getStatus() != SessionStatus.CANCELLED)
                 .toList();
@@ -638,64 +703,30 @@ public class AttendanceService {
             return 0.0;
         }
 
-        List<Enrollment> enrollments = enrollmentRepository.findByClassIdAndStatus(
-                classId, EnrollmentStatus.ENROLLED);
+        List<Long> sessionIds = sessions.stream().map(Session::getId).toList();
 
-        if (enrollments.isEmpty()) {
+        // Lấy tất cả bản ghi điểm danh thực sự có trong DB
+        List<StudentSession> allStudentSessions = studentSessionRepository.findBySessionIds(sessionIds);
+
+        // Bỏ qua các bản ghi học bù (isMakeup = true) để không làm tăng tỷ lệ của lớp học bù
+        List<StudentSession> primarySessions = allStudentSessions.stream()
+                .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup()))
+                .toList();
+
+        // Chỉ tính các bản ghi có status PRESENT hoặc ABSENT (đã điểm danh)
+        long totalPresent = primarySessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                .count();
+        long totalRecorded = primarySessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT
+                        || ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                .count();
+
+        if (totalRecorded == 0) {
             return 0.0;
         }
 
-        List<Long> sessionIds = sessions.stream().map(Session::getId).toList();
-        Set<Long> enrolledStudentIds = enrollments.stream()
-                .map(Enrollment::getStudentId)
-                .collect(Collectors.toSet());
-
-        Map<Long, List<StudentSession>> sessionStudentMap = studentSessionRepository.findBySessionIds(sessionIds)
-                .stream()
-                .filter(ss -> enrolledStudentIds.contains(ss.getStudent().getId()))
-                .collect(Collectors.groupingBy(ss -> ss.getSession().getId()));
-
-        double totalRate = 0.0;
-        int studentCount = 0;
-
-        for (Enrollment enrollment : enrollments) {
-            Long studentId = enrollment.getStudentId();
-
-            int present = 0;
-            int absent = 0;
-
-            for (Session session : sessions) {
-                List<StudentSession> studentSessions = sessionStudentMap.getOrDefault(session.getId(), List.of());
-                StudentSession studentSession = studentSessions.stream()
-                        .filter(ss -> ss.getStudent().getId().equals(studentId))
-                        .findFirst()
-                        .orElse(null);
-
-                AttendanceStatus displayStatus;
-                if (studentSession != null) {
-                    displayStatus = resolveMatrixDisplayStatus(studentSession, session);
-                } else {
-                    boolean isFutureSession = session.getDate().isAfter(LocalDate.now()) ||
-                            (session.getDate().equals(LocalDate.now()) && session.getStatus() == SessionStatus.PLANNED);
-                    displayStatus = isFutureSession ? AttendanceStatus.PLANNED : AttendanceStatus.ABSENT;
-                }
-
-                if (displayStatus == AttendanceStatus.PRESENT) {
-                    present++;
-                } else if (displayStatus == AttendanceStatus.ABSENT) {
-                    absent++;
-                }
-            }
-
-            int total = present + absent;
-            if (total > 0) {
-                double studentRate = (double) present / total;
-                totalRate += studentRate;
-                studentCount++;
-            }
-        }
-
-        return studentCount == 0 ? 0.0 : totalRate / studentCount;
+        return (double) totalPresent / totalRecorded;
     }
 
     private boolean canEditAttendance(Session session) {

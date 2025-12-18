@@ -2,6 +2,8 @@ package org.fyp.tmssep490be.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.fyp.tmssep490be.entities.enums.FeedbackQuestionStatus;
+
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -22,14 +24,13 @@ public class FeedbackQuestion {
     @Column(name = "question_text", nullable = false, columnDefinition = "TEXT")
     private String questionText;
 
-    @Column(name = "question_type", length = 100)
-    private String questionType;
-
-    @Column(columnDefinition = "TEXT[]")
-    private String[] options;
-
     @Column(name = "display_order")
     private Integer displayOrder;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
+    private FeedbackQuestionStatus status = FeedbackQuestionStatus.ACTIVE;
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

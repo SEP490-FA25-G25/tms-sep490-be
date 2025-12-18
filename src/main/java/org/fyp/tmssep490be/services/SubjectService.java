@@ -574,6 +574,8 @@ public class SubjectService {
                             .description(phase.getLearningFocus())
                             .sessions(sessions)
                             .materials(phaseMaterials)
+                            .totalSessions(sessions.size())
+                            .totalMaterials(phaseMaterials.size())
                             .build();
                 })
                 .collect(Collectors.toList());

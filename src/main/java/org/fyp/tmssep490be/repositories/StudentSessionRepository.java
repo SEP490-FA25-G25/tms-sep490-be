@@ -74,8 +74,9 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             "AND s.date BETWEEN :startDate AND :endDate " +
             "AND s.status != 'CANCELLED' " +
             "AND (" +
-            "  EXISTS (SELECT 1 FROM Enrollment e WHERE e.studentId = :studentId AND e.classId = s.classEntity.id AND e.status = 'ENROLLED') " +
-            "  OR s.status = 'DONE' " +
+            "  EXISTS (SELECT 1 FROM Enrollment e WHERE e.studentId = :studentId " +
+            "          AND e.classId = s.classEntity.id " +
+            "          AND e.status IN ('ENROLLED', 'TRANSFERRED', 'COMPLETED')) " +
             "  OR ss.isMakeup = true" +
             ") " +
             "AND (:classId IS NULL OR s.classEntity.id = :classId) " +
@@ -131,6 +132,14 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
             WHERE ss.session.id IN :sessionIds
             """)
     List<StudentSession> findBySessionIds(@Param("sessionIds") List<Long> sessionIds);
+
+    @Query("""
+            SELECT ss FROM StudentSession ss
+            JOIN ss.originalSession os
+            WHERE os.id IN :sessionIds
+              AND ss.isMakeup = true
+            """)
+    List<StudentSession> findMakeupSessionsByOriginalSessionIds(@Param("sessionIds") List<Long> sessionIds);
 
     @Query("SELECT ss FROM StudentSession ss " +
            "JOIN ss.session s " +
