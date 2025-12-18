@@ -14,12 +14,12 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * Scheduled job to automatically expire old teacher requests.
+ * Scheduled job to automatically reject expired teacher requests.
  *
  * Functionality:
- * - Expires PENDING teacher requests after configurable days (default: 7 days)
- * - Expires WAITING_CONFIRM replacement requests after configurable days (default: 3 days)
- * - Updates status to CANCELLED and adds expiry note
+ * - Rejects PENDING teacher requests after configurable days (default: 7 days)
+ * - Rejects WAITING_CONFIRM replacement requests after configurable days (default: 3 days)
+ * - Updates status to REJECTED and adds expiry note
  *
  * Runs daily at 3:30 AM (configurable via application.yml)
  */
@@ -61,8 +61,8 @@ public class TeacherRequestExpiryJob extends BaseScheduledJob {
 
             int expiredPendingCount = 0;
             for (TeacherRequest request : expiredPendingRequests) {
-                request.setStatus(RequestStatus.CANCELLED);
-                String expiryNote = String.format("Tự động hủy do quá %d ngày không xử lý (hệ thống)", pendingExpiryDays);
+                request.setStatus(RequestStatus.REJECTED);
+                String expiryNote = String.format("Tự động từ chối do quá %d ngày không xử lý (hệ thống)", pendingExpiryDays);
                 String existingNote = request.getNote();
                 if (existingNote != null && !existingNote.isEmpty()) {
                     request.setNote(existingNote + "\n" + expiryNote);
@@ -83,8 +83,8 @@ public class TeacherRequestExpiryJob extends BaseScheduledJob {
 
             int expiredWaitingConfirmCount = 0;
             for (TeacherRequest request : expiredWaitingConfirmRequests) {
-                request.setStatus(RequestStatus.CANCELLED);
-                String expiryNote = String.format("Tự động hủy do giáo viên thay thế không xác nhận trong %d ngày (hệ thống)", waitingConfirmExpiryDays);
+                request.setStatus(RequestStatus.REJECTED);
+                String expiryNote = String.format("Tự động từ chối do giáo viên thay thế không xác nhận trong %d ngày (hệ thống)", waitingConfirmExpiryDays);
                 String existingNote = request.getNote();
                 if (existingNote != null && !existingNote.isEmpty()) {
                     request.setNote(existingNote + "\n" + expiryNote);
@@ -97,8 +97,8 @@ public class TeacherRequestExpiryJob extends BaseScheduledJob {
 
             int totalExpired = expiredPendingCount + expiredWaitingConfirmCount;
             if (totalExpired > 0) {
-                logJobInfo(String.format("Expired %d PENDING requests", expiredPendingCount));
-                logJobInfo(String.format("Expired %d WAITING_CONFIRM requests", expiredWaitingConfirmCount));
+                logJobInfo(String.format("Rejected %d PENDING requests", expiredPendingCount));
+                logJobInfo(String.format("Rejected %d WAITING_CONFIRM requests", expiredWaitingConfirmCount));
             }
 
             logJobEnd("TeacherRequestExpiry", totalExpired);
