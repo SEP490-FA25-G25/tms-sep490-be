@@ -14,6 +14,7 @@ import org.fyp.tmssep490be.dtos.teachergrade.ClassGradesSummaryDTO;
 import org.fyp.tmssep490be.dtos.teachergrade.StudentGradeSummaryDTO;
 import org.fyp.tmssep490be.entities.Assessment;
 import org.fyp.tmssep490be.entities.Score;
+import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.SubjectAssessment;
 import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
@@ -31,8 +32,11 @@ import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -219,13 +223,73 @@ public class TeacherGradeService {
                     int gradedCount = (int) percents.size();
 
                     // Chuyên cần: tính ngay, không cần chờ khóa học kết thúc
-                    List<StudentSession> studentSessions = studentSessionRepository.findByStudentIdAndClassEntityId(studentId, classId);
-                    long present = studentSessions.stream()
-                            .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
-                            .count();
-                    long absent = studentSessions.stream()
-                            .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT || ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
-                            .count();
+                    List<StudentSession> studentSessions = studentSessionRepository.findByStudentIdAndClassEntityId(studentId, classId)
+                            .stream()
+                            .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup())) // Bỏ qua học bù
+                            .toList();
+
+                    // Map thông tin học bù
+                    List<Long> sessionIds = studentSessions.stream()
+                            .map(ss -> ss.getSession().getId())
+                            .distinct()
+                            .toList();
+                    Map<Long, Boolean> makeupCompletedMap = new HashMap<>();
+                    if (!sessionIds.isEmpty()) {
+                        studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
+                                .stream()
+                                .filter(ss -> ss.getStudent().getId().equals(studentId))
+                                .forEach(ss -> {
+                                    Session originalSession = ss.getOriginalSession();
+                                    if (originalSession != null && originalSession.getId() != null) {
+                                        makeupCompletedMap.merge(
+                                                originalSession.getId(),
+                                                ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
+                                                (oldVal, newVal) -> oldVal || newVal
+                                        );
+                                    }
+                                });
+                    }
+
+                    LocalDateTime now = LocalDateTime.now();
+                    long present = 0;
+                    long absent = 0;
+
+                    for (StudentSession ss : studentSessions) {
+                        AttendanceStatus status = ss.getAttendanceStatus();
+                        Session session = ss.getSession();
+
+                        if (status == AttendanceStatus.PRESENT) {
+                            present++;
+                        } else if (status == AttendanceStatus.ABSENT) {
+                            absent++;
+                        } else if (status == AttendanceStatus.EXCUSED) {
+                            // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
+                            boolean hasMakeupCompleted = makeupCompletedMap.getOrDefault(session.getId(), false);
+
+                            if (hasMakeupCompleted) {
+                                // EXCUSED có học bù (chấm xanh) → tính như PRESENT
+                                present++;
+                            } else {
+                                // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
+                                LocalDate sessionDate = session.getDate();
+                                LocalDateTime sessionEndDateTime;
+                                if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                                    java.time.LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                                    sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                                } else {
+                                    sessionEndDateTime = LocalDateTime.of(sessionDate, java.time.LocalTime.MAX);
+                                }
+
+                                boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
+                                if (isAfterSessionEnd) {
+                                    // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
+                                    absent++;
+                                }
+                                // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
+                            }
+                        }
+                    }
+
                     long totalDone = present + absent;
                     Double attendanceRate = totalDone > 0 ? (present * 100d / totalDone) : null;
                     Double attendanceScore = attendanceRate;

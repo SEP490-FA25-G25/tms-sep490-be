@@ -29,8 +29,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -66,9 +70,36 @@ public class TeacherClassService {
 
         int totalSessions = sessions.size();
 
+        // Map thông tin học bù để xác định EXCUSED có học bù hay không
+        List<Long> sessionIds = sessions.stream().map(Session::getId).toList();
+        Map<Long, Map<Long, Boolean>> makeupCompletedMap = new HashMap<>();
+        if (!sessionIds.isEmpty()) {
+            studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
+                    .forEach(ss -> {
+                        Session originalSession = ss.getOriginalSession();
+                        if (originalSession == null || ss.getStudent() == null) {
+                            return;
+                        }
+                        Long originalSessionId = originalSession.getId();
+                        Long studentId = ss.getStudent().getId();
+                        if (originalSessionId == null || studentId == null) {
+                            return;
+                        }
+
+                        makeupCompletedMap
+                                .computeIfAbsent(originalSessionId, k -> new HashMap<>())
+                                .merge(
+                                        studentId,
+                                        ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
+                                        (oldVal, newVal) -> oldVal || newVal
+                                );
+                    });
+        }
+
         // Tính tỷ lệ chuyên cần: tổng PRESENT / (PRESENT + ABSENT) của tất cả các buổi
         long totalPresent = 0;
-        long totalRecorded = 0; // PRESENT + ABSENT (không tính PLANNED, EXCUSED, v.v.)
+        long totalRecorded = 0;
+        LocalDateTime now = LocalDateTime.now();
 
         for (Session session : sessions) {
             List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(session.getId());
@@ -78,13 +109,42 @@ public class TeacherClassService {
                     continue;
                 }
 
-                if (ss.getAttendanceStatus() == AttendanceStatus.PRESENT) {
+                AttendanceStatus status = ss.getAttendanceStatus();
+                if (status == AttendanceStatus.PRESENT) {
                     totalPresent++;
                     totalRecorded++;
-                } else if (ss.getAttendanceStatus() == AttendanceStatus.ABSENT) {
+                } else if (status == AttendanceStatus.ABSENT) {
                     totalRecorded++;
+                } else if (status == AttendanceStatus.EXCUSED) {
+                    // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
+                    boolean hasMakeupCompleted = makeupCompletedMap
+                            .getOrDefault(session.getId(), Map.of())
+                            .getOrDefault(ss.getStudent().getId(), false);
+
+                    if (hasMakeupCompleted) {
+                        // EXCUSED có học bù (chấm xanh) → tính như PRESENT
+                        totalPresent++;
+                        totalRecorded++;
+                    } else {
+                        // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
+                        LocalDate sessionDate = session.getDate();
+                        LocalDateTime sessionEndDateTime;
+                        if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                            LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                            sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                        } else {
+                            sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+                        }
+
+                        boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
+                        if (isAfterSessionEnd) {
+                            // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
+                            totalRecorded++;
+                        }
+                        // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
+                    }
                 }
-                // Không tính PLANNED, EXCUSED, v.v.
+                // Không tính PLANNED
             }
         }
 
