@@ -31,7 +31,7 @@ public class AttendanceService {
             TeachingSlotStatus.SCHEDULED,
             TeachingSlotStatus.SUBSTITUTED
     );
-    
+
     private static final double ATTENDANCE_WARNING_THRESHOLD = 0.2; // 20%
 
     private final TeachingSlotRepository teachingSlotRepository;
@@ -93,21 +93,45 @@ public class AttendanceService {
 
         Session previousSession = findPreviousSession(session);
 
+        // Lấy tất cả StudentSession của session này (kể cả học bù)
+        // Điều này đảm bảo học viên học bù từ class khác cũng được hiển thị
+        // Sử dụng JOIN FETCH để tránh LazyInitializationException
+        List<StudentSession> existingStudentSessions = studentSessionRepository.findBySessionIdWithStudent(sessionId);
+
+        // Map để track học viên đã được thêm vào danh sách
+        Set<Long> addedStudentIds = new HashSet<>();
+        List<StudentAttendanceDTO> students = new ArrayList<>();
+        
+        // Thêm tất cả học viên có StudentSession trong session (kể cả học bù)
+        for (StudentSession studentSession : existingStudentSessions) {
+            // Kiểm tra null để tránh NullPointerException
+            if (studentSession.getStudent() == null) {
+                continue; // Bỏ qua nếu không có thông tin học viên
+            }
+            Long studentId = studentSession.getStudent().getId();
+            if (studentId == null) {
+                continue; // Bỏ qua nếu studentId null
+            }
+            if (!addedStudentIds.contains(studentId)) {
+                students.add(toStudentAttendanceDTO(studentSession, previousSession));
+                addedStudentIds.add(studentId);
+            }
+        }
+        
+        // Thêm các học viên trong class chưa có StudentSession (chưa điểm danh)
         Long classId = session.getClassEntity().getId();
         List<Enrollment> enrollments = enrollmentRepository.findByClassIdAndStatus(classId, EnrollmentStatus.ENROLLED);
 
-        List<StudentSession> existingStudentSessions = studentSessionRepository.findBySessionId(sessionId);
-        Map<Long, StudentSession> studentSessionMap = existingStudentSessions.stream()
-                .collect(Collectors.toMap(ss -> ss.getStudent().getId(), ss -> ss));
-
-        List<StudentAttendanceDTO> students = new ArrayList<>();
         for (Enrollment enrollment : enrollments) {
+            // Kiểm tra null để tránh NullPointerException
+            if (enrollment.getStudent() == null || enrollment.getStudent().getUserAccount() == null) {
+                continue; // Bỏ qua nếu không có thông tin học viên
+            }
             Long studentId = enrollment.getStudentId();
-            StudentSession studentSession = studentSessionMap.get(studentId);
-
-            if (studentSession != null) {
-                students.add(toStudentAttendanceDTO(studentSession, previousSession));
-            } else {
+            if (studentId == null) {
+                continue; // Bỏ qua nếu studentId null
+            }
+            if (!addedStudentIds.contains(studentId)) {
                 boolean isFutureSession = session.getDate().isAfter(LocalDate.now()) ||
                         (session.getDate().equals(LocalDate.now()) &&
                                 session.getStatus() == SessionStatus.PLANNED);
@@ -139,6 +163,7 @@ public class AttendanceService {
                         .makeup(false)
                         .makeupSessionId(null)
                         .build());
+                addedStudentIds.add(studentId);
             }
         }
 
@@ -210,12 +235,12 @@ public class AttendanceService {
         List<StudentSession> updatedSessions = studentSessionRepository.findBySessionId(sessionId);
         AttendanceSummaryDTO summary = buildSummary(updatedSessions);
 
-        // Kiểm tra và gửi cảnh báo điểm danh cho các sinh viên vắng nhiều
-        try {
-            checkAndSendAttendanceWarnings(sessionId, session.getClassEntity().getId());
-        } catch (Exception e) {
-            // Log error but don't block attendance save
-        }
+        // Lưu ý: logic cảnh báo điểm danh (checkAndSendAttendanceWarnings)
+        // trước đây chạy ngay trong transaction saveAttendance.
+        // Nếu bên trong có lỗi liên quan tới database, transaction sẽ bị
+        // đánh dấu rollback-only và dẫn tới lỗi:
+        // "Transaction silently rolled back because it has been marked as rollback-only".
+        // Để tránh làm hỏng luồng lưu điểm danh, tạm thời bỏ gọi hàm này.
 
         return AttendanceSaveResponseDTO.builder()
                 .sessionId(sessionId)
@@ -374,10 +399,16 @@ public class AttendanceService {
                 .collect(Collectors.groupingBy(ss -> ss.getSession().getId()));
 
         // Map thông tin học bù theo (originalSessionId, studentId) để tính cờ xanh/đỏ
+        // - makeupCompletedMap: đã có ít nhất một buổi học bù PRESENT (chấm xanh)
+        // - makeupFailedPastMap: có buổi học bù ABSENT và buổi bù đó đã kết thúc (dùng để tô đỏ ngay cả khi buổi gốc chưa diễn ra)
         Map<Long, Map<Long, Boolean>> makeupCompletedMap = new HashMap<>();
+        Map<Long, Map<Long, Boolean>> makeupFailedPastMap = new HashMap<>();
+        LocalDateTime nowForMakeup = LocalDateTime.now();
+
         studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
                 .forEach(ss -> {
                     Session originalSession = ss.getOriginalSession();
+                    Session makeupSession = ss.getSession();
                     if (originalSession == null || ss.getStudent() == null) {
                         return;
                     }
@@ -387,13 +418,32 @@ public class AttendanceService {
                         return;
                     }
 
+                    // Đánh dấu đã hoàn thành học bù (PRESENT)
+                    boolean isCompleted = ss.getAttendanceStatus() == AttendanceStatus.PRESENT;
                     makeupCompletedMap
                             .computeIfAbsent(originalSessionId, k -> new HashMap<>())
-                            .merge(
-                                    studentId,
-                                    ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
-                                    (oldVal, newVal) -> oldVal || newVal
-                            );
+                            .merge(studentId, isCompleted, (oldVal, newVal) -> oldVal || newVal);
+
+                    // Đánh dấu "học bù thất bại" nếu buổi học bù ABSENT và đã qua thời gian kết thúc buổi bù
+                    if (ss.getAttendanceStatus() == AttendanceStatus.ABSENT
+                            && makeupSession != null
+                            && makeupSession.getDate() != null) {
+                        LocalDate makeupDate = makeupSession.getDate();
+                        LocalDateTime makeupEndDateTime;
+                        if (makeupSession.getTimeSlotTemplate() != null
+                                && makeupSession.getTimeSlotTemplate().getEndTime() != null) {
+                            LocalTime endTime = makeupSession.getTimeSlotTemplate().getEndTime();
+                            makeupEndDateTime = LocalDateTime.of(makeupDate, endTime);
+                        } else {
+                            makeupEndDateTime = LocalDateTime.of(makeupDate, LocalTime.MAX);
+                        }
+
+                        if (nowForMakeup.isAfter(makeupEndDateTime)) {
+                            makeupFailedPastMap
+                                    .computeIfAbsent(originalSessionId, k -> new HashMap<>())
+                                    .merge(studentId, true, (oldVal, newVal) -> oldVal || newVal);
+                        }
+                    }
                 });
 
         Map<Long, StudentAttendanceMatrixDTO.StudentAttendanceMatrixDTOBuilder> rowBuilders = new LinkedHashMap<>();
@@ -434,6 +484,11 @@ public class AttendanceService {
 
                      hasMakeupCompleted = completed;
 
+                     // Kiểm tra xem có buổi học bù ABSENT và đã qua thời gian kết thúc hay chưa
+                     boolean hasMakeupFailedPast = makeupFailedPastMap
+                             .getOrDefault(session.getId(), Map.of())
+                             .getOrDefault(studentId, false);
+
                      // Tính xem đã qua thời gian kết thúc buổi học gốc chưa
                      LocalDate sessionDate = session.getDate();
                      LocalDateTime now = LocalDateTime.now();
@@ -448,8 +503,10 @@ public class AttendanceService {
 
                      boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
 
-                     // Chỉ tô đỏ khi đã qua giờ kết thúc buổi gốc và chưa có buổi bù PRESENT
-                     if (!completed && isAfterSessionEnd) {
+                     // Tô đỏ khi:
+                     // - Đã qua giờ kết thúc buổi gốc và chưa có buổi bù PRESENT, hoặc
+                     // - Có buổi học bù ABSENT đã kết thúc (ví dụ học bù trước buổi gốc nhưng không đi)
+                     if (!completed && (isAfterSessionEnd || hasMakeupFailedPast)) {
                          hasMakeupPlanned = true;
                      }
                  }
@@ -520,11 +577,10 @@ public class AttendanceService {
 
         ClassEntity classEntity = sessions.get(0).getClassEntity();
 
-        double classAttendanceRate = studentDtos.stream()
-                .filter(student -> student.getAttendanceRate() != null)
-                .mapToDouble(StudentAttendanceMatrixDTO::getAttendanceRate)
-                .average()
-                .orElse(0.0);
+        // Tỷ lệ chuyên cần của cả lớp cần thống nhất với các màn hình khác
+        // (Teacher classes, QA, báo cáo, Student portal...), nên dùng chung
+        // hàm calculateClassAttendanceRate dựa trên StudentSession thực tế.
+        double classAttendanceRate = calculateClassAttendanceRate(classId);
 
         return AttendanceMatrixDTO.builder()
                 .classId(classId)
