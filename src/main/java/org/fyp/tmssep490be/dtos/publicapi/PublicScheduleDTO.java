@@ -20,7 +20,7 @@ public class PublicScheduleDTO {
 
     private String code; // Mã lớp
 
-    private String courseName; // Tên khóa học
+    private String courseName; // Tên môn học
 
     private String timeSlot; // Khung giờ (e.g., "19h-21h")
 
