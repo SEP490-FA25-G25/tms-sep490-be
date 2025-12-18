@@ -73,6 +73,7 @@ public class SessionSummaryDTO {
 
     private String resourceCode;
 
+    // Teacher info & curriculum metadata
     private String teacherName;
 
     private Long teacherId;
@@ -82,8 +83,20 @@ public class SessionSummaryDTO {
     private Integer sequenceNo;
 
     private Integer totalSessions;
-    
+
     private Integer phaseNumber;
 
     private String phaseName;
+
+    // Attendance summary fields for teacher schedule
+    private Long totalStudents;
+
+    private Long presentCount;
+
+    private Long absentCount;
+
+    private Boolean attendanceSubmitted;
+
+    // Request types for this session (APPROVED only)
+    private List<String> pendingRequestTypes;
 }

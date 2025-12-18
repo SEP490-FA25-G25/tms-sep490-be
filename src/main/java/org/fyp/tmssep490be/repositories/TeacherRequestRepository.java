@@ -87,5 +87,12 @@ long countActiveRequestsByTeacherAndClass(@Param("teacherId") Long teacherId,
 
     //Kiểm tra xem session có pending request không
     boolean existsBySessionIdAndStatus(Long sessionId, RequestStatus status);
+
+    //Lấy các request types của session (chỉ APPROVED), sắp xếp theo thời gian approved gần nhất
+    @Query("SELECT tr FROM TeacherRequest tr " +
+           "WHERE tr.session.id = :sessionId " +
+           "AND tr.status = org.fyp.tmssep490be.entities.enums.RequestStatus.APPROVED " +
+           "ORDER BY tr.decidedAt DESC NULLS LAST, tr.submittedAt DESC")
+    List<TeacherRequest> findBySessionIdAndApprovedStatus(@Param("sessionId") Long sessionId);
 }
 
