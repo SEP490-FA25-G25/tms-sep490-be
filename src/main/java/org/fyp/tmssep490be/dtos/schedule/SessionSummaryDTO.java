@@ -10,10 +10,12 @@ import org.fyp.tmssep490be.entities.enums.Modality;
 import org.fyp.tmssep490be.entities.enums.ResourceType;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.entities.enums.SessionType;
+import org.fyp.tmssep490be.entities.enums.Skill;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -70,4 +72,18 @@ public class SessionSummaryDTO {
     private String onlineLink;
 
     private String resourceCode;
+
+    private String teacherName;
+
+    private Long teacherId;
+
+    private List<Skill> skills;
+
+    private Integer sequenceNo;
+
+    private Integer totalSessions;
+    
+    private Integer phaseNumber;
+
+    private String phaseName;
 }
