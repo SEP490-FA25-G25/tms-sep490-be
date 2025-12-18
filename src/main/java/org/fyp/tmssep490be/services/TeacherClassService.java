@@ -291,8 +291,8 @@ public class TeacherClassService {
                     // Sequence number: số thứ tự buổi học trong giáo trình (từ SubjectSession)
                     Integer sequenceNumber = s.getSubjectSession() != null ? s.getSubjectSession().getSequenceNo() : null;
                     
-                    // Time slot: khung giờ học (từ TimeSlotTemplate), nếu không có thì "TBA" (To Be Announced)
-                    String timeSlot = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getName() : "TBA";
+                    // Time slot: khung giờ học (từ TimeSlotTemplate), nếu không có thì hiển thị "Chưa xếp lịch"
+                    String timeSlot = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getName() : "Chưa xếp lịch";
                     LocalTime startTime = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getStartTime() : null;
                     LocalTime endTime = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getEndTime() : null;
                     
@@ -305,9 +305,9 @@ public class TeacherClassService {
                                     .findFirst()
                                     .map(ts -> ts.getTeacher() != null && ts.getTeacher().getUserAccount() != null
                                             ? ts.getTeacher().getUserAccount().getFullName()
-                                            : "TBA")
-                                    .orElse("TBA")
-                            : "TBA";
+                                            : "Chưa phân công")
+                                    .orElse("Chưa phân công")
+                            : "Chưa phân công";
 
                     // Lấy tên thứ trong tuần trong tiếng Việt
                     String dayOfWeek = s.getDate() != null ? getVietnameseDayName(s.getDate().getDayOfWeek().getValue()) : null;

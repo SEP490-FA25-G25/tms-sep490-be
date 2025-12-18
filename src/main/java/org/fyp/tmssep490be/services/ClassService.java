@@ -884,7 +884,7 @@ public class ClassService {
                                                         : null;
                                         String timeSlot = s.getTimeSlotTemplate() != null
                                                         ? s.getTimeSlotTemplate().getName()
-                                                        : "TBA";
+                                                        : "Chưa xếp lịch";
                                         LocalTime startTime = s.getTimeSlotTemplate() != null
                                                         ? s.getTimeSlotTemplate().getStartTime()
                                                         : null;
@@ -895,7 +895,7 @@ public class ClassService {
                                                         : "N/A";
 
                                         // Get teacher from teaching slots
-                                        String teacherName = "TBA";
+                                        String teacherName = "Chưa phân công";
                                         if (s.getTeachingSlots() != null && !s.getTeachingSlots().isEmpty()) {
                                                 teacherName = s.getTeachingSlots().stream()
                                                                 .findFirst()
@@ -904,8 +904,8 @@ public class ClassService {
                                                                                                 ? ts.getTeacher()
                                                                                                                 .getUserAccount()
                                                                                                                 .getFullName()
-                                                                                                : "TBA")
-                                                                .orElse("TBA");
+                                                                                                : "Chưa phân công")
+                                                                .orElse("Chưa phân công");
                                         }
 
                                         return QASessionListResponse.QASessionItemDTO.builder()

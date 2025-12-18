@@ -443,7 +443,7 @@ public class QAService {
                     long qaReportCount = qaReportRepository.countBySessionId(s.getId());
 
                     Integer sequenceNumber = s.getSubjectSession() != null ? s.getSubjectSession().getSequenceNo() : null;
-                    String timeSlot = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getName() : "TBA";
+                    String timeSlot = s.getTimeSlotTemplate() != null ? s.getTimeSlotTemplate().getName() : "Chưa xếp lịch";
                     String topic = s.getSubjectSession() != null ? s.getSubjectSession().getTopic() : "N/A";
 
                     String teacherName = s.getTeachingSlots() != null && !s.getTeachingSlots().isEmpty()
@@ -451,9 +451,9 @@ public class QAService {
                                     .findFirst()
                                     .map(ts -> ts.getTeacher() != null && ts.getTeacher().getUserAccount() != null
                                             ? ts.getTeacher().getUserAccount().getFullName()
-                                            : "TBA")
-                                    .orElse("TBA")
-                            : "TBA";
+                                            : "Chưa phân công")
+                                    .orElse("Chưa phân công")
+                            : "Chưa phân công";
 
                     return QASessionListResponse.QASessionItemDTO.builder()
                             .sessionId(s.getId())

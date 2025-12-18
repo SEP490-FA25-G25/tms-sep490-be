@@ -1856,7 +1856,7 @@ public class StudentRequestService {
 
         List<TransferEligibilityDTO.SessionInfo> allSessions = classSessions.stream()
                 .map(session -> {
-                    String timeSlot = "TBA";
+                    String timeSlot = "Chưa xếp lịch";
                     if (session.getTimeSlotTemplate() != null) {
                         timeSlot = session.getTimeSlotTemplate().getStartTime() + "-" + 
                                   session.getTimeSlotTemplate().getEndTime();
@@ -1865,7 +1865,7 @@ public class StudentRequestService {
                     Integer sessionNumber = session.getSubjectSession() != null ? 
                             session.getSubjectSession().getSequenceNo() : null;
                     String topic = session.getSubjectSession() != null ? 
-                            session.getSubjectSession().getTopic() : "TBA";
+                            session.getSubjectSession().getTopic() : "Chưa có";
 
                     return TransferEligibilityDTO.SessionInfo.builder()
                             .sessionId(session.getId())
@@ -1964,7 +1964,7 @@ public class StudentRequestService {
                 .sorted(Comparator.comparing(Session::getDate))
                 .limit(4)
                 .map(session -> {
-                    String timeSlot = "TBA";
+                    String timeSlot = "Chưa xếp lịch";
                     if (session.getTimeSlotTemplate() != null) {
                         timeSlot = session.getTimeSlotTemplate().getStartTime() + "-" + 
                                   session.getTimeSlotTemplate().getEndTime();
@@ -1973,7 +1973,7 @@ public class StudentRequestService {
                     Integer sessionNumber = session.getSubjectSession() != null ? 
                             session.getSubjectSession().getSequenceNo() : null;
                     String topic = session.getSubjectSession() != null ? 
-                            session.getSubjectSession().getTopic() : "TBA";
+                            session.getSubjectSession().getTopic() : "Chưa có";
                     
                     return TransferOptionDTO.UpcomingSession.builder()
                             .sessionId(session.getId())
@@ -1997,7 +1997,7 @@ public class StudentRequestService {
 
         return allSessions.stream()
                 .map(session -> {
-                    String timeSlot = "TBA";
+                    String timeSlot = "Chưa xếp lịch";
                     if (session.getTimeSlotTemplate() != null) {
                         timeSlot = session.getTimeSlotTemplate().getStartTime() + "-" + 
                                   session.getTimeSlotTemplate().getEndTime();
@@ -2006,7 +2006,7 @@ public class StudentRequestService {
                     Integer sessionNumber = session.getSubjectSession() != null ? 
                             session.getSubjectSession().getSequenceNo() : null;
                     String topic = session.getSubjectSession() != null ? 
-                            session.getSubjectSession().getTopic() : "TBA";
+                            session.getSubjectSession().getTopic() : "Chưa có";
                     
                     boolean isPast = session.getDate().isBefore(today) || session.getStatus() == SessionStatus.DONE;
                     boolean isUpcoming = session.getId().equals(upcomingSessionId);
@@ -2050,7 +2050,7 @@ public class StudentRequestService {
         List<Session> allSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
         
         if (allSessions.isEmpty()) {
-            return "TBA";
+            return "Chưa xếp lịch";
         }
 
         // Use ScheduleUtils to extract and format schedule with day names and time slots
