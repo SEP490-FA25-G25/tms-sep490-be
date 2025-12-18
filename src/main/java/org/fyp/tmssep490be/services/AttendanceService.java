@@ -31,11 +31,15 @@ public class AttendanceService {
             TeachingSlotStatus.SCHEDULED,
             TeachingSlotStatus.SUBSTITUTED
     );
+    
+    private static final double ATTENDANCE_WARNING_THRESHOLD = 0.2; // 20%
 
     private final TeachingSlotRepository teachingSlotRepository;
     private final StudentSessionRepository studentSessionRepository;
     private final SessionRepository sessionRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final NotificationService notificationService;
+    private final EmailService emailService;
 
     public List<SessionTodayDTO> getSessionsForDate(Long teacherId, LocalDate date) {
         List<TeachingSlot> slots = teachingSlotRepository.findByTeacherIdAndDate(teacherId, date);
@@ -205,6 +209,13 @@ public class AttendanceService {
 
         List<StudentSession> updatedSessions = studentSessionRepository.findBySessionId(sessionId);
         AttendanceSummaryDTO summary = buildSummary(updatedSessions);
+
+        // Kiểm tra và gửi cảnh báo điểm danh cho các sinh viên vắng nhiều
+        try {
+            checkAndSendAttendanceWarnings(sessionId, session.getClassEntity().getId());
+        } catch (Exception e) {
+            // Log error but don't block attendance save
+        }
 
         return AttendanceSaveResponseDTO.builder()
                 .sessionId(sessionId)
@@ -855,5 +866,110 @@ public class AttendanceService {
         // Nếu chưa đến giờ bắt đầu, không cho phép điểm danh
         return false;
     }
-}
 
+    // Helper: Kiểm tra và gửi cảnh báo điểm danh cho sinh viên vắng nhiều
+    private void checkAndSendAttendanceWarnings(Long sessionId, Long classId) {
+        // Lấy danh sách tất cả session của lớp học đã hoàn thành
+        List<Session> completedSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId)
+            .stream()
+            .filter(s -> s.getDate().isBefore(LocalDate.now()) || s.getDate().equals(LocalDate.now()))
+            .toList();
+        
+        if (completedSessions.isEmpty()) {
+            return;
+        }
+        
+        int totalSessions = completedSessions.size();
+        List<Long> completedSessionIds = completedSessions.stream()
+            .map(Session::getId)
+            .toList();
+        
+        // Lấy tất cả enrollment của lớp
+        List<Enrollment> enrollments = enrollmentRepository.findByClassIdAndStatus(classId, EnrollmentStatus.ENROLLED);
+        
+        // Lấy tất cả StudentSession của các buổi học đã hoàn thành
+        List<StudentSession> allStudentSessions = completedSessionIds.stream()
+            .flatMap(sid -> studentSessionRepository.findBySessionId(sid).stream())
+            .toList();
+        
+        // Group theo studentId
+        java.util.Map<Long, List<StudentSession>> studentSessionMap = allStudentSessions.stream()
+            .collect(java.util.stream.Collectors.groupingBy(ss -> ss.getStudent().getId()));
+        
+        for (Enrollment enrollment : enrollments) {
+            Long studentId = enrollment.getStudent().getId();
+            
+            // Lấy danh sách StudentSession của sinh viên này
+            List<StudentSession> studentSessions = studentSessionMap.getOrDefault(studentId, List.of());
+            
+            // Đếm số buổi vắng của sinh viên
+            long absentCount = studentSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                .count();
+            
+            // Tính tỷ lệ vắng
+            double absentRate = (double) absentCount / totalSessions;
+            
+            // Nếu vắng >= 20%, gửi cảnh báo
+            if (absentRate >= ATTENDANCE_WARNING_THRESHOLD) {
+                sendAttendanceWarning(enrollment.getStudent(), classId, totalSessions, (int) absentCount, absentRate);
+            }
+        }
+    }
+    
+    // Helper: Gửi cảnh báo điểm danh cho sinh viên
+    private void sendAttendanceWarning(Student student, Long classId, int totalSessions, int absentSessions, double absentRate) {
+        if (student == null || student.getUserAccount() == null) {
+            return;
+        }
+        
+        Long studentId = student.getId();
+        String studentName = student.getUserAccount().getFullName();
+        String studentEmail = student.getUserAccount().getEmail();
+        
+        // Lấy thông tin lớp học
+        Enrollment enrollment = enrollmentRepository.findByStudentIdAndClassIdAndStatus(
+            studentId, classId, EnrollmentStatus.ENROLLED
+        );
+        
+        if (enrollment == null || enrollment.getClassEntity() == null) {
+            return;
+        }
+        
+        ClassEntity classEntity = enrollment.getClassEntity();
+        String className = classEntity.getName();
+        int absentPercent = (int) Math.round(absentRate * 100);
+        int presentSessions = totalSessions - absentSessions;
+        int remainingAllowedAbsent = (int) Math.ceil(totalSessions * ATTENDANCE_WARNING_THRESHOLD) - absentSessions;
+        
+        // Get teacher name - simplified (classEntity doesn't have direct teaching slots)
+        String teacherName = "Giáo viên";
+        
+        // Internal notification
+        String notificationTitle = "Cảnh báo điểm danh";
+        String notificationMessage = String.format(
+            "⚠️ Cảnh báo: Bạn đã vắng %d/%d buổi học (%d%%) của lớp %s. Vui lòng chú ý điểm danh!",
+            absentSessions, totalSessions, absentPercent, className
+        );
+        
+        notificationService.createNotification(
+            studentId,
+            NotificationType.REMINDER,
+            notificationTitle,
+            notificationMessage
+        );
+        
+        // Email notification
+        emailService.sendAttendanceWarningAsync(
+            studentEmail,
+            studentName,
+            className,
+            teacherName,
+            "Hiện tại", // period
+            absentSessions,
+            totalSessions,
+            String.format("%.1f%%", absentRate * 100),
+            Math.max(0, remainingAllowedAbsent)
+        );
+    }
+}

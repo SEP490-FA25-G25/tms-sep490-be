@@ -19,6 +19,7 @@ import org.fyp.tmssep490be.entities.SubjectAssessment;
 import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
+import org.fyp.tmssep490be.entities.enums.NotificationType;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.AssessmentRepository;
@@ -58,6 +59,8 @@ public class TeacherGradeService {
     private final StudentRepository studentRepository;
     private final TeacherRepository teacherRepository;
     private final StudentSessionRepository studentSessionRepository;
+    private final NotificationService notificationService;
+    private final EmailService emailService;
 
     // Tính % điểm trên thang 100
     private Double calculatePercentage(Double score, double maxScore) {
@@ -558,6 +561,13 @@ public class TeacherGradeService {
 
         Score saved = scoreRepository.save(score);
 
+        // Gửi thông báo cho học sinh
+        try {
+            sendGradeNotificationToStudent(saved, assessment, maxScore);
+        } catch (Exception e) {
+            // Log error but don't block grade save
+        }
+
         Double scorePercent = (saved.getScore() != null && maxScore > 0)
                 ? saved.getScore().doubleValue() * 100d / maxScore
                 : null;
@@ -578,6 +588,53 @@ public class TeacherGradeService {
                 .scorePercentage(scorePercent)
                 .isGraded(saved.getGradedAt() != null)
                 .build();
+    }
+
+    // Helper: Gửi thông báo khi có điểm mới
+    private void sendGradeNotificationToStudent(Score score, Assessment assessment, double maxScore) {
+        if (score.getStudent() == null || score.getScore() == null) {
+            return;
+        }
+
+        Long studentId = score.getStudent().getId();
+        String studentName = score.getStudent().getUserAccount().getFullName();
+        String className = assessment.getClassEntity().getName();
+        String assessmentName = assessment.getSubjectAssessment().getName();
+        String teacherName = score.getGradedBy() != null 
+            ? score.getGradedBy().getUserAccount().getFullName() 
+            : "Giáo viên";
+        
+        double scoreValue = score.getScore().doubleValue();
+        double scorePercent = (maxScore > 0) ? (scoreValue * 100.0 / maxScore) : 0;
+        
+        // Internal notification
+        String notificationTitle = "Điểm số mới";
+        String notificationMessage = String.format(
+            "Điểm %s của lớp %s đã được chấm: %.2f/%.2f (%.1f%%)",
+            assessmentName, className, scoreValue, maxScore, scorePercent
+        );
+        
+        notificationService.createNotification(
+            studentId,
+            NotificationType.NOTIFICATION,
+            notificationTitle,
+            notificationMessage
+        );
+        
+        // Email notification
+        String gradedAt = score.getGradedAt() != null ? score.getGradedAt().toString() : "";
+        emailService.sendGradeUpdatedAsync(
+            score.getStudent().getUserAccount().getEmail(),
+            studentName,
+            className,
+            assessmentName,
+            "N/A", // phaseName - not used in current system
+            teacherName,
+            String.format("%.2f", scoreValue),
+            String.format("%.2f", maxScore),
+            score.getFeedback() != null ? score.getFeedback() : "",
+            gradedAt
+        );
     }
 
     // Lưu/cập nhật điểm hàng loạt
