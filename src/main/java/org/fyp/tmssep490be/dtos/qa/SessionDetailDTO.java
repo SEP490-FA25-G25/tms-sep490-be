@@ -55,6 +55,7 @@ public class SessionDetailDTO {
         private Long studentId;
         private String studentCode;
         private String studentName;
+        private String avatarUrl;
         private String attendanceStatus;
         private String homeworkStatus;
         private Boolean isMakeup;

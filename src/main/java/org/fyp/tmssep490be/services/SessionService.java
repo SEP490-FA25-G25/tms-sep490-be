@@ -61,6 +61,7 @@ public class SessionService {
                         .studentId(ss.getStudent().getId())
                         .studentCode(ss.getStudent().getUserAccount().getEmail())
                         .studentName(ss.getStudent().getUserAccount().getFullName())
+                        .avatarUrl(ss.getStudent().getUserAccount().getAvatarUrl())
                         .attendanceStatus(ss.getAttendanceStatus().name())
                         .homeworkStatus(ss.getHomeworkStatus() != null ? ss.getHomeworkStatus().name() : null)
                         .isMakeup(ss.getIsMakeup() != null ? ss.getIsMakeup() : false)
