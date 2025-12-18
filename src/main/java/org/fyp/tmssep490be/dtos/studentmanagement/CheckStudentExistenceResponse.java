@@ -21,6 +21,9 @@ public class CheckStudentExistenceResponse {
     private String phone;
     private List<BranchInfo> currentBranches;
     private boolean canAddToCurrentBranch;
+    // Additional fields for non-student users
+    private boolean isUserAccount; // true if email/phone belongs to existing user (but not student)
+    private String userRole; // e.g., "TEACHER", "QA", "ADMIN" for display
 
     @Data
     @Builder
