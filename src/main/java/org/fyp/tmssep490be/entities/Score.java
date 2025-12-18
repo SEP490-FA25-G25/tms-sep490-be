@@ -29,7 +29,8 @@ public class Score {
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;
 
-    @Column(nullable = false, precision = 5, scale = 2)
+    // Cho phép null để lưu nhận xét/feedback mà không cần nhập điểm
+    @Column(precision = 5, scale = 2)
     private BigDecimal score;
 
     @Column(columnDefinition = "TEXT")

@@ -2524,22 +2524,12 @@ public class TeacherRequestService {
                 .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
                 .collect(Collectors.toList());
 
-        // Tìm tất cả makeup sessions trỏ đến session cũ
+        // Tìm tất cả makeup sessions trỏ đến session cũ (bất kể PRESENT/ABSENT/PLANNED)
         List<StudentSession> makeupSessions = studentSessionRepository.findMakeupSessionsByOriginalSessionIds(
                 List.of(oldSession.getId()));
 
-        // Map: studentId -> makeup session PRESENT
-        Map<Long, StudentSession> completedMakeupMap = makeupSessions.stream()
-                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
-                .collect(Collectors.toMap(
-                        ss -> ss.getStudent().getId(),
-                        ss -> ss,
-                        (existing, replacement) -> existing // Nếu có nhiều, giữ cái đầu tiên
-                ));
-
-        // Map: studentId -> makeup session PLANNED (request đã APPROVED)
-        Map<Long, StudentSession> plannedMakeupMap = makeupSessions.stream()
-                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PLANNED)
+        // Map: studentId -> bất kỳ makeup session (giữ cái đầu tiên)
+        Map<Long, StudentSession> makeupMap = makeupSessions.stream()
                 .collect(Collectors.toMap(
                         ss -> ss.getStudent().getId(),
                         ss -> ss,
@@ -2549,47 +2539,24 @@ public class TeacherRequestService {
         // Set để track học viên đã được xử lý
         Set<Long> processedStudentIds = new HashSet<>();
 
-        // Xử lý từng học viên EXCUSED
+        // Logic đơn giản: chỉ phân biệt 2 trường hợp
+        // 1) Có makeup session (request MAKEUP đã được APPROVED) -> giữ EXCUSED
+        // 2) Không có makeup session (chỉ PENDING/REJECTED/không có request) -> reset về PLANNED
         for (StudentSession excusedSs : excusedStudentSessions) {
             Long studentId = excusedSs.getStudent().getId();
             processedStudentIds.add(studentId);
 
-            // Trường hợp 1: Đã học bù xong (PRESENT)
-            if (completedMakeupMap.containsKey(studentId)) {
-                StudentSession makeupSession = completedMakeupMap.get(studentId);
-                // Cập nhật originalSession trỏ đến session mới
+            StudentSession makeupSession = makeupMap.get(studentId);
+
+            if (makeupSession != null) {
+                // Trường hợp 1: Có makeup session đã được tạo (đã được APPROVED)
+                // a) Cập nhật originalSession của makeup session trỏ đến session mới
                 makeupSession.setOriginalSession(newSession);
                 studentSessionRepository.save(makeupSession);
-                log.info("Updated makeup session {} originalSession from {} to {} (student {} already completed makeup)",
+                log.info("Updated makeup session {} originalSession from {} to {} for student {}",
                         makeupSession.getId().getSessionId(), oldSession.getId(), newSession.getId(), studentId);
 
-                // VẪN giữ buổi mới ở trạng thái EXCUSED để hiển thị chấm xanh
-                // (original session được reschedule, học viên đã học bù xong)
-                StudentSession.StudentSessionId newSsId = new StudentSession.StudentSessionId();
-                newSsId.setStudentId(studentId);
-                newSsId.setSessionId(newSession.getId());
-
-                StudentSession newSs = StudentSession.builder()
-                        .id(newSsId)
-                        .student(excusedSs.getStudent())
-                        .session(newSession)
-                        .attendanceStatus(AttendanceStatus.EXCUSED)
-                        .isMakeup(false)
-                        .homeworkStatus(null)
-                        .note("Buổi học được đổi lịch từ session " + oldSession.getId() + ", học viên đã hoàn thành buổi học bù")
-                        .build();
-                studentSessionRepository.save(newSs);
-                log.info("Created new StudentSession with EXCUSED for student {} in new session {} (makeup already completed)",
-                        studentId, newSession.getId());
-            }
-            // Trường hợp 4: Có makeup session PLANNED (request đã APPROVED)
-            else if (plannedMakeupMap.containsKey(studentId)) {
-                StudentSession makeupSession = plannedMakeupMap.get(studentId);
-                // Cập nhật originalSession trỏ đến session mới
-                makeupSession.setOriginalSession(newSession);
-                studentSessionRepository.save(makeupSession);
-
-                // Cập nhật StudentRequest.targetSession nếu có
+                // b) Cập nhật StudentRequest.targetSession cho các request MAKEUP đã APPROVED
                 List<org.fyp.tmssep490be.entities.StudentRequest> makeupRequests = studentRequestRepository
                         .findByStudentIdAndTargetSessionIdAndRequestType(
                                 studentId, oldSession.getId(), StudentRequestType.MAKEUP);
@@ -2602,7 +2569,7 @@ public class TeacherRequestService {
                     }
                 }
 
-                // Tạo StudentSession mới với status = EXCUSED (giữ nguyên vì đã được approve học bù)
+                // c) Tạo StudentSession mới cho buổi được dời với status = EXCUSED (để hiển thị chấm xanh)
                 StudentSession.StudentSessionId newSsId = new StudentSession.StudentSessionId();
                 newSsId.setStudentId(studentId);
                 newSsId.setSessionId(newSession.getId());
@@ -2617,31 +2584,27 @@ public class TeacherRequestService {
                         .note("Buổi học được đổi lịch từ session " + oldSession.getId())
                         .build();
                 studentSessionRepository.save(newSs);
-                log.info("Created new StudentSession with EXCUSED for student {} in new session {} (makeup already approved)",
+                log.info("Created new EXCUSED StudentSession for student {} in new session {} (has makeup session)",
                         studentId, newSession.getId());
-            }
-            // Trường hợp 3: Có request PENDING
-            else {
+            } else {
+                // Trường hợp 2: Không có makeup session (chỉ PENDING/REJECTED/không có request)
                 List<org.fyp.tmssep490be.entities.StudentRequest> pendingRequests = studentRequestRepository
                         .findByStudentIdAndTargetSessionIdAndRequestType(
                                 studentId, oldSession.getId(), StudentRequestType.MAKEUP);
-                boolean hasPendingRequest = pendingRequests.stream()
-                        .anyMatch(req -> req.getStatus() == RequestStatus.PENDING);
 
-                if (hasPendingRequest) {
-                    // Hủy (CANCEL) các request PENDING
-                    for (org.fyp.tmssep490be.entities.StudentRequest pendingRequest : pendingRequests) {
-                        if (pendingRequest.getStatus() == RequestStatus.PENDING) {
-                            pendingRequest.setStatus(RequestStatus.CANCELLED);
-                            pendingRequest.setNote("Request cancelled due to session reschedule from " + oldSession.getId() + " to " + newSession.getId());
-                            studentRequestRepository.save(pendingRequest);
-                            log.info("Cancelled makeup request {} for student {} due to session reschedule",
-                                    pendingRequest.getId(), studentId);
-                        }
+                // Hủy (CANCEL) các request PENDING vì buổi gốc đã được dời
+                for (org.fyp.tmssep490be.entities.StudentRequest pendingRequest : pendingRequests) {
+                    if (pendingRequest.getStatus() == RequestStatus.PENDING) {
+                        pendingRequest.setStatus(RequestStatus.CANCELLED);
+                        pendingRequest.setNote("Request cancelled due to session reschedule from " + oldSession.getId()
+                                + " to " + newSession.getId());
+                        studentRequestRepository.save(pendingRequest);
+                        log.info("Cancelled makeup request {} for student {} due to session reschedule",
+                                pendingRequest.getId(), studentId);
                     }
                 }
 
-                // Trường hợp 2 hoặc 3: Tạo StudentSession mới với status = PLANNED
+                // Tạo StudentSession mới với status = PLANNED cho buổi được dời
                 StudentSession.StudentSessionId newSsId = new StudentSession.StudentSessionId();
                 newSsId.setStudentId(studentId);
                 newSsId.setSessionId(newSession.getId());
@@ -2656,7 +2619,7 @@ public class TeacherRequestService {
                         .note("Buổi học được đổi lịch từ session " + oldSession.getId())
                         .build();
                 studentSessionRepository.save(newSs);
-                log.info("Created new StudentSession with PLANNED for student {} in new session {} (no makeup or pending request cancelled)",
+                log.info("Created new PLANNED StudentSession for student {} in new session {} (no makeup session)",
                         studentId, newSession.getId());
             }
         }
@@ -3272,13 +3235,17 @@ public class TeacherRequestService {
             String originalTeacherName = request.getTeacher() != null && request.getTeacher().getUserAccount() != null
                 ? request.getTeacher().getUserAccount().getFullName()
                 : "Giáo viên";
+            String replacementTeacherName = request.getReplacementTeacher() != null
+                    && request.getReplacementTeacher().getUserAccount() != null
+                ? request.getReplacementTeacher().getUserAccount().getFullName()
+                : "giáo viên dạy thay";
             String reason = request.getRequestReason() != null ? request.getRequestReason() : "Giáo viên có việc đột xuất";
 
             // Internal notification title & message
             String notificationTitle = "Thay đổi giáo viên";
             String notificationMessage = String.format(
-                "Giáo viên %s sẽ không dạy buổi %s (%s). Giáo viên dạy thay đã được xác nhận.",
-                originalTeacherName, sessionDate, className
+                "Giáo viên %s sẽ không dạy buổi %s (%s). Giáo viên dạy thay là %s.",
+                originalTeacherName, sessionDate, className, replacementTeacherName
             );
 
             // Send bulk internal notifications
@@ -3305,6 +3272,7 @@ public class TeacherRequestService {
                         sessionDate,
                         sessionTime,
                         originalTeacherName,
+                        replacementTeacherName,
                         reason
                     );
                 }
@@ -3380,11 +3348,23 @@ public class TeacherRequestService {
             String reason = request.getRequestReason() != null ? request.getRequestReason() : "Thay đổi lịch học";
 
             // Internal notification
-            String notificationTitle = "Thay đổi lịch học";
-            String notificationMessage = String.format(
-                "Lịch học lớp %s đã thay đổi. Từ %s %s thành %s %s",
-                className, oldDate, oldTime, newDate, newTime
-            );
+            String notificationTitle;
+            String notificationMessage;
+            if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
+                // Thông báo rõ thay đổi phòng/hình thức học
+                notificationTitle = "Thay đổi hình thức/phòng học";
+                notificationMessage = String.format(
+                    "Lịch học lớp %s ngày %s %s đã thay đổi phòng/hình thức học. Từ %s sang %s.",
+                    className, oldDate, oldTime, oldRoom, newRoom
+                );
+            } else {
+                // RESCHEDULE: nhấn mạnh thay đổi ngày/giờ
+                notificationTitle = "Thay đổi lịch học";
+                notificationMessage = String.format(
+                    "Lịch học lớp %s đã thay đổi. Từ %s %s thành %s %s.",
+                    className, oldDate, oldTime, newDate, newTime
+                );
+            }
 
             // Send bulk internal notifications
             List<Long> studentUserIds = studentSessions.stream()
