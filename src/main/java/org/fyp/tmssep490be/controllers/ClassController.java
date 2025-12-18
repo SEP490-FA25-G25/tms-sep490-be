@@ -538,7 +538,7 @@ public class ClassController {
         }
 
         @GetMapping("/{classId}/sessions/metrics")
-        @PreAuthorize("hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER') or hasRole('QA')")
+        @PreAuthorize("hasRole('TEACHER') or hasRole('ACADEMIC_AFFAIR') or hasRole('CENTER_HEAD') or hasRole('MANAGER') or hasRole('QA')")
         public ResponseEntity<ResponseObject<QASessionListResponse>> getSessionsWithMetrics(
                         @PathVariable Long classId,
                         @AuthenticationPrincipal UserPrincipal currentUser) {
