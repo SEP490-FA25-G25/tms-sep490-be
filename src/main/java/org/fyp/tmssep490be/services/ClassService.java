@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -190,18 +191,18 @@ public class ClassService {
                 Map<Integer, String> dayTimeSlots = ScheduleUtils.extractScheduleFromSessions(sessions);
 
                 return dayTimeSlots.entrySet().stream()
-                        .sorted(Map.Entry.comparingByKey())
-                        .map(entry -> {
-                                String dayName = ScheduleUtils.getDayNameVietnamese(entry.getKey());
-                                String[] times = ScheduleUtils.parseTimeSlot(entry.getValue());
-                                
-                                return ClassDetailDTO.ScheduleDetailDTO.builder()
-                                        .day(dayName)
-                                        .startTime(times[0])
-                                        .endTime(times[1])
-                                        .build();
-                        })
-                        .collect(Collectors.toList());
+                                .sorted(Map.Entry.comparingByKey())
+                                .map(entry -> {
+                                        String dayName = ScheduleUtils.getDayNameVietnamese(entry.getKey());
+                                        String[] times = ScheduleUtils.parseTimeSlot(entry.getValue());
+
+                                        return ClassDetailDTO.ScheduleDetailDTO.builder()
+                                                        .day(dayName)
+                                                        .startTime(times[0])
+                                                        .endTime(times[1])
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
         }
 
         private List<TeacherSummaryDTO> getTeachersForClass(Long classId) {
@@ -438,6 +439,7 @@ public class ClassService {
                 // Only count sessions that are DONE (completed)
                 List<StudentSession> completedStudentSessions = studentSessions.stream()
                                 .filter(ss -> ss.getSession().getStatus() == SessionStatus.DONE)
+                                .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup())) // Bỏ qua học bù
                                 .toList();
 
                 if (completedStudentSessions.isEmpty()) {
@@ -447,14 +449,80 @@ public class ClassService {
                                         .build();
                 }
 
-                // Calculate attendance rate (PRESENT or EXCUSED / total completed sessions)
-                long totalRecorded = completedStudentSessions.stream()
-                                .filter(ss -> ss.getAttendanceStatus() != AttendanceStatus.PLANNED)
-                                .count();
-                long presentCount = completedStudentSessions.stream()
-                                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT ||
-                                                ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
-                                .count();
+                // Map thông tin học bù
+                List<Long> sessionIds = completedStudentSessions.stream()
+                                .map(ss -> ss.getSession().getId())
+                                .distinct()
+                                .toList();
+                Map<Long, Map<Long, Boolean>> makeupCompletedMap = new HashMap<>();
+                if (!sessionIds.isEmpty()) {
+                        studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
+                                        .forEach(ss -> {
+                                                Session originalSession = ss.getOriginalSession();
+                                                if (originalSession == null || ss.getStudent() == null) {
+                                                        return;
+                                                }
+                                                Long originalSessionId = originalSession.getId();
+                                                Long studentId = ss.getStudent().getId();
+                                                if (originalSessionId == null || studentId == null) {
+                                                        return;
+                                                }
+
+                                                makeupCompletedMap
+                                                                .computeIfAbsent(originalSessionId, k -> new HashMap<>())
+                                                                .merge(
+                                                                                studentId,
+                                                                                ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
+                                                                                (oldVal, newVal) -> oldVal || newVal
+                                                                );
+                                        });
+                }
+
+                // Calculate attendance rate với logic EXCUSED mới
+                long totalRecorded = 0;
+                long presentCount = 0;
+                LocalDateTime now = LocalDateTime.now();
+
+                for (StudentSession ss : completedStudentSessions) {
+                        AttendanceStatus status = ss.getAttendanceStatus();
+                        Session session = ss.getSession();
+
+                        if (status == AttendanceStatus.PRESENT) {
+                                presentCount++;
+                                totalRecorded++;
+                        } else if (status == AttendanceStatus.ABSENT) {
+                                totalRecorded++;
+                        } else if (status == AttendanceStatus.EXCUSED) {
+                                // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
+                                boolean hasMakeupCompleted = makeupCompletedMap
+                                                .getOrDefault(session.getId(), Map.of())
+                                                .getOrDefault(ss.getStudent().getId(), false);
+
+                                if (hasMakeupCompleted) {
+                                        // EXCUSED có học bù (chấm xanh) → tính như PRESENT
+                                        presentCount++;
+                                        totalRecorded++;
+                                } else {
+                                        // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
+                                        LocalDate sessionDate = session.getDate();
+                                        LocalDateTime sessionEndDateTime;
+                                        if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                                                LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                                                sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                                        } else {
+                                                sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+                                        }
+
+                                        boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
+                                        if (isAfterSessionEnd) {
+                                                // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
+                                                totalRecorded++;
+                                        }
+                                        // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
+                                }
+                        }
+                }
+
                 double attendanceRate = totalRecorded > 0 ? (double) presentCount / totalRecorded * 100 : 0.0;
 
                 // Calculate homework completion rate
@@ -1712,10 +1780,18 @@ public class ClassService {
                         }
                 }
 
-                // PHASE 1: SQL Bulk Insert (Fast Path - conflict check built into SQL)
+                // PHASE 1: Delete existing + SQL Bulk Insert (Replace resources)
                 int totalSuccessCount = 0;
                 for (org.fyp.tmssep490be.dtos.classcreation.AssignResourcesRequest.ResourceAssignment assignment : request
                                 .getPattern()) {
+                        // First, delete existing resources for this day of week
+                        int deletedCount = sessionResourceRepository.deleteResourcesForDayOfWeek(
+                                        classId,
+                                        assignment.getDayOfWeek().intValue());
+                        log.debug("Phase 1 - Day {}: Deleted {} existing resource assignments",
+                                        assignment.getDayOfWeek(), deletedCount);
+
+                        // Then, insert the new resource
                         int assignedCount = sessionResourceRepository.bulkInsertResourcesForDayOfWeek(
                                         classId,
                                         assignment.getDayOfWeek().intValue(),

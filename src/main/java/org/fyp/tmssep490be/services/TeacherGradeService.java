@@ -14,10 +14,12 @@ import org.fyp.tmssep490be.dtos.teachergrade.ClassGradesSummaryDTO;
 import org.fyp.tmssep490be.dtos.teachergrade.StudentGradeSummaryDTO;
 import org.fyp.tmssep490be.entities.Assessment;
 import org.fyp.tmssep490be.entities.Score;
+import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.SubjectAssessment;
 import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
+import org.fyp.tmssep490be.entities.enums.NotificationType;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.AssessmentRepository;
@@ -31,8 +33,11 @@ import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -54,6 +59,8 @@ public class TeacherGradeService {
     private final StudentRepository studentRepository;
     private final TeacherRepository teacherRepository;
     private final StudentSessionRepository studentSessionRepository;
+    private final NotificationService notificationService;
+    private final EmailService emailService;
 
     // Tính % điểm trên thang 100
     private Double calculatePercentage(Double score, double maxScore) {
@@ -219,13 +226,73 @@ public class TeacherGradeService {
                     int gradedCount = (int) percents.size();
 
                     // Chuyên cần: tính ngay, không cần chờ khóa học kết thúc
-                    List<StudentSession> studentSessions = studentSessionRepository.findByStudentIdAndClassEntityId(studentId, classId);
-                    long present = studentSessions.stream()
-                            .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
-                            .count();
-                    long absent = studentSessions.stream()
-                            .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT || ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
-                            .count();
+                    List<StudentSession> studentSessions = studentSessionRepository.findByStudentIdAndClassEntityId(studentId, classId)
+                            .stream()
+                            .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup())) // Bỏ qua học bù
+                            .toList();
+
+                    // Map thông tin học bù
+                    List<Long> sessionIds = studentSessions.stream()
+                            .map(ss -> ss.getSession().getId())
+                            .distinct()
+                            .toList();
+                    Map<Long, Boolean> makeupCompletedMap = new HashMap<>();
+                    if (!sessionIds.isEmpty()) {
+                        studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
+                                .stream()
+                                .filter(ss -> ss.getStudent().getId().equals(studentId))
+                                .forEach(ss -> {
+                                    Session originalSession = ss.getOriginalSession();
+                                    if (originalSession != null && originalSession.getId() != null) {
+                                        makeupCompletedMap.merge(
+                                                originalSession.getId(),
+                                                ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
+                                                (oldVal, newVal) -> oldVal || newVal
+                                        );
+                                    }
+                                });
+                    }
+
+                    LocalDateTime now = LocalDateTime.now();
+                    long present = 0;
+                    long absent = 0;
+
+                    for (StudentSession ss : studentSessions) {
+                        AttendanceStatus status = ss.getAttendanceStatus();
+                        Session session = ss.getSession();
+
+                        if (status == AttendanceStatus.PRESENT) {
+                            present++;
+                        } else if (status == AttendanceStatus.ABSENT) {
+                            absent++;
+                        } else if (status == AttendanceStatus.EXCUSED) {
+                            // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
+                            boolean hasMakeupCompleted = makeupCompletedMap.getOrDefault(session.getId(), false);
+
+                            if (hasMakeupCompleted) {
+                                // EXCUSED có học bù (chấm xanh) → tính như PRESENT
+                                present++;
+                            } else {
+                                // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
+                                LocalDate sessionDate = session.getDate();
+                                LocalDateTime sessionEndDateTime;
+                                if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                                    java.time.LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                                    sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                                } else {
+                                    sessionEndDateTime = LocalDateTime.of(sessionDate, java.time.LocalTime.MAX);
+                                }
+
+                                boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
+                                if (isAfterSessionEnd) {
+                                    // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
+                                    absent++;
+                                }
+                                // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
+                            }
+                        }
+                    }
+
                     long totalDone = present + absent;
                     Double attendanceRate = totalDone > 0 ? (present * 100d / totalDone) : null;
                     Double attendanceScore = attendanceRate;
@@ -494,6 +561,13 @@ public class TeacherGradeService {
 
         Score saved = scoreRepository.save(score);
 
+        // Gửi thông báo cho học sinh
+        try {
+            sendGradeNotificationToStudent(saved, assessment, maxScore);
+        } catch (Exception e) {
+            // Log error but don't block grade save
+        }
+
         Double scorePercent = (saved.getScore() != null && maxScore > 0)
                 ? saved.getScore().doubleValue() * 100d / maxScore
                 : null;
@@ -514,6 +588,53 @@ public class TeacherGradeService {
                 .scorePercentage(scorePercent)
                 .isGraded(saved.getGradedAt() != null)
                 .build();
+    }
+
+    // Helper: Gửi thông báo khi có điểm mới
+    private void sendGradeNotificationToStudent(Score score, Assessment assessment, double maxScore) {
+        if (score.getStudent() == null || score.getScore() == null) {
+            return;
+        }
+
+        Long studentId = score.getStudent().getId();
+        String studentName = score.getStudent().getUserAccount().getFullName();
+        String className = assessment.getClassEntity().getName();
+        String assessmentName = assessment.getSubjectAssessment().getName();
+        String teacherName = score.getGradedBy() != null 
+            ? score.getGradedBy().getUserAccount().getFullName() 
+            : "Giáo viên";
+        
+        double scoreValue = score.getScore().doubleValue();
+        double scorePercent = (maxScore > 0) ? (scoreValue * 100.0 / maxScore) : 0;
+        
+        // Internal notification
+        String notificationTitle = "Điểm số mới";
+        String notificationMessage = String.format(
+            "Điểm %s của lớp %s đã được chấm: %.2f/%.2f (%.1f%%)",
+            assessmentName, className, scoreValue, maxScore, scorePercent
+        );
+        
+        notificationService.createNotification(
+            studentId,
+            NotificationType.NOTIFICATION,
+            notificationTitle,
+            notificationMessage
+        );
+        
+        // Email notification
+        String gradedAt = score.getGradedAt() != null ? score.getGradedAt().toString() : "";
+        emailService.sendGradeUpdatedAsync(
+            score.getStudent().getUserAccount().getEmail(),
+            studentName,
+            className,
+            assessmentName,
+            "N/A", // phaseName - not used in current system
+            teacherName,
+            String.format("%.2f", scoreValue),
+            String.format("%.2f", maxScore),
+            score.getFeedback() != null ? score.getFeedback() : "",
+            gradedAt
+        );
     }
 
     // Lưu/cập nhật điểm hàng loạt

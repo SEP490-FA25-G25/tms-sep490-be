@@ -943,6 +943,11 @@ INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date
 -- IELTS Intermediate (Subject 2) - 5 classes (24 sessions each)
 (6, 1, 2, 'HN-IELTS-I1', 'HN IELTS Intermediate 1 (Early)', 'OFFLINE', '2025-11-17', '2026-01-09', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-10 10:00:00+07', '2025-11-11 14:00:00+07', '2025-11-10 10:00:00+07', NOW()),
 (7, 1, 2, 'HN-IELTS-I2', 'HN IELTS Intermediate 2 (Parallel A)', 'OFFLINE', '2025-12-02', '2026-01-24', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-25 10:00:00+07', '2025-11-26 14:00:00+07', '2025-11-25 10:00:00+07', NOW()),
+
+(8, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Parallel B)', 'OFFLINE', '2025-12-04', '2026-01-28', NULL, ARRAY[1,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-27 10:00:00+07', '2025-11-28 14:00:00+07', '2025-11-27 10:00:00+07', NOW()),
+(9, 1, 2, 'HN-IELTS-I4', 'HN IELTS Intermediate 4 (Parallel C)', 'ONLINE', '2025-12-06', '2026-01-30', NULL, ARRAY[0,2,4]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', NOW()),
+(10, 1, 2, 'HN-IELTS-I5', 'HN IELTS Intermediate 5 (Late)', 'OFFLINE', '2025-12-16', '2026-02-07', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-09 10:00:00+07', '2025-12-10 14:00:00+07', '2025-12-09 10:00:00+07', NOW());
+
 (8, 1, 2, 'HN-IELTS-I3', 'HN IELTS Intermediate 3 (Parallel B)', 'OFFLINE', '2025-12-04', '2026-01-28', NULL, ARRAY[2,4,6]::smallint[], 20, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-27 10:00:00+07', '2025-11-28 14:00:00+07', '2025-11-27 10:00:00+07', NOW()),
 (9, 1, 2, 'HN-IELTS-I4', 'HN IELTS Intermediate 4 (Parallel C)', 'ONLINE', '2025-12-06', '2026-01-30', NULL, ARRAY[2,4,6]::smallint[], 25, 'ONGOING', 'APPROVED', NULL, 6, 3, '2025-11-29 10:00:00+07', '2025-11-30 14:00:00+07', '2025-11-29 10:00:00+07', NOW()),
 (10, 1, 2, 'HN-IELTS-I5', 'HN IELTS Intermediate 5 (Late)', 'OFFLINE', '2025-12-16', '2026-02-07', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-09 10:00:00+07', '2025-12-10 14:00:00+07', '2025-12-09 10:00:00+07', NOW()),
@@ -1077,6 +1082,14 @@ SELECT 1500 + s.idx, 16, 24 + s.idx, 13, ('2025-12-23'::date + ((s.idx - 1) / 3)
 FROM generate_series(1, 24) AS s(idx);
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 8 FROM session WHERE class_id = 16;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 14, 'SCHEDULED' FROM session WHERE class_id = 16;
+
+-- ========== UPDATE assigned_teacher_id for some classes (leave some for testing) ==========
+-- Only assign teachers to ONGOING classes (1-4), leave SCHEDULED classes (5+) without teacher
+UPDATE "class" SET assigned_teacher_id = 1, teacher_assigned_at = created_at WHERE id = 1;  -- John Smith → HN-IELTS-F1
+UPDATE "class" SET assigned_teacher_id = 2, teacher_assigned_at = created_at WHERE id = 2;  -- Emma Wilson → HN-IELTS-F2
+UPDATE "class" SET assigned_teacher_id = 3, teacher_assigned_at = created_at WHERE id = 3;  -- David Lee → HN-IELTS-F3
+UPDATE "class" SET assigned_teacher_id = 4, teacher_assigned_at = created_at WHERE id = 4;  -- Sarah Johnson → HN-IELTS-F4
+-- Classes 5-16 left without assigned_teacher for testing schedule conflict detection
 
 -- Enrollments for Class 1 (HN-IELTS-F1 - Early) - 15 students (IDs 1-15)
 INSERT INTO enrollment (id, class_id, student_id, status, enrolled_at, enrolled_by, join_session_id, created_at, updated_at)

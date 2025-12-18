@@ -199,6 +199,21 @@ public class CurriculumService {
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "Không tìm thấy chương trình với ID: " + id));
 
+                // Only allow deactivating ACTIVE curriculums
+                if (curriculum.getStatus() != CurriculumStatus.ACTIVE) {
+                        throw new IllegalStateException(
+                                        "Chỉ có thể vô hiệu hóa chương trình đang ở trạng thái HOẠT ĐỘNG");
+                }
+
+                // Check if any levels are still ACTIVE
+                boolean hasActiveLevel = curriculum.getLevels().stream()
+                                .anyMatch(level -> level.getStatus() == LevelStatus.ACTIVE);
+
+                if (hasActiveLevel) {
+                        throw new IllegalStateException(
+                                        "Không thể vô hiệu hóa chương trình vì đang có cấp độ hoạt động. Vui lòng vô hiệu hóa tất cả cấp độ trước.");
+                }
+
                 curriculum.setStatus(CurriculumStatus.INACTIVE);
                 curriculumRepository.save(curriculum);
         }
@@ -383,6 +398,20 @@ public class CurriculumService {
                 Level level = levelRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "Không tìm thấy cấp độ với ID: " + id));
+
+                // Only allow deactivating ACTIVE levels
+                if (level.getStatus() != LevelStatus.ACTIVE) {
+                        throw new IllegalStateException(
+                                        "Chỉ có thể vô hiệu hóa cấp độ đang ở trạng thái HOẠT ĐỘNG");
+                }
+
+                // Check if any subjects are still ACTIVE
+                boolean hasActiveSubject = subjectRepository.existsByLevelIdAndStatus(id, SubjectStatus.ACTIVE);
+
+                if (hasActiveSubject) {
+                        throw new IllegalStateException(
+                                        "Không thể vô hiệu hóa cấp độ vì đang có môn học hoạt động. Vui lòng vô hiệu hóa tất cả môn học trước.");
+                }
 
                 level.setStatus(LevelStatus.INACTIVE);
                 levelRepository.save(level);
