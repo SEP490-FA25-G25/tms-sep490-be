@@ -119,4 +119,14 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
         // Find classes by status (for cronjob)
         List<ClassEntity> findByStatus(ClassStatus status);
 
+        // Find upcoming scheduled classes for public schedule page
+        @Query("SELECT c FROM ClassEntity c " +
+                        "LEFT JOIN FETCH c.subject s " +
+                        "LEFT JOIN FETCH c.branch b " +
+                        "WHERE c.status = 'SCHEDULED' " +
+                        "AND c.approvalStatus = 'APPROVED' " +
+                        "AND c.startDate >= :today " +
+                        "ORDER BY c.startDate ASC")
+        List<ClassEntity> findUpcomingScheduledClasses(@Param("today") java.time.LocalDate today);
+
 }
