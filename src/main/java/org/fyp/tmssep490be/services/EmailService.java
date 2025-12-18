@@ -149,4 +149,131 @@ public class EmailService {
         sendEmailWithTemplateAsync(to, subject, "emails/pending-request-reminder", templateData);
     }
 
+    // Gửi email thông báo student request được phê duyệt
+    public void sendStudentRequestApprovedAsync(String to, String studentName, String requestType,
+                                                 String className, String sessionInfo,
+                                                 String makeupSessionInfo, String targetClassInfo,
+                                                 String decidedBy, String decidedAt, String note) {
+        String subject = "Yêu cầu của bạn đã được phê duyệt";
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("requestType", requestType);
+        templateData.put("className", className);
+        templateData.put("sessionInfo", sessionInfo);
+        templateData.put("makeupSessionInfo", makeupSessionInfo);
+        templateData.put("targetClassInfo", targetClassInfo);
+        templateData.put("decidedBy", decidedBy);
+        templateData.put("decidedAt", decidedAt);
+        templateData.put("note", note);
+        templateData.put("requestUrl", frontendUrl + "/student/requests");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/student-request-approved", templateData);
+    }
+
+    // Gửi email thông báo student request bị từ chối
+    public void sendStudentRequestRejectedAsync(String to, String studentName, String requestType,
+                                                 String className, String sessionInfo,
+                                                 String decidedBy, String decidedAt, String rejectionReason) {
+        String subject = "Yêu cầu của bạn đã bị từ chối";
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("requestType", requestType);
+        templateData.put("className", className);
+        templateData.put("sessionInfo", sessionInfo);
+        templateData.put("decidedBy", decidedBy);
+        templateData.put("decidedAt", decidedAt);
+        templateData.put("rejectionReason", rejectionReason);
+        templateData.put("requestUrl", frontendUrl + "/student/requests");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/student-request-rejected", templateData);
+    }
+
+    // Gửi email thông báo điểm số được cập nhật
+    public void sendGradeUpdatedAsync(String to, String studentName, String className,
+                                      String assessmentName, String phaseName, String teacherName,
+                                      String score, String maxScore, String comment, String updatedAt) {
+        String subject = "Điểm số đã được cập nhật - " + assessmentName;
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("className", className);
+        templateData.put("assessmentName", assessmentName);
+        templateData.put("phaseName", phaseName);
+        templateData.put("teacherName", teacherName);
+        templateData.put("score", score);
+        templateData.put("maxScore", maxScore);
+        templateData.put("comment", comment);
+        templateData.put("updatedAt", updatedAt);
+        templateData.put("gradesUrl", frontendUrl + "/student/grades");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/grade-updated", templateData);
+    }
+
+    // Gửi email cảnh báo về tình trạng vắng nhiều
+    public void sendAttendanceWarningAsync(String to, String studentName, String className,
+                                           String teacherName, String period,
+                                           int absentCount, int totalSessions,
+                                           String attendanceRate, int remainingAllowedAbsent) {
+        String subject = "Cảnh báo: Tình trạng điểm danh của bạn";
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("className", className);
+        templateData.put("teacherName", teacherName);
+        templateData.put("period", period);
+        templateData.put("absentCount", absentCount);
+        templateData.put("totalSessions", totalSessions);
+        templateData.put("attendanceRate", attendanceRate);
+        templateData.put("remainingAllowedAbsent", remainingAllowedAbsent);
+        templateData.put("attendanceUrl", frontendUrl + "/student/attendance");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/attendance-warning", templateData);
+    }
+
+    @Async
+    public void sendSessionCancelledAsync(String to, String studentName, String className, 
+                                          String subjectName, String sessionDate, String sessionTime,
+                                          String originalTeacher, String reason) {
+        String subject = "Thông báo hủy buổi học - " + className;
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("className", className);
+        templateData.put("subjectName", subjectName);
+        templateData.put("sessionDate", sessionDate);
+        templateData.put("sessionTime", sessionTime);
+        templateData.put("originalTeacher", originalTeacher);
+        templateData.put("reason", reason);
+        templateData.put("scheduleUrl", frontendUrl + "/student/schedule");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/session-cancelled", templateData);
+    }
+
+    @Async
+    public void sendScheduleChangedAsync(String to, String studentName, String className,
+                                         String subjectName, String oldDate, String oldTime,
+                                         String oldRoom, String oldModality, String newDate,
+                                         String newTime, String newRoom, String newModality, String reason) {
+        String subject = "Thông báo thay đổi lịch học - " + className;
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("className", className);
+        templateData.put("subjectName", subjectName);
+        templateData.put("oldDate", oldDate);
+        templateData.put("oldTime", oldTime);
+        templateData.put("oldRoom", oldRoom);
+        templateData.put("oldModality", oldModality);
+        templateData.put("newDate", newDate);
+        templateData.put("newTime", newTime);
+        templateData.put("newRoom", newRoom);
+        templateData.put("newModality", newModality);
+        templateData.put("reason", reason);
+        templateData.put("scheduleUrl", frontendUrl + "/student/schedule");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/schedule-changed", templateData);
+    }
+
 }

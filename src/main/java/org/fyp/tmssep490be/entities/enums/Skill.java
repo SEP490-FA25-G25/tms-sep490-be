@@ -10,6 +10,5 @@ public enum Skill {
 
     // Special skills for specific languages (e.g., JLPT)
     VOCABULARY,
-    GRAMMAR,
-    KANJI
+    GRAMMAR
 }

@@ -16,6 +16,13 @@ public interface StudentSessionRepository extends JpaRepository<StudentSession, 
 
     List<StudentSession> findBySessionId(Long sessionId);
 
+    @Query("SELECT ss FROM StudentSession ss " +
+           "JOIN FETCH ss.student student " +
+           "JOIN FETCH student.userAccount " +
+           "JOIN FETCH ss.session s " +
+           "WHERE ss.session.id = :sessionId")
+    List<StudentSession> findBySessionIdWithStudent(@Param("sessionId") Long sessionId);
+
     @Query("SELECT DISTINCT ss FROM StudentSession ss " +
             "JOIN FETCH ss.student student " +
             "JOIN FETCH student.userAccount " +

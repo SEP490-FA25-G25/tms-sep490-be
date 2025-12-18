@@ -16,6 +16,7 @@ import org.fyp.tmssep490be.dtos.schedule.TimeSlotDTO;
 import org.fyp.tmssep490be.entities.Resource;
 import org.fyp.tmssep490be.entities.Session;
 import org.fyp.tmssep490be.entities.SessionResource;
+import org.fyp.tmssep490be.entities.Student;
 import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.Teacher;
 import org.fyp.tmssep490be.entities.TeacherRequest;
@@ -34,6 +35,7 @@ import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.ResourceRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
 import org.fyp.tmssep490be.repositories.SessionResourceRepository;
+import org.fyp.tmssep490be.repositories.StudentRequestRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.fyp.tmssep490be.repositories.TeacherRepository;
 import org.fyp.tmssep490be.repositories.TeacherRequestRepository;
@@ -41,6 +43,8 @@ import org.fyp.tmssep490be.repositories.TeachingSlotRepository;
 import org.fyp.tmssep490be.repositories.TimeSlotTemplateRepository;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.repositories.UserBranchesRepository;
+import org.fyp.tmssep490be.entities.enums.StudentRequestType;
+import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.services.EmailService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +55,7 @@ import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -65,6 +70,7 @@ public class TeacherRequestService {
     private final SessionRepository sessionRepository;
     private final SessionResourceRepository sessionResourceRepository;
     private final StudentSessionRepository studentSessionRepository;
+    private final StudentRequestRepository studentRequestRepository;
     private final TeachingSlotRepository teachingSlotRepository;
     private final UserBranchesRepository userBranchesRepository;
     private final UserAccountRepository userAccountRepository;
@@ -2243,6 +2249,12 @@ public class TeacherRequestService {
                 sendNotificationToTeacherForApproval(request);
                 // Email cho teacher về việc request đã được duyệt
                 sendEmailNotificationForApproval(request);
+                
+                // NEW: Gửi notification + email cho STUDENTS về schedule change
+                if (request.getRequestType() == TeacherRequestType.RESCHEDULE || 
+                    request.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
+                    sendScheduleChangedNotificationToStudents(request);
+                }
             }
         } catch (Exception e) {
             log.error("Lỗi khi gửi notification/email cho teacher về request {}: {}", requestId, e.getMessage());
@@ -2506,11 +2518,155 @@ public class TeacherRequestService {
                 .build();
         teachingSlotRepository.save(newTeachingSlot);
 
-        // Copy student sessions (chỉ những bản ghi PLANNED)
+        // Xử lý các trường hợp EXCUSED trước
+        List<StudentSession> excusedStudentSessions = studentSessionRepository.findAll().stream()
+                .filter(ss -> ss.getSession().getId().equals(oldSession.getId()))
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
+                .collect(Collectors.toList());
+
+        // Tìm tất cả makeup sessions trỏ đến session cũ
+        List<StudentSession> makeupSessions = studentSessionRepository.findMakeupSessionsByOriginalSessionIds(
+                List.of(oldSession.getId()));
+
+        // Map: studentId -> makeup session PRESENT
+        Map<Long, StudentSession> completedMakeupMap = makeupSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                .collect(Collectors.toMap(
+                        ss -> ss.getStudent().getId(),
+                        ss -> ss,
+                        (existing, replacement) -> existing // Nếu có nhiều, giữ cái đầu tiên
+                ));
+
+        // Map: studentId -> makeup session PLANNED (request đã APPROVED)
+        Map<Long, StudentSession> plannedMakeupMap = makeupSessions.stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PLANNED)
+                .collect(Collectors.toMap(
+                        ss -> ss.getStudent().getId(),
+                        ss -> ss,
+                        (existing, replacement) -> existing
+                ));
+
+        // Set để track học viên đã được xử lý
+        Set<Long> processedStudentIds = new HashSet<>();
+
+        // Xử lý từng học viên EXCUSED
+        for (StudentSession excusedSs : excusedStudentSessions) {
+            Long studentId = excusedSs.getStudent().getId();
+            processedStudentIds.add(studentId);
+
+            // Trường hợp 1: Đã học bù xong (PRESENT)
+            if (completedMakeupMap.containsKey(studentId)) {
+                StudentSession makeupSession = completedMakeupMap.get(studentId);
+                // Cập nhật originalSession trỏ đến session mới
+                makeupSession.setOriginalSession(newSession);
+                studentSessionRepository.save(makeupSession);
+                log.info("Updated makeup session {} originalSession from {} to {} (student {} already completed makeup)",
+                        makeupSession.getId().getSessionId(), oldSession.getId(), newSession.getId(), studentId);
+
+                // VẪN giữ buổi mới ở trạng thái EXCUSED để hiển thị chấm xanh
+                // (original session được reschedule, học viên đã học bù xong)
+                StudentSession.StudentSessionId newSsId = new StudentSession.StudentSessionId();
+                newSsId.setStudentId(studentId);
+                newSsId.setSessionId(newSession.getId());
+
+                StudentSession newSs = StudentSession.builder()
+                        .id(newSsId)
+                        .student(excusedSs.getStudent())
+                        .session(newSession)
+                        .attendanceStatus(AttendanceStatus.EXCUSED)
+                        .isMakeup(false)
+                        .homeworkStatus(null)
+                        .note("Buổi học được đổi lịch từ session " + oldSession.getId() + ", học viên đã hoàn thành buổi học bù")
+                        .build();
+                studentSessionRepository.save(newSs);
+                log.info("Created new StudentSession with EXCUSED for student {} in new session {} (makeup already completed)",
+                        studentId, newSession.getId());
+            }
+            // Trường hợp 4: Có makeup session PLANNED (request đã APPROVED)
+            else if (plannedMakeupMap.containsKey(studentId)) {
+                StudentSession makeupSession = plannedMakeupMap.get(studentId);
+                // Cập nhật originalSession trỏ đến session mới
+                makeupSession.setOriginalSession(newSession);
+                studentSessionRepository.save(makeupSession);
+
+                // Cập nhật StudentRequest.targetSession nếu có
+                List<org.fyp.tmssep490be.entities.StudentRequest> makeupRequests = studentRequestRepository
+                        .findByStudentIdAndTargetSessionIdAndRequestType(
+                                studentId, oldSession.getId(), StudentRequestType.MAKEUP);
+                for (org.fyp.tmssep490be.entities.StudentRequest makeupRequest : makeupRequests) {
+                    if (makeupRequest.getStatus() == RequestStatus.APPROVED) {
+                        makeupRequest.setTargetSession(newSession);
+                        studentRequestRepository.save(makeupRequest);
+                        log.info("Updated makeup request {} targetSession from {} to {}",
+                                makeupRequest.getId(), oldSession.getId(), newSession.getId());
+                    }
+                }
+
+                // Tạo StudentSession mới với status = EXCUSED (giữ nguyên vì đã được approve học bù)
+                StudentSession.StudentSessionId newSsId = new StudentSession.StudentSessionId();
+                newSsId.setStudentId(studentId);
+                newSsId.setSessionId(newSession.getId());
+
+                StudentSession newSs = StudentSession.builder()
+                        .id(newSsId)
+                        .student(excusedSs.getStudent())
+                        .session(newSession)
+                        .attendanceStatus(AttendanceStatus.EXCUSED)
+                        .isMakeup(false)
+                        .homeworkStatus(null)
+                        .note("Buổi học được đổi lịch từ session " + oldSession.getId())
+                        .build();
+                studentSessionRepository.save(newSs);
+                log.info("Created new StudentSession with EXCUSED for student {} in new session {} (makeup already approved)",
+                        studentId, newSession.getId());
+            }
+            // Trường hợp 3: Có request PENDING
+            else {
+                List<org.fyp.tmssep490be.entities.StudentRequest> pendingRequests = studentRequestRepository
+                        .findByStudentIdAndTargetSessionIdAndRequestType(
+                                studentId, oldSession.getId(), StudentRequestType.MAKEUP);
+                boolean hasPendingRequest = pendingRequests.stream()
+                        .anyMatch(req -> req.getStatus() == RequestStatus.PENDING);
+
+                if (hasPendingRequest) {
+                    // Hủy (CANCEL) các request PENDING
+                    for (org.fyp.tmssep490be.entities.StudentRequest pendingRequest : pendingRequests) {
+                        if (pendingRequest.getStatus() == RequestStatus.PENDING) {
+                            pendingRequest.setStatus(RequestStatus.CANCELLED);
+                            pendingRequest.setNote("Request cancelled due to session reschedule from " + oldSession.getId() + " to " + newSession.getId());
+                            studentRequestRepository.save(pendingRequest);
+                            log.info("Cancelled makeup request {} for student {} due to session reschedule",
+                                    pendingRequest.getId(), studentId);
+                        }
+                    }
+                }
+
+                // Trường hợp 2 hoặc 3: Tạo StudentSession mới với status = PLANNED
+                StudentSession.StudentSessionId newSsId = new StudentSession.StudentSessionId();
+                newSsId.setStudentId(studentId);
+                newSsId.setSessionId(newSession.getId());
+
+                StudentSession newSs = StudentSession.builder()
+                        .id(newSsId)
+                        .student(excusedSs.getStudent())
+                        .session(newSession)
+                        .attendanceStatus(AttendanceStatus.PLANNED)
+                        .isMakeup(false)
+                        .homeworkStatus(null)
+                        .note("Buổi học được đổi lịch từ session " + oldSession.getId())
+                        .build();
+                studentSessionRepository.save(newSs);
+                log.info("Created new StudentSession with PLANNED for student {} in new session {} (no makeup or pending request cancelled)",
+                        studentId, newSession.getId());
+            }
+        }
+
+        // Copy student sessions (chỉ những bản ghi PLANNED và chưa được xử lý)
         List<StudentSession> oldStudentSessions = studentSessionRepository.findAll().stream()
                 .filter(ss -> ss.getSession().getId().equals(oldSession.getId()))
-                .filter(ss -> ss.getAttendanceStatus() == null ||
-                        ss.getAttendanceStatus() == org.fyp.tmssep490be.entities.enums.AttendanceStatus.PLANNED)
+                .filter(ss -> (ss.getAttendanceStatus() == null ||
+                        ss.getAttendanceStatus() == AttendanceStatus.PLANNED))
+                .filter(ss -> !processedStudentIds.contains(ss.getStudent().getId()))
                 .collect(Collectors.toList());
         for (StudentSession oldSs : oldStudentSessions) {
             StudentSession.StudentSessionId newSsId = new StudentSession.StudentSessionId();
@@ -2521,7 +2677,7 @@ public class TeacherRequestService {
                     .id(newSsId)
                     .student(oldSs.getStudent())
                     .session(newSession)
-                    .attendanceStatus(org.fyp.tmssep490be.entities.enums.AttendanceStatus.PLANNED)
+                    .attendanceStatus(AttendanceStatus.PLANNED)
                     .isMakeup(false)
                     .homeworkStatus(null)
                     .note(null)
@@ -2683,10 +2839,12 @@ public class TeacherRequestService {
         log.info("Replacement request {} confirmed successfully by teacher {}. Session {} updated: teacher {} -> {}", 
                 requestId, userId, session.getId(), originalTeacher.getId(), request.getReplacementTeacher().getId());
 
-        // Gửi thông báo cho giáo vụ và teacher gốc
+        // Gửi thông báo cho giáo vụ, teacher gốc và STUDENTS
         try {
             sendNotificationToAcademicStaffForReplacementConfirmation(request);
             sendNotificationToOriginalTeacherForReplacementConfirmation(request);
+            // NEW: Gửi notification + email cho students về việc teacher thay đổi
+            sendSessionCancelledNotificationToStudents(request);
         } catch (Exception e) {
             log.error("Lỗi khi gửi notification về replacement confirmation cho request {}: {}", requestId, e.getMessage());
             // Không throw exception - notification failure không nên block việc confirm
@@ -3085,6 +3243,188 @@ public class TeacherRequestService {
                 requestId, replacementTeacherId, academicStaffUserId);
 
         return mapToResponseDTO(request);
+    }
+
+    // Helper: Gửi notification + email cho students khi session bị cancel (teacher replacement)
+    private void sendSessionCancelledNotificationToStudents(TeacherRequest request) {
+        try {
+            Session session = request.getSession();
+            if (session == null) {
+                return;
+            }
+
+            // Lấy danh sách students enrolled trong session
+            List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(session.getId());
+            if (studentSessions.isEmpty()) {
+                log.info("No students found in session {} - skip notification", session.getId());
+                return;
+            }
+
+            // Prepare notification data
+            String className = session.getClassEntity().getName();
+            String subjectName = session.getClassEntity().getSubject().getName();
+            String sessionDate = session.getDate().toString();
+            String sessionTime = session.getTimeSlotTemplate() != null 
+                ? String.format("%s - %s", 
+                    session.getTimeSlotTemplate().getStartTime(), 
+                    session.getTimeSlotTemplate().getEndTime())
+                : "N/A";
+            String originalTeacherName = request.getTeacher() != null && request.getTeacher().getUserAccount() != null
+                ? request.getTeacher().getUserAccount().getFullName()
+                : "Giáo viên";
+            String reason = request.getRequestReason() != null ? request.getRequestReason() : "Giáo viên có việc đột xuất";
+
+            // Internal notification title & message
+            String notificationTitle = "Thay đổi giáo viên";
+            String notificationMessage = String.format(
+                "Giáo viên %s sẽ không dạy buổi %s (%s). Giáo viên dạy thay đã được xác nhận.",
+                originalTeacherName, sessionDate, className
+            );
+
+            // Send bulk internal notifications
+            List<Long> studentUserIds = studentSessions.stream()
+                .map(ss -> ss.getStudent().getUserAccount().getId())
+                .toList();
+
+            notificationService.sendBulkNotifications(
+                studentUserIds,
+                NotificationType.NOTIFICATION,
+                notificationTitle,
+                notificationMessage
+            );
+
+            // Send individual emails
+            for (StudentSession ss : studentSessions) {
+                Student student = ss.getStudent();
+                if (student.getUserAccount() != null && student.getUserAccount().getEmail() != null) {
+                    emailService.sendSessionCancelledAsync(
+                        student.getUserAccount().getEmail(),
+                        student.getUserAccount().getFullName(),
+                        className,
+                        subjectName,
+                        sessionDate,
+                        sessionTime,
+                        originalTeacherName,
+                        reason
+                    );
+                }
+            }
+
+            log.info("Sent session cancelled notifications to {} students for session {}", studentSessions.size(), session.getId());
+        } catch (Exception e) {
+            log.error("Error sending session cancelled notifications for request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
+    }
+
+    // Helper: Gửi notification + email cho students khi schedule thay đổi (RESCHEDULE/MODALITY_CHANGE)
+    private void sendScheduleChangedNotificationToStudents(TeacherRequest request) {
+        try {
+            Session oldSession = request.getSession();
+            Session newSession = request.getNewSession();
+            
+            if (oldSession == null) {
+                return;
+            }
+
+            // Lấy danh sách students
+            List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(oldSession.getId());
+            if (studentSessions.isEmpty()) {
+                log.info("No students found in session {} - skip schedule change notification", oldSession.getId());
+                return;
+            }
+
+            // Prepare notification data
+            String className = oldSession.getClassEntity().getName();
+            String subjectName = oldSession.getClassEntity().getSubject().getName();
+            
+            // Old schedule info
+            String oldDate = oldSession.getDate().toString();
+            String oldTime = oldSession.getTimeSlotTemplate() != null
+                ? String.format("%s - %s", 
+                    oldSession.getTimeSlotTemplate().getStartTime(),
+                    oldSession.getTimeSlotTemplate().getEndTime())
+                : "N/A";
+            String oldRoom = "N/A";
+            String oldModality = "N/A";
+            if (!oldSession.getSessionResources().isEmpty()) {
+                Resource oldResource = oldSession.getSessionResources().iterator().next().getResource();
+                oldRoom = oldResource.getName();
+                // Modality không có trong Resource entity - skip
+            }
+
+            // New schedule info
+            String newDate = oldDate; // default to old if not changed
+            String newTime = oldTime;
+            String newRoom = oldRoom;
+            String newModality = oldModality;
+            
+            if (request.getRequestType() == TeacherRequestType.RESCHEDULE && newSession != null) {
+                newDate = newSession.getDate().toString();
+                newTime = newSession.getTimeSlotTemplate() != null
+                    ? String.format("%s - %s",
+                        newSession.getTimeSlotTemplate().getStartTime(),
+                        newSession.getTimeSlotTemplate().getEndTime())
+                    : oldTime;
+                if (!newSession.getSessionResources().isEmpty()) {
+                    Resource newResource = newSession.getSessionResources().iterator().next().getResource();
+                    newRoom = newResource.getName();
+                    // Modality không có trong Resource entity - skip
+                }
+            } else if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE && request.getNewResource() != null) {
+                // MODALITY_CHANGE: only resource changes, date/time stay same
+                newRoom = request.getNewResource().getName();
+                // Modality không có trong Resource entity - skip
+            }
+
+            String reason = request.getRequestReason() != null ? request.getRequestReason() : "Thay đổi lịch học";
+
+            // Internal notification
+            String notificationTitle = "Thay đổi lịch học";
+            String notificationMessage = String.format(
+                "Lịch học lớp %s đã thay đổi. Từ %s %s thành %s %s",
+                className, oldDate, oldTime, newDate, newTime
+            );
+
+            // Send bulk internal notifications
+            List<Long> studentUserIds = studentSessions.stream()
+                .map(ss -> ss.getStudent().getUserAccount().getId())
+                .toList();
+
+            notificationService.sendBulkNotifications(
+                studentUserIds,
+                NotificationType.NOTIFICATION,
+                notificationTitle,
+                notificationMessage
+            );
+
+            // Send individual emails
+            for (StudentSession ss : studentSessions) {
+                Student student = ss.getStudent();
+                if (student.getUserAccount() != null && student.getUserAccount().getEmail() != null) {
+                    emailService.sendScheduleChangedAsync(
+                        student.getUserAccount().getEmail(),
+                        student.getUserAccount().getFullName(),
+                        className,
+                        subjectName,
+                        oldDate,
+                        oldTime,
+                        oldRoom,
+                        oldModality,
+                        newDate,
+                        newTime,
+                        newRoom,
+                        newModality,
+                        reason
+                    );
+                }
+            }
+
+            log.info("Sent schedule changed notifications to {} students for session {}", studentSessions.size(), oldSession.getId());
+        } catch (Exception e) {
+            log.error("Error sending schedule changed notifications for request {}: {}", request.getId(), e.getMessage());
+            throw e;
+        }
     }
 
     // Lấy config cho teacher request

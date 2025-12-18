@@ -19,6 +19,8 @@ import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -185,19 +187,80 @@ public class StudentAttendanceService {
                 })
                 .toList();
 
+        // Map thông tin học bù để xác định EXCUSED có học bù hay không
+        List<Long> sessionIds = activeSessions.stream()
+                .map(ss -> ss.getSession().getId())
+                .distinct()
+                .toList();
+        Map<Long, Map<Long, Boolean>> makeupCompletedMap = new HashMap<>();
+        if (!sessionIds.isEmpty()) {
+            studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
+                    .forEach(ss -> {
+                        Session originalSession = ss.getOriginalSession();
+                        if (originalSession == null || ss.getStudent() == null) {
+                            return;
+                        }
+                        Long originalSessionId = originalSession.getId();
+                        Long makeupStudentId = ss.getStudent().getId();
+                        if (originalSessionId == null || makeupStudentId == null) {
+                            return;
+                        }
+
+                        makeupCompletedMap
+                                .computeIfAbsent(originalSessionId, k -> new HashMap<>())
+                                .merge(
+                                        makeupStudentId,
+                                        ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
+                                        (oldVal, newVal) -> oldVal || newVal
+                                );
+                    });
+        }
+
         int attended = 0;
         int absent = 0;
         int excused = 0;
         int upcoming = 0;
+        LocalDateTime now = LocalDateTime.now();
+        
         for (StudentSession ss : activeSessions) {
             AttendanceStatus displayStatus = resolveDisplayStatusForStudent(ss);
             if (displayStatus == null) {
                 continue;
             }
+            Session session = ss.getSession();
+            
             switch (displayStatus) {
                 case PRESENT -> attended++;
                 case ABSENT -> absent++;
-                case EXCUSED -> excused++;
+                case EXCUSED -> {
+                    excused++; // Vẫn đếm riêng để hiển thị
+                    // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
+                    boolean hasMakeupCompleted = makeupCompletedMap
+                            .getOrDefault(session.getId(), Map.of())
+                            .getOrDefault(ss.getStudent().getId(), false);
+
+                    if (hasMakeupCompleted) {
+                        // EXCUSED có học bù (chấm xanh) → tính như PRESENT
+                        attended++;
+                    } else {
+                        // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
+                        LocalDate sessionDate = session.getDate();
+                        LocalDateTime sessionEndDateTime;
+                        if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                            LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                            sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                        } else {
+                            sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+                        }
+
+                        boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
+                        if (isAfterSessionEnd) {
+                            // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
+                            absent++;
+                        }
+                        // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
+                    }
+                }
                 case PLANNED -> upcoming++;
                 default -> {
                 }

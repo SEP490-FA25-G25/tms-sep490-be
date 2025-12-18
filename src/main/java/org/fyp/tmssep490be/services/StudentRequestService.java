@@ -48,6 +48,7 @@ public class StudentRequestService {
     private final ClassRepository classRepository;
     private final UserAccountRepository userAccountRepository;
     private final NotificationService notificationService;
+    private final EmailService emailService;
 
     public Page<StudentRequestResponseDTO> getMyRequests(Long userId, RequestFilterDTO filter) {
         log.debug("Getting requests for student user {}", userId);
@@ -543,6 +544,13 @@ public class StudentRequestService {
         request = studentRequestRepository.save(request);
         log.info("Absence request created successfully with id: {}", request.getId());
 
+        // Send notification to Academic Affairs
+        try {
+            sendNotificationToAcademicStaffForNewRequest(request);
+        } catch (Exception e) {
+            log.error("Failed to send notification for new absence request {}: {}", request.getId(), e.getMessage());
+        }
+
         return mapToStudentRequestResponseDTO(request);
     }
 
@@ -662,6 +670,13 @@ public class StudentRequestService {
 
         log.info("Request {} approved by user {}", requestId, decidedById);
 
+        // Send approval notifications to student
+        try {
+            sendApprovalNotificationsToStudent(request);
+        } catch (Exception e) {
+            log.error("Failed to send approval notifications for request {}: {}", requestId, e.getMessage());
+        }
+
         return mapToStudentRequestResponseDTO(request);
     }
 
@@ -684,6 +699,13 @@ public class StudentRequestService {
         request = studentRequestRepository.save(request);
 
         log.info("Request {} rejected by user {}", requestId, decidedById);
+
+        // Send rejection notifications to student
+        try {
+            sendRejectionNotificationsToStudent(request, dto.getNote() != null ? dto.getNote() : "Không có lý do cụ thể");
+        } catch (Exception e) {
+            log.error("Failed to send rejection notifications for request {}: {}", requestId, e.getMessage());
+        }
 
         return mapToStudentRequestResponseDTO(request);
     }
@@ -827,6 +849,13 @@ public class StudentRequestService {
         // 10. If auto-approved, create makeup student session immediately
         if (autoApprove) {
             executeMakeupApproval(request);
+        } else {
+            // Send notification to Academic Affairs for new request
+            try {
+                sendNotificationToAcademicStaffForNewRequest(request);
+            } catch (Exception e) {
+                log.error("Failed to send notification for new makeup request {}: {}", request.getId(), e.getMessage());
+            }
         }
 
         log.info("Makeup request created with ID: {} - Status: {}", request.getId(), request.getStatus());
@@ -1041,7 +1070,6 @@ public class StudentRequestService {
 
         //Là hôm nay - số tuần -> ra cái ngày cũ nhất
         LocalDate cutoffDate = LocalDate.now().minusWeeks(lookbackWeeks);
-        LocalDate today = LocalDate.now();
 
         List<StudentSession> allSessions = studentSessionRepository.findAllByStudentId(studentId);
         
@@ -1051,7 +1079,8 @@ public class StudentRequestService {
                            || ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
                 .filter(ss -> {
                     LocalDate sessionDate = ss.getSession().getDate();
-                    return !sessionDate.isBefore(cutoffDate) && !sessionDate.isAfter(today);
+                    // Chỉ filter cutoffDate, KHÔNG filter tương lai (cho phép EXCUSED sessions trong tương lai)
+                    return !sessionDate.isBefore(cutoffDate);
                 })
                 .filter(ss -> ss.getSession().getStatus() != SessionStatus.CANCELLED)
                 .map(ss -> mapToMissedSessionDTO(ss, excludeRequestedSessions))
@@ -2108,6 +2137,228 @@ public class StudentRequestService {
             log.info("Sent transfer notification to student {}", request.getStudent().getId());
         } catch (Exception e) {
             log.error("Failed to send notification for transfer {}: {}", request.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * Send notification to Academic Affairs when student submits a new request
+     */
+    private void sendNotificationToAcademicStaffForNewRequest(StudentRequest request) {
+        try {
+            // Get branch of student's class
+            Long branchId = request.getCurrentClass() != null && request.getCurrentClass().getBranch() != null
+                    ? request.getCurrentClass().getBranch().getId()
+                    : null;
+
+            if (branchId == null) {
+                log.warn("Cannot send notification - request {} has no branch", request.getId());
+                return;
+            }
+
+            // Get all Academic Affairs staff in this branch
+            List<UserAccount> academicStaffUsers = userAccountRepository.findByRoleCodeAndBranches(
+                    "ACADEMIC_AFFAIR", List.of(branchId));
+
+            if (academicStaffUsers.isEmpty()) {
+                log.warn("No Academic Affairs staff found for branch {} - cannot send notification", branchId);
+                return;
+            }
+
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+            String studentName = request.getStudent() != null && request.getStudent().getUserAccount() != null
+                    ? request.getStudent().getUserAccount().getFullName()
+                    : "Học viên";
+            String sessionInfo = request.getTargetSession() != null
+                    ? String.format("%s - %s",
+                            request.getTargetSession().getDate(),
+                            request.getTargetSession().getTimeSlotTemplate() != null
+                                    ? request.getTargetSession().getTimeSlotTemplate().getName()
+                                    : "")
+                    : "";
+
+            String title = String.format("Yêu cầu mới: %s", requestTypeName);
+            String message = String.format(
+                    "Học viên %s đã tạo yêu cầu %s cho buổi học %s. Vui lòng xem xét và xử lý.",
+                    studentName,
+                    requestTypeName.toLowerCase(),
+                    sessionInfo
+            );
+
+            List<Long> recipientIds = academicStaffUsers.stream()
+                    .map(UserAccount::getId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+
+            if (recipientIds.isEmpty()) {
+                log.error("Academic Affairs recipient IDs list is empty");
+                return;
+            }
+
+            notificationService.sendBulkNotifications(
+                    recipientIds,
+                    NotificationType.REQUEST,
+                    title,
+                    message
+            );
+
+            log.info("Sent notification to {} Academic Affairs staff about request {}",
+                    recipientIds.size(), request.getId());
+        } catch (Exception e) {
+            log.error("Failed to send notification to Academic Affairs for request {}: {}",
+                    request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Send notification and email to student when request is approved
+     */
+    private void sendApprovalNotificationsToStudent(StudentRequest request) {
+        try {
+            Long studentUserId = request.getStudent().getUserAccount().getId();
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+            String sessionInfo = request.getTargetSession() != null
+                    ? String.format("%s - %s",
+                            request.getTargetSession().getDate(),
+                            request.getTargetSession().getTimeSlotTemplate() != null
+                                    ? request.getTargetSession().getTimeSlotTemplate().getName()
+                                    : "")
+                    : "";
+
+            // Internal notification
+            String title = String.format("Yêu cầu %s đã được duyệt", requestTypeName);
+            String message = String.format(
+                    "Yêu cầu %s của bạn cho buổi học %s đã được giáo vụ phê duyệt.",
+                    requestTypeName.toLowerCase(),
+                    sessionInfo
+            );
+
+            notificationService.createNotification(
+                    studentUserId,
+                    NotificationType.NOTIFICATION,
+                    title,
+                    message
+            );
+
+            // Email notification
+            String studentEmail = request.getStudent().getUserAccount().getEmail();
+            if (studentEmail != null && !studentEmail.trim().isEmpty()) {
+                String studentName = request.getStudent().getUserAccount().getFullName();
+                String className = request.getCurrentClass() != null ? request.getCurrentClass().getCode() : "N/A";
+                String makeupSessionInfo = request.getMakeupSession() != null
+                        ? String.format("%s - %s",
+                                request.getMakeupSession().getDate(),
+                                request.getMakeupSession().getTimeSlotTemplate() != null
+                                        ? request.getMakeupSession().getTimeSlotTemplate().getName()
+                                        : "")
+                        : null;
+                String targetClassInfo = request.getTargetClass() != null
+                        ? request.getTargetClass().getCode()
+                        : null;
+                String decidedBy = request.getDecidedBy() != null
+                        ? request.getDecidedBy().getFullName()
+                        : "Giáo vụ";
+                String decidedAt = request.getDecidedAt() != null
+                        ? request.getDecidedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        : "";
+
+                emailService.sendStudentRequestApprovedAsync(
+                        studentEmail,
+                        studentName,
+                        requestTypeName,
+                        className,
+                        sessionInfo,
+                        makeupSessionInfo,
+                        targetClassInfo,
+                        decidedBy,
+                        decidedAt,
+                        request.getNote()
+                );
+            }
+
+            log.info("Sent approval notifications to student {} for request {}",
+                    studentUserId, request.getId());
+        } catch (Exception e) {
+            log.error("Failed to send approval notifications for request {}: {}",
+                    request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Send notification and email to student when request is rejected
+     */
+    private void sendRejectionNotificationsToStudent(StudentRequest request, String rejectionReason) {
+        try {
+            Long studentUserId = request.getStudent().getUserAccount().getId();
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+            String sessionInfo = request.getTargetSession() != null
+                    ? String.format("%s - %s",
+                            request.getTargetSession().getDate(),
+                            request.getTargetSession().getTimeSlotTemplate() != null
+                                    ? request.getTargetSession().getTimeSlotTemplate().getName()
+                                    : "")
+                    : "";
+
+            // Internal notification
+            String title = String.format("Yêu cầu %s đã bị từ chối", requestTypeName);
+            String message = String.format(
+                    "Yêu cầu %s của bạn cho buổi học %s đã bị giáo vụ từ chối. Lý do: %s",
+                    requestTypeName.toLowerCase(),
+                    sessionInfo,
+                    rejectionReason
+            );
+
+            notificationService.createNotification(
+                    studentUserId,
+                    NotificationType.NOTIFICATION,
+                    title,
+                    message
+            );
+
+            // Email notification
+            String studentEmail = request.getStudent().getUserAccount().getEmail();
+            if (studentEmail != null && !studentEmail.trim().isEmpty()) {
+                String studentName = request.getStudent().getUserAccount().getFullName();
+                String className = request.getCurrentClass() != null ? request.getCurrentClass().getCode() : "N/A";
+                String decidedBy = request.getDecidedBy() != null
+                        ? request.getDecidedBy().getFullName()
+                        : "Giáo vụ";
+                String decidedAt = request.getDecidedAt() != null
+                        ? request.getDecidedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        : "";
+
+                emailService.sendStudentRequestRejectedAsync(
+                        studentEmail,
+                        studentName,
+                        requestTypeName,
+                        className,
+                        sessionInfo,
+                        decidedBy,
+                        decidedAt,
+                        rejectionReason
+                );
+            }
+
+            log.info("Sent rejection notifications to student {} for request {}",
+                    studentUserId, request.getId());
+        } catch (Exception e) {
+            log.error("Failed to send rejection notifications for request {}: {}",
+                    request.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get Vietnamese name for request type
+     */
+    private String getRequestTypeName(StudentRequestType requestType) {
+        switch (requestType) {
+            case ABSENCE:
+                return "Nghỉ học có phép";
+            case MAKEUP:
+                return "Học bù";
+            case TRANSFER:
+                return "Chuyển lớp";
+            default:
+                return "Yêu cầu";
         }
     }
 }

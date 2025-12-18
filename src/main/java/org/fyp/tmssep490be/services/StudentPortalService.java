@@ -51,6 +51,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -746,14 +748,82 @@ public class StudentPortalService {
             return BigDecimal.ZERO;
         }
 
-        long presentCount = studentSessionRepository.findAllByStudentId(studentId).stream()
+        List<StudentSession> studentSessions = studentSessionRepository.findAllByStudentId(studentId).stream()
                 .filter(ss -> ss.getSession().getClassEntity().getId().equals(classId))
                 .filter(ss -> ss.getSession().getStatus() == SessionStatus.DONE)
-                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
-                .count();
+                .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup())) // Bỏ qua học bù
+                .toList();
+
+        // Map thông tin học bù
+        List<Long> sessionIds = studentSessions.stream()
+                .map(ss -> ss.getSession().getId())
+                .distinct()
+                .toList();
+        Map<Long, Boolean> makeupCompletedMap = new HashMap<>();
+        if (!sessionIds.isEmpty()) {
+            studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
+                    .stream()
+                    .filter(ss -> ss.getStudent().getId().equals(studentId))
+                    .forEach(ss -> {
+                        Session originalSession = ss.getOriginalSession();
+                        if (originalSession != null && originalSession.getId() != null) {
+                            makeupCompletedMap.merge(
+                                    originalSession.getId(),
+                                    ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
+                                    (oldVal, newVal) -> oldVal || newVal
+                            );
+                        }
+                    });
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        long presentCount = 0;
+        long totalRecorded = 0;
+
+        for (StudentSession ss : studentSessions) {
+            AttendanceStatus status = ss.getAttendanceStatus();
+            Session session = ss.getSession();
+
+            if (status == AttendanceStatus.PRESENT) {
+                presentCount++;
+                totalRecorded++;
+            } else if (status == AttendanceStatus.ABSENT) {
+                totalRecorded++;
+            } else if (status == AttendanceStatus.EXCUSED) {
+                // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
+                boolean hasMakeupCompleted = makeupCompletedMap.getOrDefault(session.getId(), false);
+
+                if (hasMakeupCompleted) {
+                    // EXCUSED có học bù (chấm xanh) → tính như PRESENT
+                    presentCount++;
+                    totalRecorded++;
+                } else {
+                    // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
+                    LocalDate sessionDate = session.getDate();
+                    LocalDateTime sessionEndDateTime;
+                    if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                        LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                        sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                    } else {
+                        sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+                    }
+
+                    boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
+                    if (isAfterSessionEnd) {
+                        // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
+                        totalRecorded++;
+                    }
+                    // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
+                }
+            }
+        }
+
+        if (totalRecorded == 0) {
+            return BigDecimal.ZERO;
+        }
 
         return BigDecimal.valueOf(presentCount)
                 .multiply(BigDecimal.valueOf(100))
-                .divide(BigDecimal.valueOf(completedSessions.size()), 1, RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(totalRecorded), 1, RoundingMode.HALF_UP);
     }
 }
