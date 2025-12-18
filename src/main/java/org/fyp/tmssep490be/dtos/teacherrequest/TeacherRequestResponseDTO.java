@@ -11,6 +11,7 @@ import org.fyp.tmssep490be.entities.enums.TeacherRequestType;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -24,6 +25,8 @@ public class TeacherRequestResponseDTO {
     private RequestStatus status;
     private Long sessionId;
     private String classCode;
+    private String className;
+    private String subjectName;
     private LocalDate sessionDate;
     private LocalTime sessionStartTime;
     private LocalTime sessionEndTime;
@@ -57,5 +60,12 @@ public class TeacherRequestResponseDTO {
     private Long decidedById;
     private String decidedByName;
     private String decidedByEmail;
+    
+    // Session information for displaying badges
+    private String sessionStatus;
+    private List<String> pendingRequestTypes;
+    private Boolean attendanceSubmitted;
+    private Boolean isMakeup;
+    private String sessionModality; // ONLINE or OFFLINE based on resource type
 }
 

@@ -12,6 +12,7 @@ import org.fyp.tmssep490be.entities.Student;
 import org.fyp.tmssep490be.entities.StudentSession;
 import org.fyp.tmssep490be.entities.UserAccount;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
+import org.fyp.tmssep490be.entities.enums.ClassStatus;
 import org.fyp.tmssep490be.entities.enums.EnrollmentStatus;
 import org.fyp.tmssep490be.entities.enums.HomeworkStatus;
 import org.fyp.tmssep490be.entities.enums.SessionStatus;
@@ -100,7 +101,7 @@ public class TeacherClassService {
         // Chỉ tính các bản ghi điểm danh thực sự có trong DB (giống AttendanceService)
         List<StudentSession> allStudentSessions = studentSessionRepository.findBySessionIds(sessionIds);
         
-        // Bỏ qua các bản ghi học bù (isMakeup = true) để không làm tăng tỷ lệ của lớp học bù
+                // Bỏ qua các bản ghi học bù (isMakeup = true) để không làm tăng tỷ lệ của lớp học bù
         List<StudentSession> primarySessions = allStudentSessions.stream()
                 .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup()))
                 .collect(Collectors.toList());
@@ -142,10 +143,10 @@ public class TeacherClassService {
                     boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
                     if (isAfterSessionEnd) {
                         // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
-                        totalRecorded++;
-                    }
-                    // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
+                    totalRecorded++;
                 }
+                    // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
+            }
             }
             // Không tính PLANNED
         }
@@ -154,6 +155,33 @@ public class TeacherClassService {
         if (totalRecorded > 0) {
             // Trả về dạng 0-1 (frontend sẽ nhân 100 để hiển thị %)
             attendanceRate = (double) totalPresent / totalRecorded;
+        }
+
+        // Tính status động dựa trên startDate, endDate và session cuối cùng
+        // Để tránh hiển thị "Lớp chưa bắt đầu" khi lớp đã bắt đầu
+        // Và tự động chuyển sang COMPLETED khi tất cả session đã DONE
+        ClassStatus calculatedStatus = classEntity.getStatus();
+        LocalDate today = LocalDate.now();
+        
+        // Kiểm tra xem tất cả session không bị CANCELLED đều là DONE chưa
+        boolean allSessionsDone = !sessions.isEmpty() && 
+                sessions.stream().allMatch(s -> s.getStatus() == SessionStatus.DONE);
+        
+        if (calculatedStatus == ClassStatus.SCHEDULED && classEntity.getStartDate() != null) {
+            if (allSessionsDone) {
+                // Tất cả session đã DONE → chuyển sang COMPLETED
+                calculatedStatus = ClassStatus.COMPLETED;
+            } else if (today.isAfter(classEntity.getStartDate()) || today.isEqual(classEntity.getStartDate())) {
+                calculatedStatus = ClassStatus.ONGOING;
+            }
+        } else if (calculatedStatus == ClassStatus.ONGOING) {
+            // Kiểm tra nếu tất cả session đã DONE hoặc plannedEndDate đã qua
+            if (allSessionsDone) {
+                calculatedStatus = ClassStatus.COMPLETED;
+            } else if (classEntity.getPlannedEndDate() != null && today.isAfter(classEntity.getPlannedEndDate())) {
+                // plannedEndDate đã qua nhưng vẫn còn session chưa DONE → vẫn giữ ONGOING
+                // (scheduler job sẽ xử lý khi tất cả session DONE)
+            }
         }
 
         return TeacherClassListItemDTO.builder()
@@ -170,7 +198,7 @@ public class TeacherClassService {
                 .modality(classEntity.getModality())
                 .startDate(classEntity.getStartDate())
                 .plannedEndDate(classEntity.getPlannedEndDate())
-                .status(classEntity.getStatus())
+                .status(calculatedStatus) // Sử dụng status đã tính toán
                 .totalSessions(totalSessions)
                 .attendanceRate(attendanceRate)
                 .build();

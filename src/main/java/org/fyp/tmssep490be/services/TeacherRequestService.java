@@ -48,11 +48,15 @@ import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.services.EmailService;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.time.format.DateTimeFormatter;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -65,6 +69,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class TeacherRequestService {
+    
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final TeacherRequestRepository teacherRequestRepository;
     private final TeacherRepository teacherRepository;
@@ -1284,7 +1290,11 @@ public class TeacherRequestService {
             String requestTypeName = getRequestTypeName(request.getRequestType());
             Session session = request.getSession();
             String sessionInfo = session != null 
-                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                ? String.format("%s - %s", 
+                    session.getDate().format(DATE_FORMATTER), 
+                    session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                        ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                        : "")
                 : "";
 
             String title = String.format("Yêu cầu mới: %s", requestTypeName);
@@ -1331,7 +1341,11 @@ public class TeacherRequestService {
             String requestTypeName = getRequestTypeName(request.getRequestType());
             Session session = request.getSession();
             String sessionInfo = session != null 
-                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                ? String.format("%s - %s", 
+                    session.getDate().format(DATE_FORMATTER), 
+                    session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                        ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                        : "")
                 : "";
 
             String title = String.format("Yêu cầu %s đã được duyệt", requestTypeName);
@@ -1374,9 +1388,11 @@ public class TeacherRequestService {
             String requestTypeName = getRequestTypeName(request.getRequestType());
             Session session = request.getSession();
             String sessionInfo = session != null
-                    ? String.format("%s (%s)", 
+                    ? String.format("%s - %s", 
                         session.getDate(), 
-                        session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A")
+                        session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                            ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                            : "N/A")
                     : "N/A";
 
             String subject = "Yêu cầu của bạn đã được phê duyệt";
@@ -1404,7 +1420,11 @@ public class TeacherRequestService {
             Long replacementTeacherUserAccountId = request.getReplacementTeacher().getUserAccount().getId();
             Session session = request.getSession();
             String sessionInfo = session != null 
-                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                ? String.format("%s - %s", 
+                    session.getDate().format(DATE_FORMATTER), 
+                    session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                        ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                        : "")
                 : "";
             String originalTeacherName = request.getTeacher().getUserAccount().getFullName();
 
@@ -1454,9 +1474,11 @@ public class TeacherRequestService {
 
             Session session = request.getSession();
             String sessionInfo = session != null
-                    ? String.format("%s (%s)", 
+                    ? String.format("%s - %s", 
                         session.getDate(), 
-                        session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A")
+                        session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                            ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                            : "N/A")
                     : "N/A";
 
             String subject = "Lời mời dạy thay từ hệ thống TMS";
@@ -1480,7 +1502,11 @@ public class TeacherRequestService {
             String requestTypeName = getRequestTypeName(request.getRequestType());
             Session session = request.getSession();
             String sessionInfo = session != null 
-                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                ? String.format("%s - %s", 
+                    session.getDate().format(DATE_FORMATTER), 
+                    session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                        ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                        : "")
                 : "";
 
             String title = String.format("Yêu cầu %s đã bị từ chối", requestTypeName);
@@ -1524,9 +1550,11 @@ public class TeacherRequestService {
             String requestTypeName = getRequestTypeName(request.getRequestType());
             Session session = request.getSession();
             String sessionInfo = session != null
-                    ? String.format("%s (%s)", 
+                    ? String.format("%s - %s", 
                         session.getDate(), 
-                        session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A")
+                        session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                            ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                            : "N/A")
                     : "N/A";
 
             String subject = "Yêu cầu của bạn đã bị từ chối";
@@ -1567,7 +1595,11 @@ public class TeacherRequestService {
 
             Session session = request.getSession();
             String sessionInfo = session != null 
-                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                ? String.format("%s - %s", 
+                    session.getDate().format(DATE_FORMATTER), 
+                    session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                        ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                        : "")
                 : "";
             String replacementTeacherName = request.getReplacementTeacher() != null && request.getReplacementTeacher().getUserAccount() != null
                 ? request.getReplacementTeacher().getUserAccount().getFullName()
@@ -1617,9 +1649,11 @@ public class TeacherRequestService {
             String requestTypeName = getRequestTypeName(request.getRequestType());
             Session session = request.getSession();
             String sessionInfo = session != null
-                    ? String.format("%s (%s)", 
+                    ? String.format("%s - %s", 
                         session.getDate(), 
-                        session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A")
+                        session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                            ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                            : "N/A")
                     : "N/A";
 
             String subject = "Bạn đã tạo yêu cầu mới trên hệ thống TMS";
@@ -1642,7 +1676,11 @@ public class TeacherRequestService {
             Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
             Session session = request.getSession();
             String sessionInfo = session != null 
-                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                ? String.format("%s - %s", 
+                    session.getDate().format(DATE_FORMATTER), 
+                    session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                        ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                        : "")
                 : "";
             String replacementTeacherName = request.getReplacementTeacher() != null && request.getReplacementTeacher().getUserAccount() != null
                 ? request.getReplacementTeacher().getUserAccount().getFullName()
@@ -1677,7 +1715,11 @@ public class TeacherRequestService {
             String requestTypeName = getRequestTypeName(request.getRequestType());
             Session session = request.getSession();
             String sessionInfo = session != null 
-                ? String.format("%s - %s", session.getDate(), session.getTimeSlotTemplate() != null ? session.getTimeSlotTemplate().getName() : "")
+                ? String.format("%s - %s", 
+                    session.getDate().format(DATE_FORMATTER), 
+                    session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                        ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                        : "")
                 : "";
 
             String title = String.format("Yêu cầu %s đã được tạo", requestTypeName);
@@ -1846,12 +1888,57 @@ public class TeacherRequestService {
                 ? newResource.getResourceType().name()
                 : null;
 
+        // Lấy thông tin session để hiển thị badge
+        String sessionStatus = session != null && session.getStatus() != null ? session.getStatus().name() : null;
+        
+        // Lấy tất cả request types approved cho session này
+        List<String> pendingRequestTypes = session != null 
+                ? teacherRequestRepository.findBySessionIdAndApprovedStatus(session.getId())
+                        .stream()
+                        .map(tr -> tr.getRequestType().name())
+                        .distinct()
+                        .collect(Collectors.toList())
+                : new ArrayList<>();
+        
+        // Kiểm tra attendance submitted
+        Boolean attendanceSubmitted = null;
+        if (session != null && session.getStudentSessions() != null) {
+            attendanceSubmitted = session.getStudentSessions().stream()
+                    .anyMatch(ss -> ss.getAttendanceStatus() != null && 
+                                   ss.getAttendanceStatus() != org.fyp.tmssep490be.entities.enums.AttendanceStatus.PLANNED);
+        }
+        
+        // Kiểm tra isMakeup (có thể từ session hoặc StudentSession)
+        Boolean isMakeup = null;
+        if (session != null) {
+            // Có thể kiểm tra từ session hoặc StudentSession
+            isMakeup = session.getStudentSessions().stream()
+                    .anyMatch(ss -> ss.getIsMakeup() != null && ss.getIsMakeup());
+        }
+        
+        // Lấy session modality từ resource type
+        String sessionModality = null;
+        if (session != null && session.getSessionResources() != null && !session.getSessionResources().isEmpty()) {
+            Resource sessionResource = session.getSessionResources().iterator().next().getResource();
+            if (sessionResource.getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL) {
+                sessionModality = "ONLINE";
+            } else if (sessionResource.getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.ROOM) {
+                sessionModality = "OFFLINE";
+            }
+        }
+        // Fallback về class modality
+        if (sessionModality == null && classEntity != null && classEntity.getModality() != null) {
+            sessionModality = classEntity.getModality().name();
+        }
+
         TeacherRequestResponseDTO.TeacherRequestResponseDTOBuilder builder = TeacherRequestResponseDTO.builder()
                 .id(request.getId())
                 .requestType(request.getRequestType())
                 .status(request.getStatus())
                 .sessionId(session != null ? session.getId() : null)
                 .classCode(classEntity != null ? classEntity.getCode() : null)
+                .className(classEntity != null ? classEntity.getName() : null)
+                .subjectName(classEntity != null && classEntity.getSubject() != null ? classEntity.getSubject().getName() : null)
                 .sessionDate(session != null ? session.getDate() : null)
                 .sessionStartTime(timeSlot != null ? timeSlot.getStartTime() : null)
                 .sessionEndTime(timeSlot != null ? timeSlot.getEndTime() : null)
@@ -1875,7 +1962,12 @@ public class TeacherRequestService {
                 .newSessionStartTime(newSessionStart)
                 .newSessionEndTime(newSessionEnd)
                 .newSessionResourceName(newSessionResourceName)
-                .newSessionClassCode(newSessionClassCode);
+                .newSessionClassCode(newSessionClassCode)
+                .sessionStatus(sessionStatus)
+                .pendingRequestTypes(pendingRequestTypes)
+                .attendanceSubmitted(attendanceSubmitted)
+                .isMakeup(isMakeup)
+                .sessionModality(sessionModality);
 
         // Debug log to trace who is shown as handler in responses
         log.debug(
@@ -3234,7 +3326,7 @@ public class TeacherRequestService {
             // Prepare notification data
             String className = session.getClassEntity().getName();
             String subjectName = session.getClassEntity().getSubject().getName();
-            String sessionDate = session.getDate().toString();
+            String sessionDate = session.getDate().format(DATE_FORMATTER);
             String sessionTime = session.getTimeSlotTemplate() != null 
                 ? String.format("%s - %s", 
                     session.getTimeSlotTemplate().getStartTime(), 
@@ -3250,10 +3342,10 @@ public class TeacherRequestService {
             String reason = request.getRequestReason() != null ? request.getRequestReason() : "Giáo viên có việc đột xuất";
 
             // Internal notification title & message
-            String notificationTitle = "Thay đổi giáo viên";
+            String notificationTitle = "Yêu cầu dạy thay đã được xác nhận";
             String notificationMessage = String.format(
-                "Giáo viên %s sẽ không dạy buổi %s (%s). Giáo viên dạy thay là %s.",
-                originalTeacherName, sessionDate, className, replacementTeacherName
+                "Giáo viên %s đã xác nhận đồng ý dạy thay cho buổi học %s - %s của bạn.",
+                replacementTeacherName, sessionDate, sessionTime
             );
 
             // Send bulk internal notifications
@@ -3316,7 +3408,7 @@ public class TeacherRequestService {
             String subjectName = oldSession.getClassEntity().getSubject().getName();
             
             // Old schedule info
-            String oldDate = oldSession.getDate().toString();
+            String oldDate = oldSession.getDate().format(DATE_FORMATTER);
             String oldTime = oldSession.getTimeSlotTemplate() != null
                 ? String.format("%s - %s", 
                     oldSession.getTimeSlotTemplate().getStartTime(),
@@ -3337,7 +3429,7 @@ public class TeacherRequestService {
             String newModality = oldModality;
             
             if (request.getRequestType() == TeacherRequestType.RESCHEDULE && newSession != null) {
-                newDate = newSession.getDate().toString();
+                newDate = newSession.getDate().format(DATE_FORMATTER);
                 newTime = newSession.getTimeSlotTemplate() != null
                     ? String.format("%s - %s",
                         newSession.getTimeSlotTemplate().getStartTime(),
@@ -3361,17 +3453,17 @@ public class TeacherRequestService {
             String notificationMessage;
             if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
                 // Thông báo rõ thay đổi phòng/hình thức học
-                notificationTitle = "Thay đổi hình thức/phòng học";
+                notificationTitle = "Yêu cầu Đổi phương tiện đã được duyệt";
                 notificationMessage = String.format(
-                    "Lịch học lớp %s ngày %s %s đã thay đổi phòng/hình thức học. Từ %s sang %s.",
-                    className, oldDate, oldTime, oldRoom, newRoom
+                    "Yêu cầu đổi phương tiện của bạn cho buổi học %s - %s đã được giáo vụ duyệt.",
+                    oldDate, oldTime
                 );
             } else {
                 // RESCHEDULE: nhấn mạnh thay đổi ngày/giờ
-                notificationTitle = "Thay đổi lịch học";
+                notificationTitle = "Yêu cầu Đổi lịch đã được duyệt";
                 notificationMessage = String.format(
-                    "Lịch học lớp %s đã thay đổi. Từ %s %s thành %s %s.",
-                    className, oldDate, oldTime, newDate, newTime
+                    "Yêu cầu đổi lịch của bạn cho buổi học đã được giáo vụ duyệt. Từ %s %s thành %s %s.",
+                    oldDate, oldTime, newDate, newTime
                 );
             }
 
@@ -3424,6 +3516,32 @@ public class TeacherRequestService {
                 .reasonMinLength(MIN_REASON_LENGTH)
                 .timeWindowDays(TIME_WINDOW_DAYS)
                 .build();
+    }
+
+    // Cancel request by teacher
+    @Transactional
+    public TeacherRequestResponseDTO cancelRequest(Long requestId, Long userId) {
+        log.info("Cancelling request {} by teacher {}", requestId, userId);
+
+        TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+
+        // Kiểm tra quyền sở hữu
+        if (request.getTeacher() == null || request.getTeacher().getUserAccount() == null
+                || !request.getTeacher().getUserAccount().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN, "You can only cancel your own requests");
+        }
+
+        // Chỉ cho phép hủy request ở trạng thái PENDING hoặc WAITING_CONFIRM
+        if (request.getStatus() != RequestStatus.PENDING && request.getStatus() != RequestStatus.WAITING_CONFIRM) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Only pending or waiting confirmation requests can be cancelled");
+        }
+
+        request.setStatus(RequestStatus.CANCELLED);
+        request = teacherRequestRepository.save(request);
+
+        log.info("Request {} cancelled by teacher {} (user {})", requestId, request.getTeacher().getId(), userId);
+        return mapToResponseDTO(request);
     }
 }
 

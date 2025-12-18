@@ -53,5 +53,8 @@ public class TeacherSessionDetailDTO {
 
     @Schema(description = "Attendance summary")
     private AttendanceSummaryDTO attendanceSummary;
+
+    @Schema(description = "List of pending/approved request types for this session")
+    private List<String> pendingRequestTypes;
 }
 
