@@ -2621,16 +2621,21 @@ public class StudentRequestService {
                     session.getTimeSlotTemplate().getEndTime().format(timeFormatter));
         }
 
-        String roomStr = session.getRoomCode() != null ? "Phòng " + session.getRoomCode() : "";
-
-        StringBuilder result = new StringBuilder();
-        result.append(dayOfWeek).append(", ").append(dateStr);
-        result.append(" | ").append(timeStr);
-        if (!roomStr.isEmpty()) {
-            result.append(" | ").append(roomStr);
+        // Get room info from SessionResource -> Resource
+        String roomStr = "";
+        if (session.getSessionResources() != null && !session.getSessionResources().isEmpty()) {
+            Resource room = session.getSessionResources().stream()
+                    .filter(sr -> sr.getResource() != null && sr.getResource().getResourceType() == ResourceType.ROOM)
+                    .map(SessionResource::getResource)
+                    .findFirst()
+                    .orElse(null);
+            
+            if (room != null && room.getName() != null) {
+                roomStr = " | " + room.getName();
+            }
         }
 
-        return result.toString();
+        return String.format("%s, %s | %s%s", dayOfWeek, dateStr, timeStr, roomStr);
     }
 
     private String formatClassInfo(ClassEntity classEntity) {
@@ -2650,6 +2655,17 @@ public class StudentRequestService {
             case SUNDAY: return "Chủ nhật";
             default: return "";
         }
+    }
+
+    private Teacher getSessionTeacher(Session session) {
+        if (session == null || session.getTeachingSlots() == null || session.getTeachingSlots().isEmpty()) {
+            return null;
+        }
+        return session.getTeachingSlots().stream()
+                .map(TeachingSlot::getTeacher)
+                .filter(teacher -> teacher != null)
+                .findFirst()
+                .orElse(null);
     }
 
     private String buildStudentSubmitNotificationMessage(StudentRequest request, String requestTypeName) {
@@ -2710,9 +2726,6 @@ public class StudentRequestService {
             message.append("Buổi học bù:\n");
             message.append("Lớp: ").append(formatClassInfo(request.getMakeupSession().getClassEntity())).append("\n");
             message.append("Thời gian: ").append(formatSessionDetailInfo(request.getMakeupSession())).append("\n");
-            if (request.getMakeupSession().getTeacher() != null) {
-                message.append("Giáo viên: ").append(request.getMakeupSession().getTeacher().getUserAccount().getFullName()).append("\n");
-            }
         }
         
         if (request.getRequestType() == StudentRequestType.TRANSFER && request.getTargetClass() != null) {
@@ -2782,9 +2795,6 @@ public class StudentRequestService {
             message.append("Buổi học bù:\n");
             message.append("Lớp: ").append(formatClassInfo(request.getMakeupSession().getClassEntity())).append("\n");
             message.append("Thời gian: ").append(formatSessionDetailInfo(request.getMakeupSession())).append("\n");
-            if (request.getMakeupSession().getTeacher() != null) {
-                message.append("Giáo viên: ").append(request.getMakeupSession().getTeacher().getUserAccount().getFullName()).append("\n");
-            }
         }
         
         if (request.getRequestType() == StudentRequestType.TRANSFER && request.getTargetClass() != null) {
