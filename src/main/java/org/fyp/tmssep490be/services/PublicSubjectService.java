@@ -3,9 +3,9 @@ package org.fyp.tmssep490be.services;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.publicapi.PublicBranchDTO;
-import org.fyp.tmssep490be.dtos.publicapi.PublicCourseCatalogDTO;
-import org.fyp.tmssep490be.dtos.publicapi.PublicCourseDTO;
-import org.fyp.tmssep490be.dtos.publicapi.PublicCourseSimpleDTO;
+import org.fyp.tmssep490be.dtos.publicapi.PublicSubjectCatalogDTO;
+import org.fyp.tmssep490be.dtos.publicapi.PublicSubjectDTO;
+import org.fyp.tmssep490be.dtos.publicapi.PublicSubjectSimpleDTO;
 import org.fyp.tmssep490be.dtos.publicapi.PublicScheduleDTO;
 import org.fyp.tmssep490be.entities.Branch;
 import org.fyp.tmssep490be.entities.ClassEntity;
@@ -33,14 +33,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Service for public course operations (landing page)
- * Only returns ACTIVE courses for public visibility
+ * Service for public subject operations (landing page)
+ * Only returns ACTIVE subjects for public visibility
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class PublicCourseService {
+public class PublicSubjectService {
 
         private final CurriculumRepository curriculumRepository;
         private final SubjectRepository subjectRepository;
@@ -60,15 +60,15 @@ public class PublicCourseService {
         }
 
         /**
-         * Get simple course list for consultation form dropdown
+         * Get simple subject list for consultation form dropdown
          */
-        public List<PublicCourseSimpleDTO> getSimpleCourseList() {
-                log.info("Fetching simple course list for consultation form");
+        public List<PublicSubjectSimpleDTO> getSimpleSubjectList() {
+                log.info("Fetching simple subject list for consultation form");
 
                 return subjectRepository.findAll().stream()
                                 .filter(s -> s.getStatus() == SubjectStatus.ACTIVE)
                                 .sorted(Comparator.comparing(Subject::getName))
-                                .map(s -> PublicCourseSimpleDTO.builder()
+                                .map(s -> PublicSubjectSimpleDTO.builder()
                                                 .id(s.getId())
                                                 .code(s.getCode())
                                                 .name(s.getName())
@@ -77,42 +77,42 @@ public class PublicCourseService {
         }
 
         /**
-         * Get all courses grouped by curriculum for landing page
+         * Get all subjects grouped by curriculum for landing page
          * Only returns ACTIVE curriculums and ACTIVE subjects
          */
-        public PublicCourseCatalogDTO getCourseCatalog() {
-                log.info("Fetching public course catalog for landing page");
+        public PublicSubjectCatalogDTO getSubjectCatalog() {
+                log.info("Fetching public subject catalog for landing page");
 
                 // Get ACTIVE curriculums
                 List<Curriculum> activeCurriculums = curriculumRepository
                                 .findByStatusOrderByCode(CurriculumStatus.ACTIVE);
 
-                List<PublicCourseCatalogDTO.CurriculumGroup> curriculumGroups = activeCurriculums.stream()
+                List<PublicSubjectCatalogDTO.CurriculumGroup> curriculumGroups = activeCurriculums.stream()
                                 .map(this::mapToCurriculumGroup)
-                                .filter(group -> !group.getCourses().isEmpty()) // Only include curriculums with courses
+                                .filter(group -> !group.getSubjects().isEmpty()) // Only include curriculums with subjects
                                 .collect(Collectors.toList());
 
-                return PublicCourseCatalogDTO.builder()
+                return PublicSubjectCatalogDTO.builder()
                                 .curriculums(curriculumGroups)
                                 .build();
         }
 
         /**
-         * Get course detail by ID for public course detail page
+         * Get subject detail by ID for public subject detail page
          * Only returns ACTIVE subjects
          */
-        public PublicCourseDTO getCourseDetail(Long id) {
-                log.info("Fetching public course detail for ID: {}", id);
+        public PublicSubjectDTO getSubjectDetail(Long id) {
+                log.info("Fetching public subject detail for ID: {}", id);
 
                 Subject subject = subjectRepository.findById(id)
-                                .orElseThrow(() -> new RuntimeException("Course not found with id: " + id));
+                                .orElseThrow(() -> new RuntimeException("Subject not found with id: " + id));
 
                 // Only return ACTIVE subjects for public display
                 if (subject.getStatus() != SubjectStatus.ACTIVE) {
-                        throw new RuntimeException("Course not available");
+                        throw new RuntimeException("Subject not available");
                 }
 
-                return mapToPublicCourseDTO(subject);
+                return mapToPublicSubjectDTO(subject);
         }
 
         private PublicBranchDTO mapToPublicBranchDTO(Branch branch) {
@@ -120,10 +120,12 @@ public class PublicCourseService {
                                 .id(branch.getId())
                                 .name(branch.getName())
                                 .address(branch.getAddress())
+                                .phone(branch.getPhone())
+                                .email(branch.getEmail())
                                 .build();
         }
 
-        private PublicCourseCatalogDTO.CurriculumGroup mapToCurriculumGroup(Curriculum curriculum) {
+        private PublicSubjectCatalogDTO.CurriculumGroup mapToCurriculumGroup(Curriculum curriculum) {
                 // Get ACTIVE subjects for this curriculum
                 List<Subject> activeSubjects = subjectRepository.findByCurriculumId(curriculum.getId())
                                 .stream()
@@ -132,26 +134,26 @@ public class PublicCourseService {
                                                 s -> s.getLevel() != null ? s.getLevel().getSortOrder() : 0))
                                 .collect(Collectors.toList());
 
-                List<PublicCourseDTO> courses = activeSubjects.stream()
-                                .map(this::mapToPublicCourseDTO)
+                List<PublicSubjectDTO> subjects = activeSubjects.stream()
+                                .map(this::mapToPublicSubjectDTO)
                                 .collect(Collectors.toList());
 
-                return PublicCourseCatalogDTO.CurriculumGroup.builder()
+                return PublicSubjectCatalogDTO.CurriculumGroup.builder()
                                 .id(curriculum.getId())
                                 .code(curriculum.getCode())
                                 .name(curriculum.getName())
                                 .description(curriculum.getDescription())
-                                .courses(courses)
+                                .subjects(subjects)
                                 .build();
         }
 
-        private PublicCourseDTO mapToPublicCourseDTO(Subject subject) {
-                List<PublicCourseDTO.PublicCoursePhaseDTO> phases = new ArrayList<>();
+        private PublicSubjectDTO mapToPublicSubjectDTO(Subject subject) {
+                List<PublicSubjectDTO.PublicSubjectPhaseDTO> phases = new ArrayList<>();
 
                 if (subject.getSubjectPhases() != null) {
                         phases = subject.getSubjectPhases().stream()
                                         .sorted(Comparator.comparing(SubjectPhase::getPhaseNumber))
-                                        .map(phase -> PublicCourseDTO.PublicCoursePhaseDTO.builder()
+                                        .map(phase -> PublicSubjectDTO.PublicSubjectPhaseDTO.builder()
                                                         .id(phase.getId())
                                                         .phaseNumber(phase.getPhaseNumber())
                                                         .name(phase.getName())
@@ -159,18 +161,18 @@ public class PublicCourseService {
                                         .collect(Collectors.toList());
                 }
 
-                List<PublicCourseDTO.PublicCourseCLODTO> clos = new ArrayList<>();
+                List<PublicSubjectDTO.PublicSubjectCLODTO> clos = new ArrayList<>();
                 if (subject.getClos() != null) {
                         clos = subject.getClos().stream()
                                         .sorted(Comparator.comparing(CLO::getCode))
-                                        .map(clo -> PublicCourseDTO.PublicCourseCLODTO.builder()
+                                        .map(clo -> PublicSubjectDTO.PublicSubjectCLODTO.builder()
                                                         .code(clo.getCode())
                                                         .description(clo.getDescription())
                                                         .build())
                                         .collect(Collectors.toList());
                 }
 
-                return PublicCourseDTO.builder()
+                return PublicSubjectDTO.builder()
                                 .id(subject.getId())
                                 .code(subject.getCode())
                                 .name(subject.getName())

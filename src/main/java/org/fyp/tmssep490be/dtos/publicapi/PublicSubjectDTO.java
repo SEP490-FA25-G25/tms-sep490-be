@@ -16,7 +16,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PublicCourseDTO {
+public class PublicSubjectDTO {
     private Long id;
     private String code;
     private String name;
@@ -37,16 +37,16 @@ public class PublicCourseDTO {
     private BigDecimal hoursPerSession;
 
     // Phases for syllabus display
-    private List<PublicCoursePhaseDTO> phases;
+    private List<PublicSubjectPhaseDTO> phases;
 
     // CLOs for learning outcomes display
-    private List<PublicCourseCLODTO> clos;
+    private List<PublicSubjectCLODTO> clos;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class PublicCoursePhaseDTO {
+    public static class PublicSubjectPhaseDTO {
         private Long id;
         private Integer phaseNumber;
         private String name;
@@ -56,7 +56,7 @@ public class PublicCourseDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class PublicCourseCLODTO {
+    public static class PublicSubjectCLODTO {
         private String code;
         private String description;
     }
