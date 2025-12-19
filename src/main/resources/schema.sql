@@ -797,7 +797,6 @@ CREATE INDEX idx_student_request_current_class ON student_request(current_class_
 CREATE INDEX idx_student_request_target_class ON student_request(target_class_id);
 CREATE INDEX idx_student_request_target_session ON student_request(target_session_id);
 CREATE INDEX idx_student_request_makeup_session ON student_request(makeup_session_id);
-CREATE INDEX idx_student_request_effective_session ON student_request(effective_session_id);
 CREATE INDEX idx_student_request_decided_by ON student_request(decided_by);
 CREATE INDEX idx_teacher_request_teacher ON teacher_request(teacher_id);
 CREATE INDEX idx_teacher_request_session ON teacher_request(session_id);
