@@ -1,6 +1,5 @@
 package org.fyp.tmssep490be.scheduler;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.entities.QAReport;
@@ -15,12 +14,15 @@ import org.fyp.tmssep490be.repositories.QAReportRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
 import org.fyp.tmssep490be.repositories.StudentSessionRepository;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,29 +39,26 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
     private final StudentSessionRepository studentSessionRepository;
     private final QAReportRepository qaReportRepository;
     private final UserAccountRepository userAccountRepository;
-    private final TransactionTemplate transactionTemplate;
 
-    @PostConstruct
+    /**
+     * Update past sessions to DONE status when application is ready.
+     * This ensures seed data has been loaded before checking for past sessions.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional
     public void updateOnStartup() {
-        log.info("Server startup: Checking for past sessions that need to be updated to DONE status");
+        log.info("Application ready: Checking for past sessions that need to be updated to DONE status");
         try {
-            transactionTemplate.executeWithoutResult(status -> {
-                try {
-                    updatePastSessionsToDone();
-                    // Also create QA reports for existing DONE sessions that don't have reports
-                    createQAReportsForDoneSessionsWithoutReports();
-                } catch (Exception e) {
-                    log.error("Error updating sessions on startup", e);
-                    status.setRollbackOnly();
-                }
-            });
+            updatePastSessionsToDone();
+            // Also create QA reports for existing DONE sessions that don't have reports
+            createQAReportsForDoneSessionsWithoutReports();
         } catch (Exception e) {
             log.error("Error updating sessions on startup: {}", e.getMessage(), e);
-
+            // Don't throw exception to prevent application startup failure
         }
     }
 
-     //Automatically mark sessions as DONE if their date has passed
+     //Automatically mark sessions as DONE if they have ended (passed end time) AND have teacher note
      //Also marks students with PLANNED attendance as ABSENT
      //Creates QA reports for sessions that are automatically marked as DONE
      //Runs daily at 1:00 AM
@@ -70,16 +69,19 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
             logJobStart("SessionAutoUpdate");
             
             LocalDate today = LocalDate.now();
+            LocalTime currentTime = LocalTime.now();
 
-            List<Session> pastSessions = sessionRepository.findPastSessionsByStatus(today, SessionStatus.PLANNED);
+            // Find sessions that have ended (passed end time) and have teacher note
+            List<Session> endedSessionsWithNote = sessionRepository.findEndedSessionsWithTeacherNote(
+                today, currentTime, SessionStatus.PLANNED);
             
-            if (pastSessions.isEmpty()) {
-                logJobEnd("SessionAutoUpdate", "No past sessions to update");
+            if (endedSessionsWithNote.isEmpty()) {
+                logJobEnd("SessionAutoUpdate", "No ended sessions with teacher note to update");
                 return;
             }
 
-            logJobInfo(String.format("Found %d past sessions with PLANNED status (date < %s)", 
-                pastSessions.size(), today));
+            logJobInfo(String.format("Found %d ended sessions with teacher note (date < %s OR (date = %s AND endTime < %s))", 
+                endedSessionsWithNote.size(), today, today, currentTime));
 
             // Get a QA user to assign as reportedBy for auto-created reports
             Optional<UserAccount> qaUserOpt = userAccountRepository.findUsersByRole("QA").stream()
@@ -89,8 +91,9 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
                 logJobInfo("No QA user found. Skipping QA report creation.");
             }
 
-            int updatedSessionCount = sessionRepository.updatePastSessionsStatus(
-                today, SessionStatus.PLANNED, SessionStatus.DONE);
+            // Update sessions to DONE status (only those with teacher note and ended)
+            int updatedSessionCount = sessionRepository.updateEndedSessionsWithTeacherNoteToDone(
+                today, currentTime, SessionStatus.PLANNED, SessionStatus.DONE);
             
             int updatedAttendanceCount = 0;
             int createdQAReportCount = 0;
@@ -98,7 +101,7 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
             List<QAReport> qaReportsToSave = new ArrayList<>();
             
             // Update attendance and create QA reports for affected sessions
-            for (Session session : pastSessions) {
+            for (Session session : endedSessionsWithNote) {
                 // Refresh session to get updated status
                 Session refreshedSession = sessionRepository.findById(session.getId())
                         .orElse(session);
@@ -147,6 +150,83 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
             logJobInfo(String.format("Updated %d sessions to DONE status", updatedSessionCount));
             logJobInfo(String.format("Auto-marked %d attendance records as ABSENT", updatedAttendanceCount));
             logJobInfo(String.format("Created %d QA reports for auto-completed sessions", createdQAReportCount));
+
+            // Also handle sessions that ended more than 48 hours ago without teacher note
+            LocalDateTime fortyEightHoursAgo = LocalDateTime.now().minusHours(48);
+            LocalDate cutoffDate = fortyEightHoursAgo.toLocalDate();
+            LocalTime cutoffTime = fortyEightHoursAgo.toLocalTime();
+
+            List<Session> endedSessionsWithoutNote = sessionRepository.findEndedSessionsWithoutTeacherNoteAfter48Hours(
+                    cutoffDate, cutoffTime, SessionStatus.PLANNED);
+
+            if (!endedSessionsWithoutNote.isEmpty()) {
+                logJobInfo(String.format("Found %d sessions ended more than 48 hours ago without teacher note", 
+                        endedSessionsWithoutNote.size()));
+
+                int updatedWithoutNoteCount = sessionRepository.updateEndedSessionsWithoutTeacherNoteAfter48HoursToDone(
+                        cutoffDate, cutoffTime, SessionStatus.PLANNED, SessionStatus.DONE);
+
+                int updatedAttendanceWithoutNoteCount = 0;
+                int createdQAReportWithoutNoteCount = 0;
+                List<StudentSession> studentSessionsWithoutNoteToSave = new ArrayList<>();
+                List<QAReport> qaReportsWithoutNoteToSave = new ArrayList<>();
+
+                for (Session session : endedSessionsWithoutNote) {
+                    Session refreshedSession = sessionRepository.findById(session.getId())
+                            .orElse(session);
+
+                    // Auto-mark students with PLANNED attendance as ABSENT
+                    List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(refreshedSession.getId());
+                    for (StudentSession studentSession : studentSessions) {
+                        if (studentSession.getAttendanceStatus() == AttendanceStatus.PLANNED) {
+                            studentSession.setAttendanceStatus(AttendanceStatus.ABSENT);
+                            studentSession.setRecordedAt(OffsetDateTime.now());
+                            studentSessionsWithoutNoteToSave.add(studentSession);
+                            updatedAttendanceWithoutNoteCount++;
+                        }
+                    }
+
+                    // Create QA report with special content indicating no teacher note
+                    if (refreshedSession.getStatus() == SessionStatus.DONE && qaUserOpt.isPresent()) {
+                        long existingSubmittedReports = qaReportRepository.countSubmittedReportsBySessionId(refreshedSession.getId());
+
+                        if (existingSubmittedReports == 0) {
+                            QAReport autoReport = QAReport.builder()
+                                    .classEntity(refreshedSession.getClassEntity())
+                                    .session(refreshedSession)
+                                    .reportedBy(qaUserOpt.get())
+                                    .reportType(QAReportType.CLASSROOM_OBSERVATION)
+                                    .status(QAReportStatus.SUBMITTED)
+                                    .content(String.format(
+                                            "Buổi học đã tự động được đánh dấu hoàn thành sau 48 giờ kể từ khi kết thúc. " +
+                                            "Chưa có báo cáo từ giáo viên. Session ID: %d, Date: %s, End Time: %s",
+                                            refreshedSession.getId(),
+                                            refreshedSession.getDate(),
+                                            refreshedSession.getTimeSlotTemplate() != null && refreshedSession.getTimeSlotTemplate().getEndTime() != null
+                                                    ? refreshedSession.getTimeSlotTemplate().getEndTime().toString()
+                                                    : "N/A"))
+                                    .build();
+                            qaReportsWithoutNoteToSave.add(autoReport);
+                            createdQAReportWithoutNoteCount++;
+                        }
+                    }
+                }
+
+                // Batch save all updated student sessions
+                if (!studentSessionsWithoutNoteToSave.isEmpty()) {
+                    studentSessionRepository.saveAll(studentSessionsWithoutNoteToSave);
+                }
+
+                // Batch save all created QA reports
+                if (!qaReportsWithoutNoteToSave.isEmpty()) {
+                    qaReportRepository.saveAll(qaReportsWithoutNoteToSave);
+                }
+
+                logJobInfo(String.format("Updated %d sessions to DONE status (without teacher note after 48h)", updatedWithoutNoteCount));
+                logJobInfo(String.format("Auto-marked %d attendance records as ABSENT (sessions without note)", updatedAttendanceWithoutNoteCount));
+                logJobInfo(String.format("Created %d QA reports for sessions without teacher note", createdQAReportWithoutNoteCount));
+            }
+
             logJobEnd("SessionAutoUpdate", updatedSessionCount);
 
         } catch (Exception e) {

@@ -54,4 +54,19 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Modifying
     @Query("UPDATE Notification n SET n.status = 'ARCHIVED' WHERE n.recipient.id = :recipientId AND n.id IN :notificationIds")
     int archiveNotifications(@Param("recipientId") Long recipientId, @Param("notificationIds") List<Long> notificationIds);
+
+    /**
+     * Check if a notification with the same title was sent to the recipient within the specified hours
+     * Used to prevent duplicate reminders for the same milestone
+     */
+    @Query("""
+            SELECT COUNT(n) > 0 FROM Notification n
+            WHERE n.recipient.id = :recipientId
+              AND n.title = :title
+              AND n.createdAt >= :since
+            """)
+    boolean existsByRecipientIdAndTitleAndCreatedAtAfter(
+            @Param("recipientId") Long recipientId,
+            @Param("title") String title,
+            @Param("since") LocalDateTime since);
 }

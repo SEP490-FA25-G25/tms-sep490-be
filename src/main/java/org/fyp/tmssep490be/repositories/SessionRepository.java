@@ -164,6 +164,92 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("today") LocalDate today,
             @Param("status") SessionStatus status);
 
+    /**
+     * Find sessions that have ended (date < today OR (date = today AND endTime < currentTime))
+     * and have teacher note, with PLANNED status
+     */
+    @Query("""
+            SELECT s FROM Session s
+            JOIN s.timeSlotTemplate tst
+            WHERE s.status = :status
+              AND s.teacherNote IS NOT NULL
+              AND s.teacherNote <> ''
+              AND (
+                s.date < :today
+                OR (s.date = :today AND tst.endTime < :currentTime)
+              )
+            """)
+    List<Session> findEndedSessionsWithTeacherNote(
+            @Param("today") LocalDate today,
+            @Param("currentTime") LocalTime currentTime,
+            @Param("status") SessionStatus status);
+
+    /**
+     * Find sessions that have ended more than 48 hours ago and don't have teacher note
+     * Used to auto-complete sessions that teacher forgot to submit report
+     */
+    @Query("""
+            SELECT s FROM Session s
+            JOIN s.timeSlotTemplate tst
+            WHERE s.status = :status
+              AND (s.teacherNote IS NULL OR s.teacherNote = '')
+              AND (
+                s.date < :cutoffDate
+                OR (s.date = :cutoffDate AND tst.endTime < :cutoffTime)
+              )
+            """)
+    List<Session> findEndedSessionsWithoutTeacherNoteAfter48Hours(
+            @Param("cutoffDate") LocalDate cutoffDate,
+            @Param("cutoffTime") LocalTime cutoffTime,
+            @Param("status") SessionStatus status);
+
+    /**
+     * Update sessions to DONE status if they have ended and have teacher note
+     * Uses native query because JPQL doesn't support JOIN in UPDATE
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            UPDATE session s
+            SET status = :newStatus
+            FROM time_slot_template tst
+            WHERE s.time_slot_template_id = tst.id
+              AND s.status = CAST(:oldStatus AS VARCHAR)
+              AND s.teacher_note IS NOT NULL
+              AND s.teacher_note <> ''
+              AND (
+                s.date < :today
+                OR (s.date = :today AND tst.end_time < :currentTime)
+              )
+            """, nativeQuery = true)
+    int updateEndedSessionsWithTeacherNoteToDone(
+            @Param("today") LocalDate today,
+            @Param("currentTime") LocalTime currentTime,
+            @Param("oldStatus") SessionStatus oldStatus,
+            @Param("newStatus") SessionStatus newStatus);
+
+    /**
+     * Update sessions to DONE status if they have ended more than 48 hours ago without teacher note
+     * Uses native query because JPQL doesn't support JOIN in UPDATE
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            UPDATE session s
+            SET status = CAST(:newStatus AS VARCHAR)
+            FROM time_slot_template tst
+            WHERE s.time_slot_template_id = tst.id
+              AND s.status = CAST(:oldStatus AS VARCHAR)
+              AND (s.teacher_note IS NULL OR s.teacher_note = '')
+              AND (
+                s.date < :cutoffDate
+                OR (s.date = :cutoffDate AND tst.end_time < :cutoffTime)
+              )
+            """, nativeQuery = true)
+    int updateEndedSessionsWithoutTeacherNoteAfter48HoursToDone(
+            @Param("cutoffDate") LocalDate cutoffDate,
+            @Param("cutoffTime") LocalTime cutoffTime,
+            @Param("oldStatus") SessionStatus oldStatus,
+            @Param("newStatus") SessionStatus newStatus);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Session s SET s.status = :newStatus WHERE s.date < :today AND s.status = :oldStatus")
     int updatePastSessionsStatus(
