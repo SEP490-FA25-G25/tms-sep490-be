@@ -38,7 +38,7 @@ public class StudentController {
 
 
     @GetMapping
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<Page<StudentListItemDTO>>> getStudents(
             @RequestParam(required = false) List<Long> branchIds,
             @RequestParam(required = false) String search,
@@ -69,7 +69,7 @@ public class StudentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<CreateStudentResponse>> createStudent(
             @Valid @RequestBody CreateStudentRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
@@ -92,7 +92,7 @@ public class StudentController {
     }
     
     @GetMapping("/check-existence")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<CheckStudentExistenceResponse>> checkStudentExistence(
             @RequestParam String type, // EMAIL or PHONE
             @RequestParam String value,
@@ -114,7 +114,7 @@ public class StudentController {
     }
 
     @PostMapping("/{studentId}/sync-to-branch")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<SyncToBranchResponse>> syncStudentToBranch(
             @PathVariable Long studentId,
             @Valid @RequestBody SyncToBranchRequest request,
@@ -137,7 +137,7 @@ public class StudentController {
     }
 
     @GetMapping("/{studentId}")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentDetailDTO>> getStudentDetail(
             @PathVariable Long studentId,
             @AuthenticationPrincipal UserPrincipal currentUser
@@ -154,7 +154,7 @@ public class StudentController {
     }
 
     @PutMapping("/{studentId}")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentDetailDTO>> updateStudent(
             @PathVariable Long studentId,
             @Valid @RequestBody UpdateStudentRequest request,
@@ -174,7 +174,7 @@ public class StudentController {
     }
 
     @DeleteMapping("/{studentId}/skill-assessments/{assessmentId}")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<Void>> deleteSkillAssessment(
             @PathVariable Long studentId,
             @PathVariable Long assessmentId,
@@ -192,7 +192,7 @@ public class StudentController {
 
     // Template học viên của lớp khi đưa cho sale, sale lấy template và gửi lại giáo vụ những người đăng ký và add vào hệ thống
     @GetMapping("/import/template")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<org.springframework.core.io.Resource> downloadImportTemplate(
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
@@ -209,7 +209,7 @@ public class StudentController {
 
     // Trước khi được add vào hệ thống, thi giáo vụ phải xem preview student đã có ở trong hệ thống hay chưa
     @PostMapping(value = "/import/preview", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentImportPreview>> previewImport(
             @RequestParam Long branchId,
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
@@ -252,7 +252,7 @@ public class StudentController {
     }
 
     @PostMapping("/import/execute")
-    @PreAuthorize("hasRole('ROLE_ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasRole('ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentImportResult>> executeImport(
             @Valid @RequestBody StudentImportExecuteRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser
@@ -286,7 +286,7 @@ public class StudentController {
 
     // Student tự xem profile của mình
     @GetMapping("/me/profile")
-    @PreAuthorize("hasRole('ROLE_STUDENT')")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ResponseObject<StudentDetailDTO>> getMyProfile(
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
@@ -301,7 +301,7 @@ public class StudentController {
 
     // Student tự cập nhật profile của mình
     @PutMapping("/me/profile")
-    @PreAuthorize("hasRole('ROLE_STUDENT')")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ResponseObject<StudentDetailDTO>> updateMyProfile(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @Valid @RequestBody org.fyp.tmssep490be.dtos.user.UpdateProfileRequest request
@@ -317,7 +317,7 @@ public class StudentController {
 
     // Student tự lấy danh sách lớp của mình
     @GetMapping("/me/classes")
-    @PreAuthorize("hasRole('ROLE_STUDENT')")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ResponseObject<List<StudentClassDTO>>> getMyClasses(
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {

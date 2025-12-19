@@ -265,7 +265,7 @@ CREATE TABLE subject (
   description TEXT,
   score_scale VARCHAR(100), -- ví dụ: IELTS: 0-9, TOEFL: 0-120, HSK: 0-600, etc.
   total_hours INTEGER, -- ví dụ: 120 hours cho HSK3
-  thumbnail_url VARCHAR(500), -- URL ảnh bìa khóa học
+  thumbnail_url VARCHAR(500), -- URL ảnh bìa môn học
 
   number_of_sessions INTEGER, -- tổng số buổi học
   hours_per_session DECIMAL(5,2), -- ví dụ: 2.5 hours/session cho HSK3

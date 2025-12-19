@@ -60,16 +60,16 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                         
                         log.info("WebSocket authenticated for user ID: {}, email: {}", userId, email);
                     } else {
-                        log.warn("Invalid JWT token in WebSocket connection");
-                        throw new IllegalArgumentException("Invalid JWT token");
+                        // Token invalid/expired - allow anonymous connection
+                        log.warn("Invalid or expired JWT token in WebSocket connection - allowing anonymous access");
                     }
                 } catch (Exception e) {
-                    log.error("Error authenticating WebSocket connection", e);
-                    throw new IllegalArgumentException("Authentication failed", e);
+                    // Authentication failed - allow anonymous connection but log error
+                    log.warn("Error authenticating WebSocket connection: {} - allowing anonymous access", e.getMessage());
                 }
             } else {
-                log.warn("No JWT token found in WebSocket connection");
-                throw new IllegalArgumentException("Missing authentication token");
+                // No token provided - allow anonymous connection
+                log.debug("No JWT token found in WebSocket connection - anonymous access");
             }
         }
         

@@ -58,7 +58,7 @@ public class ClassService {
 
         public Page<ClassListItemDTO> getClasses(
                         List<Long> branchIds,
-                        Long courseId,
+                        Long subjectId,
                         ClassStatus status,
                         ApprovalStatus approvalStatus,
                         Modality modality,
@@ -66,8 +66,8 @@ public class ClassService {
                         Pageable pageable,
                         Long userId) {
                 log.debug(
-                                "Getting classes for user {} with filters: branchIds={}, courseId={}, status={}, approvalStatus={}, modality={}, search={}",
-                                userId, branchIds, courseId, status, approvalStatus, modality, search);
+                                "Getting classes for user {} with filters: branchIds={}, subjectId={}, status={}, approvalStatus={}, modality={}, search={}",
+                                userId, branchIds, subjectId, status, approvalStatus, modality, search);
 
                 List<Long> accessibleBranchIds = getUserAccessibleBranches(userId);
 
@@ -82,7 +82,7 @@ public class ClassService {
                                 finalBranchIds,
                                 approvalStatus, // null = all approval statuses
                                 status, // null = all class statuses
-                                courseId,
+                                subjectId,
                                 modality,
                                 search,
                                 pageable);
@@ -884,7 +884,7 @@ public class ClassService {
                                                         : null;
                                         String timeSlot = s.getTimeSlotTemplate() != null
                                                         ? s.getTimeSlotTemplate().getName()
-                                                        : "TBA";
+                                                        : "Chưa xếp lịch";
                                         LocalTime startTime = s.getTimeSlotTemplate() != null
                                                         ? s.getTimeSlotTemplate().getStartTime()
                                                         : null;
@@ -895,7 +895,7 @@ public class ClassService {
                                                         : "N/A";
 
                                         // Get teacher from teaching slots
-                                        String teacherName = "TBA";
+                                        String teacherName = "Chưa phân công";
                                         if (s.getTeachingSlots() != null && !s.getTeachingSlots().isEmpty()) {
                                                 teacherName = s.getTeachingSlots().stream()
                                                                 .findFirst()
@@ -904,8 +904,8 @@ public class ClassService {
                                                                                                 ? ts.getTeacher()
                                                                                                                 .getUserAccount()
                                                                                                                 .getFullName()
-                                                                                                : "TBA")
-                                                                .orElse("TBA");
+                                                                                                : "Chưa phân công")
+                                                                .orElse("Chưa phân công");
                                         }
 
                                         return QASessionListResponse.QASessionItemDTO.builder()

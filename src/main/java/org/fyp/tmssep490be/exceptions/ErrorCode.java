@@ -54,7 +54,7 @@ public enum ErrorCode {
     INVALID_FILE_TYPE_XLSX(1214, "Chỉ hỗ trợ tệp Excel (.xlsx)"),
     EXCEL_PARSE_FAILED(1206, "Phân tích tệp Excel thất bại"),
     NO_STUDENTS_TO_IMPORT(1217, "Không có học viên nào để nhập"),
-    CLASS_NOT_APPROVED(1207, "Lớp học phải được phê duyệt trước khi đăng ký"),
+    CLASS_NOT_APPROVED(1207, "Lớp học phải được phê duyệt trước khi ghi danh"),
     CLASS_INVALID_STATUS(1208, "Lớp học phải ở trạng thái 'đã lên lịch' hoặc 'đang diễn ra' để đăng ký"),
     NO_FUTURE_SESSIONS(1209, "Không còn buổi học nào trong tương lai để đăng ký"),
 

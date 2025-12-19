@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,7 +37,7 @@ public class StudentRequestService {
 
     private static final int MAKEUP_LOOKBACK_WEEKS = 2;      // Số tuần nhìn lại để tìm buổi vắng
     private static final int MAKEUP_WEEKS_LIMIT = 2;         // Giới hạn số tuần cho phép xin học bù
-    private static final int MAX_TRANSFERS_PER_COURSE = 1;   // Số lần transfer tối đa mỗi khóa học
+    private static final int MAX_TRANSFERS_PER_COURSE = 1;   // Số lần transfer tối đa mỗi môn học
     private static final int ABSENCE_LEAD_TIME_DAYS = 1;     // Số ngày trước buổi học cần xin phép
     private static final int REASON_MIN_LENGTH = 10;         // Độ dài tối thiểu của lý do
 
@@ -624,11 +625,13 @@ public class StudentRequestService {
         log.info("Absence request created and auto-approved with id: {}", request.getId());
 
         // Mark the session as EXCUSED immediately since it's auto-approved
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        OffsetDateTime now = OffsetDateTime.now();
         markSessionAsExcused(
                 student,
                 session,
                 String.format("Vắng có phép được tạo và duyệt bởi AA lúc %s. Request ID: %d",
-                        OffsetDateTime.now(), request.getId())
+                        now.format(formatter), request.getId())
         );
 
         return mapToStudentRequestResponseDTO(request);
@@ -653,11 +656,13 @@ public class StudentRequestService {
         request = studentRequestRepository.save(request);
 
         if (request.getRequestType().equals(StudentRequestType.ABSENCE) && request.getTargetSession() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            OffsetDateTime now = OffsetDateTime.now();
             markSessionAsExcused(
                     request.getStudent(),
                     request.getTargetSession(),
                     String.format("Vắng có phép được duyệt lúc %s. Request ID: %d",
-                            OffsetDateTime.now(), requestId)
+                            now.format(formatter), requestId)
             );
         }
 
@@ -902,6 +907,54 @@ public class StudentRequestService {
         studentSessionRepository.save(makeupStudentSession);
         log.info("Created makeup StudentSession for student {} session {}", 
                 request.getStudent().getId(), request.getMakeupSession().getId());
+
+        // 4. Update target session attendance: ABSENT -> EXCUSED (if not already EXCUSED)
+        StudentSession.StudentSessionId targetSsId = new StudentSession.StudentSessionId(
+                request.getStudent().getId(),
+                request.getTargetSession().getId()
+        );
+        StudentSession targetStudentSession = studentSessionRepository.findById(targetSsId)
+                .orElseThrow(() -> new ResourceNotFoundException("Target student session not found"));
+
+        if (targetStudentSession.getAttendanceStatus() == AttendanceStatus.ABSENT) {
+            targetStudentSession.setAttendanceStatus(AttendanceStatus.EXCUSED);
+            targetStudentSession.setMakeupSession(request.getMakeupSession());
+            
+            // APPEND makeup info đầy đủ thay vì OVERRIDE teacher's note
+            String existingNote = targetStudentSession.getNote();
+            String makeupInfo = formatMakeupInfo(request.getMakeupSession());
+            String makeupNote = "Excused - học bù tại " + makeupInfo;
+            
+            if (existingNote != null && !existingNote.trim().isEmpty()) {
+                targetStudentSession.setNote(existingNote + "\n---\n" + makeupNote);
+            } else {
+                targetStudentSession.setNote(makeupNote);
+            }
+            
+            studentSessionRepository.save(targetStudentSession);
+            log.info("Updated target session attendance {} from ABSENT to EXCUSED (preserved existing note)", targetStudentSession.getId());
+        } else if (targetStudentSession.getAttendanceStatus() == AttendanceStatus.EXCUSED) {
+            // Already EXCUSED, just update makeup link if not set
+            if (targetStudentSession.getMakeupSession() == null) {
+                targetStudentSession.setMakeupSession(request.getMakeupSession());
+                
+                // APPEND makeup info đầy đủ
+                String existingNote = targetStudentSession.getNote();
+                String makeupInfo = formatMakeupInfo(request.getMakeupSession());
+                String makeupNote = "Học bù tại " + makeupInfo;
+                
+                if (existingNote != null && !existingNote.trim().isEmpty()) {
+                    targetStudentSession.setNote(existingNote + "\n---\n" + makeupNote);
+                } else {
+                    targetStudentSession.setNote(makeupNote);
+                }
+                
+                studentSessionRepository.save(targetStudentSession);
+                log.info("Updated EXCUSED session {} with makeup link (preserved existing note)", targetStudentSession.getId());
+            } else {
+                log.info("Target session {} already EXCUSED with makeup session, no update needed", targetStudentSession.getId());
+            }
+        }
     }
 
     private StudentRequestDetailDTO mapToDetailDTO(StudentRequest request) {
@@ -1113,12 +1166,16 @@ public class StudentRequestService {
 
         // Business Rule: SAME-BRANCH ONLY - không cho phép học bù ở branch khác
 
-        // Tìm các buổi cùng subject trong cùng chi nhánh, trong giới hạn thời gian
+        // Tìm các buổi cùng subject trong cùng chi nhánh, trong vòng 2 tuần kể từ buổi missed
+        LocalDate missedDate = targetSession.getDate();
+        LocalDate endDate = missedDate.plusWeeks(MAKEUP_WEEKS_LIMIT);
+        
         List<Session> makeupOptions = sessionRepository.findMakeupSessionOptions(
                 targetSession.getSubjectSession().getId(),
                 targetSessionId,
                 targetSession.getClassEntity().getBranch().getId(),
-                MAKEUP_WEEKS_LIMIT
+                missedDate,
+                endDate
         );
 
         List<MakeupOptionDTO> rankedOptions = makeupOptions.stream()
@@ -1196,6 +1253,36 @@ public class StudentRequestService {
             }
         }
 
+        String teacherName = null;
+        if (session.getTeachingSlots() != null && !session.getTeachingSlots().isEmpty()) {
+            Teacher teacher = session.getTeachingSlots().iterator().next().getTeacher();
+            if (teacher != null && teacher.getUserAccount() != null) {
+                teacherName = teacher.getUserAccount().getFullName();
+            }
+        }
+
+        Integer phaseNumber = null;
+        String phaseName = null;
+        Integer totalSessions = null;
+        if (subjectSession != null && subjectSession.getPhase() != null) {
+            SubjectPhase phase = subjectSession.getPhase();
+            phaseNumber = phase.getPhaseNumber();
+            phaseName = phase.getName();
+            // Count total sessions in the subject (across all phases)
+            if (phase.getSubject() != null) {
+                totalSessions = phase.getSubject().getSubjectPhases().stream()
+                        .mapToInt(p -> p.getSubjectSessions().size())
+                        .sum();
+            }
+        }
+
+        List<String> skillsList = null;
+        if (subjectSession != null && subjectSession.getSkills() != null && !subjectSession.getSkills().isEmpty()) {
+            skillsList = subjectSession.getSkills().stream()
+                    .map(Enum::name)
+                    .collect(Collectors.toList());
+        }
+
         return MissedSessionDTO.builder()
                 .sessionId(session.getId())
                 .date(session.getDate())
@@ -1214,6 +1301,12 @@ public class StudentRequestService {
                         .resourceName(resourceName)
                         .resourceType(resourceType)
                         .onlineLink(onlineLink)
+                        .teacherName(teacherName)
+                        .sequenceNo(subjectSession != null ? subjectSession.getSequenceNo() : null)
+                        .totalSessions(totalSessions)
+                        .phaseNumber(phaseNumber)
+                        .phaseName(phaseName)
+                        .skills(skillsList)
                         .build())
                 .timeSlotInfo(MissedSessionDTO.TimeSlotInfo.builder()
                         .startTime(timeSlot != null ? timeSlot.getStartTime().toString() : null)
@@ -1275,6 +1368,39 @@ public class StudentRequestService {
             }
         }
 
+        // Get teacher name
+        String teacherName = null;
+        if (session.getTeachingSlots() != null && !session.getTeachingSlots().isEmpty()) {
+            Teacher teacher = session.getTeachingSlots().iterator().next().getTeacher();
+            if (teacher != null && teacher.getUserAccount() != null) {
+                teacherName = teacher.getUserAccount().getFullName();
+            }
+        }
+
+        // Get phase info and total sessions
+        Integer phaseNumber = null;
+        String phaseName = null;
+        Integer totalSessions = null;
+        if (subjectSession != null && subjectSession.getPhase() != null) {
+            SubjectPhase phase = subjectSession.getPhase();
+            phaseNumber = phase.getPhaseNumber();
+            phaseName = phase.getName();
+            // Count total sessions in the subject (across all phases)
+            if (phase.getSubject() != null) {
+                totalSessions = phase.getSubject().getSubjectPhases().stream()
+                        .mapToInt(p -> p.getSubjectSessions().size())
+                        .sum();
+            }
+        }
+
+        // Get skills as strings
+        List<String> skillsList = null;
+        if (subjectSession != null && subjectSession.getSkills() != null && !subjectSession.getSkills().isEmpty()) {
+            skillsList = subjectSession.getSkills().stream()
+                    .map(Enum::name)
+                    .collect(Collectors.toList());
+        }
+
         return MakeupOptionDTO.builder()
                 .sessionId(session.getId())
                 .date(session.getDate())
@@ -1295,6 +1421,12 @@ public class StudentRequestService {
                         .resourceName(resourceName)
                         .resourceType(resourceType)
                         .onlineLink(onlineLink)
+                        .teacherName(teacherName)
+                        .sequenceNo(subjectSession != null ? subjectSession.getSequenceNo() : null)
+                        .totalSessions(totalSessions)
+                        .phaseNumber(phaseNumber)
+                        .phaseName(phaseName)
+                        .skills(skillsList)
                         .build())
                 .timeSlotInfo(MakeupOptionDTO.TimeSlotInfo.builder()
                         .startTime(timeSlot != null ? timeSlot.getStartTime().toString() : null)
@@ -1452,7 +1584,52 @@ public class StudentRequestService {
         return (double) unexcusedAbsences / pastSessions.size() * 100;
     }
 
-    private void markSessionAsExcused(Student student, Session session, String note) {
+    /**
+     * VD: "SE1742 - Buổi 15 (Java Backend) ngày 15/12/2024 15:30-17:00"
+     */
+    private String formatMakeupInfo(Session makeupSession) {
+        ClassEntity makeupClass = makeupSession.getClassEntity();
+        SubjectSession subjectSession = makeupSession.getSubjectSession();
+        TimeSlotTemplate timeSlot = makeupSession.getTimeSlotTemplate();
+        
+        StringBuilder info = new StringBuilder();
+        
+        // Lớp học
+        info.append(makeupClass.getCode());
+        
+        // Buổi học số mấy
+        if (subjectSession != null) {
+            info.append(" - Buổi ").append(subjectSession.getSequenceNo());
+            
+            // Topic nếu có
+            if (subjectSession.getTopic() != null && !subjectSession.getTopic().trim().isEmpty()) {
+                info.append(" (").append(subjectSession.getTopic()).append(")");
+            }
+        }
+        
+        // Ngày giờ
+        if (makeupSession.getDate() != null) {
+            info.append(" ngày ").append(makeupSession.getDate().format(
+                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+            ));
+        }
+        
+        // Giờ học
+        if (timeSlot != null && timeSlot.getStartTime() != null && timeSlot.getEndTime() != null) {
+            info.append(" ")
+                .append(timeSlot.getStartTime().format(
+                    java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                ))
+                .append("-")
+                .append(timeSlot.getEndTime().format(
+                    java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                ));
+        }
+        
+        return info.toString();
+    }
+
+    private void markSessionAsExcused(Student student, Session session, String systemNote) {
         StudentSession.StudentSessionId id = new StudentSession.StudentSessionId(student.getId(), session.getId());
         StudentSession ss = studentSessionRepository.findById(id)
                 .orElseGet(() -> StudentSession.builder()
@@ -1462,7 +1639,15 @@ public class StudentRequestService {
                         .build());
 
         ss.setAttendanceStatus(AttendanceStatus.EXCUSED);
-        ss.setNote(note);
+        
+        // APPEND system note thay vì OVERRIDE teacher's note
+        String existingNote = ss.getNote();
+        if (existingNote != null && !existingNote.trim().isEmpty()) {
+            ss.setNote(existingNote + "\n---\n" + systemNote);
+        } else {
+            ss.setNote(systemNote);
+        }
+        
         ss.setRecordedAt(OffsetDateTime.now());
 
         studentSessionRepository.save(ss);
@@ -1856,7 +2041,7 @@ public class StudentRequestService {
 
         List<TransferEligibilityDTO.SessionInfo> allSessions = classSessions.stream()
                 .map(session -> {
-                    String timeSlot = "TBA";
+                    String timeSlot = "Chưa xếp lịch";
                     if (session.getTimeSlotTemplate() != null) {
                         timeSlot = session.getTimeSlotTemplate().getStartTime() + "-" + 
                                   session.getTimeSlotTemplate().getEndTime();
@@ -1865,7 +2050,7 @@ public class StudentRequestService {
                     Integer sessionNumber = session.getSubjectSession() != null ? 
                             session.getSubjectSession().getSequenceNo() : null;
                     String topic = session.getSubjectSession() != null ? 
-                            session.getSubjectSession().getTopic() : "TBA";
+                            session.getSubjectSession().getTopic() : "Chưa có";
 
                     return TransferEligibilityDTO.SessionInfo.builder()
                             .sessionId(session.getId())
@@ -1964,7 +2149,7 @@ public class StudentRequestService {
                 .sorted(Comparator.comparing(Session::getDate))
                 .limit(4)
                 .map(session -> {
-                    String timeSlot = "TBA";
+                    String timeSlot = "Chưa xếp lịch";
                     if (session.getTimeSlotTemplate() != null) {
                         timeSlot = session.getTimeSlotTemplate().getStartTime() + "-" + 
                                   session.getTimeSlotTemplate().getEndTime();
@@ -1973,7 +2158,7 @@ public class StudentRequestService {
                     Integer sessionNumber = session.getSubjectSession() != null ? 
                             session.getSubjectSession().getSequenceNo() : null;
                     String topic = session.getSubjectSession() != null ? 
-                            session.getSubjectSession().getTopic() : "TBA";
+                            session.getSubjectSession().getTopic() : "Chưa có";
                     
                     return TransferOptionDTO.UpcomingSession.builder()
                             .sessionId(session.getId())
@@ -1997,7 +2182,7 @@ public class StudentRequestService {
 
         return allSessions.stream()
                 .map(session -> {
-                    String timeSlot = "TBA";
+                    String timeSlot = "Chưa xếp lịch";
                     if (session.getTimeSlotTemplate() != null) {
                         timeSlot = session.getTimeSlotTemplate().getStartTime() + "-" + 
                                   session.getTimeSlotTemplate().getEndTime();
@@ -2006,7 +2191,7 @@ public class StudentRequestService {
                     Integer sessionNumber = session.getSubjectSession() != null ? 
                             session.getSubjectSession().getSequenceNo() : null;
                     String topic = session.getSubjectSession() != null ? 
-                            session.getSubjectSession().getTopic() : "TBA";
+                            session.getSubjectSession().getTopic() : "Chưa có";
                     
                     boolean isPast = session.getDate().isBefore(today) || session.getStatus() == SessionStatus.DONE;
                     boolean isUpcoming = session.getId().equals(upcomingSessionId);
@@ -2050,7 +2235,7 @@ public class StudentRequestService {
         List<Session> allSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classId);
         
         if (allSessions.isEmpty()) {
-            return "TBA";
+            return "Chưa xếp lịch";
         }
 
         // Use ScheduleUtils to extract and format schedule with day names and time slots

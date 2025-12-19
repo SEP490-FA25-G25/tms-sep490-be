@@ -467,7 +467,7 @@ public class CurriculumService {
 
                 long subjectCount = subjectRepository.countByLevelId(id);
                 if (subjectCount > 0) {
-                        throw new IllegalStateException("Không thể xóa cấp độ vì đã có khóa học phụ thuộc.");
+                        throw new IllegalStateException("Không thể xóa cấp độ vì đã có môn học phụ thuộc.");
                 }
 
                 levelRepository.delete(level);

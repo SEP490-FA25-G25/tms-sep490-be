@@ -62,7 +62,7 @@ public class StudentRequestController {
 
     //Step đầu tiên trong luồng tạo makeup request là student phải gọi config từ bảng policy lên
     @GetMapping("/config")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ACADEMIC_AFFAIR')")
     public ResponseEntity<ResponseObject<StudentRequestConfigDTO>> getConfig() {
         StudentRequestConfigDTO config = studentRequestService.getStudentRequestConfig();
         return ResponseEntity.ok(ResponseObject.success("Retrieved configuration successfully", config));

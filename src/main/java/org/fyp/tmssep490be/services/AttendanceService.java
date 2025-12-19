@@ -304,7 +304,7 @@ public class AttendanceService {
         String teacherName = getTeacherNameForSession(sessionId);
 
         List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(sessionId);
-        AttendanceSummaryDTO summary = buildSummary(studentSessions);
+        AttendanceSummaryDTO summary = buildSummary(studentSessions, session);
 
         return SessionReportResponseDTO.builder()
                 .sessionId(session.getId())
@@ -346,7 +346,7 @@ public class AttendanceService {
         String teacherName = getTeacherNameForSession(sessionId);
 
         List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(sessionId);
-        AttendanceSummaryDTO summary = buildSummary(studentSessions);
+        AttendanceSummaryDTO summary = buildSummary(studentSessions, session);
 
         return SessionReportResponseDTO.builder()
                 .sessionId(session.getId())
@@ -676,9 +676,36 @@ public class AttendanceService {
     }
 
     private AttendanceSummaryDTO buildSummary(Collection<StudentSession> studentSessions) {
+        return buildSummary(studentSessions, null);
+    }
+
+    private AttendanceSummaryDTO buildSummary(Collection<StudentSession> studentSessions, Session session) {
         int total = studentSessions.size();
         int present = 0;
         int absent = 0;
+        Integer completedHomeworkCount = null;
+
+        // Kiểm tra xem session có bài tập về nhà không (từ buổi học trước)
+        boolean hasHomework = false;
+        if (session != null) {
+            Session previousSession = findPreviousSession(session);
+            hasHomework = previousSession != null
+                    && previousSession.getSubjectSession() != null
+                    && previousSession.getSubjectSession().getStudentTask() != null
+                    && !previousSession.getSubjectSession().getStudentTask().trim().isEmpty();
+        }
+
+        // Tính toán số học viên đã làm bài tập về nhà (nếu có bài tập)
+        if (hasHomework) {
+            int completed = 0;
+            for (StudentSession ss : studentSessions) {
+                if (ss.getHomeworkStatus() == HomeworkStatus.COMPLETED) {
+                    completed++;
+                }
+            }
+            completedHomeworkCount = completed;
+        }
+
         for (StudentSession ss : studentSessions) {
             AttendanceStatus status = resolveDisplayStatus(ss);
             if (status == AttendanceStatus.PRESENT) {
@@ -691,6 +718,7 @@ public class AttendanceService {
                 .totalStudents(total)
                 .presentCount(present)
                 .absentCount(absent)
+                .completedHomeworkCount(completedHomeworkCount)
                 .build();
     }
 
@@ -876,6 +904,11 @@ public class AttendanceService {
             return false;
         }
 
+        // Lưu ý: Cho phép sửa điểm danh cả khi session đã DONE (đã nộp báo cáo),
+        // miễn là vẫn trong vòng 48 giờ sau khi kết thúc.
+        // Khi sửa điểm danh, summary trong báo cáo sẽ tự động cập nhật
+        // (vì summary được tính từ StudentSession records).
+
         LocalDate sessionDate = session.getDate();
         LocalDateTime now = LocalDateTime.now();
 
@@ -904,7 +937,7 @@ public class AttendanceService {
 
         // Cho phép điểm danh nếu:
         // 1. Session đang diễn ra (đã đến giờ bắt đầu và chưa kết thúc)
-        // 2. Hoặc session đã kết thúc nhưng chưa quá 48 giờ
+        // 2. Hoặc session đã kết thúc nhưng chưa quá 48 giờ (kể cả khi đã DONE)
         boolean isSessionOngoing = !now.isBefore(sessionStartDateTime) && !now.isAfter(sessionEndDateTime);
         boolean isWithin48HoursAfterEnd = now.isAfter(sessionEndDateTime);
         
@@ -914,6 +947,7 @@ public class AttendanceService {
         
         if (isWithin48HoursAfterEnd) {
             // Cho phép chỉnh sửa trong vòng 48 giờ sau khi kết thúc
+            // (bao gồm cả trường hợp đã nộp báo cáo - status DONE)
             LocalDate deadlineDate = sessionDate.plusDays(2);
             LocalDateTime deadline = LocalDateTime.of(deadlineDate, LocalTime.MAX);
             return !now.isAfter(deadline);

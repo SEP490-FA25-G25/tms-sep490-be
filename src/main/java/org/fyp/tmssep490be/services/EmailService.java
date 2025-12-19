@@ -112,7 +112,7 @@ public class EmailService {
 
 
     public void sendFeedbackReminderAsync(String to, String studentName, String className) {
-        String subject = "Nhắc nhở: Đánh giá khóa học";
+        String subject = "Nhắc nhở: Đánh giá môn học";
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("studentName", studentName);
         templateData.put("className", className);

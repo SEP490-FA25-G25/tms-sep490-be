@@ -20,7 +20,7 @@ public class SessionController {
     private final SessionService sessionService;
 
     @GetMapping("/qa/sessions/{sessionId}")
-    @PreAuthorize("hasAnyRole('QA', 'TEACHER', 'ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasAnyRole('QA', 'TEACHER', 'ACADEMIC_AFFAIR', 'CENTER_HEAD', 'MANAGER')")
     public ResponseEntity<ResponseObject<SessionDetailDTO>> getSessionDetail(
         @PathVariable Long sessionId,
         @AuthenticationPrincipal UserPrincipal currentUser

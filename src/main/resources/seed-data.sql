@@ -577,8 +577,8 @@ INSERT INTO plo (id, curriculum_id, code, description, created_at, updated_at) V
 -- Courses: 2 IELTS subjects only (Foundation + Intermediate)
 INSERT INTO subject (id, curriculum_id, level_id, logical_subject_code, version, code, name, description, total_hours, number_of_sessions, hours_per_session, prerequisites, target_audience, teaching_methods, score_scale, status, approval_status, decided_by_manager, decided_at, rejection_reason, created_by, created_at, updated_at, effective_date) VALUES
 -- IELTS Courses
-(1, 1, 1, 'IELTS-FOUND-2025', 1, 'IELTS-FOUND-2025-V1', 'IELTS Foundation 2025', 'Khóa học nền tảng cho người mới bắt đầu, mục tiêu band 3.0-4.0', 60, 24, 2.5, 'Không yêu cầu kiến thức nền tảng.', 'Học viên mất gốc hoặc mới bắt đầu học tiếng Anh.', 'Communicative Language Teaching (CLT) kết hợp bài tập thực hành.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-20 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-20 14:00:00+07', '2024-09-01'),
-(2, 1, 3, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Khóa học trung cấp, mục tiêu band 5.0-5.5', 60, 24, 2.5, 'Hoàn thành khóa Foundation hoặc IELTS 4.0+', 'Học viên có nền tảng cơ bản, mục tiêu band 5.0-5.5.', 'Chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-25 14:00:00+07', '2024-09-01');
+(1, 1, 1, 'IELTS-FOUND-2025', 1, 'IELTS-FOUND-2025-V1', 'IELTS Foundation 2025', 'Môn học nền tảng cho người mới bắt đầu, mục tiêu band 3.0-4.0', 60, 24, 2.5, 'Không yêu cầu kiến thức nền tảng.', 'Học viên mất gốc hoặc mới bắt đầu học tiếng Anh.', 'Communicative Language Teaching (CLT) kết hợp bài tập thực hành.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-20 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-20 14:00:00+07', '2024-09-01'),
+(2, 1, 3, 'IELTS-INT-2025', 1, 'IELTS-INT-2025-V1', 'IELTS Intermediate 2025', 'Môn học trung cấp, mục tiêu band 5.0-5.5', 60, 24, 2.5, 'Hoàn thành khóa Foundation hoặc IELTS 4.0+', 'Học viên có nền tảng cơ bản, mục tiêu band 5.0-5.5.', 'Chiến thuật giải đề và nâng cao từ vựng học thuật.', '0-9', 'ACTIVE', 'APPROVED', 2, '2024-08-25 14:00:00+07', NULL, 5, '2024-08-15 00:00:00+07', '2024-08-25 14:00:00+07', '2024-09-01');
 -- Course Phases for Foundation
 INSERT INTO subject_phase (id, subject_id, phase_number, name, duration_weeks, created_at, updated_at) VALUES
 (1, 1, 1, 'Foundation Basics', 4, '2024-08-15 00:00:00+07', '2024-08-15 00:00:00+07'),
@@ -1449,7 +1449,7 @@ INSERT INTO qa_report (id, class_id, session_id, reported_by, report_type, statu
 
 -- 3. Student Feedback Analysis (Phân tích phản hồi)
 INSERT INTO qa_report (id, class_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
-(5, 1, 10, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', '100% học viên hài lòng với khóa học. Điểm đánh giá trung bình 4.8/5. Khen thưởng giáo viên.', '2025-12-05 10:00:00+07', '2025-12-05 10:00:00+07'),
+(5, 1, 10, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', '100% học viên hài lòng với môn học. Điểm đánh giá trung bình 4.8/5. Khen thưởng giáo viên.', '2025-12-05 10:00:00+07', '2025-12-05 10:00:00+07'),
 (6, 6, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', 'Phản hồi trái chiều. Một số học viên phàn nàn về tốc độ giảng dạy. Trao đổi với giáo viên để điều chỉnh tốc độ phù hợp với trình độ học viên.', '2025-12-06 10:00:00+07', '2025-12-06 10:00:00+07'),
 (7, 3, 11, 'STUDENT_FEEDBACK_ANALYSIS', 'SUBMITTED', 'Phản hồi tích cực về nội dung bài giảng. Đề xuất tiếp tục phương pháp giảng dạy hiện tại.', '2025-12-07 10:00:00+07', '2025-12-07 10:00:00+07');
 

@@ -319,6 +319,7 @@ public class StudentScheduleService {
 
         // Extract resource information
         String resourceName = null;
+        String resourceCode = null;
         org.fyp.tmssep490be.entities.enums.ResourceType resourceType = null;
         String onlineLink = null;
 
@@ -326,12 +327,46 @@ public class StudentScheduleService {
             SessionResource sessionResource = session.getSessionResources().iterator().next();
             Resource resource = sessionResource.getResource();
             resourceName = resource.getName();
+            resourceCode = resource.getCode();
             resourceType = resource.getResourceType();
             
             // If virtual resource, the name is typically the zoom link or label
             if (resourceType == org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL) {
                 onlineLink = resource.getName(); // Store zoom link
             }
+        }
+
+        String teacherName = null;
+        Long teacherId = null;
+        if (!session.getTeachingSlots().isEmpty()) {
+            TeachingSlot teachingSlot = session.getTeachingSlots().iterator().next();
+            if (teachingSlot.getTeacher() != null) {
+                teacherName = teachingSlot.getTeacher().getUserAccount().getFullName();
+                teacherId = teachingSlot.getTeacher().getId();
+            }
+        }
+
+        List<org.fyp.tmssep490be.entities.enums.Skill> skills = null;
+        if (subjectSession != null && subjectSession.getSkills() != null) {
+            skills = subjectSession.getSkills();
+        }
+
+        Integer sequenceNo = null;
+        if (subjectSession != null) {
+            sequenceNo = subjectSession.getSequenceNo();
+        }
+
+        Integer totalSessions = null;
+        if (classEntity.getSubject() != null) {
+            totalSessions = classEntity.getSubject().getNumberOfSessions();
+        }
+
+        Integer phaseNumber = null;
+        String phaseName = null;
+        if (subjectSession != null && subjectSession.getPhase() != null) {
+            SubjectPhase phase = subjectSession.getPhase();
+            phaseNumber = phase.getPhaseNumber();
+            phaseName = phase.getName();
         }
 
         return SessionSummaryDTO.builder()
@@ -357,8 +392,17 @@ public class StudentScheduleService {
                 .isMakeup(studentSession.getIsMakeup() != null ? studentSession.getIsMakeup() : false)
                 .makeupInfo(makeupInfo)
                 .resourceName(resourceName)
+                .resourceCode(resourceCode)
                 .resourceType(resourceType)
                 .onlineLink(onlineLink)
+                // NEW FIELDS
+                .teacherName(teacherName)
+                .teacherId(teacherId)
+                .skills(skills)
+                .sequenceNo(sequenceNo)
+                .totalSessions(totalSessions)
+                .phaseNumber(phaseNumber)
+                .phaseName(phaseName)
                 .build();
     }
 
@@ -381,6 +425,9 @@ public class StudentScheduleService {
         }
 
         TimeSlotTemplate originalTimeSlot = originalSession.getTimeSlotTemplate();
+        ClassEntity originalClass = originalSession.getClassEntity();
+        SubjectSession originalSubjectSession = originalSession.getSubjectSession();
+        
         return MakeupInfoDTO.builder()
                 .isMakeup(true)
                 .originalSessionId(originalSession.getId())
@@ -390,6 +437,11 @@ public class StudentScheduleService {
                 .originalStatus(originalSession.getStatus())
                 .reason("Session rescheduled")
                 .makeupDate(studentSession.getSession().getDate())
+                // NEW: Enrich với class và session info
+                .originalClassCode(originalClass != null ? originalClass.getCode() : null)
+                .originalClassName(originalClass != null ? originalClass.getName() : null)
+                .originalSequenceNo(originalSubjectSession != null ? originalSubjectSession.getSequenceNo() : null)
+                .originalTopic(originalSubjectSession != null ? originalSubjectSession.getTopic() : null)
                 .build();
     }
 

@@ -255,7 +255,7 @@ public class TeacherGradeService {
                                                                         .orElse(0);
                                         int gradedCount = (int) percents.size();
 
-                                        // Chuyên cần: tính ngay, không cần chờ khóa học kết thúc
+                                        // Chuyên cần: tính ngay, không cần chờ môn học kết thúc
                                         List<StudentSession> studentSessions = studentSessionRepository
                                                         .findByStudentIdAndClassEntityId(studentId, classId)
                                                         .stream()

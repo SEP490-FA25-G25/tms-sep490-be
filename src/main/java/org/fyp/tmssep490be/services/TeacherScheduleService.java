@@ -31,6 +31,7 @@ public class TeacherScheduleService {
     private final TeacherRepository teacherRepository;
     private final SessionRepository sessionRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
+    private final TeacherRequestRepository teacherRequestRepository;
     private final ObjectMapper objectMapper;
 
     public LocalDate getCurrentWeekStart() {
@@ -202,6 +203,14 @@ public class TeacherScheduleService {
                 .attendanceSubmitted(attendanceSubmitted)
                 .build();
 
+        // Lấy request type của request được approved gần nhất (chỉ lấy request đầu tiên sau khi sort)
+        List<String> pendingRequestTypes = teacherRequestRepository
+                .findBySessionIdAndApprovedStatus(session.getId())
+                .stream()
+                .findFirst()
+                .map(tr -> List.of(tr.getRequestType().name()))
+                .orElse(Collections.emptyList());
+
         return TeacherSessionDetailDTO.builder()
                 .sessionId(session.getId())
                 .date(session.getDate())
@@ -215,6 +224,7 @@ public class TeacherScheduleService {
                 .classroomResource(classroomResource)
                 .makeupInfo(makeupInfo)
                 .attendanceSummary(attendanceSummary)
+                .pendingRequestTypes(pendingRequestTypes)
                 .build();
     }
 
@@ -394,7 +404,27 @@ public class TeacherScheduleService {
             }
         }
 
-        // Lưu ý: Attendance summary không nằm trong SessionSummaryDTO mà ở TeacherSessionDetailDTO
+        // Tính tóm tắt điểm danh (giống như trong mapToTeacherSessionDetailDTO)
+        long totalStudents = session.getStudentSessions().size();
+        long presentCount = session.getStudentSessions().stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                .count();
+        long absentCount = session.getStudentSessions().stream()
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                .count();
+        
+        // Kiểm tra xem đã chốt điểm danh (có SV nào khác PLANNED)
+        boolean attendanceSubmitted = session.getStudentSessions().stream()
+                .anyMatch(ss -> ss.getAttendanceStatus() != null && 
+                               ss.getAttendanceStatus() != AttendanceStatus.PLANNED);
+
+        // Lấy request type của request được approved gần nhất (chỉ lấy request đầu tiên sau khi sort)
+        List<String> pendingRequestTypes = teacherRequestRepository
+                .findBySessionIdAndApprovedStatus(session.getId())
+                .stream()
+                .findFirst()
+                .map(tr -> List.of(tr.getRequestType().name()))
+                .orElse(Collections.emptyList());
 
         return SessionSummaryDTO.builder()
                 .sessionId(session.getId())
@@ -422,6 +452,11 @@ public class TeacherScheduleService {
                 .resourceCode(resourceCode)
                 .resourceType(resourceType)
                 .onlineLink(onlineLink)
+                .totalStudents(totalStudents)
+                .presentCount(presentCount)
+                .absentCount(absentCount)
+                .attendanceSubmitted(attendanceSubmitted)
+                .pendingRequestTypes(pendingRequestTypes)
                 .build();
     }
 

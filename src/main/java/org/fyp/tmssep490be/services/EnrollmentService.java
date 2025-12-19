@@ -399,7 +399,7 @@ public class EnrollmentService {
             String title = String.format("Xác nhận đăng ký lớp: %s", classEntity.getCode());
             String message = String.format(
                     "Bạn đã được đăng ký thành công vào lớp học %s (%s). " +
-                            "Khóa học sẽ bắt đầu vào ngày %s. " +
+                            "Môn học sẽ bắt đầu vào ngày %s. " +
                             "Lịch học: %s",
                     classEntity.getCode(),
                     classEntity.getSubject().getName(),

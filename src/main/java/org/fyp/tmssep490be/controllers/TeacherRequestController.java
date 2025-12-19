@@ -552,5 +552,23 @@ public class TeacherRequestController {
                 .data(response)
                 .build());
     }
+
+    //Endpoint để giáo viên hủy yêu cầu của mình
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ResponseObject<TeacherRequestResponseDTO>> cancelRequest(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        
+        log.info("Cancel request {} by teacher {}", id, userPrincipal.getId());
+
+        TeacherRequestResponseDTO response = teacherRequestService.cancelRequest(id, userPrincipal.getId());
+
+        return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
+                .success(true)
+                .message("Request cancelled successfully")
+                .data(response)
+                .build());
+    }
 }
 
