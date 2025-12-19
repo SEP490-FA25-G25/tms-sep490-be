@@ -36,8 +36,8 @@ RUN ./mvnw dependency:go-offline -B
 # Copy source code
 COPY tms-be-temp/src src
 
-# Build application
-RUN ./mvnw clean package -DskipTests -B
+# Build application (skip test compilation and execution)
+RUN ./mvnw clean package -Dmaven.test.skip=true -B
 
 # Stage 3: Production - Combined Frontend + Backend
 FROM eclipse-temurin:21-jre-alpine
