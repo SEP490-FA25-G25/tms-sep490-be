@@ -14,7 +14,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PublicCourseCatalogDTO {
+public class PublicSubjectCatalogDTO {
     private List<CurriculumGroup> curriculums;
 
     @Data
@@ -26,6 +26,6 @@ public class PublicCourseCatalogDTO {
         private String code;
         private String name;
         private String description;
-        private List<PublicCourseDTO> courses;
+        private List<PublicSubjectDTO> subjects; // Renamed from courses
     }
 }

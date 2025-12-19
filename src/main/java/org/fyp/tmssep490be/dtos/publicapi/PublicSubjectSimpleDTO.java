@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PublicCourseSimpleDTO {
+public class PublicSubjectSimpleDTO {
     private Long id;
     private String name;
     private String code;
