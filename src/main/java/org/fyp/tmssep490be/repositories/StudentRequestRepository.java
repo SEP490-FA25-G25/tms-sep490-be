@@ -198,10 +198,6 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
             @Param("targetSessionId") Long targetSessionId,
             @Param("requestType") StudentRequestType requestType);
 
-    /**
-     * Find requests by status and submitted before cutoff date
-     * Used by RequestExpiryJob to expire old PENDING requests
-     */
     @Query("SELECT sr FROM StudentRequest sr " +
            "WHERE sr.status = :status " +
            "AND sr.submittedAt < :cutoffDate " +
@@ -209,4 +205,13 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
     List<StudentRequest> findByStatusAndSubmittedAtBefore(
             @Param("status") RequestStatus status,
             @Param("cutoffDate") OffsetDateTime cutoffDate);
+
+    @Query("SELECT sr FROM StudentRequest sr " +
+           "WHERE sr.student.id = :studentId " +
+           "AND sr.targetSession.id IN :sessionIds " +
+           "AND sr.requestType IN :requestTypes")
+    List<StudentRequest> findByStudentIdAndTargetSessionIdInAndRequestTypeIn(
+            @Param("studentId") Long studentId,
+            @Param("sessionIds") List<Long> sessionIds,
+            @Param("requestTypes") List<StudentRequestType> requestTypes);
 }

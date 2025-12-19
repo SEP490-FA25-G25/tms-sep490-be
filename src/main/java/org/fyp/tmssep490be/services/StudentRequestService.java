@@ -1896,7 +1896,39 @@ public class StudentRequestService {
             throw new BusinessRuleException("PAST_SESSION", "Target session must be in the future");
         }
 
-        // 6b. Check schedule conflicts with other classes (including makeup sessions)
+        // 6b. Check for completed makeup sessions that would become orphaned
+        // If student already attended a makeup for a future session (originalSession.date >= joinDate),
+        // block transfer to preserve attendance data integrity
+        LocalDate joinDate = targetSession.getDate();
+        List<StudentSession> completedMakeups = studentSessionRepository.findAllByStudentId(studentId)
+                .stream()
+                .filter(ss -> Boolean.TRUE.equals(ss.getIsMakeup()))
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                .filter(ss -> ss.getOriginalSession() != null)
+                .filter(ss -> ss.getOriginalSession().getClassEntity().getId().equals(dto.getCurrentClassId()))
+                .filter(ss -> !ss.getOriginalSession().getDate().isBefore(joinDate)) // originalSession >= joinDate
+                .toList();
+        
+        if (!completedMakeups.isEmpty()) {
+            // Get the earliest originalSession that blocks transfer
+            StudentSession blockingMakeup = completedMakeups.stream()
+                    .min(Comparator.comparing(ss -> ss.getOriginalSession().getDate()))
+                    .orElse(null);
+            
+            if (blockingMakeup != null) {
+                Session originalSession = blockingMakeup.getOriginalSession();
+                throw new BusinessRuleException("MAKEUP_CONFLICT",
+                        String.format("Không thể chuyển lớp từ buổi này. Học viên đã học bù cho buổi %s (%s) nhưng buổi đó chưa diễn ra. " +
+                                "Vui lòng chọn buổi bắt đầu sau ngày %s.",
+                                originalSession.getSubjectSession() != null 
+                                        ? originalSession.getSubjectSession().getSequenceNo() 
+                                        : originalSession.getId(),
+                                originalSession.getDate(),
+                                originalSession.getDate()));
+            }
+        }
+
+        // 6c. Check schedule conflicts with other classes (including makeup sessions)
         List<Session> targetClassFutureSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
                 dto.getTargetClassId(), targetSession.getDate());
         validateScheduleConflictsForTransfer(studentId, dto.getCurrentClassId(), dto.getTargetClassId(), targetClassFutureSessions);
@@ -2027,8 +2059,8 @@ public class StudentRequestService {
         log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
                 newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
 
-        // 4. DELETE sessions from old class that would conflict with new class schedule
-        // Use datetime comparison: only delete sessions that start AT or AFTER joinSession's start time
+        // 4. Identify sessions from old class that will be removed
+        // Use datetime comparison: only remove sessions that start AT or AFTER joinSession's start time
         // This allows student to attend morning class in old class even if joining evening class in new class on same day
         List<StudentSession> allOldClassSessions = studentSessionRepository
                 .findByStudentIdAndClassEntityId(studentId, currentClass.getId());
@@ -2061,6 +2093,43 @@ public class StudentRequestService {
                 })
                 .toList();
 
+        // 4b. Clean up related requests and makeup sessions BEFORE deleting StudentSessions
+        // Get session IDs that will be removed
+        List<Long> removedSessionIds = futureOldSessions.stream()
+                .map(ss -> ss.getSession().getId())
+                .toList();
+        
+        if (!removedSessionIds.isEmpty()) {
+            // Delete ABSENCE/MAKEUP requests targeting these sessions (no longer relevant after transfer)
+            List<StudentRequest> relatedRequests = studentRequestRepository
+                    .findByStudentIdAndTargetSessionIdInAndRequestTypeIn(
+                            studentId, 
+                            removedSessionIds, 
+                            List.of(StudentRequestType.ABSENCE, StudentRequestType.MAKEUP));
+            
+            if (!relatedRequests.isEmpty()) {
+                log.info("Deleting {} related ABSENCE/MAKEUP requests for removed sessions", relatedRequests.size());
+                studentRequestRepository.deleteAll(relatedRequests);
+            }
+            
+            // Delete makeup StudentSessions at OTHER classes that reference these sessions as originalSession
+            // (Student no longer needs to make up for sessions they won't attend)
+            // EXCEPTION: Keep makeup sessions that student already attended (PRESENT) - preserve attendance record
+            List<StudentSession> orphanedMakeupSessions = studentSessionRepository
+                    .findMakeupSessionsByOriginalSessionIds(removedSessionIds)
+                    .stream()
+                    .filter(ss -> ss.getStudent().getId().equals(studentId))
+                    .filter(ss -> ss.getAttendanceStatus() != AttendanceStatus.PRESENT) // Don't delete attended sessions
+                    .toList();
+            
+            if (!orphanedMakeupSessions.isEmpty()) {
+                log.info("Deleting {} orphaned makeup StudentSessions referencing removed sessions (skipping attended ones)", 
+                        orphanedMakeupSessions.size());
+                studentSessionRepository.deleteAll(orphanedMakeupSessions);
+            }
+        }
+
+        // 4c. Delete the identified old class StudentSessions
         studentSessionRepository.deleteAll(futureOldSessions);
 
         log.info("Deleted {} future StudentSessions from old class (sessions on/after {})", 
