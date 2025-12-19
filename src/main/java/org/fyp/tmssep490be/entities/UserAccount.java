@@ -57,6 +57,9 @@ public class UserAccount {
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
 
+    @Column(name = "last_password_change_at")
+    private OffsetDateTime lastPasswordChangeAt;
+
     @OneToMany(mappedBy = "userAccount")
     @Builder.Default
     private Set<UserRole> userRoles = new HashSet<>();

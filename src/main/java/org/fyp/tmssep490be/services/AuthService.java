@@ -87,6 +87,8 @@ public class AuthService {
 
         log.info("Login successful for user: {} with {} branches", userPrincipal.getEmail(), branches.size());
 
+        boolean mustChangePassword = user.getLastPasswordChangeAt() == null;
+
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -98,6 +100,7 @@ public class AuthService {
                 .avatarUrl(user.getAvatarUrl())
                 .roles(roles)
                 .branches(branches)
+                .mustChangePassword(mustChangePassword)
                 .build();
     }
 
@@ -143,6 +146,9 @@ public class AuthService {
 
         log.info("Token refresh successful for user: {} with {} branches", user.getEmail(), branches.size());
 
+        // Check if password change is required on refresh as well (optional but good for security)
+        boolean mustChangePassword = user.getLastPasswordChangeAt() == null;
+
         return AuthResponse.builder()
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
@@ -154,6 +160,7 @@ public class AuthService {
                 .avatarUrl(user.getAvatarUrl())
                 .roles(roleNames)
                 .branches(branches)
+                .mustChangePassword(mustChangePassword)
                 .build();
     }
 
@@ -194,6 +201,7 @@ public class AuthService {
 
         // Cập nhật mật khẩu
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setLastPasswordChangeAt(java.time.OffsetDateTime.now());
         userAccountRepository.save(user);
 
         log.info("Đổi mật khẩu thành công cho user: {}", userId);

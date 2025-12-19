@@ -25,6 +25,8 @@ public class AuthResponse {
     private String avatarUrl;
     private Set<String> roles;
     private List<BranchInfo> branches;
+    @Builder.Default
+    private boolean mustChangePassword = false;
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
