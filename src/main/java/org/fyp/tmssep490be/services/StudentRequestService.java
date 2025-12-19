@@ -634,6 +634,13 @@ public class StudentRequestService {
                         now.format(formatter), request.getId())
         );
 
+        // Send notification to student about on-behalf request creation
+        try {
+            sendOnBehalfCreationNotifications(request);
+        } catch (Exception e) {
+            log.error("Failed to send on-behalf notifications for absence request {}: {}", request.getId(), e.getMessage());
+        }
+
         return mapToStudentRequestResponseDTO(request);
     }
 
@@ -855,6 +862,12 @@ public class StudentRequestService {
         // 10. If auto-approved, create makeup student session immediately
         if (autoApprove) {
             executeMakeupApproval(request);
+            // Send notification to student about on-behalf request creation
+            try {
+                sendOnBehalfCreationNotifications(request);
+            } catch (Exception e) {
+                log.error("Failed to send on-behalf notifications for makeup request {}: {}", request.getId(), e.getMessage());
+            }
         } else {
             // Send notification to Academic Affairs for new request
             try {
@@ -1904,6 +1917,19 @@ public class StudentRequestService {
         // 9. If auto-approved, execute transfer immediately (with override info if provided)
         if (autoApprove) {
             executeTransfer(request, dto.getCapacityOverride(), dto.getOverrideReason());
+            // Send notification to student about on-behalf request creation
+            try {
+                sendOnBehalfCreationNotifications(request);
+            } catch (Exception e) {
+                log.error("Failed to send on-behalf notifications for transfer request {}: {}", request.getId(), e.getMessage());
+            }
+        } else {
+            // Send notification to Academic Affairs for new request
+            try {
+                sendNotificationToAcademicStaffForNewRequest(request);
+            } catch (Exception e) {
+                log.error("Failed to send notification for new transfer request {}: {}", request.getId(), e.getMessage());
+            }
         }
 
         log.info("Transfer request created with ID: {} - Status: {}", request.getId(), request.getStatus());
@@ -2333,6 +2359,66 @@ public class StudentRequestService {
         }
     }
 
+    @Async("emailTaskExecutor")
+    private void sendOnBehalfCreationNotifications(StudentRequest request) {
+        try {
+            Long studentUserId = request.getStudent().getUserAccount().getId();
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+
+            // Internal notification with detailed message
+            String title = String.format("Giáo vụ đã tạo yêu cầu %s cho bạn", requestTypeName);
+            String message = buildOnBehalfNotificationMessage(request, requestTypeName);
+
+            notificationService.createNotification(
+                    studentUserId,
+                    NotificationType.NOTIFICATION,
+                    title,
+                    message
+            );
+
+            // Email notification
+            String studentEmail = request.getStudent().getUserAccount().getEmail();
+            if (studentEmail != null && !studentEmail.trim().isEmpty()) {
+                String studentName = request.getStudent().getUserAccount().getFullName();
+                String className = request.getCurrentClass() != null ? formatClassInfo(request.getCurrentClass()) : "N/A";
+                String sessionInfo = request.getTargetSession() != null
+                        ? formatSessionDetailInfo(request.getTargetSession())
+                        : "N/A";
+                String makeupSessionInfo = request.getMakeupSession() != null
+                        ? formatSessionDetailInfo(request.getMakeupSession())
+                        : null;
+                String targetClassInfo = request.getTargetClass() != null
+                        ? formatClassInfo(request.getTargetClass())
+                        : null;
+                String submittedBy = request.getSubmittedBy() != null
+                        ? request.getSubmittedBy().getFullName()
+                        : "Giáo vụ";
+                String submittedAt = request.getSubmittedAt() != null
+                        ? request.getSubmittedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        : "";
+
+                emailService.sendStudentRequestOnBehalfAsync(
+                        studentEmail,
+                        studentName,
+                        requestTypeName,
+                        className,
+                        sessionInfo,
+                        makeupSessionInfo,
+                        targetClassInfo,
+                        submittedBy,
+                        submittedAt,
+                        request.getRequestReason()
+                );
+            }
+
+            log.info("Sent on-behalf creation notifications to student {} for request {}",
+                    studentUserId, request.getId());
+        } catch (Exception e) {
+            log.error("Failed to send on-behalf notifications for request {}: {}",
+                    request.getId(), e.getMessage(), e);
+        }
+    }
+
     /**
      * Send notification to Academic Affairs when student submits a new request
      */
@@ -2361,21 +2447,9 @@ public class StudentRequestService {
             String studentName = request.getStudent() != null && request.getStudent().getUserAccount() != null
                     ? request.getStudent().getUserAccount().getFullName()
                     : "Học viên";
-            String sessionInfo = request.getTargetSession() != null
-                    ? String.format("%s - %s",
-                            request.getTargetSession().getDate(),
-                            request.getTargetSession().getTimeSlotTemplate() != null
-                                    ? request.getTargetSession().getTimeSlotTemplate().getName()
-                                    : "")
-                    : "";
 
             String title = String.format("Yêu cầu mới: %s", requestTypeName);
-            String message = String.format(
-                    "Học viên %s đã tạo yêu cầu %s cho buổi học %s. Vui lòng xem xét và xử lý.",
-                    studentName,
-                    requestTypeName.toLowerCase(),
-                    sessionInfo
-            );
+            String message = buildAcademicStaffNotificationMessage(request, requestTypeName, studentName);
 
             List<Long> recipientIds = academicStaffUsers.stream()
                     .map(UserAccount::getId)
@@ -2410,21 +2484,10 @@ public class StudentRequestService {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
             String requestTypeName = getRequestTypeName(request.getRequestType());
-            String sessionInfo = request.getTargetSession() != null
-                    ? String.format("%s - %s",
-                            request.getTargetSession().getDate(),
-                            request.getTargetSession().getTimeSlotTemplate() != null
-                                    ? request.getTargetSession().getTimeSlotTemplate().getName()
-                                    : "")
-                    : "";
 
-            // Internal notification
+            // Internal notification with detailed message
             String title = String.format("Yêu cầu %s đã được duyệt", requestTypeName);
-            String message = String.format(
-                    "Yêu cầu %s của bạn cho buổi học %s đã được giáo vụ phê duyệt.",
-                    requestTypeName.toLowerCase(),
-                    sessionInfo
-            );
+            String message = buildApprovalNotificationMessage(request, requestTypeName);
 
             notificationService.createNotification(
                     studentUserId,
@@ -2438,21 +2501,20 @@ public class StudentRequestService {
             if (studentEmail != null && !studentEmail.trim().isEmpty()) {
                 String studentName = request.getStudent().getUserAccount().getFullName();
                 String className = request.getCurrentClass() != null ? request.getCurrentClass().getCode() : "N/A";
+                String sessionInfo = request.getTargetSession() != null
+                        ? formatSessionDetailInfo(request.getTargetSession())
+                        : "N/A";
                 String makeupSessionInfo = request.getMakeupSession() != null
-                        ? String.format("%s - %s",
-                                request.getMakeupSession().getDate(),
-                                request.getMakeupSession().getTimeSlotTemplate() != null
-                                        ? request.getMakeupSession().getTimeSlotTemplate().getName()
-                                        : "")
+                        ? formatSessionDetailInfo(request.getMakeupSession())
                         : null;
                 String targetClassInfo = request.getTargetClass() != null
-                        ? request.getTargetClass().getCode()
+                        ? formatClassInfo(request.getTargetClass())
                         : null;
                 String decidedBy = request.getDecidedBy() != null
                         ? request.getDecidedBy().getFullName()
                         : "Giáo vụ";
                 String decidedAt = request.getDecidedAt() != null
-                        ? request.getDecidedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        ? request.getDecidedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
                         : "";
 
                 emailService.sendStudentRequestApprovedAsync(
@@ -2464,8 +2526,7 @@ public class StudentRequestService {
                         makeupSessionInfo,
                         targetClassInfo,
                         decidedBy,
-                        decidedAt,
-                        request.getNote()
+                        decidedAt
                 );
             }
 
@@ -2485,22 +2546,10 @@ public class StudentRequestService {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
             String requestTypeName = getRequestTypeName(request.getRequestType());
-            String sessionInfo = request.getTargetSession() != null
-                    ? String.format("%s - %s",
-                            request.getTargetSession().getDate(),
-                            request.getTargetSession().getTimeSlotTemplate() != null
-                                    ? request.getTargetSession().getTimeSlotTemplate().getName()
-                                    : "")
-                    : "";
 
-            // Internal notification
+            // Internal notification with detailed message
             String title = String.format("Yêu cầu %s đã bị từ chối", requestTypeName);
-            String message = String.format(
-                    "Yêu cầu %s của bạn cho buổi học %s đã bị giáo vụ từ chối. Lý do: %s",
-                    requestTypeName.toLowerCase(),
-                    sessionInfo,
-                    rejectionReason
-            );
+            String message = buildRejectionNotificationMessage(request, requestTypeName, rejectionReason);
 
             notificationService.createNotification(
                     studentUserId,
@@ -2514,11 +2563,14 @@ public class StudentRequestService {
             if (studentEmail != null && !studentEmail.trim().isEmpty()) {
                 String studentName = request.getStudent().getUserAccount().getFullName();
                 String className = request.getCurrentClass() != null ? request.getCurrentClass().getCode() : "N/A";
+                String sessionInfo = request.getTargetSession() != null
+                        ? formatSessionDetailInfo(request.getTargetSession())
+                        : "N/A";
                 String decidedBy = request.getDecidedBy() != null
                         ? request.getDecidedBy().getFullName()
                         : "Giáo vụ";
                 String decidedAt = request.getDecidedAt() != null
-                        ? request.getDecidedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        ? request.getDecidedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
                         : "";
 
                 emailService.sendStudentRequestRejectedAsync(
@@ -2541,9 +2593,6 @@ public class StudentRequestService {
         }
     }
 
-    /**
-     * Get Vietnamese name for request type
-     */
     private String getRequestTypeName(StudentRequestType requestType) {
         switch (requestType) {
             case ABSENCE:
@@ -2555,5 +2604,208 @@ public class StudentRequestService {
             default:
                 return "Yêu cầu";
         }
+    }
+
+    private String formatSessionDetailInfo(Session session) {
+        if (session == null) return "N/A";
+
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        String dayOfWeek = getDayOfWeekInVietnamese(session.getDate());
+        String dateStr = session.getDate().format(dateFormatter);
+
+        String timeStr = "N/A";
+        if (session.getTimeSlotTemplate() != null) {
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+            timeStr = String.format("%s - %s",
+                    session.getTimeSlotTemplate().getStartTime().format(timeFormatter),
+                    session.getTimeSlotTemplate().getEndTime().format(timeFormatter));
+        }
+
+        String roomStr = session.getRoomCode() != null ? "Phòng " + session.getRoomCode() : "";
+
+        StringBuilder result = new StringBuilder();
+        result.append(dayOfWeek).append(", ").append(dateStr);
+        result.append(" | ").append(timeStr);
+        if (!roomStr.isEmpty()) {
+            result.append(" | ").append(roomStr);
+        }
+
+        return result.toString();
+    }
+
+    private String formatClassInfo(ClassEntity classEntity) {
+        if (classEntity == null) return "N/A";
+        return String.format("%s (%s)", classEntity.getName(), classEntity.getCode());
+    }
+
+    private String getDayOfWeekInVietnamese(LocalDate date) {
+        if (date == null) return "";
+        switch (date.getDayOfWeek()) {
+            case MONDAY: return "Thứ 2";
+            case TUESDAY: return "Thứ 3";
+            case WEDNESDAY: return "Thứ 4";
+            case THURSDAY: return "Thứ 5";
+            case FRIDAY: return "Thứ 6";
+            case SATURDAY: return "Thứ 7";
+            case SUNDAY: return "Chủ nhật";
+            default: return "";
+        }
+    }
+
+    private String buildStudentSubmitNotificationMessage(StudentRequest request, String requestTypeName) {
+        StringBuilder message = new StringBuilder();
+        message.append("Yêu cầu ").append(requestTypeName.toLowerCase()).append(" của bạn đã được gửi\n");
+        message.append("\n");
+        message.append("Lớp học: ").append(formatClassInfo(request.getCurrentClass())).append("\n");
+        
+        if (request.getTargetSession() != null) {
+            message.append("Buổi học: ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+        }
+        
+        if (request.getRequestReason() != null && !request.getRequestReason().isEmpty()) {
+            message.append("Lý do: ").append(request.getRequestReason()).append("\n");
+        }
+        
+        message.append("\n");
+        message.append("Trạng thái: Đang chờ giáo vụ xử lý");
+        
+        return message.toString();
+    }
+
+    private String buildAcademicStaffNotificationMessage(StudentRequest request, String requestTypeName, String studentName) {
+        StringBuilder message = new StringBuilder();
+        message.append("Yêu cầu ").append(requestTypeName.toLowerCase()).append(" mới từ học viên\n");
+        message.append("\n");
+        
+        String studentCode = request.getStudent() != null ? request.getStudent().getStudentCode() : "N/A";
+        message.append("Học viên: ").append(studentName).append(" (").append(studentCode).append(")\n");
+        message.append("Lớp học: ").append(formatClassInfo(request.getCurrentClass())).append("\n");
+        
+        if (request.getTargetSession() != null) {
+            message.append("Buổi học: ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+        }
+        
+        if (request.getRequestReason() != null && !request.getRequestReason().isEmpty()) {
+            message.append("Lý do: ").append(request.getRequestReason()).append("\n");
+        }
+        
+        message.append("\n");
+        message.append("Vui lòng xem xét và xử lý yêu cầu này");
+        
+        return message.toString();
+    }
+
+    private String buildApprovalNotificationMessage(StudentRequest request, String requestTypeName) {
+        StringBuilder message = new StringBuilder();
+        message.append("Yêu cầu ").append(requestTypeName.toLowerCase()).append(" của bạn đã được phê duyệt\n");
+        message.append("\n");
+        message.append("Lớp học: ").append(formatClassInfo(request.getCurrentClass())).append("\n");
+        
+        if (request.getTargetSession() != null) {
+            message.append("Buổi học: ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+        }
+        
+        if (request.getRequestType() == StudentRequestType.MAKEUP && request.getMakeupSession() != null) {
+            message.append("\n");
+            message.append("Buổi học bù:\n");
+            message.append("Lớp: ").append(formatClassInfo(request.getMakeupSession().getClassEntity())).append("\n");
+            message.append("Thời gian: ").append(formatSessionDetailInfo(request.getMakeupSession())).append("\n");
+            if (request.getMakeupSession().getTeacher() != null) {
+                message.append("Giáo viên: ").append(request.getMakeupSession().getTeacher().getUserAccount().getFullName()).append("\n");
+            }
+        }
+        
+        if (request.getRequestType() == StudentRequestType.TRANSFER && request.getTargetClass() != null) {
+            message.append("\n");
+            message.append("Chuyển sang lớp: ").append(formatClassInfo(request.getTargetClass())).append("\n");
+            if (request.getTargetSession() != null) {
+                message.append("Ngày hiệu lực: Từ buổi ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+            }
+        }
+        
+        message.append("\n");
+        String decidedBy = request.getDecidedBy() != null ? request.getDecidedBy().getFullName() : "Giáo vụ";
+        message.append("Người duyệt: ").append(decidedBy).append("\n");
+        
+        if (request.getDecidedAt() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            message.append("Thời gian duyệt: ").append(request.getDecidedAt().format(formatter));
+        }
+        
+        return message.toString();
+    }
+
+    private String buildRejectionNotificationMessage(StudentRequest request, String requestTypeName, String rejectionReason) {
+        StringBuilder message = new StringBuilder();
+        message.append("Yêu cầu ").append(requestTypeName.toLowerCase()).append(" của bạn đã bị từ chối\n");
+        message.append("\n");
+        message.append("Lớp học: ").append(formatClassInfo(request.getCurrentClass())).append("\n");
+        
+        if (request.getTargetSession() != null) {
+            message.append("Buổi học: ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+        }
+        
+        message.append("\n");
+        message.append("Lý do từ chối: ").append(rejectionReason).append("\n");
+        message.append("\n");
+        
+        String decidedBy = request.getDecidedBy() != null ? request.getDecidedBy().getFullName() : "Giáo vụ";
+        message.append("Người từ chối: ").append(decidedBy).append("\n");
+        
+        if (request.getDecidedAt() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            message.append("Thời gian: ").append(request.getDecidedAt().format(formatter)).append("\n");
+        }
+        
+        message.append("\n");
+        message.append("Bạn có thể liên hệ trực tiếp với giáo vụ để được giải thích chi tiết");
+        
+        return message.toString();
+    }
+
+    private String buildOnBehalfNotificationMessage(StudentRequest request, String requestTypeName) {
+        StringBuilder message = new StringBuilder();
+        message.append("Giáo vụ đã tạo yêu cầu ").append(requestTypeName.toLowerCase()).append(" cho bạn\n");
+        message.append("\n");
+        message.append("Lớp học: ").append(formatClassInfo(request.getCurrentClass())).append("\n");
+        
+        if (request.getTargetSession() != null) {
+            message.append("Buổi học: ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+        }
+        
+        if (request.getRequestReason() != null && !request.getRequestReason().isEmpty()) {
+            message.append("Lý do: ").append(request.getRequestReason()).append("\n");
+        }
+        
+        if (request.getRequestType() == StudentRequestType.MAKEUP && request.getMakeupSession() != null) {
+            message.append("\n");
+            message.append("Buổi học bù:\n");
+            message.append("Lớp: ").append(formatClassInfo(request.getMakeupSession().getClassEntity())).append("\n");
+            message.append("Thời gian: ").append(formatSessionDetailInfo(request.getMakeupSession())).append("\n");
+            if (request.getMakeupSession().getTeacher() != null) {
+                message.append("Giáo viên: ").append(request.getMakeupSession().getTeacher().getUserAccount().getFullName()).append("\n");
+            }
+        }
+        
+        if (request.getRequestType() == StudentRequestType.TRANSFER && request.getTargetClass() != null) {
+            message.append("\n");
+            message.append("Chuyển sang lớp: ").append(formatClassInfo(request.getTargetClass())).append("\n");
+            if (request.getTargetSession() != null) {
+                message.append("Ngày hiệu lực: Từ buổi ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+            }
+        }
+        
+        message.append("\n");
+        message.append("Trạng thái: Đã được phê duyệt tự động\n");
+        
+        String submittedBy = request.getSubmittedBy() != null ? request.getSubmittedBy().getFullName() : "Giáo vụ";
+        message.append("Người tạo: ").append(submittedBy).append(" (Giáo vụ)\n");
+        
+        if (request.getSubmittedAt() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            message.append("Thời gian: ").append(request.getSubmittedAt().format(formatter));
+        }
+        
+        return message.toString();
     }
 }

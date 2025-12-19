@@ -149,7 +149,7 @@ public class EmailService {
     public void sendStudentRequestApprovedAsync(String to, String studentName, String requestType,
                                                  String className, String sessionInfo,
                                                  String makeupSessionInfo, String targetClassInfo,
-                                                 String decidedBy, String decidedAt, String note) {
+                                                 String decidedBy, String decidedAt) {
         String subject = "Yêu cầu của bạn đã được phê duyệt";
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("studentName", studentName);
@@ -160,11 +160,33 @@ public class EmailService {
         templateData.put("targetClassInfo", targetClassInfo);
         templateData.put("decidedBy", decidedBy);
         templateData.put("decidedAt", decidedAt);
-        templateData.put("note", note);
         templateData.put("requestUrl", frontendUrl + "/student/requests");
         templateData.put("frontendUrl", frontendUrl);
 
         sendEmailWithTemplateAsync(to, subject, "emails/student-request-approved", templateData);
+    }
+
+    // Gửi email thông báo student request được tạo bởi AA (on-behalf)
+    public void sendStudentRequestOnBehalfAsync(String to, String studentName, String requestType,
+                                                 String className, String sessionInfo,
+                                                 String makeupSessionInfo, String targetClassInfo,
+                                                 String submittedBy, String submittedAt,
+                                                 String requestReason) {
+        String subject = "Giáo vụ đã tạo yêu cầu cho bạn - " + requestType;
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("studentName", studentName);
+        templateData.put("requestType", requestType);
+        templateData.put("className", className);
+        templateData.put("sessionInfo", sessionInfo);
+        templateData.put("makeupSessionInfo", makeupSessionInfo);
+        templateData.put("targetClassInfo", targetClassInfo);
+        templateData.put("submittedBy", submittedBy);
+        templateData.put("submittedAt", submittedAt);
+        templateData.put("requestReason", requestReason);
+        templateData.put("requestUrl", frontendUrl + "/student/requests");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/student-request-onbehalf", templateData);
     }
 
     // Gửi email thông báo student request bị từ chối
