@@ -54,8 +54,8 @@ public class EnrollmentService {
         // 1. Validate class exists, đủ điều kiện enroll
         ClassEntity classEntity = validateClassForEnrollment(classId, enrolledBy);
 
-        // 2. Parse Excel file
-        List<StudentEnrollmentData> parsedData = excelParserService.parseStudentEnrollment(file);
+        // 2. Parse Excel file with class code validation
+        List<StudentEnrollmentData> parsedData = excelParserService.parseStudentEnrollment(file, classEntity.getCode());
 
         if (parsedData.isEmpty()) {
             throw new CustomException(ErrorCode.EXCEL_FILE_EMPTY);
@@ -116,7 +116,7 @@ public class EnrollmentService {
             // Validate required fields
             if (data.getEmail() == null || data.getEmail().isBlank()) {
                 data.setStatus(StudentResolutionStatus.ERROR);
-                data.setErrorMessage("Email is required");
+                data.setErrorMessage("Email là bắt buộc");
                 continue;
             }
             
@@ -129,7 +129,7 @@ public class EnrollmentService {
             
             if (data.getFullName() == null || data.getFullName().isBlank()) {
                 data.setStatus(StudentResolutionStatus.ERROR);
-                data.setErrorMessage("Full name is required");
+                data.setErrorMessage("Họ và tên là bắt buộc");
                 continue;
             }
             
@@ -161,7 +161,7 @@ public class EnrollmentService {
             String emailLower = data.getEmail().toLowerCase();
             if (seenEmails.contains(emailLower)) {
                 data.setStatus(StudentResolutionStatus.DUPLICATE);
-                data.setErrorMessage("Duplicate email in Excel file");
+                data.setErrorMessage("Email bị trùng lặp trong file Excel");
                 continue;
             }
             seenEmails.add(emailLower);
@@ -180,6 +180,7 @@ public class EnrollmentService {
                     if (alreadyEnrolled) {
                         data.setStatus(StudentResolutionStatus.ALREADY_ENROLLED);
                         data.setResolvedStudentId(student.get().getId());
+                        data.setResolvedStudentCode(student.get().getStudentCode());
                         data.setErrorMessage("Học viên đã đăng ký vào lớp này");
                         log.debug("Student {} already enrolled in class {}",
                                 student.get().getId(), classEntity.getId());
@@ -188,8 +189,9 @@ public class EnrollmentService {
 
                     data.setStatus(StudentResolutionStatus.FOUND);
 
-                    // Set resolved student ID để lát nữa execute thì add vào enrollment
+                    // Set resolved student ID và student code để UI hiển thị
                     data.setResolvedStudentId(student.get().getId());
+                    data.setResolvedStudentCode(student.get().getStudentCode());
                     
                     // Check if student is in the class's branch
                     boolean inBranch = userBranchesRepository.existsByUserAccountIdAndBranchId(
@@ -202,8 +204,8 @@ public class EnrollmentService {
                         data.setNote("Học viên từ chi nhánh khác, sẽ được tự động thêm vào chi nhánh này");
                     }
                     
-                    log.debug("Found student by email: {} -> ID: {}, needsSync: {}", 
-                            data.getEmail(), student.get().getId(), !inBranch);
+                    log.debug("Found student by email: {} -> ID: {}, Code: {}, needsSync: {}", 
+                            data.getEmail(), student.get().getId(), student.get().getStudentCode(), !inBranch);
                     continue;
                 }
             }
@@ -733,10 +735,41 @@ public class EnrollmentService {
     }
 
     private String generateStudentCode(Long branchId, String fullName, String email) {
-        // Simple timestamp-based code: ST{branchId}{timestamp}{random}
-        long timestamp = System.currentTimeMillis();
-        int random = (int) (Math.random() * 1000);
-        return String.format("ST%d%d%03d", branchId, timestamp, random);
+        String baseName;
+
+        // Prioritize fullName, fallback to email prefix
+        if (fullName != null && !fullName.trim().isEmpty()) {
+            // Remove special chars, spaces, and convert to uppercase
+            baseName = fullName.replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+            // Limit to max 10 characters
+            if (baseName.length() > 10) {
+                baseName = baseName.substring(0, 10);
+            }
+        } else if (email != null && email.contains("@")) {
+            // Use part before @ from email
+            baseName = email.substring(0, email.indexOf("@"))
+                    .replaceAll("[^a-zA-Z0-9]", "")
+                    .toUpperCase();
+            if (baseName.length() > 10) {
+                baseName = baseName.substring(0, 10);
+            }
+        } else {
+            // Fallback: use timestamp
+            baseName = String.valueOf(System.currentTimeMillis()).substring(6);
+        }
+
+        // Add random suffix to ensure uniqueness
+        int randomSuffix = (int) (Math.random() * 1000);
+
+        String studentCode = String.format("ST%d%s%03d", branchId, baseName, randomSuffix);
+
+        // Double-check uniqueness (rare collision case)
+        while (studentRepository.findByStudentCode(studentCode).isPresent()) {
+            randomSuffix = (int) (Math.random() * 1000);
+            studentCode = String.format("ST%d%s%03d", branchId, baseName, randomSuffix);
+        }
+
+        return studentCode;
     }
 
     private void checkScheduleConflictsForPreview(List<StudentEnrollmentData> parsedData, ClassEntity classEntity) {
@@ -778,9 +811,6 @@ public class EnrollmentService {
         }
     }
 
-    /**
-     * Validate email format
-     */
     private boolean isValidEmail(String email) {
         if (email == null || email.isBlank()) {
             return false;
@@ -788,24 +818,12 @@ public class EnrollmentService {
         return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     }
 
-    /**
-     * Check if time slots overlap
-     */
     private boolean hasTimeOverlap(TimeSlotTemplate slot1, TimeSlotTemplate slot2) {
         if (slot1 == null || slot2 == null) return false;
         return !(slot1.getEndTime().isBefore(slot2.getStartTime()) || 
                  slot2.getEndTime().isBefore(slot1.getStartTime()));
     }
 
-    /**
-     * Validate schedule conflicts for a student enrolling in a new class.
-     * Throws CustomException if student has schedule conflict with active enrollments.
-     * 
-     * @param studentId Student ID to check
-     * @param newClassId New class ID to enroll into
-     * @param newClassSessions Sessions of the new class
-     * @param studentEmail Student email for error message
-     */
     private void validateScheduleConflicts(Long studentId, Long newClassId, 
                                           List<Session> newClassSessions, String studentEmail) {
         // 1. Get active enrollments (excluding the target class itself)

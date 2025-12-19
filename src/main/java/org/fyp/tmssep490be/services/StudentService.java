@@ -206,7 +206,7 @@ public class StudentService {
     }
 
     @Transactional
-    protected CreateStudentResponse handleExistingStudentSync(
+    private CreateStudentResponse handleExistingStudentSync(
             UserAccount existingUser, CreateStudentRequest request, Long currentUserId
     ) {
         log.info("Handling existing user {} for branch sync", existingUser.getEmail());
@@ -967,9 +967,6 @@ public class StudentService {
         return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     }
     
-    /**
-     * Validate Vietnamese phone number format (10-11 digits starting with 0)
-     */
     private boolean isValidPhone(String phone) {
         if (phone == null || phone.isBlank()) {
             return false;

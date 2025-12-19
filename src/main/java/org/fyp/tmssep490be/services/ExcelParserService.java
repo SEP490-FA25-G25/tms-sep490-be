@@ -39,7 +39,7 @@ public class ExcelParserService {
             DateTimeFormatter.ofPattern("MM/dd/yyyy")
     };
 
-    public List<StudentEnrollmentData> parseStudentEnrollment(MultipartFile file) {
+    public List<StudentEnrollmentData> parseStudentEnrollment(MultipartFile file, String expectedClassCode) {
         List<StudentEnrollmentData> students = new ArrayList<>();
 
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
@@ -51,12 +51,34 @@ public class ExcelParserService {
             // Detect if this is a class-specific template by checking first cell content
             Row firstRow = sheet.getRow(0);
             boolean isClassSpecificTemplate = false;
+            String extractedClassCode = null;
 
             // Vào đây để check là template có phải của class hay không
             if (firstRow != null && firstRow.getCell(0) != null) {
                 String firstCellValue = firstRow.getCell(0).getStringCellValue();
                 if (firstCellValue != null && firstCellValue.startsWith("Class:")) {
                     isClassSpecificTemplate = true;
+                    
+                    // Extract class code from format: "Class: {code} | Name: {name} | Course: {course}"
+                    try {
+                        String[] parts = firstCellValue.split("\\|");
+                        if (parts.length >= 1) {
+                            String classPart = parts[0].trim(); // "Class: SE1801"
+                            if (classPart.startsWith("Class:")) {
+                                extractedClassCode = classPart.substring(6).trim(); // Remove "Class:" prefix
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to extract class code from template: {}", e.getMessage());
+                    }
+                    
+                    // Validate class code
+                    if (extractedClassCode != null && !extractedClassCode.equals(expectedClassCode)) {
+                        log.error("Class code mismatch. Expected: {}, Found in Excel: {}", expectedClassCode, extractedClassCode);
+                        throw new CustomException(ErrorCode.ENROLLMENT_FILE_CLASS_MISMATCH,
+                                String.format("File Excel này dành cho lớp '%s'. Vui lòng tải file mẫu đúng cho lớp '%s'.", 
+                                        extractedClassCode, expectedClassCode));
+                    }
                 }
             }
 

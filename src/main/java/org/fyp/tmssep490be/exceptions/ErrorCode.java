@@ -71,6 +71,7 @@ public enum ErrorCode {
     TOO_MANY_STUDENTS_IN_FILE(1220, "Số lượng học viên trong file vượt quá giới hạn cho phép"),
     INVALID_EMAIL_FORMAT(1221, "Định dạng email không hợp lệ"),
     ENROLLMENT_SCHEDULE_CONFLICT(1222, "Trùng lịch học với lớp đang theo học"),
+    ENROLLMENT_FILE_CLASS_MISMATCH(1223, "File Excel không khớp với lớp đang ghi danh"),
 
     // Class errors (4000-4099)
     CLASS_NOT_FOUND(4000, "Không tìm thấy lớp học"),
