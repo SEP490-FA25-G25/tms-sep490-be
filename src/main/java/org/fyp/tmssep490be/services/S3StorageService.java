@@ -199,6 +199,7 @@ public class S3StorageService {
                         .builder()
                         .bucket(bucketName)
                         .key(key)
+                        .responseContentDisposition("inline")
                         .build();
 
                 software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest presignRequest = software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest
