@@ -43,6 +43,9 @@ public class StudentClassDTO {
     private Integer totalSessions;
     private Integer completedSessions;
 
+    private Integer currentEnrollment;
+    private Integer maxCapacity;
+
     @Data
     @Builder
     @NoArgsConstructor

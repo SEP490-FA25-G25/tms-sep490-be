@@ -469,6 +469,12 @@ public class StudentPortalService {
                     || session.getStatus() == SessionStatus.DONE)
                 .count();
 
+        // Calculate current enrollment count (ENROLLED only)
+        int currentEnrollment = enrollmentRepository.countByClassIdAndStatus(
+                classEntity.getId(), 
+                EnrollmentStatus.ENROLLED
+        );
+
         return StudentClassDTO.builder()
                 .classId(classEntity.getId())
                 .classCode(classEntity.getCode())
@@ -489,6 +495,8 @@ public class StudentPortalService {
                 .enrollmentStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : null)
                 .totalSessions(totalSessions)
                 .completedSessions(completedSessions)
+                .currentEnrollment(currentEnrollment)
+                .maxCapacity(classEntity.getMaxCapacity())
                 .scheduleSummary(generateScheduleSummary(classEntity))
                 .scheduleDetails(generateScheduleDetails(classEntity))
                 .build();

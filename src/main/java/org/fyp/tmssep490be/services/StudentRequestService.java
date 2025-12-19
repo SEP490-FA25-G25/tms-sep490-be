@@ -2190,6 +2190,12 @@ public class StudentRequestService {
 
         List<Session> classSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
 
+        // Calculate current enrollment count (ENROLLED only)
+        int currentEnrollment = enrollmentRepository.countByClassIdAndStatus(
+                classEntity.getId(), 
+                EnrollmentStatus.ENROLLED
+        );
+
         List<TransferEligibilityDTO.SessionInfo> allSessions = classSessions.stream()
                 .map(session -> {
                     String timeSlot = "Chưa xếp lịch";
@@ -2229,6 +2235,8 @@ public class StudentRequestService {
                 .enrollmentDate(enrollment.getEnrolledAt() != null ? enrollment.getEnrolledAt().toLocalDate().toString() : null)
                 .scheduleInfo(scheduleInfo)
                 .scheduleTime(scheduleTime)
+                .currentEnrollment(currentEnrollment)
+                .maxCapacity(classEntity.getMaxCapacity())
                 .allSessions(allSessions)
                 .transferQuota(TransferEligibilityDTO.TransferQuota.builder()
                         .used(used)
