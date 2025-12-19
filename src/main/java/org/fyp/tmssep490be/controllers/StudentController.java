@@ -334,4 +334,21 @@ public class StudentController {
                 .build());
     }
 
+    @GetMapping("/assessors")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ACADEMIC_AFFAIR')")
+    public ResponseEntity<ResponseObject<List<AssessorDTO>>> getAssessors(
+            @RequestParam Long branchId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("Student {} requesting assessors for branch {}", currentUser.getId(), branchId);
+
+        List<AssessorDTO> assessors = studentService.getAssessorsByBranch(branchId);
+
+        return ResponseEntity.ok(ResponseObject.<List<AssessorDTO>>builder()
+                .success(true)
+                .message("Lấy danh sách giảng viên thành công")
+                .data(assessors)
+                .build());
+    }
+
 }

@@ -43,6 +43,15 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
                         @Param("roleCode") String roleCode,
                         @Param("branchIds") List<Long> branchIds);
 
+        @Query("SELECT DISTINCT u FROM UserAccount u " +
+                        "JOIN u.userRoles ur " +
+                        "JOIN u.userBranches ub " +
+                        "WHERE ur.role.code = 'TEACHER' " +
+                        "AND ub.branch.id = :branchId " +
+                        "AND u.status = 'ACTIVE' " +
+                        "ORDER BY u.fullName ASC")
+        List<UserAccount> findActiveTeachersByBranchId(@Param("branchId") Long branchId);
+
         // Tìm kiếm theo tên, email, hoặc số điện thoại (không phân biệt hoa thường)
         @Query(value = "SELECT DISTINCT u.* FROM user_account u " +
                         "LEFT JOIN user_role ur ON u.id = ur.user_id " +
