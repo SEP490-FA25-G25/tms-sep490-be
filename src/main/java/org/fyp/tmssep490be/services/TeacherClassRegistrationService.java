@@ -856,9 +856,16 @@ public class TeacherClassRegistrationService {
             return false;
         }
         LocalDate today = LocalDate.now();
+        LocalDate startDate = classEntity.getStartDate();
+
+        // If start date has passed, emergency assign is NOT allowed
+        if (today.isAfter(startDate)) {
+            return false;
+        }
+
         // Latest possible close date is startDate - 2 days
-        LocalDate latestCloseDate = classEntity.getStartDate().minusDays(2);
-        // If today >= latestCloseDate, it's too late for normal registration
+        LocalDate latestCloseDate = startDate.minusDays(2);
+        // Emergency allowed if today >= latestCloseDate AND today <= startDate
         return !today.isBefore(latestCloseDate);
     }
 
