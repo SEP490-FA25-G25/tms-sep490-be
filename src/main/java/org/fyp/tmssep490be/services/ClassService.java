@@ -469,12 +469,12 @@ public class ClassService {
                                                 }
 
                                                 makeupCompletedMap
-                                                                .computeIfAbsent(originalSessionId, k -> new HashMap<>())
+                                                                .computeIfAbsent(originalSessionId,
+                                                                                k -> new HashMap<>())
                                                                 .merge(
                                                                                 studentId,
                                                                                 ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
-                                                                                (oldVal, newVal) -> oldVal || newVal
-                                                                );
+                                                                                (oldVal, newVal) -> oldVal || newVal);
                                         });
                 }
 
@@ -506,7 +506,8 @@ public class ClassService {
                                         // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
                                         LocalDate sessionDate = session.getDate();
                                         LocalDateTime sessionEndDateTime;
-                                        if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                                        if (session.getTimeSlotTemplate() != null
+                                                        && session.getTimeSlotTemplate().getEndTime() != null) {
                                                 LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
                                                 sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
                                         } else {
@@ -515,7 +516,8 @@ public class ClassService {
 
                                         boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
                                         if (isAfterSessionEnd) {
-                                                // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
+                                                // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như
+                                                // ABSENT
                                                 totalRecorded++;
                                         }
                                         // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
@@ -1693,11 +1695,28 @@ public class ClassService {
 
                 log.info("Calculated conflicts for {} resources across {} sessions", resources.size(), totalSessions);
 
+                // Filter and sort resources
+                final int sessionsCount = totalSessions;
                 return resources.stream()
+                                // Filter out resources with 100% conflict (all sessions are conflicting)
+                                .filter(r -> conflictMap.getOrDefault(r.getId(), 0) < sessionsCount)
+                                // Sort by: 1) capacity closest to class capacity, 2) name
+                                .sorted((r1, r2) -> {
+                                        // Sort by capacity difference (ascending) - closest to class capacity first
+                                        int diff1 = Math.abs((r1.getCapacity() != null ? r1.getCapacity() : 0)
+                                                        - requiredCapacity);
+                                        int diff2 = Math.abs((r2.getCapacity() != null ? r2.getCapacity() : 0)
+                                                        - requiredCapacity);
+                                        int capacityCompare = Integer.compare(diff1, diff2);
+                                        if (capacityCompare != 0)
+                                                return capacityCompare;
+                                        // Then by name
+                                        return r1.getName().compareToIgnoreCase(r2.getName());
+                                })
                                 .map(r -> org.fyp.tmssep490be.dtos.classcreation.AvailableResourceDTO.fromEntity(
                                                 r,
                                                 conflictMap.getOrDefault(r.getId(), 0),
-                                                totalSessions))
+                                                sessionsCount))
                                 .toList();
         }
 
