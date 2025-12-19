@@ -67,5 +67,6 @@ public class TeacherRequestResponseDTO {
     private Boolean attendanceSubmitted;
     private Boolean isMakeup;
     private String sessionModality; // ONLINE or OFFLINE based on resource type
+    private Boolean reportSubmitted; // Whether QA report has been submitted for the session
 }
 

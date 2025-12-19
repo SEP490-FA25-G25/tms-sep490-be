@@ -171,6 +171,11 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("oldStatus") SessionStatus oldStatus,
             @Param("newStatus") SessionStatus newStatus);
 
+    @Query("SELECT s FROM Session s WHERE s.status = :status AND s.date < :today")
+    List<Session> findPastSessionsByStatusAndDate(
+            @Param("status") SessionStatus status,
+            @Param("today") LocalDate today);
+
     @Query("SELECT s FROM Session s " +
             "LEFT JOIN FETCH s.timeSlotTemplate tst " +
             "LEFT JOIN FETCH s.teachingSlots ts " +

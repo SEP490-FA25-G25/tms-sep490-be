@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yêu cầu đã bị từ chối</title>
+    <title>Giáo vụ đã tạo yêu cầu cho bạn</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -25,36 +25,46 @@
             margin-bottom: 30px;
         }
         .logo {
-            color: #f44336;
+            color: #2196F3;
             font-size: 28px;
             font-weight: bold;
             margin-bottom: 10px;
         }
-        .warning-icon {
+        .info-icon {
             font-size: 64px;
-            color: #f44336;
+            color: #2196F3;
             margin: 20px 0;
         }
         .title {
             font-size: 24px;
-            color: #f44336;
+            color: #2196F3;
             margin-bottom: 20px;
         }
         .content {
             margin-bottom: 30px;
         }
         .request-info {
-            background-color: #ffebee;
+            background-color: #e3f2fd;
             padding: 20px;
             border-radius: 8px;
             margin: 20px 0;
-            border-left: 4px solid #f44336;
+            border-left: 4px solid #2196F3;
         }
         .request-info p {
             margin: 8px 0;
         }
         .request-info strong {
-            color: #c62828;
+            color: #1565c0;
+        }
+        .status-box {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-left: 4px solid #4CAF50;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .status-box strong {
+            color: #2e7d32;
         }
         .reason-box {
             background-color: #fff3e0;
@@ -82,13 +92,6 @@
             box-shadow: 0 6px 8px rgba(0,0,0,0.15);
             transform: translateY(-2px);
         }
-        .help-box {
-            background-color: #e3f2fd;
-            padding: 15px;
-            border-left: 4px solid #2196F3;
-            margin: 20px 0;
-            border-radius: 4px;
-        }
         .footer {
             margin-top: 30px;
             padding-top: 20px;
@@ -106,34 +109,33 @@
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">📚 TMS</div>
-            <div class="warning-icon">❌</div>
-            <h1 class="title">Yêu cầu đã bị từ chối</h1>
+            <div class="logo">TMS</div>
+            <div class="info-icon">ℹ️</div>
+            <h1 class="title">Giáo vụ đã tạo yêu cầu cho bạn</h1>
         </div>
 
         <div class="content">
             <p>Xin chào <strong th:text="${studentName}">Học viên</strong>,</p>
             
-            <p>Rất tiếc, yêu cầu <strong th:text="${requestType}">yêu cầu</strong> của bạn đã bị giáo vụ từ chối.</p>
+            <p>Giáo vụ đã tạo yêu cầu <strong th:text="${requestType}">yêu cầu</strong> cho bạn và đã tự động phê duyệt.</p>
 
             <div class="request-info">
                 <p><strong>Loại yêu cầu:</strong> <span th:text="${requestType}">Nghỉ học có phép</span></p>
                 <p><strong>Lớp học:</strong> <span th:text="${className}">PRE-IELTS-001</span></p>
                 <p><strong>Buổi học:</strong> <span th:text="${sessionInfo}">Thứ 6, 20/12/2025 | 18:30-20:30 | Phòng 301</span></p>
-                <p><strong>Người từ chối:</strong> <span th:text="${decidedBy}">Giáo vụ</span></p>
-                <p><strong>Ngày từ chối:</strong> <span th:text="${decidedAt}">18/12/2025 15:30</span></p>
+                <p th:if="${makeupSessionInfo}"><strong>Buổi học bù:</strong> <span th:text="${makeupSessionInfo}">Thứ 7, 28/12/2025 | 14:00-16:00 | Phòng 205</span></p>
+                <p th:if="${targetClassInfo}"><strong>Lớp chuyển đến:</strong> <span th:text="${targetClassInfo}">PRE-IELTS-002</span></p>
             </div>
 
-            <div class="reason-box">
-                <strong>📋 Lý do từ chối:</strong>
-                <p th:text="${rejectionReason}">Không đủ căn cứ để phê duyệt yêu cầu này.</p>
+            <div class="reason-box" th:if="${requestReason}">
+                <strong>Lý do yêu cầu:</strong>
+                <p th:text="${requestReason}">Học viên liên hệ trực tiếp xin nghỉ</p>
             </div>
 
-            <div class="help-box">
-                <strong>💡 Bạn có thể làm gì?</strong>
-                <p>• Liên hệ trực tiếp với giáo vụ để được giải thích chi tiết</p>
-                <p>• Nếu có thêm thông tin bổ sung, bạn có thể tạo yêu cầu mới với lý do rõ ràng hơn</p>
-                <p>• Kiểm tra quy định về việc nghỉ học và học bù tại trang web</p>
+            <div class="status-box">
+                <strong>Trạng thái:</strong> Đã được phê duyệt tự động
+                <p><strong>Người tạo:</strong> <span th:text="${submittedBy}">Nguyễn Thị B (Giáo vụ)</span></p>
+                <p><strong>Thời gian:</strong> <span th:text="${submittedAt}">19/12/2025 15:30</span></p>
             </div>
 
             <div style="text-align: center;">

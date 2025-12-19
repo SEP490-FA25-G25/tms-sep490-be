@@ -58,6 +58,9 @@ public interface QAReportRepository extends JpaRepository<QAReport, Long> {
     @Query("SELECT COUNT(qar) FROM QAReport qar WHERE qar.session.id = :sessionId")
     long countBySessionId(@Param("sessionId") Long sessionId);
 
+    @Query("SELECT COUNT(qar) FROM QAReport qar WHERE qar.session.id = :sessionId AND qar.status = org.fyp.tmssep490be.entities.enums.QAReportStatus.SUBMITTED")
+    long countSubmittedReportsBySessionId(@Param("sessionId") Long sessionId);
+
     @Query("SELECT qar FROM QAReport qar " +
            "LEFT JOIN FETCH qar.reportedBy " +
            "WHERE qar.classEntity.id = :classId " +

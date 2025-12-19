@@ -56,5 +56,8 @@ public class TeacherSessionDetailDTO {
 
     @Schema(description = "List of pending/approved request types for this session")
     private List<String> pendingRequestTypes;
+
+    @Schema(description = "Whether QA report has been submitted for this session")
+    private Boolean reportSubmitted;
 }
 

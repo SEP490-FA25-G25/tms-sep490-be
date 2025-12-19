@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.format.DateTimeFormatter;
@@ -634,6 +635,13 @@ public class StudentRequestService {
                         now.format(formatter), request.getId())
         );
 
+        // Send notification to student about on-behalf request creation
+        try {
+            sendOnBehalfCreationNotifications(request);
+        } catch (Exception e) {
+            log.error("Failed to send on-behalf notifications for absence request {}: {}", request.getId(), e.getMessage());
+        }
+
         return mapToStudentRequestResponseDTO(request);
     }
 
@@ -855,6 +863,12 @@ public class StudentRequestService {
         // 10. If auto-approved, create makeup student session immediately
         if (autoApprove) {
             executeMakeupApproval(request);
+            // Send notification to student about on-behalf request creation
+            try {
+                sendOnBehalfCreationNotifications(request);
+            } catch (Exception e) {
+                log.error("Failed to send on-behalf notifications for makeup request {}: {}", request.getId(), e.getMessage());
+            }
         } else {
             // Send notification to Academic Affairs for new request
             try {
@@ -1113,14 +1127,16 @@ public class StudentRequestService {
      public MissedSessionsResponseDTO getMissedSessions(Long userId, Integer weeksBack, Boolean excludeRequested) {
         Student student = studentRepository.findByUserAccountId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
-        return getMissedSessionsForStudent(student.getId(), weeksBack, excludeRequested);
+        // Student chỉ được xem buổi EXCUSED (có phép) để tạo makeup request
+        return getMissedSessionsForStudent(student.getId(), weeksBack, excludeRequested, false);
     }
 
-    public MissedSessionsResponseDTO getMissedSessionsForStudent(Long studentId, Integer weeksBack, Boolean excludeRequested) {
+    public MissedSessionsResponseDTO getMissedSessionsForStudent(Long studentId, Integer weeksBack, Boolean excludeRequested, Boolean allowAbsent) {
         // Nếu client không truyền weeksBack, sử dụng hardcoded constant
         int lookbackWeeks = weeksBack != null ? weeksBack : MAKEUP_LOOKBACK_WEEKS;
 
         boolean excludeRequestedSessions = excludeRequested != null ? excludeRequested : true;
+        boolean includeAbsent = allowAbsent != null ? allowAbsent : false;
 
         //Là hôm nay - số tuần -> ra cái ngày cũ nhất
         LocalDate cutoffDate = LocalDate.now().minusWeeks(lookbackWeeks);
@@ -1129,8 +1145,17 @@ public class StudentRequestService {
         
         List<MissedSessionDTO> missedSessions = allSessions.stream()
                 .filter(ss -> ss.getSession() != null)
-                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT 
-                           || ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
+                .filter(ss -> {
+                    // Logic phân quyền: Student chỉ thấy EXCUSED, AA thấy cả EXCUSED + ABSENT
+                    if (includeAbsent) {
+                        // Academic Affairs: cho phép cả EXCUSED và ABSENT
+                        return ss.getAttendanceStatus() == AttendanceStatus.EXCUSED 
+                            || ss.getAttendanceStatus() == AttendanceStatus.ABSENT;
+                    } else {
+                        // Student: chỉ cho phép EXCUSED (có phép)
+                        return ss.getAttendanceStatus() == AttendanceStatus.EXCUSED;
+                    }
+                })
                 .filter(ss -> {
                     LocalDate sessionDate = ss.getSession().getDate();
                     // Chỉ filter cutoffDate, KHÔNG filter tương lai (cho phép EXCUSED sessions trong tương lai)
@@ -1458,35 +1483,37 @@ public class StudentRequestService {
             Long targetClassId, 
             List<Session> targetClassSessions) {
         
-        // 1. Get active enrollments excluding both current and target classes
-        List<Enrollment> activeEnrollments = enrollmentRepository
-                .findByStudentIdAndStatus(studentId, EnrollmentStatus.ENROLLED);
+        // Simple approach: Get ALL future StudentSessions of this student
+        // This includes both regular class sessions AND makeup sessions (isMakeup=true)
+        // Then check for time overlaps with target class sessions
         
-        List<Enrollment> otherEnrollments = activeEnrollments.stream()
-                .filter(e -> !e.getClassId().equals(excludeClassId) && !e.getClassId().equals(targetClassId))
-                .collect(Collectors.toList());
+        LocalDate today = LocalDate.now();
         
-        if (otherEnrollments.isEmpty()) {
-            return; // No other active enrollments to check
+        List<StudentSession> allFutureStudentSessions = studentSessionRepository.findAllByStudentId(studentId)
+                .stream()
+                .filter(ss -> ss.getSession() != null)
+                .filter(ss -> !ss.getSession().getDate().isBefore(today))
+                .filter(ss -> ss.getSession().getStatus() == SessionStatus.PLANNED)
+                // Exclude sessions from the class being transferred FROM (will be deleted anyway)
+                .filter(ss -> !ss.getSession().getClassEntity().getId().equals(excludeClassId))
+                // Exclude sessions from target class (shouldn't exist, but defensive)
+                .filter(ss -> !ss.getSession().getClassEntity().getId().equals(targetClassId))
+                .toList();
+        
+        if (allFutureStudentSessions.isEmpty()) {
+            return; // No future sessions to check
         }
 
-        // 2. Get sessions from other classes
-        List<Long> otherClassIds = otherEnrollments.stream()
-                .map(Enrollment::getClassId)
-                .distinct()
-                .collect(Collectors.toList());
-        
-        List<Session> otherClassSessions = sessionRepository.findByClassEntityIdInAndStatus(
-                otherClassIds, SessionStatus.PLANNED);
-
-        // 3. Check for time overlaps
+        // Check for time overlaps
         for (Session targetSession : targetClassSessions) {
             LocalDate targetDate = targetSession.getDate();
             TimeSlotTemplate targetTimeSlot = targetSession.getTimeSlotTemplate();
             
             if (targetTimeSlot == null) continue;
             
-            for (Session existingSession : otherClassSessions) {
+            for (StudentSession existingSS : allFutureStudentSessions) {
+                Session existingSession = existingSS.getSession();
+                
                 if (!existingSession.getDate().equals(targetDate)) {
                     continue;
                 }
@@ -1499,11 +1526,17 @@ public class StudentRequestService {
                             ? existingSession.getClassEntity().getCode() 
                             : "Unknown";
                     
+                    // Differentiate message for makeup vs regular sessions
+                    String sessionType = Boolean.TRUE.equals(existingSS.getIsMakeup()) 
+                            ? "buổi học bù tại lớp" 
+                            : "lớp";
+                    
                     throw new BusinessRuleException("SCHEDULE_CONFLICT", 
-                            String.format("Lớp chuyển đến có lịch học trùng vào ngày %s (%s-%s) với lớp %s đang theo học",
+                            String.format("Lớp chuyển đến có lịch học trùng vào ngày %s (%s-%s) với %s %s",
                                     targetDate,
                                     targetTimeSlot.getStartTime(),
                                     targetTimeSlot.getEndTime(),
+                                    sessionType,
                                     conflictingClass));
                 }
             }
@@ -1863,6 +1896,11 @@ public class StudentRequestService {
             throw new BusinessRuleException("PAST_SESSION", "Target session must be in the future");
         }
 
+        // 6b. Check schedule conflicts with other classes (including makeup sessions)
+        List<Session> targetClassFutureSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
+                dto.getTargetClassId(), targetSession.getDate());
+        validateScheduleConflictsForTransfer(studentId, dto.getCurrentClassId(), dto.getTargetClassId(), targetClassFutureSessions);
+
         // 7. Create request
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
@@ -1893,6 +1931,19 @@ public class StudentRequestService {
         // 9. If auto-approved, execute transfer immediately (with override info if provided)
         if (autoApprove) {
             executeTransfer(request, dto.getCapacityOverride(), dto.getOverrideReason());
+            // Send notification to student about on-behalf request creation
+            try {
+                sendOnBehalfCreationNotifications(request);
+            } catch (Exception e) {
+                log.error("Failed to send on-behalf notifications for transfer request {}: {}", request.getId(), e.getMessage());
+            }
+        } else {
+            // Send notification to Academic Affairs for new request
+            try {
+                sendNotificationToAcademicStaffForNewRequest(request);
+            } catch (Exception e) {
+                log.error("Failed to send notification for new transfer request {}: {}", request.getId(), e.getMessage());
+            }
         }
 
         log.info("Transfer request created with ID: {} - Status: {}", request.getId(), request.getStatus());
@@ -1976,13 +2027,38 @@ public class StudentRequestService {
         log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
                 newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
 
-        // 4. DELETE all sessions from old class that are on or after joinDate
-        // These are sessions student won't attend because they've transferred
+        // 4. DELETE sessions from old class that would conflict with new class schedule
+        // Use datetime comparison: only delete sessions that start AT or AFTER joinSession's start time
+        // This allows student to attend morning class in old class even if joining evening class in new class on same day
         List<StudentSession> allOldClassSessions = studentSessionRepository
                 .findByStudentIdAndClassEntityId(studentId, currentClass.getId());
         
+        LocalTime joinStartTime = joinSession.getTimeSlotTemplate() != null 
+                ? joinSession.getTimeSlotTemplate().getStartTime() 
+                : LocalTime.MIN;
+        
         List<StudentSession> futureOldSessions = allOldClassSessions.stream()
-                .filter(ss -> !ss.getSession().getDate().isBefore(joinDate)) // date >= joinDate
+                .filter(ss -> {
+                    Session oldSession = ss.getSession();
+                    LocalDate oldDate = oldSession.getDate();
+                    
+                    // If old session is on a date AFTER joinDate -> delete
+                    if (oldDate.isAfter(joinDate)) {
+                        return true;
+                    }
+                    
+                    // If old session is on the SAME date as joinDate
+                    if (oldDate.equals(joinDate)) {
+                        // Compare start times - only delete if old session starts at or after join session
+                        LocalTime oldStartTime = oldSession.getTimeSlotTemplate() != null 
+                                ? oldSession.getTimeSlotTemplate().getStartTime() 
+                                : LocalTime.MIN;
+                        return !oldStartTime.isBefore(joinStartTime);
+                    }
+                    
+                    // Old session is BEFORE joinDate -> keep
+                    return false;
+                })
                 .toList();
 
         studentSessionRepository.deleteAll(futureOldSessions);
@@ -2322,6 +2398,66 @@ public class StudentRequestService {
         }
     }
 
+    @Async("emailTaskExecutor")
+    private void sendOnBehalfCreationNotifications(StudentRequest request) {
+        try {
+            Long studentUserId = request.getStudent().getUserAccount().getId();
+            String requestTypeName = getRequestTypeName(request.getRequestType());
+
+            // Internal notification with detailed message
+            String title = String.format("Giáo vụ đã tạo yêu cầu %s cho bạn", requestTypeName);
+            String message = buildOnBehalfNotificationMessage(request, requestTypeName);
+
+            notificationService.createNotification(
+                    studentUserId,
+                    NotificationType.NOTIFICATION,
+                    title,
+                    message
+            );
+
+            // Email notification
+            String studentEmail = request.getStudent().getUserAccount().getEmail();
+            if (studentEmail != null && !studentEmail.trim().isEmpty()) {
+                String studentName = request.getStudent().getUserAccount().getFullName();
+                String className = request.getCurrentClass() != null ? formatClassInfo(request.getCurrentClass()) : "N/A";
+                String sessionInfo = request.getTargetSession() != null
+                        ? formatSessionDetailInfo(request.getTargetSession())
+                        : "N/A";
+                String makeupSessionInfo = request.getMakeupSession() != null
+                        ? formatSessionDetailInfo(request.getMakeupSession())
+                        : null;
+                String targetClassInfo = request.getTargetClass() != null
+                        ? formatClassInfo(request.getTargetClass())
+                        : null;
+                String submittedBy = request.getSubmittedBy() != null
+                        ? request.getSubmittedBy().getFullName()
+                        : "Giáo vụ";
+                String submittedAt = request.getSubmittedAt() != null
+                        ? request.getSubmittedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        : "";
+
+                emailService.sendStudentRequestOnBehalfAsync(
+                        studentEmail,
+                        studentName,
+                        requestTypeName,
+                        className,
+                        sessionInfo,
+                        makeupSessionInfo,
+                        targetClassInfo,
+                        submittedBy,
+                        submittedAt,
+                        request.getRequestReason()
+                );
+            }
+
+            log.info("Sent on-behalf creation notifications to student {} for request {}",
+                    studentUserId, request.getId());
+        } catch (Exception e) {
+            log.error("Failed to send on-behalf notifications for request {}: {}",
+                    request.getId(), e.getMessage(), e);
+        }
+    }
+
     /**
      * Send notification to Academic Affairs when student submits a new request
      */
@@ -2350,21 +2486,9 @@ public class StudentRequestService {
             String studentName = request.getStudent() != null && request.getStudent().getUserAccount() != null
                     ? request.getStudent().getUserAccount().getFullName()
                     : "Học viên";
-            String sessionInfo = request.getTargetSession() != null
-                    ? String.format("%s - %s",
-                            request.getTargetSession().getDate(),
-                            request.getTargetSession().getTimeSlotTemplate() != null
-                                    ? request.getTargetSession().getTimeSlotTemplate().getName()
-                                    : "")
-                    : "";
 
             String title = String.format("Yêu cầu mới: %s", requestTypeName);
-            String message = String.format(
-                    "Học viên %s đã tạo yêu cầu %s cho buổi học %s. Vui lòng xem xét và xử lý.",
-                    studentName,
-                    requestTypeName.toLowerCase(),
-                    sessionInfo
-            );
+            String message = buildAcademicStaffNotificationMessage(request, requestTypeName, studentName);
 
             List<Long> recipientIds = academicStaffUsers.stream()
                     .map(UserAccount::getId)
@@ -2399,21 +2523,10 @@ public class StudentRequestService {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
             String requestTypeName = getRequestTypeName(request.getRequestType());
-            String sessionInfo = request.getTargetSession() != null
-                    ? String.format("%s - %s",
-                            request.getTargetSession().getDate(),
-                            request.getTargetSession().getTimeSlotTemplate() != null
-                                    ? request.getTargetSession().getTimeSlotTemplate().getName()
-                                    : "")
-                    : "";
 
-            // Internal notification
+            // Internal notification with detailed message
             String title = String.format("Yêu cầu %s đã được duyệt", requestTypeName);
-            String message = String.format(
-                    "Yêu cầu %s của bạn cho buổi học %s đã được giáo vụ phê duyệt.",
-                    requestTypeName.toLowerCase(),
-                    sessionInfo
-            );
+            String message = buildApprovalNotificationMessage(request, requestTypeName);
 
             notificationService.createNotification(
                     studentUserId,
@@ -2427,21 +2540,20 @@ public class StudentRequestService {
             if (studentEmail != null && !studentEmail.trim().isEmpty()) {
                 String studentName = request.getStudent().getUserAccount().getFullName();
                 String className = request.getCurrentClass() != null ? request.getCurrentClass().getCode() : "N/A";
+                String sessionInfo = request.getTargetSession() != null
+                        ? formatSessionDetailInfo(request.getTargetSession())
+                        : "N/A";
                 String makeupSessionInfo = request.getMakeupSession() != null
-                        ? String.format("%s - %s",
-                                request.getMakeupSession().getDate(),
-                                request.getMakeupSession().getTimeSlotTemplate() != null
-                                        ? request.getMakeupSession().getTimeSlotTemplate().getName()
-                                        : "")
+                        ? formatSessionDetailInfo(request.getMakeupSession())
                         : null;
                 String targetClassInfo = request.getTargetClass() != null
-                        ? request.getTargetClass().getCode()
+                        ? formatClassInfo(request.getTargetClass())
                         : null;
                 String decidedBy = request.getDecidedBy() != null
                         ? request.getDecidedBy().getFullName()
                         : "Giáo vụ";
                 String decidedAt = request.getDecidedAt() != null
-                        ? request.getDecidedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        ? request.getDecidedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
                         : "";
 
                 emailService.sendStudentRequestApprovedAsync(
@@ -2453,8 +2565,7 @@ public class StudentRequestService {
                         makeupSessionInfo,
                         targetClassInfo,
                         decidedBy,
-                        decidedAt,
-                        request.getNote()
+                        decidedAt
                 );
             }
 
@@ -2474,22 +2585,10 @@ public class StudentRequestService {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
             String requestTypeName = getRequestTypeName(request.getRequestType());
-            String sessionInfo = request.getTargetSession() != null
-                    ? String.format("%s - %s",
-                            request.getTargetSession().getDate(),
-                            request.getTargetSession().getTimeSlotTemplate() != null
-                                    ? request.getTargetSession().getTimeSlotTemplate().getName()
-                                    : "")
-                    : "";
 
-            // Internal notification
+            // Internal notification with detailed message
             String title = String.format("Yêu cầu %s đã bị từ chối", requestTypeName);
-            String message = String.format(
-                    "Yêu cầu %s của bạn cho buổi học %s đã bị giáo vụ từ chối. Lý do: %s",
-                    requestTypeName.toLowerCase(),
-                    sessionInfo,
-                    rejectionReason
-            );
+            String message = buildRejectionNotificationMessage(request, requestTypeName, rejectionReason);
 
             notificationService.createNotification(
                     studentUserId,
@@ -2503,11 +2602,14 @@ public class StudentRequestService {
             if (studentEmail != null && !studentEmail.trim().isEmpty()) {
                 String studentName = request.getStudent().getUserAccount().getFullName();
                 String className = request.getCurrentClass() != null ? request.getCurrentClass().getCode() : "N/A";
+                String sessionInfo = request.getTargetSession() != null
+                        ? formatSessionDetailInfo(request.getTargetSession())
+                        : "N/A";
                 String decidedBy = request.getDecidedBy() != null
                         ? request.getDecidedBy().getFullName()
                         : "Giáo vụ";
                 String decidedAt = request.getDecidedAt() != null
-                        ? request.getDecidedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        ? request.getDecidedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
                         : "";
 
                 emailService.sendStudentRequestRejectedAsync(
@@ -2530,9 +2632,6 @@ public class StudentRequestService {
         }
     }
 
-    /**
-     * Get Vietnamese name for request type
-     */
     private String getRequestTypeName(StudentRequestType requestType) {
         switch (requestType) {
             case ABSENCE:
@@ -2544,5 +2643,218 @@ public class StudentRequestService {
             default:
                 return "Yêu cầu";
         }
+    }
+
+    private String formatSessionDetailInfo(Session session) {
+        if (session == null) return "N/A";
+
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        String dayOfWeek = getDayOfWeekInVietnamese(session.getDate());
+        String dateStr = session.getDate().format(dateFormatter);
+
+        String timeStr = "N/A";
+        if (session.getTimeSlotTemplate() != null) {
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+            timeStr = String.format("%s - %s",
+                    session.getTimeSlotTemplate().getStartTime().format(timeFormatter),
+                    session.getTimeSlotTemplate().getEndTime().format(timeFormatter));
+        }
+
+        // Get room info from SessionResource -> Resource
+        String roomStr = "";
+        if (session.getSessionResources() != null && !session.getSessionResources().isEmpty()) {
+            Resource room = session.getSessionResources().stream()
+                    .filter(sr -> sr.getResource() != null && sr.getResource().getResourceType() == ResourceType.ROOM)
+                    .map(SessionResource::getResource)
+                    .findFirst()
+                    .orElse(null);
+            
+            if (room != null && room.getName() != null) {
+                roomStr = " | " + room.getName();
+            }
+        }
+
+        return String.format("%s, %s | %s%s", dayOfWeek, dateStr, timeStr, roomStr);
+    }
+
+    private String formatClassInfo(ClassEntity classEntity) {
+        if (classEntity == null) return "N/A";
+        return String.format("%s (%s)", classEntity.getName(), classEntity.getCode());
+    }
+
+    private String getDayOfWeekInVietnamese(LocalDate date) {
+        if (date == null) return "";
+        switch (date.getDayOfWeek()) {
+            case MONDAY: return "Thứ 2";
+            case TUESDAY: return "Thứ 3";
+            case WEDNESDAY: return "Thứ 4";
+            case THURSDAY: return "Thứ 5";
+            case FRIDAY: return "Thứ 6";
+            case SATURDAY: return "Thứ 7";
+            case SUNDAY: return "Chủ nhật";
+            default: return "";
+        }
+    }
+
+    private Teacher getSessionTeacher(Session session) {
+        if (session == null || session.getTeachingSlots() == null || session.getTeachingSlots().isEmpty()) {
+            return null;
+        }
+        return session.getTeachingSlots().stream()
+                .map(TeachingSlot::getTeacher)
+                .filter(teacher -> teacher != null)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String buildStudentSubmitNotificationMessage(StudentRequest request, String requestTypeName) {
+        StringBuilder message = new StringBuilder();
+        message.append("Yêu cầu ").append(requestTypeName.toLowerCase()).append(" của bạn đã được gửi\n");
+        message.append("\n");
+        message.append("Lớp học: ").append(formatClassInfo(request.getCurrentClass())).append("\n");
+        
+        if (request.getTargetSession() != null) {
+            message.append("Buổi học: ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+        }
+        
+        if (request.getRequestReason() != null && !request.getRequestReason().isEmpty()) {
+            message.append("Lý do: ").append(request.getRequestReason()).append("\n");
+        }
+        
+        message.append("\n");
+        message.append("Trạng thái: Đang chờ giáo vụ xử lý");
+        
+        return message.toString();
+    }
+
+    private String buildAcademicStaffNotificationMessage(StudentRequest request, String requestTypeName, String studentName) {
+        StringBuilder message = new StringBuilder();
+        message.append("Yêu cầu ").append(requestTypeName.toLowerCase()).append(" mới từ học viên\n");
+        message.append("\n");
+        
+        String studentCode = request.getStudent() != null ? request.getStudent().getStudentCode() : "N/A";
+        message.append("Học viên: ").append(studentName).append(" (").append(studentCode).append(")\n");
+        message.append("Lớp học: ").append(formatClassInfo(request.getCurrentClass())).append("\n");
+        
+        if (request.getTargetSession() != null) {
+            message.append("Buổi học: ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+        }
+        
+        if (request.getRequestReason() != null && !request.getRequestReason().isEmpty()) {
+            message.append("Lý do: ").append(request.getRequestReason()).append("\n");
+        }
+        
+        message.append("\n");
+        message.append("Vui lòng xem xét và xử lý yêu cầu này");
+        
+        return message.toString();
+    }
+
+    private String buildApprovalNotificationMessage(StudentRequest request, String requestTypeName) {
+        StringBuilder message = new StringBuilder();
+        message.append("Yêu cầu ").append(requestTypeName.toLowerCase()).append(" của bạn đã được phê duyệt\n");
+        message.append("\n");
+        message.append("Lớp học: ").append(formatClassInfo(request.getCurrentClass())).append("\n");
+        
+        if (request.getTargetSession() != null) {
+            message.append("Buổi học: ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+        }
+        
+        if (request.getRequestType() == StudentRequestType.MAKEUP && request.getMakeupSession() != null) {
+            message.append("\n");
+            message.append("Buổi học bù:\n");
+            message.append("Lớp: ").append(formatClassInfo(request.getMakeupSession().getClassEntity())).append("\n");
+            message.append("Thời gian: ").append(formatSessionDetailInfo(request.getMakeupSession())).append("\n");
+        }
+        
+        if (request.getRequestType() == StudentRequestType.TRANSFER && request.getTargetClass() != null) {
+            message.append("\n");
+            message.append("Chuyển sang lớp: ").append(formatClassInfo(request.getTargetClass())).append("\n");
+            if (request.getTargetSession() != null) {
+                message.append("Ngày hiệu lực: Từ buổi ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+            }
+        }
+        
+        message.append("\n");
+        String decidedBy = request.getDecidedBy() != null ? request.getDecidedBy().getFullName() : "Giáo vụ";
+        message.append("Người duyệt: ").append(decidedBy).append("\n");
+        
+        if (request.getDecidedAt() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            message.append("Thời gian duyệt: ").append(request.getDecidedAt().format(formatter));
+        }
+        
+        return message.toString();
+    }
+
+    private String buildRejectionNotificationMessage(StudentRequest request, String requestTypeName, String rejectionReason) {
+        StringBuilder message = new StringBuilder();
+        message.append("Yêu cầu ").append(requestTypeName.toLowerCase()).append(" của bạn đã bị từ chối\n");
+        message.append("\n");
+        message.append("Lớp học: ").append(formatClassInfo(request.getCurrentClass())).append("\n");
+        
+        if (request.getTargetSession() != null) {
+            message.append("Buổi học: ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+        }
+        
+        message.append("\n");
+        message.append("Lý do từ chối: ").append(rejectionReason).append("\n");
+        message.append("\n");
+        
+        String decidedBy = request.getDecidedBy() != null ? request.getDecidedBy().getFullName() : "Giáo vụ";
+        message.append("Người từ chối: ").append(decidedBy).append("\n");
+        
+        if (request.getDecidedAt() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            message.append("Thời gian: ").append(request.getDecidedAt().format(formatter)).append("\n");
+        }
+        
+        message.append("\n");
+        message.append("Bạn có thể liên hệ trực tiếp với giáo vụ để được giải thích chi tiết");
+        
+        return message.toString();
+    }
+
+    private String buildOnBehalfNotificationMessage(StudentRequest request, String requestTypeName) {
+        StringBuilder message = new StringBuilder();
+        message.append("Giáo vụ đã tạo yêu cầu ").append(requestTypeName.toLowerCase()).append(" cho bạn\n");
+        message.append("\n");
+        message.append("Lớp học: ").append(formatClassInfo(request.getCurrentClass())).append("\n");
+        
+        if (request.getTargetSession() != null) {
+            message.append("Buổi học: ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+        }
+        
+        if (request.getRequestReason() != null && !request.getRequestReason().isEmpty()) {
+            message.append("Lý do: ").append(request.getRequestReason()).append("\n");
+        }
+        
+        if (request.getRequestType() == StudentRequestType.MAKEUP && request.getMakeupSession() != null) {
+            message.append("\n");
+            message.append("Buổi học bù:\n");
+            message.append("Lớp: ").append(formatClassInfo(request.getMakeupSession().getClassEntity())).append("\n");
+            message.append("Thời gian: ").append(formatSessionDetailInfo(request.getMakeupSession())).append("\n");
+        }
+        
+        if (request.getRequestType() == StudentRequestType.TRANSFER && request.getTargetClass() != null) {
+            message.append("\n");
+            message.append("Chuyển sang lớp: ").append(formatClassInfo(request.getTargetClass())).append("\n");
+            if (request.getTargetSession() != null) {
+                message.append("Ngày hiệu lực: Từ buổi ").append(formatSessionDetailInfo(request.getTargetSession())).append("\n");
+            }
+        }
+        
+        message.append("\n");
+        message.append("Trạng thái: Đã được phê duyệt tự động\n");
+        
+        String submittedBy = request.getSubmittedBy() != null ? request.getSubmittedBy().getFullName() : "Giáo vụ";
+        message.append("Người tạo: ").append(submittedBy).append(" (Giáo vụ)\n");
+        
+        if (request.getSubmittedAt() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            message.append("Thời gian: ").append(request.getSubmittedAt().format(formatter));
+        }
+        
+        return message.toString();
     }
 }
