@@ -512,13 +512,13 @@ public class TeacherRequestController {
             @RequestBody @Valid TeacherRequestRejectDTO rejectDTO,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         
-        log.info("Decline replacement request {} by teacher {}", id, userPrincipal.getId());
+        log.info("Giáo viên {} từ chối yêu cầu dạy thay {}", userPrincipal.getId(), id);
 
         TeacherRequestResponseDTO response = teacherRequestService.declineReplacementRequest(id, rejectDTO.getReason(), userPrincipal.getId());
 
         return ResponseEntity.ok(ResponseObject.<TeacherRequestResponseDTO>builder()
                 .success(true)
-                .message("Replacement request declined")
+                .message("Đã từ chối yêu cầu dạy thay")
                 .data(response)
                 .build());
     }

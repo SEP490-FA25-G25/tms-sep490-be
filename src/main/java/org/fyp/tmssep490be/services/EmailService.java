@@ -295,4 +295,45 @@ public class EmailService {
         sendEmailWithTemplateAsync(to, subject, "emails/schedule-changed", templateData);
     }
 
+    public void sendTeacherRequestApprovedAsync(String to, String teacherName, String requestType,
+                                                String sessionInfo, String approvalNote) {
+        String subject = String.format("Yêu cầu %s đã được duyệt", requestType);
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("teacherName", teacherName);
+        templateData.put("requestType", requestType);
+        templateData.put("sessionInfo", sessionInfo);
+        templateData.put("approvalNote", approvalNote);
+        templateData.put("scheduleUrl", frontendUrl + "/teacher/schedule");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/teacher-request-approved", templateData);
+    }
+
+    public void sendTeacherRequestRejectedAsync(String to, String teacherName, String requestType,
+                                                String sessionInfo, String rejectionReason) {
+        String subject = String.format("Yêu cầu %s đã bị từ chối", requestType);
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("teacherName", teacherName);
+        templateData.put("requestType", requestType);
+        templateData.put("sessionInfo", sessionInfo);
+        templateData.put("rejectionReason", rejectionReason);
+        templateData.put("scheduleUrl", frontendUrl + "/teacher/schedule");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/teacher-request-rejected", templateData);
+    }
+
+    public void sendTeacherReplacementConfirmedAsync(String to, String teacherName, String replacementTeacherName,
+                                                      String sessionInfo) {
+        String subject = "Yêu cầu dạy thay đã được xác nhận";
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("teacherName", teacherName);
+        templateData.put("replacementTeacherName", replacementTeacherName);
+        templateData.put("sessionInfo", sessionInfo);
+        templateData.put("scheduleUrl", frontendUrl + "/teacher/schedule");
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/teacher-replacement-confirmed", templateData);
+    }
+
 }

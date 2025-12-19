@@ -222,6 +222,20 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("status") SessionStatus status);
 
     /**
+     * Find sessions that have passed their date (date < today) without teacher note
+     * Used to auto-complete sessions that passed their date
+     */
+    @Query("""
+            SELECT s FROM Session s
+            WHERE s.status = :status
+              AND s.date < :today
+              AND (s.teacherNote IS NULL OR s.teacherNote = '')
+            """)
+    List<Session> findPastSessionsWithoutTeacherNote(
+            @Param("today") LocalDate today,
+            @Param("status") SessionStatus status);
+
+    /**
      * Update sessions to DONE status if they have ended and have teacher note
      * Uses native query because JPQL doesn't support JOIN in UPDATE
      */
@@ -265,6 +279,17 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     int updateEndedSessionsWithoutTeacherNoteAfter48HoursToDone(
             @Param("cutoffDate") LocalDate cutoffDate,
             @Param("cutoffTime") LocalTime cutoffTime,
+            @Param("oldStatus") SessionStatus oldStatus,
+            @Param("newStatus") SessionStatus newStatus);
+
+    /**
+     * Update sessions to DONE status if they have passed their date (date < today) without teacher note
+     * Uses native query for efficiency
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Session s SET s.status = :newStatus WHERE s.date < :today AND s.status = :oldStatus AND (s.teacherNote IS NULL OR s.teacherNote = '')")
+    int updatePastSessionsWithoutTeacherNoteToDone(
+            @Param("today") LocalDate today,
             @Param("oldStatus") SessionStatus oldStatus,
             @Param("newStatus") SessionStatus newStatus);
 

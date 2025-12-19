@@ -90,6 +90,16 @@ long countActiveRequestsByTeacherAndClass(@Param("teacherId") Long teacherId,
     //Kiểm tra xem session có pending request không
     boolean existsBySessionIdAndStatus(Long sessionId, RequestStatus status);
 
+    //Kiểm tra xem session có request active không (PENDING, WAITING_CONFIRM, APPROVED)
+    //Check cả session.id (session gốc) và newSession.id (session mới được tạo từ reschedule)
+    //Loại trừ REJECTED và CANCELLED vì vẫn có thể tạo request mới
+    @Query("SELECT COUNT(tr) > 0 FROM TeacherRequest tr " +
+           "WHERE (tr.session.id = :sessionId OR tr.newSession.id = :sessionId) " +
+           "AND tr.status IN (org.fyp.tmssep490be.entities.enums.RequestStatus.PENDING, " +
+           "org.fyp.tmssep490be.entities.enums.RequestStatus.WAITING_CONFIRM, " +
+           "org.fyp.tmssep490be.entities.enums.RequestStatus.APPROVED)")
+    boolean existsActiveRequestBySessionId(@Param("sessionId") Long sessionId);
+
     //Kiểm tra xem giáo viên đã có request nào cho session này chưa (ngoại trừ REJECTED và CANCELLED)
     //Check cả session.id (session gốc) và newSession.id (session mới được tạo từ reschedule)
     @Query("SELECT COUNT(tr) > 0 FROM TeacherRequest tr " +

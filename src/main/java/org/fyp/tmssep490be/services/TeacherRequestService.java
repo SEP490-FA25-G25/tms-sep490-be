@@ -329,6 +329,7 @@ public class TeacherRequestService {
 
         // Filter resources theo modality
         ResourceType requiredResourceType = null;
+        ResourceType preferredResourceType = null; // Dùng cho RESCHEDULE để ưu tiên sắp xếp
         if (isModalityChange) {
             // MODALITY_CHANGE: đổi modality của session
             // Dựa vào resource hiện tại của session, không phải classModality
@@ -350,25 +351,28 @@ public class TeacherRequestService {
                 }
             }
         } else {
-            // RESCHEDULE: giữ nguyên modality -> lấy từ session resource, không phải class
+            // RESCHEDULE: hiển thị cả online và offline, nhưng ưu tiên theo modality hiện tại
             Modality sessionModality = getSessionModality(session);
             if (sessionModality != null) {
-                // Giữ nguyên modality của session
-                requiredResourceType = (sessionModality == Modality.OFFLINE) 
+                // Xác định resource type ưu tiên (không filter, chỉ dùng để sắp xếp)
+                preferredResourceType = (sessionModality == Modality.OFFLINE) 
                         ? ResourceType.ROOM 
                         : ResourceType.VIRTUAL;
             } else {
                 // Fallback về class modality nếu session chưa có resource
                 Modality classModality = session.getClassEntity().getModality();
                 if (classModality != null) {
-                    requiredResourceType = (classModality == Modality.OFFLINE) 
+                    preferredResourceType = (classModality == Modality.OFFLINE) 
                             ? ResourceType.ROOM 
                             : ResourceType.VIRTUAL;
                 }
             }
+            // RESCHEDULE: không filter theo modality, lấy tất cả resources
+            requiredResourceType = null;
         }
         
         final ResourceType finalRequiredResourceType = requiredResourceType;
+        final ResourceType finalPreferredResourceType = preferredResourceType;
         List<Resource> resources = allResources.stream()
                 .filter(r -> finalRequiredResourceType == null || r.getResourceType() == finalRequiredResourceType)
                 .collect(Collectors.toList());
@@ -404,7 +408,8 @@ public class TeacherRequestService {
             boolean containsCurrent = filteredResources.stream().anyMatch(r -> r.getId().equals(currentResourceId));
             if (!containsCurrent) {
                 resourceRepository.findById(currentResourceId).ifPresent(resource -> {
-                    // Chỉ thêm nếu resource phù hợp với modality và capacity
+                    // Với RESCHEDULE: không cần check modality match vì đã lấy tất cả
+                    // Với MODALITY_CHANGE: vẫn cần check modality match
                     boolean modalityMatch = finalRequiredResourceType == null || 
                             resource.getResourceType() == finalRequiredResourceType;
                     boolean capacityMatch = resource.getCapacity() == null || finalStudentCount == null ||
@@ -416,7 +421,8 @@ public class TeacherRequestService {
             }
         }
 
-        // Sắp xếp theo: current resource trước, sau đó theo độ chênh lệch capacity (gần nhất trước)
+        // Sắp xếp theo: current resource trước, sau đó ưu tiên modality hiện tại (nếu RESCHEDULE), 
+        // sau đó theo độ chênh lệch capacity (gần nhất trước)
         final Integer finalStudentCountForSort = studentCount;
         return filteredResources.stream()
                 .map(r -> ModalityResourceSuggestionDTO.builder()
@@ -431,6 +437,34 @@ public class TeacherRequestService {
                     // Current resource lên đầu
                     if (a.isCurrentResource() && !b.isCurrentResource()) return -1;
                     if (!a.isCurrentResource() && b.isCurrentResource()) return 1;
+                    
+                    // RESCHEDULE: ưu tiên resources có modality giống với session hiện tại
+                    if (finalPreferredResourceType != null) {
+                        ResourceType aType = null;
+                        ResourceType bType = null;
+                        
+                        try {
+                            if (a.getResourceType() != null) {
+                                aType = ResourceType.valueOf(a.getResourceType());
+                            }
+                        } catch (IllegalArgumentException e) {
+                            // Ignore invalid resource type
+                        }
+                        
+                        try {
+                            if (b.getResourceType() != null) {
+                                bType = ResourceType.valueOf(b.getResourceType());
+                            }
+                        } catch (IllegalArgumentException e) {
+                            // Ignore invalid resource type
+                        }
+                        
+                        boolean aMatchesPreferred = aType != null && aType == finalPreferredResourceType;
+                        boolean bMatchesPreferred = bType != null && bType == finalPreferredResourceType;
+                        
+                        if (aMatchesPreferred && !bMatchesPreferred) return -1;
+                        if (!aMatchesPreferred && bMatchesPreferred) return 1;
+                    }
                     
                     // Sắp xếp theo độ chênh lệch capacity với số học viên (gần nhất trước)
                     if (finalStudentCountForSort != null && a.getCapacity() != null && b.getCapacity() != null) {
@@ -1144,15 +1178,15 @@ public class TeacherRequestService {
         List<Session> sessions = sessionRepository.findUpcomingSessionsForTeacher(
                 teacher.getId(), fromDate, toDate, classId);
 
-        // Chỉ gợi ý session chưa diễn ra
+        // Chỉ gợi ý session chưa diễn ra và chưa có request active (PENDING, WAITING_CONFIRM, APPROVED)
         return sessions.stream()
                 .filter(this::isUpcomingSession)
+                .filter(session -> !teacherRequestRepository.existsActiveRequestBySessionId(session.getId()))
                 .map(session -> {
                     MySessionDTO dto = mapToMySessionDTO(session);
                     if (dto != null) {
-                        boolean hasPending = teacherRequestRepository.existsBySessionIdAndStatus(
-                                session.getId(), RequestStatus.PENDING);
-                        dto.setHasPendingRequest(hasPending);
+                        // Không cần set hasPendingRequest nữa vì đã filter rồi
+                        dto.setHasPendingRequest(false);
                     }
                     return dto;
                 })
@@ -1476,21 +1510,15 @@ public class TeacherRequestService {
             Session session = request.getSession();
             String sessionInfo = session != null
                     ? String.format("%s - %s", 
-                        session.getDate(), 
+                        session.getDate().format(DATE_FORMATTER), 
                         session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
                             ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
                             : "N/A")
                     : "N/A";
 
-            String subject = "Yêu cầu của bạn đã được phê duyệt";
-            StringBuilder body = new StringBuilder();
-            body.append("Xin chào ").append(teacherName).append(",<br/><br/>")
-                .append("Yêu cầu ").append(requestTypeName.toLowerCase())
-                .append(" của bạn cho buổi học ").append(sessionInfo)
-                .append(" đã được giáo vụ phê duyệt.<br/><br/>")
-                .append("Trân trọng,<br/>Hệ thống TMS");
+            String approvalNote = request.getNote() != null ? request.getNote() : "";
 
-            emailService.sendEmailAsync(email, subject, body.toString());
+            emailService.sendTeacherRequestApprovedAsync(email, teacherName, requestTypeName, sessionInfo, approvalNote);
         } catch (Exception e) {
             log.error("Lỗi khi gửi approval email cho teacher về request {}: {}", request.getId(), e.getMessage());
         }
@@ -1638,22 +1666,13 @@ public class TeacherRequestService {
             Session session = request.getSession();
             String sessionInfo = session != null
                     ? String.format("%s - %s", 
-                        session.getDate(), 
+                        session.getDate().format(DATE_FORMATTER), 
                         session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
                             ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
                             : "N/A")
                     : "N/A";
 
-            String subject = "Yêu cầu của bạn đã bị từ chối";
-            StringBuilder body = new StringBuilder();
-            body.append("Xin chào ").append(teacherName).append(",<br/><br/>")
-                .append("Yêu cầu ").append(requestTypeName.toLowerCase())
-                .append(" của bạn cho buổi học ").append(sessionInfo)
-                .append(" đã bị giáo vụ từ chối.<br/>")
-                .append("Lý do: ").append(reason).append("<br/><br/>")
-                .append("Trân trọng,<br/>Hệ thống TMS");
-
-            emailService.sendEmailAsync(email, subject, body.toString());
+            emailService.sendTeacherRequestRejectedAsync(email, teacherName, requestTypeName, sessionInfo, reason);
         } catch (Exception e) {
             log.error("Lỗi khi gửi rejection email cho teacher về request {}: {}", request.getId(), e.getMessage());
         }
@@ -1761,6 +1780,7 @@ public class TeacherRequestService {
     private void sendNotificationToOriginalTeacherForReplacementConfirmation(TeacherRequest request) {
         try {
             Long teacherUserAccountId = request.getTeacher().getUserAccount().getId();
+            UserAccount teacherAccount = request.getTeacher().getUserAccount();
             Session session = request.getSession();
             String sessionInfo = session != null 
                 ? String.format("%s - %s", 
@@ -1787,10 +1807,20 @@ public class TeacherRequestService {
                     message
             );
 
-            log.info("Đã gửi notification cho teacher {} về replacement confirmation của request {}",
+            // Gửi email cho original teacher
+            if (teacherAccount != null && teacherAccount.getEmail() != null && !teacherAccount.getEmail().trim().isEmpty()) {
+                emailService.sendTeacherReplacementConfirmedAsync(
+                    teacherAccount.getEmail(),
+                    teacherAccount.getFullName(),
+                    replacementTeacherName,
+                    sessionInfo
+                );
+            }
+
+            log.info("Đã gửi notification và email cho teacher {} về replacement confirmation của request {}",
                     teacherUserAccountId, request.getId());
         } catch (Exception e) {
-            log.error("Lỗi khi gửi notification cho teacher về replacement confirmation của request {}: {}", request.getId(), e.getMessage());
+            log.error("Lỗi khi gửi notification/email cho teacher về replacement confirmation của request {}: {}", request.getId(), e.getMessage());
             throw e;
         }
     }
@@ -1835,7 +1865,7 @@ public class TeacherRequestService {
     private String getRequestTypeName(TeacherRequestType requestType) {
         switch (requestType) {
             case MODALITY_CHANGE:
-                return "Đổi phương tiện";
+                return "Thay đổi phương thức";
             case RESCHEDULE:
                 return "Đổi lịch";
             case REPLACEMENT:
@@ -2157,8 +2187,10 @@ public class TeacherRequestService {
         List<Session> sessions = sessionRepository.findUpcomingSessionsForTeacher(
                 teacher.getId(), fromDate, toDate, classId);
 
+        // Chỉ gợi ý session chưa diễn ra và chưa có request active (PENDING, WAITING_CONFIRM, APPROVED)
         return sessions.stream()
                 .filter(this::isUpcomingSession)
+                .filter(session -> !teacherRequestRepository.existsActiveRequestBySessionId(session.getId()))
                 .map(this::mapToMySessionDTO)
                 .collect(Collectors.toList());
     }
@@ -2442,20 +2474,25 @@ public class TeacherRequestService {
         request = teacherRequestRepository.save(request);
         log.info("Request {} approved successfully by academic staff {}", requestId, academicStaffUserId);
 
-        // Gửi thông báo + email cho teacher
+        // Gửi thông báo + email cho teacher và students
         try {
             if (request.getRequestType() == TeacherRequestType.REPLACEMENT && request.getStatus() == RequestStatus.WAITING_CONFIRM) {
                 // REPLACEMENT: gửi thông báo cho replacement teacher
                 sendNotificationToReplacementTeacher(request);
                 // Email cho replacement teacher (mời dạy thay)
                 sendEmailNotificationForReplacementInvitation(request);
+                
+                // Gửi thông báo + email cho original teacher (request đã được approve, đang chờ replacement teacher confirm)
+                sendNotificationToTeacherForApproval(request);
+                sendEmailNotificationForApproval(request);
+                // Note: Students sẽ nhận notification/email khi replacement teacher confirm (status = APPROVED)
             } else {
                 // MODALITY_CHANGE và RESCHEDULE: gửi thông báo cho teacher gốc
                 sendNotificationToTeacherForApproval(request);
                 // Email cho teacher về việc request đã được duyệt
                 sendEmailNotificationForApproval(request);
                 
-                // NEW: Gửi notification + email cho STUDENTS về schedule change
+                // Gửi notification + email cho STUDENTS về schedule change
                 if (request.getRequestType() == TeacherRequestType.RESCHEDULE || 
                     request.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
                     sendScheduleChangedNotificationToStudents(request);
@@ -3026,34 +3063,34 @@ public class TeacherRequestService {
     //Giáo viên dạy thay từ chối dạy thay
     @Transactional
     public TeacherRequestResponseDTO declineReplacementRequest(Long requestId, String reason, Long userId) {
-        log.info("Decline replacement request {} by teacher {}", requestId, userId);
+        log.info("Giáo viên {} từ chối yêu cầu dạy thay {}", userId, requestId);
 
         // Lấy request với đầy đủ relationships
         TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
-                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Không tìm thấy yêu cầu"));
 
         // Kiểm tra request phải là REPLACEMENT và status là WAITING_CONFIRM
         if (request.getRequestType() != TeacherRequestType.REPLACEMENT) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not a REPLACEMENT request");
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Yêu cầu này không phải là yêu cầu dạy thay");
         }
         if (request.getStatus() != RequestStatus.WAITING_CONFIRM) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not in WAITING_CONFIRM status");
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Yêu cầu không ở trạng thái chờ xác nhận");
         }
 
         // Kiểm tra quyền: teacher phải là replacement teacher
         Teacher teacher = teacherRepository.findByUserAccountId(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Teacher not found"));
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND, "Không tìm thấy thông tin giáo viên"));
 
         if (request.getReplacementTeacher() == null || !request.getReplacementTeacher().getId().equals(teacher.getId())) {
-            throw new CustomException(ErrorCode.FORBIDDEN, "You are not the replacement teacher for this request");
+            throw new CustomException(ErrorCode.FORBIDDEN, "Bạn không phải là giáo viên dạy thay được yêu cầu cho yêu cầu này");
         }
 
         // Validate lý do từ chối
         if (reason == null || reason.trim().isEmpty()) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Rejection reason is required");
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Lý do từ chối là bắt buộc");
         }
         if (reason.trim().length() < MIN_REASON_LENGTH) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Rejection reason must be at least " + MIN_REASON_LENGTH + " characters");
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Lý do từ chối phải có ít nhất " + MIN_REASON_LENGTH + " ký tự");
         }
 
         // Khi replacement teacher từ chối, request trở lại PENDING để giáo vụ có thể xử lý lại
@@ -3076,7 +3113,7 @@ public class TeacherRequestService {
         request.setReplacementTeacher(null); // Xóa replacement teacher để giáo vụ có thể chọn lại
 
         request = teacherRequestRepository.save(request);
-        log.info("Replacement request {} declined by teacher {}, returning to PENDING status", requestId, userId);
+        log.info("Yêu cầu dạy thay {} đã được giáo viên {} từ chối, chuyển về trạng thái chờ duyệt", requestId, userId);
 
         return mapToResponseDTO(request);
     }
@@ -3449,11 +3486,11 @@ public class TeacherRequestService {
                 : "giáo viên dạy thay";
             String reason = request.getRequestReason() != null ? request.getRequestReason() : "Giáo viên có việc đột xuất";
 
-            // Internal notification title & message
-            String notificationTitle = "Yêu cầu dạy thay đã được xác nhận";
+            // Internal notification title & message cho học viên
+            String notificationTitle = "Buổi học có giáo viên dạy thay";
             String notificationMessage = String.format(
-                "Giáo viên %s đã xác nhận đồng ý dạy thay cho buổi học %s - %s của bạn.",
-                replacementTeacherName, sessionDate, sessionTime
+                "Buổi học %s - %s sẽ được giáo viên %s dạy thay cho giáo viên %s.",
+                sessionDate, sessionTime, replacementTeacherName, originalTeacherName
             );
 
             // Send bulk internal notifications
@@ -3556,21 +3593,21 @@ public class TeacherRequestService {
 
             String reason = request.getRequestReason() != null ? request.getRequestReason() : "Thay đổi lịch học";
 
-            // Internal notification
+            // Internal notification cho học viên
             String notificationTitle;
             String notificationMessage;
             if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE) {
-                // Thông báo rõ thay đổi phòng/hình thức học
-                notificationTitle = "Yêu cầu Đổi phương tiện đã được duyệt";
+                // Thông báo rõ thay đổi phòng/hình thức học cho học viên
+                notificationTitle = "Buổi học đã thay đổi phương thức";
                 notificationMessage = String.format(
-                    "Yêu cầu đổi phương tiện của bạn cho buổi học %s - %s đã được giáo vụ duyệt.",
+                    "Buổi học %s - %s đã được thay đổi phương thức học.",
                     oldDate, oldTime
                 );
             } else {
-                // RESCHEDULE: nhấn mạnh thay đổi ngày/giờ
-                notificationTitle = "Yêu cầu Đổi lịch đã được duyệt";
+                // RESCHEDULE: nhấn mạnh thay đổi ngày/giờ cho học viên
+                notificationTitle = "Buổi học đã đổi lịch";
                 notificationMessage = String.format(
-                    "Yêu cầu đổi lịch của bạn cho buổi học đã được giáo vụ duyệt. Từ %s %s thành %s %s.",
+                    "Buổi học đã được đổi lịch từ %s %s thành %s %s.",
                     oldDate, oldTime, newDate, newTime
                 );
             }
@@ -3629,26 +3666,26 @@ public class TeacherRequestService {
     // Cancel request by teacher
     @Transactional
     public TeacherRequestResponseDTO cancelRequest(Long requestId, Long userId) {
-        log.info("Cancelling request {} by teacher {}", requestId, userId);
+        log.info("Giáo viên {} đang hủy yêu cầu {}", userId, requestId);
 
         TeacherRequest request = teacherRequestRepository.findByIdWithTeacherAndSession(requestId)
-                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Request not found"));
+                .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_REQUEST_NOT_FOUND, "Không tìm thấy yêu cầu"));
 
         // Kiểm tra quyền sở hữu
         if (request.getTeacher() == null || request.getTeacher().getUserAccount() == null
                 || !request.getTeacher().getUserAccount().getId().equals(userId)) {
-            throw new CustomException(ErrorCode.FORBIDDEN, "You can only cancel your own requests");
+            throw new CustomException(ErrorCode.FORBIDDEN, "Bạn chỉ có thể hủy yêu cầu của chính mình");
         }
 
         // Chỉ cho phép hủy request ở trạng thái PENDING hoặc WAITING_CONFIRM
         if (request.getStatus() != RequestStatus.PENDING && request.getStatus() != RequestStatus.WAITING_CONFIRM) {
-            throw new CustomException(ErrorCode.INVALID_INPUT, "Only pending or waiting confirmation requests can be cancelled");
+            throw new CustomException(ErrorCode.INVALID_INPUT, "Chỉ có thể hủy các yêu cầu đang chờ duyệt hoặc chờ xác nhận");
         }
 
         request.setStatus(RequestStatus.CANCELLED);
         request = teacherRequestRepository.save(request);
 
-        log.info("Request {} cancelled by teacher {} (user {})", requestId, request.getTeacher().getId(), userId);
+        log.info("Yêu cầu {} đã được giáo viên {} (user {}) hủy", requestId, request.getTeacher().getId(), userId);
         return mapToResponseDTO(request);
     }
 
