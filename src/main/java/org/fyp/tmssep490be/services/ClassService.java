@@ -709,11 +709,11 @@ public class ClassService {
                                 .fullName(userAccount.getFullName())
                                 .email(userAccount.getEmail())
                                 .phone(userAccount.getPhone())
+                                .address(userAccount.getAddress())
                                 .avatarUrl(userAccount.getAvatarUrl())
                                 .replacementSkillAssessments(assessmentDTOs)
                                 .classMatchInfo(classMatchInfo)
                                 .activeEnrollments(activeEnrollments)
-                                .accountStatus(userAccount.getStatus().name())
                                 .build();
         }
 

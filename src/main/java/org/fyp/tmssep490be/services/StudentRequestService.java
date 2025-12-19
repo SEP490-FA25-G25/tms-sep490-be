@@ -319,6 +319,12 @@ public class StudentRequestService {
             effectiveDateStr = request.getTargetSession().getDate().toString();
         }
         
+        // For MAKEUP requests, calculate days until MAKEUP session (the actual deadline)
+        // For ABSENCE/TRANSFER, calculate days until TARGET session
+        Session sessionForCountdown = (request.getRequestType() == StudentRequestType.MAKEUP && request.getMakeupSession() != null)
+                ? request.getMakeupSession()
+                : request.getTargetSession();
+        
         return AARequestResponseDTO.builder()
                 .id(request.getId())
                 .requestType(request.getRequestType() != null ? request.getRequestType().toString() : null)
@@ -335,7 +341,7 @@ public class StudentRequestService {
                 .submittedBy(mapUserToAAUserSummary(request.getSubmittedBy()))
                 .decidedAt(request.getDecidedAt())
                 .decidedBy(mapUserToAAUserSummary(request.getDecidedBy()))
-                .daysUntilSession(calculateDaysUntilSession(request.getTargetSession()))
+                .daysUntilSession(calculateDaysUntilSession(sessionForCountdown))
                 .attendanceStats(calculateAttendanceStats(request))
                 .build();
     }

@@ -15,9 +15,8 @@ public class AvailableStudentDTO {
     private String fullName;
     private String email;
     private String phone;
+    private String address;
     private String avatarUrl;
-
-    private String accountStatus;
 
     private List<SkillAssessmentDTO> replacementSkillAssessments;
 
