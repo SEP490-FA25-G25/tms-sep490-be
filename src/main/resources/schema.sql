@@ -95,6 +95,7 @@ CREATE TABLE user_account (
   password_hash VARCHAR(255) NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
   last_login_at TIMESTAMPTZ,
+  last_password_change_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_user_gender CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
