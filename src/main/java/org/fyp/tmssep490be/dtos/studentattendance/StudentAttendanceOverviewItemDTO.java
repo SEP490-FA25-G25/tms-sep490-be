@@ -21,6 +21,7 @@ public class StudentAttendanceOverviewItemDTO {
     private String courseName;
 
     private LocalDate startDate;
+    private LocalDate expectedEndDate;
     private LocalDate actualEndDate;
 
     private int totalSessions;

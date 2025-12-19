@@ -185,6 +185,24 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("status") SessionStatus status);
 
     /**
+     * Find all sessions that have ended (passed end time), regardless of teacher note
+     * Used to auto-update attendance from PLANNED to ABSENT
+     */
+    @Query("""
+            SELECT s FROM Session s
+            JOIN s.timeSlotTemplate tst
+            WHERE s.status = :status
+              AND (
+                s.date < :today
+                OR (s.date = :today AND tst.endTime < :currentTime)
+              )
+            """)
+    List<Session> findAllEndedSessions(
+            @Param("today") LocalDate today,
+            @Param("currentTime") LocalTime currentTime,
+            @Param("status") SessionStatus status);
+
+    /**
      * Find sessions that have ended more than 48 hours ago and don't have teacher note
      * Used to auto-complete sessions that teacher forgot to submit report
      */
@@ -201,6 +219,20 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     List<Session> findEndedSessionsWithoutTeacherNoteAfter48Hours(
             @Param("cutoffDate") LocalDate cutoffDate,
             @Param("cutoffTime") LocalTime cutoffTime,
+            @Param("status") SessionStatus status);
+
+    /**
+     * Find sessions that have passed their date (date < today) without teacher note
+     * Used to auto-complete sessions that passed their date
+     */
+    @Query("""
+            SELECT s FROM Session s
+            WHERE s.status = :status
+              AND s.date < :today
+              AND (s.teacherNote IS NULL OR s.teacherNote = '')
+            """)
+    List<Session> findPastSessionsWithoutTeacherNote(
+            @Param("today") LocalDate today,
             @Param("status") SessionStatus status);
 
     /**
@@ -247,6 +279,17 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     int updateEndedSessionsWithoutTeacherNoteAfter48HoursToDone(
             @Param("cutoffDate") LocalDate cutoffDate,
             @Param("cutoffTime") LocalTime cutoffTime,
+            @Param("oldStatus") SessionStatus oldStatus,
+            @Param("newStatus") SessionStatus newStatus);
+
+    /**
+     * Update sessions to DONE status if they have passed their date (date < today) without teacher note
+     * Uses native query for efficiency
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Session s SET s.status = :newStatus WHERE s.date < :today AND s.status = :oldStatus AND (s.teacherNote IS NULL OR s.teacherNote = '')")
+    int updatePastSessionsWithoutTeacherNoteToDone(
+            @Param("today") LocalDate today,
             @Param("oldStatus") SessionStatus oldStatus,
             @Param("newStatus") SessionStatus newStatus);
 

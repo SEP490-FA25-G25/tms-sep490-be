@@ -31,9 +31,10 @@ public class ManagerTeacherController {
     @GetMapping
     @PreAuthorize("hasAnyRole('MANAGER','CENTER_HEAD')")
     public ResponseEntity<ResponseObject<List<ManagerTeacherListItemDTO>>> getManagedTeachers(
-            @AuthenticationPrincipal UserPrincipal currentUser) {
-        log.info("Manager {} requesting managed teachers list", currentUser.getId());
-        List<ManagerTeacherListItemDTO> teachers = managerTeacherService.getManagedTeachers(currentUser.getId());
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam(required = false) Long branchId) {
+        log.info("Manager {} requesting managed teachers list (branchId: {})", currentUser.getId(), branchId);
+        List<ManagerTeacherListItemDTO> teachers = managerTeacherService.getManagedTeachers(currentUser.getId(), branchId);
         return ResponseEntity.ok(ResponseObject.success(teachers));
     }
 

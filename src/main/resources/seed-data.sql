@@ -293,35 +293,35 @@ INSERT INTO time_slot_template (id, branch_id, name, start_time, end_time, creat
 (26, 2, 'HCM Late Afternoon 1.5h', '16:00:00', '17:30:00', '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
 
 -- Resources (Rooms & Zoom) - Comprehensive for Testing
-INSERT INTO resource (id, branch_id, resource_type, code, name, capacity, capacity_override, created_at, updated_at) VALUES
+INSERT INTO resource (id, branch_id, resource_type, code, name, capacity, capacity_override, meeting_url, created_at, updated_at) VALUES
 -- Ha Noi Branch - Physical Rooms (Various capacities)
-(1, 1, 'ROOM', 'HN01-R101', 'Ha Noi Room 101', 20, 25, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(2, 1, 'ROOM', 'HN01-R102', 'Ha Noi Room 102', 15, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(3, 1, 'ROOM', 'HN01-R201', 'Ha Noi Room 201', 25, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(1, 1, 'ROOM', 'HN01-R101', 'Ha Noi Room 101', 20, 25, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(2, 1, 'ROOM', 'HN01-R102', 'Ha Noi Room 102', 15, NULL, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(3, 1, 'ROOM', 'HN01-R201', 'Ha Noi Room 201', 25, NULL, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
 -- Ha Noi Branch - Small Rooms (for VIP/1-1 classes)
-(9, 1, 'ROOM', 'HN01-R301', 'Ha Noi VIP Room 301', 5, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(10, 1, 'ROOM', 'HN01-R302', 'Ha Noi Study Room 302', 8, 10, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(9, 1, 'ROOM', 'HN01-R301', 'Ha Noi VIP Room 301', 5, NULL, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(10, 1, 'ROOM', 'HN01-R302', 'Ha Noi Study Room 302', 8, 10, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
 -- Ha Noi Branch - Large Rooms (for workshops/seminars)
-(11, 1, 'ROOM', 'HN01-R401', 'Ha Noi Conference Hall', 50, 60, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(12, 1, 'ROOM', 'HN01-R402', 'Ha Noi Seminar Room', 35, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(11, 1, 'ROOM', 'HN01-R401', 'Ha Noi Conference Hall', 50, 60, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(12, 1, 'ROOM', 'HN01-R402', 'Ha Noi Seminar Room', 35, NULL, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
 -- Ha Noi Branch - Virtual (Multiple Zoom accounts)
-(4, 1, 'VIRTUAL', 'HN01-Z01', 'Ha Noi Zoom 01', 100, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(13, 1, 'VIRTUAL', 'HN01-Z02', 'Ha Noi Zoom 02', 100, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(14, 1, 'VIRTUAL', 'HN01-Z03', 'Ha Noi Zoom 03 (Premium)', 300, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
-(15, 1, 'VIRTUAL', 'HN01-GM01', 'Ha Noi Google Meet 01', 100, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(4, 1, 'VIRTUAL', 'HN01-Z01', 'Ha Noi Zoom 01', 100, NULL, NULL, '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(13, 1, 'VIRTUAL', 'HN01-GM02', 'Ha Noi Google Meet 02', 100, NULL, 'https://meet.google.com/ugb-mcbz-eki', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(14, 1, 'VIRTUAL', 'HN01-GM03', 'Ha Noi Google Meet 03', 100, NULL, 'https://meet.google.com/vyj-ngvm-vpm', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
+(15, 1, 'VIRTUAL', 'HN01-GM01', 'Ha Noi Google Meet 01', 100, NULL, 'https://meet.google.com/izb-xhvh-cpb', '2024-01-15 00:00:00+07', '2024-01-15 00:00:00+07'),
 -- Ho Chi Minh Branch - Physical Rooms
-(5, 2, 'ROOM', 'HCM01-R101', 'HCM Room 101', 20, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
-(6, 2, 'ROOM', 'HCM01-R102', 'HCM Room 102', 20, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
-(7, 2, 'ROOM', 'HCM01-R201', 'HCM Room 201', 25, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(5, 2, 'ROOM', 'HCM01-R101', 'HCM Room 101', 20, NULL, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(6, 2, 'ROOM', 'HCM01-R102', 'HCM Room 102', 20, NULL, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(7, 2, 'ROOM', 'HCM01-R201', 'HCM Room 201', 25, NULL, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
 -- HCM Branch - Small Rooms
-(16, 2, 'ROOM', 'HCM01-R301', 'HCM VIP Room 301', 6, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
-(17, 2, 'ROOM', 'HCM01-R302', 'HCM Private Room 302', 4, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(16, 2, 'ROOM', 'HCM01-R301', 'HCM VIP Room 301', 6, NULL, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(17, 2, 'ROOM', 'HCM01-R302', 'HCM Private Room 302', 4, NULL, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
 -- HCM Branch - Large Rooms
-(18, 2, 'ROOM', 'HCM01-R401', 'HCM Training Center', 40, 50, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(18, 2, 'ROOM', 'HCM01-R401', 'HCM Training Center', 40, 50, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
 -- Ho Chi Minh Branch - Virtual
-(8, 2, 'VIRTUAL', 'HCM01-Z01', 'HCM Zoom 01', 100, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
-(19, 2, 'VIRTUAL', 'HCM01-Z02', 'HCM Zoom 02', 100, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
-(20, 2, 'VIRTUAL', 'HCM01-MS01', 'HCM MS Teams 01', 250, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
+(8, 2, 'VIRTUAL', 'HCM01-Z01', 'HCM Zoom 01', 100, NULL, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(19, 2, 'VIRTUAL', 'HCM01-Z02', 'HCM Zoom 02', 100, NULL, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07'),
+(20, 2, 'VIRTUAL', 'HCM01-MS01', 'HCM MS Teams 01', 250, NULL, NULL, '2024-03-01 00:00:00+07', '2024-03-01 00:00:00+07');
 
 -- User Role & Branch Assignments
 INSERT INTO user_role (user_id, role_id) VALUES
@@ -333,7 +333,7 @@ INSERT INTO user_role (user_id, role_id) SELECT id, 7 FROM user_account WHERE id
 
 INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES
 -- Staff assignments
-(1,1,1), (1,2,1), (2,1,1), (2,2,1), (3,1,2), (4,2,2), (5,1,2), (6,1,2), (6,2,2), (7,1,2), (8,2,4), (9,2,4), (10,1,2), (11,2,4);
+(1,1,1), (1,2,1), (2,1,1), (2,2,1), (3,1,2), (3,2,2), (4,2,2), (5,1,2), (6,1,2), (6,2,2), (7,1,2), (8,2,4), (9,2,4), (10,1,2), (11,2,4);
 -- Teachers - HN (original)
 INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 1, 6 FROM user_account WHERE id BETWEEN 20 AND 27;
 -- Teachers - HCM (original)

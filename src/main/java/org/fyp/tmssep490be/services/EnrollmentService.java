@@ -44,6 +44,8 @@ public class EnrollmentService {
     private final LevelRepository levelRepository;
     private final NotificationService notificationService;
     private final StudentService studentService;
+    private final ScoreRepository scoreRepository;
+    private final AssessmentRepository assessmentRepository;
 
     public ClassEnrollmentImportPreview previewClassEnrollmentImport(
             Long classId,
@@ -399,13 +401,61 @@ public class EnrollmentService {
         log.info("Generated {} student_session records ({} sessions per student)",
                 studentSessions.size(), futureSessions.size());
 
-        // 5. Send notifications cho students và Academic Affairs
-        sendEnrollmentNotifications(enrollments, classEntity);
+        // 5. Auto-generate score records for all assessments
+        List<Assessment> classAssessments = assessmentRepository.findByClassEntityId(classId);
+        log.info("Found {} assessments for class {}", classAssessments.size(), classId);
+        
+        if (!classAssessments.isEmpty()) {
+            List<Score> scores = new ArrayList<>();
+            
+            for (Enrollment enrollment : enrollments) {
+                Student student = studentMap.get(enrollment.getStudentId());
+                if (student == null) {
+                    log.error("Student not found for score creation: {}", enrollment.getStudentId());
+                    continue;
+                }
+                
+                for (Assessment assessment : classAssessments) {
+                    log.debug("Creating score record for student {} - assessment {}",
+                            student.getId(), assessment.getId());
+                    // Kiểm tra xem score đã tồn tại chưa (tránh duplicate nếu re-enroll)
+                    boolean scoreExists = scoreRepository.findByStudentIdAndAssessmentId(
+                            student.getId(), assessment.getId()).isPresent();
+                    
+                    if (!scoreExists) {
+                        Score score = Score.builder()
+                                .assessment(assessment)
+                                .student(student)
+                                .score(null)  // NULL = chưa chấm điểm
+                                .feedback(null)
+                                .gradedBy(null)
+                                .gradedAt(null)
+                                .createdAt(OffsetDateTime.now())
+                                .updatedAt(OffsetDateTime.now())
+                                .build();
+                        scores.add(score);
+                    }
+                }
+            }
+            
+            if (!scores.isEmpty()) {
+                scoreRepository.saveAll(scores);
+                log.info("Generated {} score records ({} assessments × {} students)",
+                        scores.size(), classAssessments.size(), enrollments.size());
+            } else {
+                log.info("No new score records created (all students already have scores)");
+            }
+        } else {
+            log.info("No assessments found for class {} - skipping score creation", classId);
+        }
 
-        // 6. Send enrollment confirmation emails (async batch)
+        // 6. Send notifications cho students và Academic Affairs
+        sendEnrollmentNotifications(enrollments, classEntity, studentMap);
+
+        // 7. Send enrollment confirmation emails (async batch)
         sendEnrollmentEmailsAsync(studentIds, classEntity);
 
-        // 7. Return result
+        // 8. Return result
         List<String> warnings = new ArrayList<>();
         if (LocalDate.now().isAfter(classEntity.getStartDate())) {
             warnings.add("Mid-course enrollment: Students will only be enrolled in future sessions");
@@ -420,9 +470,9 @@ public class EnrollmentService {
     }
 
     @Async("emailTaskExecutor")
-    private void sendEnrollmentNotificationToStudent(Enrollment enrollment, ClassEntity classEntity) {
+    protected void sendEnrollmentNotificationToStudent(Enrollment enrollment, ClassEntity classEntity, Student student) {
         try {
-            Long studentUserId = enrollment.getStudent().getUserAccount().getId();
+            Long studentUserId = student.getUserAccount().getId();
 
             String title = String.format("Xác nhận đăng ký lớp: %s", classEntity.getCode());
             String message = String.format(
@@ -449,7 +499,7 @@ public class EnrollmentService {
 
 
     @Async("emailTaskExecutor")
-    private void sendEnrollmentNotifications(List<Enrollment> enrollments, ClassEntity classEntity) {
+    protected void sendEnrollmentNotifications(List<Enrollment> enrollments, ClassEntity classEntity, Map<Long, Student> studentMap) {
         try {
             if (enrollments.isEmpty()) {
                 log.debug("Không có enrollments nào để gửi notification");
@@ -458,7 +508,12 @@ public class EnrollmentService {
 
             // Gửi notification cho từng student
             for (Enrollment enrollment : enrollments) {
-                sendEnrollmentNotificationToStudent(enrollment, classEntity);
+                Student student = studentMap.get(enrollment.getStudentId());
+                if (student != null) {
+                    sendEnrollmentNotificationToStudent(enrollment, classEntity, student);
+                } else {
+                    log.warn("Student not found in map for enrollment studentId={}", enrollment.getStudentId());
+                }
             }
 
             // Gửi notification cho Academic Affairs của branch tương ứng
@@ -473,7 +528,7 @@ public class EnrollmentService {
     }
 
     @Async("emailTaskExecutor")
-    private void sendEnrollmentNotificationToAcademicAffairs(List<Enrollment> enrollments, ClassEntity classEntity) {
+    protected void sendEnrollmentNotificationToAcademicAffairs(List<Enrollment> enrollments, ClassEntity classEntity) {
         try {
             // Lấy branch của class để gửi cho Academic Affairs tương ứng
             Long branchId = classEntity.getBranch().getId();
@@ -890,7 +945,7 @@ public class EnrollmentService {
     }
 
     @Async("emailTaskExecutor")
-    private void sendEnrollmentEmailsAsync(List<Long> studentIds, ClassEntity classEntity) {
+    protected void sendEnrollmentEmailsAsync(List<Long> studentIds, ClassEntity classEntity) {
         try {
             String centerName = classEntity.getBranch() != null ? classEntity.getBranch().getName() : "TMS";
             

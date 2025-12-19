@@ -148,7 +148,7 @@ public class StudentService {
                 assessment.setLevel(level);
                 assessment.setScore(input.getScore());
                 assessment.setAssessmentDate(LocalDate.now());
-                assessment.setAssessmentType("manual_creation");
+                assessment.setAssessmentType("placement_test");
                 assessment.setNote(input.getNote());
 
                 // Set người chấm điểm student này

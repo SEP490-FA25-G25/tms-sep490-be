@@ -36,21 +36,36 @@ public class ManagerTeacherService {
 
     // Lấy danh sách giáo viên trong phạm vi quản lý của manager
     @Transactional(readOnly = true)
-    public List<ManagerTeacherListItemDTO> getManagedTeachers(Long managerUserId) {
-        List<Long> branchIds = userBranchesRepository.findBranchIdsByUserId(managerUserId);
-        if (branchIds == null || branchIds.isEmpty()) {
+    public List<ManagerTeacherListItemDTO> getManagedTeachers(Long managerUserId, Long branchId) {
+        List<Long> managerBranchIds = userBranchesRepository.findBranchIdsByUserId(managerUserId);
+        if (managerBranchIds == null || managerBranchIds.isEmpty()) {
+            log.warn("Manager {} không có chi nhánh nào được gán", managerUserId);
             return Collections.emptyList();
         }
 
-        Set<Long> branchScope = new HashSet<>(branchIds);
+        // Nếu có branchId được chỉ định, kiểm tra xem manager có quyền quản lý branch đó không
+        Set<Long> branchScope;
+        if (branchId != null) {
+            if (!managerBranchIds.contains(branchId)) {
+                log.warn("Manager {} không có quyền truy cập chi nhánh {}", managerUserId, branchId);
+                return Collections.emptyList();
+            }
+            branchScope = Set.of(branchId);
+            log.info("Lọc giáo viên theo chi nhánh {} cho manager {}", branchId, managerUserId);
+        } else {
+            branchScope = new HashSet<>(managerBranchIds);
+            log.info("Lấy tất cả giáo viên từ {} chi nhánh cho manager {}", branchScope.size(), managerUserId);
+        }
 
         // Lấy tất cả giáo viên đang được gán vào các chi nhánh trong phạm vi quản lý
         List<Teacher> teachers = teacherRepository.findByBranchIds(new ArrayList<>(branchScope));
 
         if (teachers.isEmpty()) {
+            log.info("Không tìm thấy giáo viên nào trong phạm vi quản lý");
             return Collections.emptyList();
         }
 
+        log.info("Tìm thấy {} giáo viên trong phạm vi quản lý", teachers.size());
         return teachers.stream()
                 .map(teacher -> mapToDto(teacher, branchScope))
                 .toList();

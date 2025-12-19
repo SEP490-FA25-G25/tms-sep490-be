@@ -31,7 +31,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
@@ -49,6 +48,7 @@ public class TeacherClassService {
     private final SessionRepository sessionRepository;
     private final StudentSessionRepository studentSessionRepository;
     private final SubjectService subjectService;
+    private final AttendanceService attendanceService;
 
     // Lấy tất cả lớp học được phân công cho giáo viên theo teacherId
     public List<TeacherClassListItemDTO> getTeacherClasses(Long teacherId) {
@@ -97,65 +97,11 @@ public class TeacherClassService {
                     });
         }
 
+        // Sử dụng cùng logic tính tỷ lệ chuyên cần như AttendanceService để đảm bảo nhất quán
         // Tính tỷ lệ chuyên cần: tổng PRESENT / (PRESENT + ABSENT) của các buổi đã điểm danh
-        // Chỉ tính các bản ghi điểm danh thực sự có trong DB (giống AttendanceService)
-        List<StudentSession> allStudentSessions = studentSessionRepository.findBySessionIds(sessionIds);
+        double classAttendanceRate = attendanceService.calculateClassAttendanceRate(classEntity.getId());
         
-                // Bỏ qua các bản ghi học bù (isMakeup = true) để không làm tăng tỷ lệ của lớp học bù
-        List<StudentSession> primarySessions = allStudentSessions.stream()
-                .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup()))
-                .collect(Collectors.toList());
-
-        long totalPresent = 0;
-        long totalRecorded = 0;
-        LocalDateTime now = LocalDateTime.now();
-
-        for (StudentSession ss : primarySessions) {
-            AttendanceStatus status = ss.getAttendanceStatus();
-            Session session = ss.getSession();
-
-            if (status == AttendanceStatus.PRESENT) {
-                totalPresent++;
-                totalRecorded++;
-            } else if (status == AttendanceStatus.ABSENT) {
-                totalRecorded++;
-            } else if (status == AttendanceStatus.EXCUSED) {
-                // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
-                boolean hasMakeupCompleted = makeupCompletedMap
-                        .getOrDefault(session.getId(), Map.of())
-                        .getOrDefault(ss.getStudent().getId(), false);
-
-                if (hasMakeupCompleted) {
-                    // EXCUSED có học bù (chấm xanh) → tính như PRESENT
-                    totalPresent++;
-                    totalRecorded++;
-                } else {
-                    // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
-                    LocalDate sessionDate = session.getDate();
-                    LocalDateTime sessionEndDateTime;
-                    if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
-                        LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
-                        sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
-                    } else {
-                        sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
-                    }
-
-                    boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
-                    if (isAfterSessionEnd) {
-                        // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
-                    totalRecorded++;
-                }
-                    // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
-            }
-            }
-            // Không tính PLANNED
-        }
-
-        Double attendanceRate = null;
-        if (totalRecorded > 0) {
-            // Trả về dạng 0-1 (frontend sẽ nhân 100 để hiển thị %)
-            attendanceRate = (double) totalPresent / totalRecorded;
-        }
+        Double attendanceRate = classAttendanceRate > 0 ? classAttendanceRate : null;
 
         // Tính status động dựa trên startDate, endDate và session cuối cùng
         // Để tránh hiển thị "Lớp chưa bắt đầu" khi lớp đã bắt đầu

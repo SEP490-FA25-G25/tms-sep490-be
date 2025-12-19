@@ -377,7 +377,7 @@ public class StudentPortalService {
 
         Map<String, BigDecimal> componentScores = new HashMap<>();
         scoreRepository.findByStudentIdAndClassId(enrollment.getStudentId(), classEntity.getId()).forEach(score -> {
-            if (score.getAssessment() != null && score.getAssessment().getSubjectAssessment() != null) {
+            if (score.getAssessment() != null && score.getAssessment().getSubjectAssessment() != null && score.getScore() != null) {
                 String assessmentName = score.getAssessment().getSubjectAssessment().getName();
                 componentScores.put(assessmentName, score.getScore());
             }

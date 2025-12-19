@@ -25,7 +25,7 @@ public class CreateStudentRequest {
     @Size(min = 2, max = 100, message = "Full name must be between 2-100 characters")
     private String fullName;
 
-    @Pattern(regexp = "^0[0-9]{9,10}$", message = "Phone must be 10-11 digits starting with 0")
+    @Pattern(regexp = "^0[0-9]{9}$", message = "Phone must be 10 digits starting with 0")
     private String phone;
 
     private String facebookUrl;
