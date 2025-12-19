@@ -36,7 +36,7 @@ public class QAController {
 
 
     @GetMapping("/classes")
-    @PreAuthorize("hasAnyRole('QA','MANAGER','ACADEMIC_AFFAIR')")
+    @PreAuthorize("hasAnyRole('QA','MANAGER','ACADEMIC_AFFAIR','CENTER_HEAD')")
     public ResponseEntity<ResponseObject<Page<QAClassListItemDTO>>> getQAClasses(
         @RequestParam(required = false) List<Long> branchIds,
 

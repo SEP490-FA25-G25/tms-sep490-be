@@ -333,7 +333,7 @@ INSERT INTO user_role (user_id, role_id) SELECT id, 7 FROM user_account WHERE id
 
 INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES
 -- Staff assignments
-(1,1,1), (1,2,1), (2,1,1), (2,2,1), (3,1,2), (3,2,2), (4,2,2), (5,1,2), (6,1,2), (6,2,2), (7,1,2), (8,2,4), (9,2,4), (10,1,2), (11,2,4);
+(1,1,1), (1,2,1), (2,1,1), (2,2,1), (3,1,2), (4,2,2), (5,1,2), (6,1,2), (6,2,2), (7,1,2), (8,2,4), (9,2,4), (10,1,2), (11,2,4);
 -- Teachers - HN (original)
 INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 1, 6 FROM user_account WHERE id BETWEEN 20 AND 27;
 -- Teachers - HCM (original)
