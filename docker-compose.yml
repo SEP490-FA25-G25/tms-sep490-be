@@ -33,7 +33,7 @@ services:
       postgres:
         condition: service_healthy
     env_file:
-      - tms-be-temp/.env
+      - .env
     environment:
       # Database connection
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tms
