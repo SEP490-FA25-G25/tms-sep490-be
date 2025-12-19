@@ -1,15 +1,25 @@
 # Multi-stage build: Frontend + Backend in one image
-# Build context: .. (CAPSTONE folder)
-# Stage 1: Build Frontend (bỏ qua TypeScript check và lint)
+# Build context: parent directory containing both FE and BE folders
+# Usage: 
+#   docker compose build (uses docker-compose.yml settings)
+#   docker build --build-arg FE_DIR=tms-sep490-fe --build-arg BE_DIR=tms-sep490-be -f tms-sep490-be/Dockerfile .
+
+# Build arguments for directory names
+ARG FE_DIR=tms-sep490-fe
+ARG BE_DIR=tms-sep490-be
+
+# Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
+
+ARG FE_DIR
 
 WORKDIR /app/frontend
 
-# Copy frontend source (from CAPSTONE/tms-sep490-fe/)
-COPY tms-sep490-fe/package.json tms-sep490-fe/pnpm-lock.yaml ./
-COPY tms-sep490-fe/ ./
+# Copy frontend source
+COPY ${FE_DIR}/package.json ${FE_DIR}/pnpm-lock.yaml ./
+COPY ${FE_DIR}/ ./
 
-# Install dependencies và build (bỏ qua tsc và lint)
+# Install dependencies và build
 ENV CI=true
 RUN npm install -g pnpm && \
     pnpm install --frozen-lockfile && \
@@ -18,44 +28,48 @@ RUN npm install -g pnpm && \
 # Stage 2: Build Backend
 FROM eclipse-temurin:21-jdk-alpine AS backend-builder
 
+ARG BE_DIR
+
 WORKDIR /app/backend
 
-# Copy Maven wrapper và pom.xml (from CAPSTONE/tms-sep490-be/)
-COPY tms-sep490-be/mvnw .
-COPY tms-sep490-be/.mvn .mvn
-COPY tms-sep490-be/pom.xml .
+# Copy Maven wrapper và pom.xml
+COPY ${BE_DIR}/mvnw .
+COPY ${BE_DIR}/.mvn .mvn
+COPY ${BE_DIR}/pom.xml .
 
 # Make Maven wrapper executable
 RUN chmod +x ./mvnw
 
-# Download dependencies (cached nếu pom.xml không đổi)
+# Download dependencies
 RUN ./mvnw dependency:go-offline -B
 
-# Copy source code (from CAPSTONE/tms-sep490-be/src)
-COPY tms-sep490-be/src src
+# Copy source code
+COPY ${BE_DIR}/src src
 
-# Build application (skip tests)
+# Build application
 RUN ./mvnw clean package -DskipTests -B
 
 # Stage 3: Production - Combined Frontend + Backend
 FROM eclipse-temurin:21-jre-alpine
 
+ARG BE_DIR
+
 WORKDIR /app
 
-# Install nginx để serve frontend
+# Install nginx
 RUN apk add --no-cache nginx
 
 # Create non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy frontend build từ stage 1
+# Copy frontend build
 COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 
-# Copy backend JAR từ stage 2
+# Copy backend JAR
 COPY --from=backend-builder /app/backend/target/tms-sep490-be-0.0.1-SNAPSHOT.jar app.jar
 
-# Copy nginx config (from CAPSTONE/tms-sep490-be/)
-COPY tms-sep490-be/nginx-combined.conf /etc/nginx/http.d/default.conf
+# Copy nginx config
+COPY ${BE_DIR}/nginx-combined.conf /etc/nginx/http.d/default.conf
 
 # Create nginx directories với proper permissions
 RUN mkdir -p /var/log/nginx /var/lib/nginx/tmp /run/nginx && \

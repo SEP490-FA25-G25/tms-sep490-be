@@ -11,8 +11,8 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       # Initialize database với schema và seed data
-      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./src/main/resources/seed-data.sql:/docker-entrypoint-initdb.d/02-seed-data.sql:ro
+      - ./${BE_DIR:-tms-sep490-be}/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./${BE_DIR:-tms-sep490-be}/src/main/resources/seed-data.sql:/docker-entrypoint-initdb.d/02-seed-data.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d tms"]
       interval: 10s
@@ -27,13 +27,16 @@ services:
   app:
     build:
       context: ..
-      dockerfile: tms-be-temp/Dockerfile
+      dockerfile: ${BE_DIR:-tms-sep490-be}/Dockerfile
+      args:
+        FE_DIR: ${FE_DIR:-tms-sep490-fe}
+        BE_DIR: ${BE_DIR:-tms-sep490-be}
     container_name: tms-app
     depends_on:
       postgres:
         condition: service_healthy
     env_file:
-      - .env
+      - ${BE_DIR:-tms-sep490-be}/.env
     environment:
       # Database connection
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tms
