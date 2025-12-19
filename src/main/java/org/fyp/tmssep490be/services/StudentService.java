@@ -206,7 +206,7 @@ public class StudentService {
     }
 
     @Transactional
-    private CreateStudentResponse handleExistingStudentSync(
+    protected CreateStudentResponse handleExistingStudentSync(
             UserAccount existingUser, CreateStudentRequest request, Long currentUserId
     ) {
         log.info("Handling existing user {} for branch sync", existingUser.getEmail());
@@ -898,6 +898,30 @@ public class StudentService {
                 data.setErrorMessage("Email không đúng định dạng");
                 continue;
             }
+            
+            // Validate full name length (2-100 characters)
+            String trimmedName = data.getFullName().trim();
+            if (trimmedName.length() < 2 || trimmedName.length() > 100) {
+                data.setStatus(StudentImportData.StudentImportStatus.ERROR);
+                data.setErrorMessage("Họ và tên phải có từ 2-100 ký tự");
+                continue;
+            }
+            
+            // Validate phone format if provided (Vietnamese phone: 0xxxxxxxxx)
+            if (data.getPhone() != null && !data.getPhone().isBlank()) {
+                if (!isValidPhone(data.getPhone())) {
+                    data.setStatus(StudentImportData.StudentImportStatus.ERROR);
+                    data.setErrorMessage("Số điện thoại phải có 10-11 số và bắt đầu bằng 0");
+                    continue;
+                }
+            }
+            
+            // Validate DOB is not in future
+            if (data.getDob() != null && data.getDob().isAfter(LocalDate.now())) {
+                data.setStatus(StudentImportData.StudentImportStatus.ERROR);
+                data.setErrorMessage("Ngày sinh không được là ngày tương lai");
+                continue;
+            }
 
             // Check duplicate trong file Excel
             String emailLower = data.getEmail().toLowerCase();
@@ -941,6 +965,18 @@ public class StudentService {
         if (email == null || email.isBlank()) return false;
         // Match EnrollmentService regex - require TLD (.com, .vn, etc.)
         return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    }
+    
+    /**
+     * Validate Vietnamese phone number format (10-11 digits starting with 0)
+     */
+    private boolean isValidPhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return false;
+        }
+        // Remove spaces and check format
+        String cleaned = phone.replaceAll("\\s", "");
+        return cleaned.matches("^0[0-9]{9,10}$");
     }
 
     public CheckStudentExistenceResponse checkStudentExistence(
