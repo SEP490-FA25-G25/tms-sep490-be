@@ -88,11 +88,18 @@ long countActiveRequestsByTeacherAndClass(@Param("teacherId") Long teacherId,
     //Kiểm tra xem session có pending request không
     boolean existsBySessionIdAndStatus(Long sessionId, RequestStatus status);
 
-    //Lấy các request types của session (chỉ APPROVED), sắp xếp theo thời gian approved gần nhất
+    //Kiểm tra xem giáo viên đã có request nào cho session này chưa (ngoại trừ REJECTED và CANCELLED)
+    @Query("SELECT COUNT(tr) > 0 FROM TeacherRequest tr " +
+           "WHERE tr.teacher.id = :teacherId " +
+           "AND tr.session.id = :sessionId " +
+           "AND tr.status NOT IN (org.fyp.tmssep490be.entities.enums.RequestStatus.REJECTED, org.fyp.tmssep490be.entities.enums.RequestStatus.CANCELLED)")
+    boolean existsByTeacherIdAndSessionIdExcludingRejectedAndCancelled(@Param("teacherId") Long teacherId, @Param("sessionId") Long sessionId);
+
+    //Lấy các request types của session (chỉ APPROVED)
+    //Vì giáo viên chỉ được tạo 1 request cho 1 session, nên sẽ chỉ có tối đa 1 request approved
     @Query("SELECT tr FROM TeacherRequest tr " +
            "WHERE tr.session.id = :sessionId " +
-           "AND tr.status = org.fyp.tmssep490be.entities.enums.RequestStatus.APPROVED " +
-           "ORDER BY tr.decidedAt DESC NULLS LAST, tr.submittedAt DESC")
+           "AND tr.status = org.fyp.tmssep490be.entities.enums.RequestStatus.APPROVED")
     List<TeacherRequest> findBySessionIdAndApprovedStatus(@Param("sessionId") Long sessionId);
 }
 

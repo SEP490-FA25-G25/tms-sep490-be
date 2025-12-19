@@ -99,4 +99,7 @@ public class SessionSummaryDTO {
 
     // Request types for this session (APPROVED only)
     private List<String> pendingRequestTypes;
+
+    // Whether QA report has been submitted for this session
+    private Boolean reportSubmitted;
 }

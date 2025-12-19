@@ -116,6 +116,16 @@ public class TeacherRequestService {
             throw new CustomException(ErrorCode.FORBIDDEN, "You are not assigned to this session");
         }
 
+        // Kiểm tra xem giáo viên đã có request nào cho session này chưa (ngoại trừ REJECTED và CANCELLED)
+        // Giáo viên chỉ được tạo 1 request cho 1 session, trừ khi request đó bị từ chối hoặc hủy
+        boolean hasExistingRequest = teacherRequestRepository.existsByTeacherIdAndSessionIdExcludingRejectedAndCancelled(
+                teacher.getId(), session.getId());
+        if (hasExistingRequest) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, 
+                    "Bạn đã có yêu cầu đang chờ xử lý hoặc đã được duyệt cho buổi học này. " +
+                    "Chỉ có thể tạo yêu cầu mới sau khi yêu cầu trước đó bị từ chối hoặc hủy.");
+        }
+
         // Chỉ cho phép tạo yêu cầu cho buổi PLANNED và còn đủ thời gian
         if (session.getStatus() != SessionStatus.PLANNED) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Session is not in PLANNED status");
@@ -1124,6 +1134,16 @@ public class TeacherRequestService {
                 .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
         if (!isOwner) {
             throw new CustomException(ErrorCode.FORBIDDEN, "Teacher is not assigned to this session");
+        }
+
+        // Kiểm tra xem giáo viên đã có request nào cho session này chưa (ngoại trừ REJECTED và CANCELLED)
+        // Giáo viên chỉ được tạo 1 request cho 1 session, trừ khi request đó bị từ chối hoặc hủy
+        boolean hasExistingRequest = teacherRequestRepository.existsByTeacherIdAndSessionIdExcludingRejectedAndCancelled(
+                teacher.getId(), session.getId());
+        if (hasExistingRequest) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, 
+                    "Giáo viên đã có yêu cầu đang chờ xử lý hoặc đã được duyệt cho buổi học này. " +
+                    "Chỉ có thể tạo yêu cầu mới sau khi yêu cầu trước đó bị từ chối hoặc hủy.");
         }
 
         LocalDate today = LocalDate.now();
