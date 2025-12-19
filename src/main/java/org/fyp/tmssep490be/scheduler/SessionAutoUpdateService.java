@@ -55,6 +55,7 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
             });
         } catch (Exception e) {
             log.error("Error updating sessions on startup: {}", e.getMessage(), e);
+
         }
     }
 
@@ -220,3 +221,4 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
         }
     }
 }
+
