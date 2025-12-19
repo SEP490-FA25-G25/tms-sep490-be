@@ -68,7 +68,11 @@ public class SecurityConfiguration {
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
                 configuration.setAllowedOrigins(
-                                List.of("http://localhost:5173"));
+                                List.of(
+                                        "http://localhost:5173",
+                                        "https://tms-language.com",
+                                        "http://tms-language.com"
+                                ));
                 configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
                 configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
                 configuration.setExposedHeaders(List.of("Authorization"));
