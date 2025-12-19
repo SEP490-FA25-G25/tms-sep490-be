@@ -18,6 +18,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/qa/reports")
 @RequiredArgsConstructor
@@ -76,20 +78,21 @@ public class QAReportController {
         @RequestParam(required = false) QAReportStatus status,
         @RequestParam(required = false) Long reportedBy,
         @RequestParam(required = false) String search,
+        @RequestParam(required = false) List<Long> branchIds,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size,
         @RequestParam(defaultValue = "createdAt") String sort,
         @RequestParam(defaultValue = "desc") String sortDir,
         @AuthenticationPrincipal UserPrincipal currentUser
     ) {
-        log.info("User {} requesting QA reports list with filters: classId={}, sessionId={}, phaseId={}, reportType={}, status={}, search={}",
-                 currentUser.getId(), classId, sessionId, phaseId, reportType, status, search);
+        log.info("User {} requesting QA reports list with filters: classId={}, sessionId={}, phaseId={}, reportType={}, status={}, search={}, branchIds={}",
+                 currentUser.getId(), classId, sessionId, phaseId, reportType, status, search, branchIds);
 
         Sort.Direction direction = sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sort));
 
         Page<QAReportListItemDTO> reports = qaReportService.getQAReports(
-            classId, sessionId, phaseId, reportType, status, reportedBy, search, pageable, currentUser.getId()
+            classId, sessionId, phaseId, reportType, status, reportedBy, search, branchIds, pageable, currentUser.getId()
         );
 
         return ResponseEntity.ok(ResponseObject.<Page<QAReportListItemDTO>>builder()
