@@ -1113,14 +1113,16 @@ public class StudentRequestService {
      public MissedSessionsResponseDTO getMissedSessions(Long userId, Integer weeksBack, Boolean excludeRequested) {
         Student student = studentRepository.findByUserAccountId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found for user ID: " + userId));
-        return getMissedSessionsForStudent(student.getId(), weeksBack, excludeRequested);
+        // Student chỉ được xem buổi EXCUSED (có phép) để tạo makeup request
+        return getMissedSessionsForStudent(student.getId(), weeksBack, excludeRequested, false);
     }
 
-    public MissedSessionsResponseDTO getMissedSessionsForStudent(Long studentId, Integer weeksBack, Boolean excludeRequested) {
+    public MissedSessionsResponseDTO getMissedSessionsForStudent(Long studentId, Integer weeksBack, Boolean excludeRequested, Boolean allowAbsent) {
         // Nếu client không truyền weeksBack, sử dụng hardcoded constant
         int lookbackWeeks = weeksBack != null ? weeksBack : MAKEUP_LOOKBACK_WEEKS;
 
         boolean excludeRequestedSessions = excludeRequested != null ? excludeRequested : true;
+        boolean includeAbsent = allowAbsent != null ? allowAbsent : false;
 
         //Là hôm nay - số tuần -> ra cái ngày cũ nhất
         LocalDate cutoffDate = LocalDate.now().minusWeeks(lookbackWeeks);
@@ -1129,8 +1131,17 @@ public class StudentRequestService {
         
         List<MissedSessionDTO> missedSessions = allSessions.stream()
                 .filter(ss -> ss.getSession() != null)
-                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.ABSENT 
-                           || ss.getAttendanceStatus() == AttendanceStatus.EXCUSED)
+                .filter(ss -> {
+                    // Logic phân quyền: Student chỉ thấy EXCUSED, AA thấy cả EXCUSED + ABSENT
+                    if (includeAbsent) {
+                        // Academic Affairs: cho phép cả EXCUSED và ABSENT
+                        return ss.getAttendanceStatus() == AttendanceStatus.EXCUSED 
+                            || ss.getAttendanceStatus() == AttendanceStatus.ABSENT;
+                    } else {
+                        // Student: chỉ cho phép EXCUSED (có phép)
+                        return ss.getAttendanceStatus() == AttendanceStatus.EXCUSED;
+                    }
+                })
                 .filter(ss -> {
                     LocalDate sessionDate = ss.getSession().getDate();
                     // Chỉ filter cutoffDate, KHÔNG filter tương lai (cho phép EXCUSED sessions trong tương lai)
