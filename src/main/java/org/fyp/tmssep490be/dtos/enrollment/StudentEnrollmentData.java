@@ -23,6 +23,7 @@ public class StudentEnrollmentData {
 
     private StudentResolutionStatus status;  // FOUND/CREATE/DUPLICATE/ERROR
     private Long resolvedStudentId;  // Nếu FOUND
+    private String resolvedStudentCode;  // Student code nếu FOUND (for UI display)
     private String errorMessage;  // Nếu ERROR
 
     // Multi-branch support

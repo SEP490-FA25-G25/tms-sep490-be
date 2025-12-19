@@ -28,12 +28,14 @@ public class EnrollmentTemplateService {
 
             String className = classEntity.getName();
             String courseName = classEntity.getSubject() != null ? classEntity.getSubject().getName() : "Unknown Course";
+            String classCode = classEntity.getCode();
 
             Sheet sheet = workbook.createSheet(className + " - Enrollment");
 
             Row infoRow = sheet.createRow(0);
             Cell infoCell = infoRow.createCell(0);
-            infoCell.setCellValue("Class: " + className + " | Course: " + courseName);
+            // Use class code for validation (more user-friendly than ID)
+            infoCell.setCellValue("Class: " + classCode + " | Name: " + className + " | Course: " + courseName);
             CellStyle infoStyle = createInfoStyle(workbook);
             infoCell.setCellStyle(infoStyle);
 

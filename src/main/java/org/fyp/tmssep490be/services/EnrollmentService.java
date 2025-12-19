@@ -36,11 +36,13 @@ public class EnrollmentService {
     private final UserRoleRepository userRoleRepository;
     private final UserBranchesRepository userBranchesRepository;
     private final ExcelParserService excelParserService;
+    private final BranchRepository branchRepository;
+    private final PolicyService policyService;
+    private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final ReplacementSkillAssessmentRepository replacementSkillAssessmentRepository;
     private final LevelRepository levelRepository;
     private final NotificationService notificationService;
-    private final EmailService emailService;
     private final StudentService studentService;
 
     public ClassEnrollmentImportPreview previewClassEnrollmentImport(
@@ -52,8 +54,8 @@ public class EnrollmentService {
         // 1. Validate class exists, đủ điều kiện enroll
         ClassEntity classEntity = validateClassForEnrollment(classId, enrolledBy);
 
-        // 2. Parse Excel file
-        List<StudentEnrollmentData> parsedData = excelParserService.parseStudentEnrollment(file);
+        // 2. Parse Excel file with class code validation
+        List<StudentEnrollmentData> parsedData = excelParserService.parseStudentEnrollment(file, classEntity.getCode());
 
         if (parsedData.isEmpty()) {
             throw new CustomException(ErrorCode.EXCEL_FILE_EMPTY);
@@ -114,7 +116,7 @@ public class EnrollmentService {
             // Validate required fields
             if (data.getEmail() == null || data.getEmail().isBlank()) {
                 data.setStatus(StudentResolutionStatus.ERROR);
-                data.setErrorMessage("Email is required");
+                data.setErrorMessage("Email là bắt buộc");
                 continue;
             }
             
@@ -127,7 +129,31 @@ public class EnrollmentService {
             
             if (data.getFullName() == null || data.getFullName().isBlank()) {
                 data.setStatus(StudentResolutionStatus.ERROR);
-                data.setErrorMessage("Full name is required");
+                data.setErrorMessage("Họ và tên là bắt buộc");
+                continue;
+            }
+            
+            // Validate full name length (2-100 characters)
+            String trimmedName = data.getFullName().trim();
+            if (trimmedName.length() < 2 || trimmedName.length() > 100) {
+                data.setStatus(StudentResolutionStatus.ERROR);
+                data.setErrorMessage("Họ và tên phải có từ 2-100 ký tự");
+                continue;
+            }
+            
+            // Validate phone format if provided (Vietnamese phone: 0xxxxxxxxx)
+            if (data.getPhone() != null && !data.getPhone().isBlank()) {
+                if (!isValidPhone(data.getPhone())) {
+                    data.setStatus(StudentResolutionStatus.ERROR);
+                    data.setErrorMessage("Số điện thoại phải có 10-11 số và bắt đầu bằng 0");
+                    continue;
+                }
+            }
+            
+            // Validate DOB is not in future
+            if (data.getDob() != null && data.getDob().isAfter(LocalDate.now())) {
+                data.setStatus(StudentResolutionStatus.ERROR);
+                data.setErrorMessage("Ngày sinh không được là ngày tương lai");
                 continue;
             }
 
@@ -135,7 +161,7 @@ public class EnrollmentService {
             String emailLower = data.getEmail().toLowerCase();
             if (seenEmails.contains(emailLower)) {
                 data.setStatus(StudentResolutionStatus.DUPLICATE);
-                data.setErrorMessage("Duplicate email in Excel file");
+                data.setErrorMessage("Email bị trùng lặp trong file Excel");
                 continue;
             }
             seenEmails.add(emailLower);
@@ -154,6 +180,7 @@ public class EnrollmentService {
                     if (alreadyEnrolled) {
                         data.setStatus(StudentResolutionStatus.ALREADY_ENROLLED);
                         data.setResolvedStudentId(student.get().getId());
+                        data.setResolvedStudentCode(student.get().getStudentCode());
                         data.setErrorMessage("Học viên đã đăng ký vào lớp này");
                         log.debug("Student {} already enrolled in class {}",
                                 student.get().getId(), classEntity.getId());
@@ -162,8 +189,9 @@ public class EnrollmentService {
 
                     data.setStatus(StudentResolutionStatus.FOUND);
 
-                    // Set resolved student ID để lát nữa execute thì add vào enrollment
+                    // Set resolved student ID và student code để UI hiển thị
                     data.setResolvedStudentId(student.get().getId());
+                    data.setResolvedStudentCode(student.get().getStudentCode());
                     
                     // Check if student is in the class's branch
                     boolean inBranch = userBranchesRepository.existsByUserAccountIdAndBranchId(
@@ -176,8 +204,8 @@ public class EnrollmentService {
                         data.setNote("Học viên từ chi nhánh khác, sẽ được tự động thêm vào chi nhánh này");
                     }
                     
-                    log.debug("Found student by email: {} -> ID: {}, needsSync: {}", 
-                            data.getEmail(), student.get().getId(), !inBranch);
+                    log.debug("Found student by email: {} -> ID: {}, Code: {}, needsSync: {}", 
+                            data.getEmail(), student.get().getId(), student.get().getStudentCode(), !inBranch);
                     continue;
                 }
             }
@@ -604,6 +632,13 @@ public class EnrollmentService {
     private Student createStudentQuick(StudentEnrollmentData data, Long branchId, Long enrolledBy) {
         log.info("Creating new student: {}", data.getEmail());
 
+        // Get default password from policy (same as student import)
+        String defaultPassword = policyService.getGlobalString("student.default_password", "12345678");
+        
+        // Fetch branch entity from DB (not just set ID)
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new EntityNotFoundException("Branch not found: " + branchId));
+
         // 1. Create user_account
         UserAccount user = new UserAccount();
         user.setEmail(data.getEmail());
@@ -615,7 +650,7 @@ public class EnrollmentService {
         user.setGender(data.getGender() != null ? data.getGender() : Gender.MALE);
         user.setDob(data.getDob());
         user.setStatus(UserStatus.ACTIVE);
-        user.setPasswordHash(passwordEncoder.encode(generateTemporaryPassword()));
+        user.setPasswordHash(passwordEncoder.encode(defaultPassword));
         UserAccount savedUser = userAccountRepository.save(user);
 
         log.debug("Created user_account: ID {}", savedUser.getId());
@@ -645,9 +680,6 @@ public class EnrollmentService {
         log.debug("Assigned STUDENT role to user {}", savedUser.getId());
 
         // 4. Assign to branch
-        Branch branch = new Branch();
-        branch.setId(branchId);
-
         UserBranches.UserBranchesId userBranchId = new UserBranches.UserBranchesId();
         userBranchId.setUserId(savedUser.getId());
         userBranchId.setBranchId(branchId);
@@ -656,36 +688,88 @@ public class EnrollmentService {
         userBranch.setId(userBranchId);
         userBranch.setUserAccount(savedUser);
         userBranch.setBranch(branch);
-        // Note: assignedBy should be the enrolledBy user, but we don't have it here
-        // This is acceptable as the enrollment record tracks enrolled_by
+        
+        // Set assignedBy if available
+        if (enrolledBy != null) {
+            UserAccount assignedByUser = userAccountRepository.findById(enrolledBy).orElse(null);
+            if (assignedByUser != null) {
+                userBranch.setAssignedBy(assignedByUser);
+            }
+        }
+        
         userBranchesRepository.save(userBranch);
 
         log.debug("Assigned user {} to branch {}", savedUser.getId(), branchId);
 
-        // REMOVED: Skill assessment creation from Excel data
-        // Assessments are now handled separately through dedicated individual student
-        // creation workflow
-        log.debug("Student creation completed without assessment data for student {}", savedStudent.getId());
+        // 5. Send welcome email with credentials (CRITICAL FIX)
+        try {
+            emailService.sendNewStudentCredentialsAsync(
+                    savedUser.getEmail(),
+                    savedUser.getFullName(),
+                    savedStudent.getStudentCode(),
+                    savedUser.getEmail(),
+                    defaultPassword,
+                    branch.getName()
+            );
+            log.info("Sent welcome email with credentials to: {}", savedUser.getEmail());
+        } catch (Exception e) {
+            log.error("Failed to send welcome email to {}: {}", savedUser.getEmail(), e.getMessage());
+            // Don't fail the whole operation if email fails
+        }
+
+        log.debug("Student creation completed for student {}", savedStudent.getId());
 
         return savedStudent;
     }
 
-    private String generateTemporaryPassword() {
-        // Generate random 8-character password
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        StringBuilder password = new StringBuilder();
-        Random random = new Random();
-        for (int i = 0; i < 8; i++) {
-            password.append(chars.charAt(random.nextInt(chars.length())));
+    /**
+     * Validate Vietnamese phone number format (10-11 digits starting with 0)
+     */
+    private boolean isValidPhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return false;
         }
-        return password.toString();
+        // Remove spaces and check format
+        String cleaned = phone.replaceAll("\\s", "");
+        return cleaned.matches("^0[0-9]{9,10}$");
     }
 
     private String generateStudentCode(Long branchId, String fullName, String email) {
-        // Simple timestamp-based code: ST{branchId}{timestamp}{random}
-        long timestamp = System.currentTimeMillis();
-        int random = (int) (Math.random() * 1000);
-        return String.format("ST%d%d%03d", branchId, timestamp, random);
+        String baseName;
+
+        // Prioritize fullName, fallback to email prefix
+        if (fullName != null && !fullName.trim().isEmpty()) {
+            // Remove special chars, spaces, and convert to uppercase
+            baseName = fullName.replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+            // Limit to max 10 characters
+            if (baseName.length() > 10) {
+                baseName = baseName.substring(0, 10);
+            }
+        } else if (email != null && email.contains("@")) {
+            // Use part before @ from email
+            baseName = email.substring(0, email.indexOf("@"))
+                    .replaceAll("[^a-zA-Z0-9]", "")
+                    .toUpperCase();
+            if (baseName.length() > 10) {
+                baseName = baseName.substring(0, 10);
+            }
+        } else {
+            // Fallback: use timestamp
+            baseName = String.valueOf(System.currentTimeMillis()).substring(6);
+        }
+
+        // Add random suffix to ensure uniqueness
+        int randomSuffix = (int) (Math.random() * 1000);
+
+        String studentCode = String.format("ST%d%s%03d", branchId, baseName, randomSuffix);
+
+        // Double-check uniqueness (rare collision case)
+        while (studentRepository.findByStudentCode(studentCode).isPresent()) {
+            randomSuffix = (int) (Math.random() * 1000);
+            studentCode = String.format("ST%d%s%03d", branchId, baseName, randomSuffix);
+        }
+
+        return studentCode;
     }
 
     private void checkScheduleConflictsForPreview(List<StudentEnrollmentData> parsedData, ClassEntity classEntity) {
@@ -727,9 +811,6 @@ public class EnrollmentService {
         }
     }
 
-    /**
-     * Validate email format
-     */
     private boolean isValidEmail(String email) {
         if (email == null || email.isBlank()) {
             return false;
@@ -737,24 +818,12 @@ public class EnrollmentService {
         return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     }
 
-    /**
-     * Check if time slots overlap
-     */
     private boolean hasTimeOverlap(TimeSlotTemplate slot1, TimeSlotTemplate slot2) {
         if (slot1 == null || slot2 == null) return false;
         return !(slot1.getEndTime().isBefore(slot2.getStartTime()) || 
                  slot2.getEndTime().isBefore(slot1.getStartTime()));
     }
 
-    /**
-     * Validate schedule conflicts for a student enrolling in a new class.
-     * Throws CustomException if student has schedule conflict with active enrollments.
-     * 
-     * @param studentId Student ID to check
-     * @param newClassId New class ID to enroll into
-     * @param newClassSessions Sessions of the new class
-     * @param studentEmail Student email for error message
-     */
     private void validateScheduleConflicts(Long studentId, Long newClassId, 
                                           List<Session> newClassSessions, String studentEmail) {
         // 1. Get active enrollments (excluding the target class itself)
