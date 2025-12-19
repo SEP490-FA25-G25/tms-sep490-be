@@ -198,8 +198,9 @@ public class QAReportService {
     @Transactional(readOnly = true)
     public Page<QAReportListItemDTO> getQAReports(Long classId, Long sessionId, Long phaseId,
             QAReportType reportType, QAReportStatus status, Long reportedBy,
-            String search, Pageable pageable, Long userId) {
-        log.info("Getting QA reports with filters - userId={}, search={}", userId, search);
+            String search, List<Long> requestedBranchIds, Pageable pageable, Long userId) {
+        log.info("Getting QA reports with filters - userId={}, search={}, requestedBranchIds={}", 
+                 userId, search, requestedBranchIds);
 
         UserAccount user = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
@@ -209,14 +210,32 @@ public class QAReportService {
 
         List<Long> branchIds;
         if (isManager) {
-            branchIds = null;
-            log.info("User {} is MANAGER, returning reports from all branches", userId);
+            // Manager có thể filter theo branchIds cụ thể hoặc xem tất cả
+            branchIds = requestedBranchIds;
+            log.info("User {} is MANAGER, using requested branchIds: {}", userId, branchIds);
         } else {
-            branchIds = getUserAccessibleBranches(userId);
+            // CENTER_HEAD/QA chỉ thấy branches có quyền truy cập
+            List<Long> accessibleBranchIds = getUserAccessibleBranches(userId);
 
-            if (branchIds.isEmpty()) {
+            if (accessibleBranchIds.isEmpty()) {
                 log.warn("User {} không có branch nào được phân quyền, trả về danh sách rỗng", userId);
                 return Page.empty(pageable);
+            }
+
+            // Nếu có request branchIds, lọc theo intersection với accessible branches
+            if (requestedBranchIds != null && !requestedBranchIds.isEmpty()) {
+                branchIds = accessibleBranchIds.stream()
+                        .filter(requestedBranchIds::contains)
+                        .toList();
+                log.info("User {} requested specific branches, filtered to accessible ones: {}", userId, branchIds);
+                
+                if (branchIds.isEmpty()) {
+                    log.warn("User {} không có quyền truy cập các branch được yêu cầu", userId);
+                    return Page.empty(pageable);
+                }
+            } else {
+                branchIds = accessibleBranchIds;
+                log.info("User {} viewing all accessible branches: {}", userId, branchIds);
             }
         }
 
