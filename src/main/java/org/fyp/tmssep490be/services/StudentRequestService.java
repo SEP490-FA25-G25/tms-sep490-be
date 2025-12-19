@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.format.DateTimeFormatter;
@@ -1482,35 +1483,37 @@ public class StudentRequestService {
             Long targetClassId, 
             List<Session> targetClassSessions) {
         
-        // 1. Get active enrollments excluding both current and target classes
-        List<Enrollment> activeEnrollments = enrollmentRepository
-                .findByStudentIdAndStatus(studentId, EnrollmentStatus.ENROLLED);
+        // Simple approach: Get ALL future StudentSessions of this student
+        // This includes both regular class sessions AND makeup sessions (isMakeup=true)
+        // Then check for time overlaps with target class sessions
         
-        List<Enrollment> otherEnrollments = activeEnrollments.stream()
-                .filter(e -> !e.getClassId().equals(excludeClassId) && !e.getClassId().equals(targetClassId))
-                .collect(Collectors.toList());
+        LocalDate today = LocalDate.now();
         
-        if (otherEnrollments.isEmpty()) {
-            return; // No other active enrollments to check
+        List<StudentSession> allFutureStudentSessions = studentSessionRepository.findAllByStudentId(studentId)
+                .stream()
+                .filter(ss -> ss.getSession() != null)
+                .filter(ss -> !ss.getSession().getDate().isBefore(today))
+                .filter(ss -> ss.getSession().getStatus() == SessionStatus.PLANNED)
+                // Exclude sessions from the class being transferred FROM (will be deleted anyway)
+                .filter(ss -> !ss.getSession().getClassEntity().getId().equals(excludeClassId))
+                // Exclude sessions from target class (shouldn't exist, but defensive)
+                .filter(ss -> !ss.getSession().getClassEntity().getId().equals(targetClassId))
+                .toList();
+        
+        if (allFutureStudentSessions.isEmpty()) {
+            return; // No future sessions to check
         }
 
-        // 2. Get sessions from other classes
-        List<Long> otherClassIds = otherEnrollments.stream()
-                .map(Enrollment::getClassId)
-                .distinct()
-                .collect(Collectors.toList());
-        
-        List<Session> otherClassSessions = sessionRepository.findByClassEntityIdInAndStatus(
-                otherClassIds, SessionStatus.PLANNED);
-
-        // 3. Check for time overlaps
+        // Check for time overlaps
         for (Session targetSession : targetClassSessions) {
             LocalDate targetDate = targetSession.getDate();
             TimeSlotTemplate targetTimeSlot = targetSession.getTimeSlotTemplate();
             
             if (targetTimeSlot == null) continue;
             
-            for (Session existingSession : otherClassSessions) {
+            for (StudentSession existingSS : allFutureStudentSessions) {
+                Session existingSession = existingSS.getSession();
+                
                 if (!existingSession.getDate().equals(targetDate)) {
                     continue;
                 }
@@ -1523,11 +1526,17 @@ public class StudentRequestService {
                             ? existingSession.getClassEntity().getCode() 
                             : "Unknown";
                     
+                    // Differentiate message for makeup vs regular sessions
+                    String sessionType = Boolean.TRUE.equals(existingSS.getIsMakeup()) 
+                            ? "buổi học bù tại lớp" 
+                            : "lớp";
+                    
                     throw new BusinessRuleException("SCHEDULE_CONFLICT", 
-                            String.format("Lớp chuyển đến có lịch học trùng vào ngày %s (%s-%s) với lớp %s đang theo học",
+                            String.format("Lớp chuyển đến có lịch học trùng vào ngày %s (%s-%s) với %s %s",
                                     targetDate,
                                     targetTimeSlot.getStartTime(),
                                     targetTimeSlot.getEndTime(),
+                                    sessionType,
                                     conflictingClass));
                 }
             }
@@ -1887,6 +1896,11 @@ public class StudentRequestService {
             throw new BusinessRuleException("PAST_SESSION", "Target session must be in the future");
         }
 
+        // 6b. Check schedule conflicts with other classes (including makeup sessions)
+        List<Session> targetClassFutureSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
+                dto.getTargetClassId(), targetSession.getDate());
+        validateScheduleConflictsForTransfer(studentId, dto.getCurrentClassId(), dto.getTargetClassId(), targetClassFutureSessions);
+
         // 7. Create request
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
@@ -2013,13 +2027,38 @@ public class StudentRequestService {
         log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
                 newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
 
-        // 4. DELETE all sessions from old class that are on or after joinDate
-        // These are sessions student won't attend because they've transferred
+        // 4. DELETE sessions from old class that would conflict with new class schedule
+        // Use datetime comparison: only delete sessions that start AT or AFTER joinSession's start time
+        // This allows student to attend morning class in old class even if joining evening class in new class on same day
         List<StudentSession> allOldClassSessions = studentSessionRepository
                 .findByStudentIdAndClassEntityId(studentId, currentClass.getId());
         
+        LocalTime joinStartTime = joinSession.getTimeSlotTemplate() != null 
+                ? joinSession.getTimeSlotTemplate().getStartTime() 
+                : LocalTime.MIN;
+        
         List<StudentSession> futureOldSessions = allOldClassSessions.stream()
-                .filter(ss -> !ss.getSession().getDate().isBefore(joinDate)) // date >= joinDate
+                .filter(ss -> {
+                    Session oldSession = ss.getSession();
+                    LocalDate oldDate = oldSession.getDate();
+                    
+                    // If old session is on a date AFTER joinDate -> delete
+                    if (oldDate.isAfter(joinDate)) {
+                        return true;
+                    }
+                    
+                    // If old session is on the SAME date as joinDate
+                    if (oldDate.equals(joinDate)) {
+                        // Compare start times - only delete if old session starts at or after join session
+                        LocalTime oldStartTime = oldSession.getTimeSlotTemplate() != null 
+                                ? oldSession.getTimeSlotTemplate().getStartTime() 
+                                : LocalTime.MIN;
+                        return !oldStartTime.isBefore(joinStartTime);
+                    }
+                    
+                    // Old session is BEFORE joinDate -> keep
+                    return false;
+                })
                 .toList();
 
         studentSessionRepository.deleteAll(futureOldSessions);
