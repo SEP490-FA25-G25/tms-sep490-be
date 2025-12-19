@@ -14,6 +14,7 @@ import org.fyp.tmssep490be.exceptions.ResourceNotFoundException;
 import org.fyp.tmssep490be.repositories.BranchRepository;
 import org.fyp.tmssep490be.repositories.CenterRepository;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
+import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class ManagerBranchService {
     private final CenterRepository centerRepository;
     private final NotificationService notificationService;
     private final UserAccountRepository userAccountRepository;
+    private final UserBranchesRepository userBranchesRepository;
 
     // Lấy danh sách tất cả chi nhánh với thông tin tổng quan
     @Transactional(readOnly = true)
@@ -81,6 +83,9 @@ public class ManagerBranchService {
 
         Branch savedBranch = branchRepository.save(branch);
         log.info("Đã tạo chi nhánh mới với ID: {}", savedBranch.getId());
+
+        // Tự động thêm Admin và Manager vào chi nhánh mới
+        assignGlobalRolesToBranch(savedBranch);
 
         return mapToOverviewDTO(savedBranch);
     }
@@ -299,5 +304,33 @@ public class ManagerBranchService {
                 .teacherStatus(teacherStatus)
                 .resourceStatus(resourceStatus)
                 .build();
+    }
+
+    /**
+     * Tự động thêm users có role ADMIN và MANAGER vào chi nhánh mới.
+     */
+    private void assignGlobalRolesToBranch(Branch branch) {
+        List<String> globalRoles = List.of("ADMIN", "MANAGER");
+        
+        for (String roleCode : globalRoles) {
+            List<UserAccount> users = userAccountRepository.findUsersByRole(roleCode);
+            for (UserAccount user : users) {
+                // Kiểm tra xem user đã được assign chưa
+                boolean alreadyAssigned = userBranchesRepository
+                    .existsByUserAccountIdAndBranchId(user.getId(), branch.getId());
+                
+                if (!alreadyAssigned) {
+                    UserBranches userBranch = UserBranches.builder()
+                        .id(new UserBranches.UserBranchesId(user.getId(), branch.getId()))
+                        .userAccount(user)
+                        .branch(branch)
+                        .assignedAt(OffsetDateTime.now())
+                        .build();
+                    userBranchesRepository.save(userBranch);
+                    log.info("Đã tự động thêm user {} (role: {}) vào chi nhánh {}", 
+                        user.getFullName(), roleCode, branch.getName());
+                }
+            }
+        }
     }
 }

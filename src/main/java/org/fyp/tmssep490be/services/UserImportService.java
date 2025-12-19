@@ -16,6 +16,10 @@ import org.fyp.tmssep490be.repositories.RoleRepository;
 import org.fyp.tmssep490be.repositories.UserAccountRepository;
 import org.fyp.tmssep490be.repositories.UserBranchesRepository;
 import org.fyp.tmssep490be.repositories.UserRoleRepository;
+import org.fyp.tmssep490be.repositories.TeacherRepository;
+import org.fyp.tmssep490be.repositories.StudentRepository;
+import org.fyp.tmssep490be.entities.Teacher;
+import org.fyp.tmssep490be.entities.Student;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +45,8 @@ public class UserImportService {
     private final UserBranchesRepository userBranchesRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final TeacherRepository teacherRepository;
+    private final StudentRepository studentRepository;
 
     public UserImportPreview previewUserImport(MultipartFile file) {
         List<UserImportData> users = excelParserService.parseUserImport(file);
@@ -90,8 +96,15 @@ public class UserImportService {
             }
         }
 
-        // 3. Kiểm tra Chi nhánh (hỗ trợ nhiều mã cách nhau bằng dấu phẩy)
-        if (user.getBranchCode() != null && !user.getBranchCode().isEmpty()) {
+        // 3. Kiểm tra Chi nhánh (bắt buộc cho các role không phải ADMIN/MANAGER)
+        String roleCode = user.getRole() != null ? user.getRole().toUpperCase() : "";
+        boolean isGlobalRole = "ADMIN".equals(roleCode) || "MANAGER".equals(roleCode);
+        
+        if (user.getBranchCode() == null || user.getBranchCode().trim().isEmpty()) {
+            if (!isGlobalRole) {
+                errorMsg.append("Chi nhánh là bắt buộc. ");
+            }
+        } else {
             String[] branchCodes = user.getBranchCode().split(",");
             for (String code : branchCodes) {
                 String trimmedCode = code.trim();
@@ -104,7 +117,18 @@ public class UserImportService {
             }
         }
 
-        // 4. Kiểm tra Họ và tên
+        // 4. Kiểm tra Số điện thoại (nếu có)
+        if (user.getPhone() != null && !user.getPhone().trim().isEmpty()) {
+            String phone = user.getPhone().trim();
+            // Validate format: SĐT Việt Nam 10 số, bắt đầu bằng 0(3|5|7|8|9)
+            if (!phone.matches("^(0[35789])[0-9]{8}$")) {
+                errorMsg.append("Số điện thoại không hợp lệ. ");
+            } else if (userAccountRepository.existsByPhone(phone)) {
+                errorMsg.append("Số điện thoại đã tồn tại trong hệ thống. ");
+            }
+        }
+
+        // 5. Kiểm tra Họ và tên
         if (user.getFullName() == null || user.getFullName().isEmpty()) {
             errorMsg.append("Họ tên là bắt buộc. ");
         }
@@ -158,11 +182,34 @@ public class UserImportService {
                     userRole.setUserAccount(user);
                     userRole.setRole(roleOpt.get());
                     userRoleRepository.save(userRole);
+
+                    // Tạo Teacher/Student profile nếu cần
+                    String roleCode = roleOpt.get().getCode();
+                    if ("TEACHER".equals(roleCode)) {
+                        createTeacherProfile(user);
+                    } else if ("STUDENT".equals(roleCode)) {
+                        createStudentProfile(user);
+                    }
                 }
 
-                // Gán Chi nhánh (xử lý nhiều chi nhánh)
+                // Gán Chi nhánh
                 List<String> assignedBranchNames = new ArrayList<>();
-                if (data.getBranchCode() != null && !data.getBranchCode().isEmpty()) {
+                String roleCode = data.getRole().toUpperCase();
+                boolean isGlobalRole = "ADMIN".equals(roleCode) || "MANAGER".equals(roleCode);
+                
+                if (isGlobalRole) {
+                    // ADMIN/MANAGER: tự động gán vào TẤT CẢ chi nhánh
+                    List<Branch> allBranches = branchRepository.findAll();
+                    for (Branch branch : allBranches) {
+                        UserBranches userBranch = new UserBranches();
+                        userBranch.setUserAccount(user);
+                        userBranch.setBranch(branch);
+                        userBranchesRepository.save(userBranch);
+                        assignedBranchNames.add(branch.getName());
+                    }
+                    log.info("ADMIN/MANAGER {} được gán vào {} chi nhánh", user.getFullName(), allBranches.size());
+                } else if (data.getBranchCode() != null && !data.getBranchCode().isEmpty()) {
+                    // Các role khác: gán theo branch code trong file Excel
                     String[] branchCodes = data.getBranchCode().split(",");
                     for (String code : branchCodes) {
                         String trimmedCode = code.trim();
@@ -230,5 +277,43 @@ public class UserImportService {
 
         log.warn("Không thể parse ngày sinh: {}", dobString);
         return null;
+    }
+
+    /**
+     * Tạo Teacher profile khi import user với role TEACHER
+     */
+    private void createTeacherProfile(UserAccount user) {
+        long count = teacherRepository.count() + 1;
+        String employeeCode = String.format("TCH-%03d", count);
+        
+        Teacher teacher = Teacher.builder()
+            .userAccount(user)
+            .employeeCode(employeeCode)
+            .hireDate(java.time.LocalDate.now())
+            .contractType("full-time")
+            .createdAt(java.time.OffsetDateTime.now())
+            .updatedAt(java.time.OffsetDateTime.now())
+            .build();
+        
+        teacherRepository.save(teacher);
+        log.info("Đã tạo Teacher profile cho user {} với mã nhân viên {}", 
+            user.getFullName(), employeeCode);
+    }
+
+    /**
+     * Tạo Student profile khi import user với role STUDENT
+     */
+    private void createStudentProfile(UserAccount user) {
+        long count = studentRepository.count() + 1;
+        String studentCode = String.format("STD-%04d", count);
+        
+        Student student = Student.builder()
+            .userAccount(user)
+            .studentCode(studentCode)
+            .build();
+        
+        studentRepository.save(student);
+        log.info("Đã tạo Student profile cho user {} với mã học viên {}", 
+            user.getFullName(), studentCode);
     }
 }
