@@ -1695,11 +1695,11 @@ public class ClassService {
 
                 log.info("Calculated conflicts for {} resources across {} sessions", resources.size(), totalSessions);
 
-                // Filter and sort resources
-                final int sessionsCount = totalSessions;
+                // Filter to only show 100% available resources (no conflicts)
+                // and sort by capacity closest to class capacity
                 return resources.stream()
-                                // Filter out resources with 100% conflict (all sessions are conflicting)
-                                .filter(r -> conflictMap.getOrDefault(r.getId(), 0) < sessionsCount)
+                                // Only show resources with 0 conflicts (100% available)
+                                .filter(r -> conflictMap.getOrDefault(r.getId(), 0) == 0)
                                 // Sort by: 1) capacity closest to class capacity, 2) name
                                 .sorted((r1, r2) -> {
                                         // Sort by capacity difference (ascending) - closest to class capacity first
@@ -1715,8 +1715,8 @@ public class ClassService {
                                 })
                                 .map(r -> org.fyp.tmssep490be.dtos.classcreation.AvailableResourceDTO.fromEntity(
                                                 r,
-                                                conflictMap.getOrDefault(r.getId(), 0),
-                                                sessionsCount))
+                                                0, // Always 0 conflicts since we filter
+                                                totalSessions))
                                 .toList();
         }
 
@@ -1772,7 +1772,7 @@ public class ClassService {
                         org.fyp.tmssep490be.dtos.classcreation.AssignResourcesRequest request,
                         Long userId) {
                 long startTime = System.currentTimeMillis();
-                log.info("Starting HYBRID resource assignment for class ID {} by user {}", classId, userId);
+                log.info("Assigning resources for class ID {} by user {}", classId, userId);
 
                 ClassEntity classEntity = classRepository.findById(classId)
                                 .orElseThrow(() -> new CustomException(ErrorCode.CLASS_NOT_FOUND));
@@ -1784,8 +1784,6 @@ public class ClassService {
                 if (totalSessions == 0) {
                         throw new CustomException(ErrorCode.NO_SESSIONS_FOUND_FOR_CLASS);
                 }
-
-                List<org.fyp.tmssep490be.dtos.classcreation.AssignResourcesResponse.ResourceConflictDetail> conflicts = new ArrayList<>();
 
                 // Validate all resources exist and belong to same branch
                 for (org.fyp.tmssep490be.dtos.classcreation.AssignResourcesRequest.ResourceAssignment assignment : request
@@ -1799,7 +1797,8 @@ public class ClassService {
                         }
                 }
 
-                // PHASE 1: Delete existing + SQL Bulk Insert (Replace resources)
+                // Delete existing + SQL Bulk Insert (Replace resources)
+                // Since we only allow 100% available resources, there should be no conflicts
                 int totalSuccessCount = 0;
                 for (org.fyp.tmssep490be.dtos.classcreation.AssignResourcesRequest.ResourceAssignment assignment : request
                                 .getPattern()) {
@@ -1807,7 +1806,7 @@ public class ClassService {
                         int deletedCount = sessionResourceRepository.deleteResourcesForDayOfWeek(
                                         classId,
                                         assignment.getDayOfWeek().intValue());
-                        log.debug("Phase 1 - Day {}: Deleted {} existing resource assignments",
+                        log.debug("Day {}: Deleted {} existing resource assignments",
                                         assignment.getDayOfWeek(), deletedCount);
 
                         // Then, insert the new resource
@@ -1817,98 +1816,20 @@ public class ClassService {
                                         assignment.getResourceId());
                         totalSuccessCount += assignedCount;
 
-                        log.debug("Phase 1 - Day {}: Assigned {} sessions to Resource ID: {}",
+                        log.debug("Day {}: Assigned {} sessions to Resource ID: {}",
                                         assignment.getDayOfWeek(), assignedCount, assignment.getResourceId());
                 }
 
-                log.info("Phase 1 complete: {}/{} sessions assigned successfully", totalSuccessCount, totalSessions);
-
-                // PHASE 2: Java Conflict Analysis (Detailed Path - find sessions that couldn't
-                // be assigned)
-                for (org.fyp.tmssep490be.dtos.classcreation.AssignResourcesRequest.ResourceAssignment assignment : request
-                                .getPattern()) {
-                        org.fyp.tmssep490be.entities.Resource resource = resourceRepository
-                                        .findById(assignment.getResourceId()).get();
-
-                        // Find sessions with resource conflicts for this day of week
-                        List<Object[]> conflictingSessions = sessionResourceRepository.findSessionsWithResourceConflict(
-                                        classId,
-                                        assignment.getDayOfWeek().intValue(),
-                                        assignment.getResourceId());
-
-                        log.debug("Phase 2 - Day {}: Found {} sessions with conflicts",
-                                        assignment.getDayOfWeek(), conflictingSessions.size());
-
-                        // Analyze each conflicting session and build conflict details
-                        for (Object[] conflictData : conflictingSessions) {
-                                Long sessionId = ((Number) conflictData[0]).longValue();
-                                LocalDate sessionDate = conflictData[1] instanceof java.sql.Date
-                                                ? ((java.sql.Date) conflictData[1]).toLocalDate()
-                                                : (LocalDate) conflictData[1];
-                                Long timeSlotId = conflictData[2] != null ? ((Number) conflictData[2]).longValue()
-                                                : null;
-                                Long conflictingClassId = conflictData[4] != null
-                                                ? ((Number) conflictData[4]).longValue()
-                                                : null;
-
-                                // Get detailed conflict information
-                                Object[] conflictDetails = sessionResourceRepository.findConflictingSessionDetails(
-                                                sessionId, assignment.getResourceId());
-
-                                String conflictingClassName = null;
-                                java.time.LocalTime timeStart = null;
-                                java.time.LocalTime timeEnd = null;
-
-                                if (conflictDetails != null && conflictDetails.length >= 3) {
-                                        conflictingClassName = (String) conflictDetails[2];
-                                        if (conflictDetails.length > 4 && conflictDetails[4] != null) {
-                                                timeStart = (java.time.LocalTime) conflictDetails[4];
-                                        }
-                                        if (conflictDetails.length > 5 && conflictDetails[5] != null) {
-                                                timeEnd = (java.time.LocalTime) conflictDetails[5];
-                                        }
-                                }
-
-                                String conflictReason = String.format(
-                                                "Tài nguyên '%s' đã được sử dụng bởi lớp '%s' vào ngày %s lúc %s-%s",
-                                                resource.getName(),
-                                                conflictingClassName != null ? conflictingClassName : "khác",
-                                                sessionDate,
-                                                timeStart != null ? timeStart : "N/A",
-                                                timeEnd != null ? timeEnd : "N/A");
-
-                                log.warn("CONFLICT DETECTED! Resource {} is already used by class {} on {} at time slot {}",
-                                                resource.getId(), conflictingClassName, sessionDate, timeSlotId);
-
-                                conflicts.add(org.fyp.tmssep490be.dtos.classcreation.AssignResourcesResponse.ResourceConflictDetail
-                                                .builder()
-                                                .sessionId(sessionId)
-                                                .date(sessionDate)
-                                                .dayOfWeek(assignment.getDayOfWeek())
-                                                .timeSlotTemplateId(timeSlotId)
-                                                .timeSlotStart(timeStart)
-                                                .timeSlotEnd(timeEnd)
-                                                .requestedResourceId(resource.getId())
-                                                .requestedResourceName(resource.getName())
-                                                .conflictType(org.fyp.tmssep490be.dtos.classcreation.AssignResourcesResponse.ConflictType.CLASS_BOOKING)
-                                                .conflictReason(conflictReason)
-                                                .conflictingClassId(conflictingClassId)
-                                                .conflictingClassName(conflictingClassName)
-                                                .build());
-                        }
-                }
-
-                log.info("Phase 2 complete: {} conflicts detected", conflicts.size());
-
                 long processingTime = System.currentTimeMillis() - startTime;
-                log.info("HYBRID resource assignment completed in {}ms", processingTime);
+                log.info("Resource assignment completed: {}/{} sessions in {}ms",
+                                totalSuccessCount, totalSessions, processingTime);
 
                 return org.fyp.tmssep490be.dtos.classcreation.AssignResourcesResponse.builder()
                                 .classId(classId)
                                 .totalSessions(totalSessions)
                                 .successCount(totalSuccessCount)
-                                .conflictCount(conflicts.size())
-                                .conflicts(conflicts)
+                                .conflictCount(0) // Always 0 since we only allow 100% available resources
+                                .conflicts(List.of()) // Empty list
                                 .processingTimeMs(processingTime)
                                 .build();
         }
