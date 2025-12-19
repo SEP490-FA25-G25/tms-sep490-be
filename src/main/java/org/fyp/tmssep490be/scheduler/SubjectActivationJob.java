@@ -6,6 +6,7 @@ import org.fyp.tmssep490be.entities.Subject;
 import org.fyp.tmssep490be.entities.enums.ApprovalStatus;
 import org.fyp.tmssep490be.entities.enums.SubjectStatus;
 import org.fyp.tmssep490be.repositories.SubjectRepository;
+import org.fyp.tmssep490be.services.SubjectService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import java.util.List;
  * 2. approvalStatus = APPROVED
  * 3. effectiveDate <= TODAY
  * - Updates status from PENDING_ACTIVATION to ACTIVE
+ * - Cascades ACTIVE status to Level and Curriculum
  *
  * Runs daily at 1:00 AM (configurable via application.yml)
  */
@@ -34,6 +36,7 @@ import java.util.List;
 public class SubjectActivationJob extends BaseScheduledJob {
 
     private final SubjectRepository subjectRepository;
+    private final SubjectService subjectService;
 
     /**
      * Activate subjects on their effective date.
@@ -68,6 +71,9 @@ public class SubjectActivationJob extends BaseScheduledJob {
 
                 subject.setStatus(SubjectStatus.ACTIVE);
                 subjectRepository.save(subject);
+
+                // Cascade ACTIVE status to Level and Curriculum
+                subjectService.activateLevelAndCurriculumIfNeeded(subject);
 
                 activatedCount++;
             }

@@ -1440,7 +1440,7 @@ INSERT INTO student_feedback (id, student_id, class_id, phase_id, is_feedback, s
 -- 1. Classroom Observation (Dự giờ) - Class 2 (Good)
 INSERT INTO qa_report (id, class_id, session_id, reported_by, report_type, status, content, created_at, updated_at) VALUES
 (1, 2, 105, 10, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Giáo viên chuẩn bị bài kỹ lưỡng. Tương tác với học viên tốt. Không khí lớp học sôi nổi. Đề xuất giáo viên chia sẻ kinh nghiệm giảng dạy cho các giáo viên mới.', '2025-12-05 10:00:00+07', '2025-12-05 10:00:00+07'),
-(2, 2, 110, 10, 'CLASSROOM_OBSERVATION', 'SUBMITTED', 'Học viên tham gia đầy đủ. Bài giảng đi đúng trọng tâm. Tiếp tục phát huy.', '2025-12-08 10:00:00+07', '2025-12-08 10:00:00+07');
+(2, 2, 110, 10, 'CLASSROOM_OBSERVATION', 'DRAFT', 'Học viên tham gia đầy đủ. Bài giảng đi đúng trọng tâm. Tiếp tục phát huy.', '2025-12-08 10:00:00+07', '2025-12-08 10:00:00+07');
 
 -- 2. Classroom Observation - Class 4 (Online Foundation)
 INSERT INTO qa_report (id, class_id, session_id, reported_by, report_type, status, content, created_at, updated_at) VALUES

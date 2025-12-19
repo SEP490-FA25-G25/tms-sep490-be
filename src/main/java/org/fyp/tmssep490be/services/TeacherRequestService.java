@@ -32,6 +32,7 @@ import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.entities.enums.NotificationType;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
+import org.fyp.tmssep490be.repositories.QAReportRepository;
 import org.fyp.tmssep490be.repositories.ResourceRepository;
 import org.fyp.tmssep490be.repositories.SessionRepository;
 import org.fyp.tmssep490be.repositories.SessionResourceRepository;
@@ -83,6 +84,7 @@ public class TeacherRequestService {
     private final UserAccountRepository userAccountRepository;
     private final ResourceRepository resourceRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
+    private final QAReportRepository qaReportRepository;
     private final NotificationService notificationService;
     private final EmailService emailService;
 
@@ -114,6 +116,16 @@ public class TeacherRequestService {
                 .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
         if (!isOwner) {
             throw new CustomException(ErrorCode.FORBIDDEN, "You are not assigned to this session");
+        }
+
+        // Kiểm tra xem giáo viên đã có request nào cho session này chưa (ngoại trừ REJECTED và CANCELLED)
+        // Giáo viên chỉ được tạo 1 request cho 1 session, trừ khi request đó bị từ chối hoặc hủy
+        boolean hasExistingRequest = teacherRequestRepository.existsByTeacherIdAndSessionIdExcludingRejectedAndCancelled(
+                teacher.getId(), session.getId());
+        if (hasExistingRequest) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, 
+                    "Bạn đã có yêu cầu đang chờ xử lý hoặc đã được duyệt cho buổi học này. " +
+                    "Chỉ có thể tạo yêu cầu mới sau khi yêu cầu trước đó bị từ chối hoặc hủy.");
         }
 
         // Chỉ cho phép tạo yêu cầu cho buổi PLANNED và còn đủ thời gian
@@ -978,6 +990,70 @@ public class TeacherRequestService {
         return userBranchesRepository.findBranchIdsByUserId(userId);
     }
 
+    /**
+     * Tự động hủy request nếu session date đã qua.
+     * Logic giống với TeacherRequestExpiryJob nhưng được gọi khi load request detail.
+     * Chỉ áp dụng cho PENDING và WAITING_CONFIRM requests.
+     */
+    private void autoCancelIfSessionDatePassed(TeacherRequest request) {
+        // Chỉ check cho PENDING và WAITING_CONFIRM
+        if (request.getStatus() != RequestStatus.PENDING && request.getStatus() != RequestStatus.WAITING_CONFIRM) {
+            return;
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDate sessionDate = getSessionDateForExpiry(request);
+
+        // Nếu session date đã qua, tự động hủy
+        if (sessionDate != null && sessionDate.isBefore(today)) {
+            long daysPassed = java.time.temporal.ChronoUnit.DAYS.between(sessionDate, today);
+            String expiryReason = String.format("Tự động hủy do buổi học đã qua %d ngày (hệ thống)", daysPassed);
+            
+            request.setStatus(RequestStatus.CANCELLED);
+            String existingNote = request.getNote();
+            if (existingNote != null && !existingNote.isEmpty()) {
+                request.setNote(existingNote + "\n" + expiryReason);
+            } else {
+                request.setNote(expiryReason);
+            }
+            teacherRequestRepository.save(request);
+            log.info("Auto-cancelled request {} because session date {} has passed ({} days ago)", 
+                    request.getId(), sessionDate, daysPassed);
+        }
+    }
+
+    /**
+     * Lấy session date để check expiry.
+     * Với RESCHEDULE: lấy ngày sớm hơn giữa session gốc và newSession (ngày gần hơn với hôm nay)
+     * Với các loại khác: lấy session.date
+     */
+    private LocalDate getSessionDateForExpiry(TeacherRequest request) {
+        LocalDate originalDate = null;
+        LocalDate newDate = null;
+
+        // Lấy date của session gốc
+        if (request.getSession() != null) {
+            originalDate = request.getSession().getDate();
+        }
+
+        // Với RESCHEDULE, lấy date của session mới
+        if (request.getRequestType() == TeacherRequestType.RESCHEDULE) {
+            if (request.getNewSession() != null) {
+                newDate = request.getNewSession().getDate();
+            } else if (request.getNewDate() != null) {
+                newDate = request.getNewDate();
+            }
+        }
+
+        // Nếu có cả 2 date, lấy ngày sớm hơn (gần hơn với hôm nay)
+        if (originalDate != null && newDate != null) {
+            return originalDate.isBefore(newDate) ? originalDate : newDate;
+        }
+
+        // Nếu chỉ có 1 trong 2, trả về date đó
+        return originalDate != null ? originalDate : newDate;
+    }
+
     //Lấy danh sách teachers cho academic staff (filter theo branch)
     @Transactional(readOnly = true)
     public List<TeacherListDTO> getTeachersForStaff(Long academicStaffUserId, Long branchId) {
@@ -1124,6 +1200,16 @@ public class TeacherRequestService {
                 .anyMatch(slot -> slot.getTeacher() != null && slot.getTeacher().getId().equals(teacher.getId()));
         if (!isOwner) {
             throw new CustomException(ErrorCode.FORBIDDEN, "Teacher is not assigned to this session");
+        }
+
+        // Kiểm tra xem giáo viên đã có request nào cho session này chưa (ngoại trừ REJECTED và CANCELLED)
+        // Giáo viên chỉ được tạo 1 request cho 1 session, trừ khi request đó bị từ chối hoặc hủy
+        boolean hasExistingRequest = teacherRequestRepository.existsByTeacherIdAndSessionIdExcludingRejectedAndCancelled(
+                teacher.getId(), session.getId());
+        if (hasExistingRequest) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, 
+                    "Giáo viên đã có yêu cầu đang chờ xử lý hoặc đã được duyệt cho buổi học này. " +
+                    "Chỉ có thể tạo yêu cầu mới sau khi yêu cầu trước đó bị từ chối hoặc hủy.");
         }
 
         LocalDate today = LocalDate.now();
@@ -1759,7 +1845,7 @@ public class TeacherRequestService {
     }
 
     //Lấy chi tiết request theo ID cho teacher
-    @Transactional(readOnly = true)
+    @Transactional
     public TeacherRequestResponseDTO getRequestById(Long requestId, Long userId) {
         log.info("Getting request {} for user {}", requestId, userId);
 
@@ -1773,6 +1859,9 @@ public class TeacherRequestService {
         if (request.getNewTimeSlot() != null) {
             request.getNewTimeSlot().getName();
         }
+
+        // Tự động hủy request nếu session date đã qua (giống logic trong expiry job)
+        autoCancelIfSessionDatePassed(request);
 
         // Kiểm tra quyền truy cập
         Teacher teacher = teacherRepository.findByUserAccountId(userId)
@@ -1790,7 +1879,7 @@ public class TeacherRequestService {
     }
 
     //Lấy chi tiết request theo ID cho academic staff (không cần kiểm tra authorization, đã filter theo branch ở list)
-    @Transactional(readOnly = true)
+    @Transactional
     public TeacherRequestResponseDTO getRequestForStaff(Long requestId, Long academicStaffUserId, Long branchId) {
         log.info("Getting request {} for staff {} with branch {}", requestId, academicStaffUserId, branchId);
 
@@ -1804,6 +1893,9 @@ public class TeacherRequestService {
         if (request.getNewTimeSlot() != null) {
             request.getNewTimeSlot().getName();
         }
+
+        // Tự động hủy request nếu session date đã qua (giống logic trong expiry job)
+        autoCancelIfSessionDatePassed(request);
 
         // Ensure academic staff only sees requests of teachers in the same branch
         Long teacherUserAccountId = request.getTeacher() != null && request.getTeacher().getUserAccount() != null
@@ -1930,6 +2022,17 @@ public class TeacherRequestService {
         if (sessionModality == null && classEntity != null && classEntity.getModality() != null) {
             sessionModality = classEntity.getModality().name();
         }
+        
+        // Kiểm tra reportSubmitted (giống logic trong TeacherScheduleService)
+        Boolean reportSubmitted = null;
+        if (session != null) {
+            long submittedReportCount = qaReportRepository.countSubmittedReportsBySessionId(session.getId());
+            boolean hasSubmittedReport = submittedReportCount > 0;
+            boolean hasDoneStatusWithNote = session.getStatus() == SessionStatus.DONE 
+                    && session.getTeacherNote() != null 
+                    && !session.getTeacherNote().trim().isEmpty();
+            reportSubmitted = hasSubmittedReport || hasDoneStatusWithNote;
+        }
 
         TeacherRequestResponseDTO.TeacherRequestResponseDTOBuilder builder = TeacherRequestResponseDTO.builder()
                 .id(request.getId())
@@ -1967,7 +2070,8 @@ public class TeacherRequestService {
                 .pendingRequestTypes(pendingRequestTypes)
                 .attendanceSubmitted(attendanceSubmitted)
                 .isMakeup(isMakeup)
-                .sessionModality(sessionModality);
+                .sessionModality(sessionModality)
+                .reportSubmitted(reportSubmitted);
 
         // Debug log to trace who is shown as handler in responses
         log.debug(

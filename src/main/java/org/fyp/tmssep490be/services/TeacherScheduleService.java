@@ -11,6 +11,7 @@ import org.fyp.tmssep490be.dtos.schedule.TeacherSessionDetailDTO;
 import org.fyp.tmssep490be.entities.*;
 import org.fyp.tmssep490be.entities.enums.AttendanceStatus;
 import org.fyp.tmssep490be.entities.enums.ResourceType;
+import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
@@ -32,6 +33,7 @@ public class TeacherScheduleService {
     private final SessionRepository sessionRepository;
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
     private final TeacherRequestRepository teacherRequestRepository;
+    private final QAReportRepository qaReportRepository;
     private final ObjectMapper objectMapper;
 
     public LocalDate getCurrentWeekStart() {
@@ -193,6 +195,12 @@ public class TeacherScheduleService {
                 .anyMatch(ss -> ss.getAttendanceStatus() != null && 
                                ss.getAttendanceStatus() != AttendanceStatus.PLANNED);
 
+        // Kiểm tra xem đã có báo cáo được nộp chưa:
+        // 1. Có QA report SUBMITTED, HOẶC
+        // 2. Session status = DONE và có teacherNote (teacher đã nộp báo cáo)
+        boolean reportSubmitted = qaReportRepository.countSubmittedReportsBySessionId(session.getId()) > 0
+                || (session.getStatus() == SessionStatus.DONE && session.getTeacherNote() != null && !session.getTeacherNote().trim().isEmpty());
+
         // Xây dựng attendance summary
         AttendanceSummaryDTO attendanceSummary = AttendanceSummaryDTO.builder()
                 .totalStudents(totalStudents)
@@ -203,7 +211,8 @@ public class TeacherScheduleService {
                 .attendanceSubmitted(attendanceSubmitted)
                 .build();
 
-        // Lấy request type của request được approved gần nhất (chỉ lấy request đầu tiên sau khi sort)
+        // Lấy request type đã approved cho session này
+        // Vì giáo viên chỉ được tạo 1 request cho 1 session, nên chỉ có tối đa 1 request approved
         List<String> pendingRequestTypes = teacherRequestRepository
                 .findBySessionIdAndApprovedStatus(session.getId())
                 .stream()
@@ -225,6 +234,7 @@ public class TeacherScheduleService {
                 .makeupInfo(makeupInfo)
                 .attendanceSummary(attendanceSummary)
                 .pendingRequestTypes(pendingRequestTypes)
+                .reportSubmitted(reportSubmitted)
                 .build();
     }
 
@@ -418,7 +428,14 @@ public class TeacherScheduleService {
                 .anyMatch(ss -> ss.getAttendanceStatus() != null && 
                                ss.getAttendanceStatus() != AttendanceStatus.PLANNED);
 
-        // Lấy request type của request được approved gần nhất (chỉ lấy request đầu tiên sau khi sort)
+        // Kiểm tra xem đã có báo cáo được nộp chưa:
+        // 1. Có QA report SUBMITTED, HOẶC
+        // 2. Session status = DONE và có teacherNote (teacher đã nộp báo cáo)
+        boolean reportSubmitted = qaReportRepository.countSubmittedReportsBySessionId(session.getId()) > 0
+                || (session.getStatus() == SessionStatus.DONE && session.getTeacherNote() != null && !session.getTeacherNote().trim().isEmpty());
+
+        // Lấy request type đã approved cho session này
+        // Vì giáo viên chỉ được tạo 1 request cho 1 session, nên chỉ có tối đa 1 request approved
         List<String> pendingRequestTypes = teacherRequestRepository
                 .findBySessionIdAndApprovedStatus(session.getId())
                 .stream()
@@ -457,6 +474,7 @@ public class TeacherScheduleService {
                 .absentCount(absentCount)
                 .attendanceSubmitted(attendanceSubmitted)
                 .pendingRequestTypes(pendingRequestTypes)
+                .reportSubmitted(reportSubmitted)
                 .build();
     }
 

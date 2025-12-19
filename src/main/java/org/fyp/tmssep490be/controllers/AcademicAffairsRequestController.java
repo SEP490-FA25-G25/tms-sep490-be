@@ -185,8 +185,9 @@ public class AcademicAffairsRequestController {
             @RequestParam(required = false) Integer weeksBack,
             @RequestParam(required = false) Boolean excludeRequested) {
 
+        // Academic Affairs có thể xem cả EXCUSED và ABSENT để tạo makeup request cho trường hợp đặc biệt
         MissedSessionsResponseDTO response = studentRequestService.getMissedSessionsForStudent(
-                studentId, weeksBack, excludeRequested);
+                studentId, weeksBack, excludeRequested, true);
 
         return ResponseEntity.ok(ResponseObject.success("Retrieved missed sessions successfully", response));
     }

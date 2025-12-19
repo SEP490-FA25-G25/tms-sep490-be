@@ -799,6 +799,14 @@ public class SubjectService {
             throw new IllegalStateException("Chỉ có thể gửi môn học ở trạng thái NHÁP hoặc BỊ TỪ CHỐI");
         }
 
+        // Validate effectiveDate is not in the past
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate effectiveDate = subject.getEffectiveDate();
+        if (effectiveDate != null && effectiveDate.isBefore(today)) {
+            throw new IllegalStateException(
+                    "Ngày hiệu lực không được là ngày trong quá khứ. Vui lòng quay lại Bước 1 để cập nhật ngày hiệu lực.");
+        }
+
         // Set updatedAt only when re-submitting after rejection
         if (subject.getApprovalStatus() == ApprovalStatus.REJECTED) {
             subject.setUpdatedAt(OffsetDateTime.now());
@@ -866,6 +874,10 @@ public class SubjectService {
         }
 
         subjectRepository.save(subject);
+
+        // Cascade ACTIVE status to Level and Curriculum if subject is activated
+        // immediately
+        activateLevelAndCurriculumIfNeeded(subject);
 
         // Send notification to Subject Leader (creator)
         sendApprovalNotificationToCreator(subject, true, null);
@@ -1062,23 +1074,18 @@ public class SubjectService {
         Subject originalSubject = subjectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
 
-        // Get curriculum and level codes
-        String curriculumCode = originalSubject.getCurriculum() != null ? originalSubject.getCurriculum().getCode()
-                : "UNKNOWN";
-        String levelCode = originalSubject.getLevel() != null ? originalSubject.getLevel().getCode() : "UNKNOWN";
-        int year = originalSubject.getEffectiveDate() != null
-                ? originalSubject.getEffectiveDate().getYear()
-                : java.time.LocalDate.now().getYear();
+        // Get the original code and calculate next version
+        String originalCode = originalSubject.getCode();
 
-        // Calculate new version
-        Integer nextVersion = getNextVersionNumber(curriculumCode, levelCode, year);
-        String logicalCode = String.format("%s-%s-%d", curriculumCode, levelCode, year);
-        String newCode = String.format("%s-V%d", logicalCode, nextVersion);
+        // Extract base code (remove existing version suffix if present, e.g., -V2, -V3)
+        String baseCode = originalCode.replaceAll("-V\\d+$", "");
 
-        // Ensure code uniqueness
+        // Find next available version number for this base code
+        int nextVersion = 2; // Start from V2
+        String newCode = baseCode + "-V" + nextVersion;
         while (subjectRepository.existsByCode(newCode)) {
             nextVersion++;
-            newCode = String.format("%s-V%d", logicalCode, nextVersion);
+            newCode = baseCode + "-V" + nextVersion;
         }
 
         // Get creator
@@ -1089,10 +1096,10 @@ public class SubjectService {
         Subject newSubject = new Subject();
         newSubject.setCurriculum(originalSubject.getCurriculum());
         newSubject.setLevel(originalSubject.getLevel());
-        newSubject.setLogicalSubjectCode(logicalCode);
+        newSubject.setLogicalSubjectCode(baseCode);
         newSubject.setVersion(nextVersion);
         newSubject.setCode(newCode);
-        newSubject.setName(originalSubject.getName() + " (V" + nextVersion + ")");
+        newSubject.setName(originalSubject.getName() + " (Bản sao)");
         newSubject.setDescription(originalSubject.getDescription());
         newSubject.setScoreScale(originalSubject.getScoreScale());
         newSubject.setTotalHours(originalSubject.getTotalHours());
@@ -1279,5 +1286,37 @@ public class SubjectService {
                 .effectiveDate(savedNewSubject.getEffectiveDate())
                 .createdAt(savedNewSubject.getCreatedAt())
                 .build();
+    }
+
+    // ========== CASCADE STATUS UPDATES ==========
+    /**
+     * Activates Level and Curriculum when Subject becomes ACTIVE.
+     * - Level becomes ACTIVE if at least one Subject is ACTIVE
+     * - Curriculum becomes ACTIVE if at least one Level is ACTIVE
+     * 
+     * @param subject The subject that was activated
+     */
+    public void activateLevelAndCurriculumIfNeeded(Subject subject) {
+        if (subject.getStatus() != SubjectStatus.ACTIVE) {
+            return; // Only cascade if subject is ACTIVE
+        }
+
+        // 1. Activate Level if needed
+        Level level = subject.getLevel();
+        if (level != null && level.getStatus() != LevelStatus.ACTIVE) {
+            level.setStatus(LevelStatus.ACTIVE);
+            levelRepository.save(level);
+            log.info("Level {} ('{}') activated because Subject {} ('{}') is ACTIVE",
+                    level.getId(), level.getName(), subject.getId(), subject.getName());
+
+            // 2. Activate Curriculum if needed
+            Curriculum curriculum = level.getCurriculum();
+            if (curriculum != null && curriculum.getStatus() != CurriculumStatus.ACTIVE) {
+                curriculum.setStatus(CurriculumStatus.ACTIVE);
+                curriculumRepository.save(curriculum);
+                log.info("Curriculum {} ('{}') activated because Level {} ('{}') is ACTIVE",
+                        curriculum.getId(), curriculum.getName(), level.getId(), level.getName());
+            }
+        }
     }
 }

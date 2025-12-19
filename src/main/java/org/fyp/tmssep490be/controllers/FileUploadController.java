@@ -32,7 +32,6 @@ public class FileUploadController {
             // Images
             "image/jpeg",
             "image/png",
-            "image/gif",
             "image/webp",
             // PDF
             "application/pdf",
@@ -48,7 +47,7 @@ public class FileUploadController {
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             // Images
-            ".jpg", ".jpeg", ".png", ".gif", ".webp",
+            ".jpg", ".jpeg", ".png", ".webp",
             // Documents
             ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx");
 
@@ -56,7 +55,7 @@ public class FileUploadController {
     private static final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Upload file", description = "Upload images (JPG, PNG, GIF, WebP) or documents (PDF, Word, Excel, PowerPoint) to S3. Max 20MB.")
+    @Operation(summary = "Upload file", description = "Upload images (JPG, PNG, WebP) or documents (PDF, Word, Excel, PowerPoint) to S3. Max 20MB.")
     public ResponseEntity<ResponseObject<Map<String, String>>> uploadFile(
             @RequestParam("file") MultipartFile file) {
 
@@ -111,7 +110,7 @@ public class FileUploadController {
         boolean validExtension = ALLOWED_EXTENSIONS.stream().anyMatch(lowerFilename::endsWith);
         if (!validExtension) {
             throw new CustomException(ErrorCode.INVALID_INPUT,
-                    "Định dạng file không được hỗ trợ. Chỉ cho phép: JPG, PNG, GIF, WebP, PDF, Word, Excel, PowerPoint");
+                    "Định dạng file không được hỗ trợ. Chỉ cho phép: JPG, PNG, WebP, PDF, Word, Excel, PowerPoint");
         }
 
         // Check content type (allow null for some browsers)
