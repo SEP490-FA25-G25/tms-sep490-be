@@ -1,6 +1,8 @@
 package org.fyp.tmssep490be.scheduler;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.entities.TeacherRequest;
 import org.fyp.tmssep490be.entities.enums.RequestStatus;
 import org.fyp.tmssep490be.entities.enums.TeacherRequestType;
@@ -10,6 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -27,6 +30,7 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @ConditionalOnProperty(
     prefix = "tms.scheduler.jobs.teacher-request-expiry",
     name = "enabled",
@@ -36,12 +40,30 @@ import java.util.List;
 public class TeacherRequestExpiryJob extends BaseScheduledJob {
 
     private final TeacherRequestRepository teacherRequestRepository;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${tms.scheduler.jobs.teacher-request-expiry.pending-expiry-days:7}")
     private int pendingExpiryDays;
 
     @Value("${tms.scheduler.jobs.teacher-request-expiry.waiting-confirm-expiry-days:3}")
     private int waitingConfirmExpiryDays;
+
+    @PostConstruct
+    public void expireOnStartup() {
+        log.info("Server startup: Checking for expired teacher requests that need to be cancelled");
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                try {
+                    expireOldTeacherRequests();
+                } catch (Exception e) {
+                    log.error("Error expiring teacher requests on startup", e);
+                    status.setRollbackOnly();
+                }
+            });
+        } catch (Exception e) {
+            log.error("Error expiring teacher requests on startup: {}", e.getMessage(), e);
+        }
+    }
 
     @Scheduled(cron = "${tms.scheduler.jobs.teacher-request-expiry.cron:0 30 3 * * ?}")
     @Transactional

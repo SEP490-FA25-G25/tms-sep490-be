@@ -1,5 +1,6 @@
 package org.fyp.tmssep490be.scheduler;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.entities.Session;
@@ -11,6 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -45,6 +47,24 @@ import java.util.List;
 public class RequestExpiryJob extends BaseScheduledJob {
 
     private final StudentRequestRepository studentRequestRepository;
+    private final TransactionTemplate transactionTemplate;
+
+    @PostConstruct
+    public void expireOnStartup() {
+        log.info("Server startup: Checking for expired student requests that need to be cancelled");
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                try {
+                    expireOldStudentRequests();
+                } catch (Exception e) {
+                    log.error("Error expiring student requests on startup", e);
+                    status.setRollbackOnly();
+                }
+            });
+        } catch (Exception e) {
+            log.error("Error expiring student requests on startup: {}", e.getMessage(), e);
+        }
+    }
 
     @Scheduled(cron = "${tms.scheduler.jobs.request-expiry.cron:0 0 3 * * ?}")
     @Transactional

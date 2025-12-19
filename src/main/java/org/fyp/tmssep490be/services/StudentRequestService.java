@@ -660,6 +660,9 @@ public class StudentRequestService {
             throw new BusinessRuleException("INVALID_STATUS", "Only pending requests can be approved");
         }
 
+        // CRITICAL VALIDATION: Prevent approval if session has already passed
+        validateSessionNotPassed(request);
+
         UserAccount decidedBy = userAccountRepository.findById(decidedById)
                 .orElseThrow(() -> new ResourceNotFoundException("Deciding user not found"));
 
@@ -2453,7 +2456,7 @@ public class StudentRequestService {
      * Send notification to student when transfer is executed successfully
      */
     @Async("emailTaskExecutor")
-    private void sendTransferExecutionNotifications(StudentRequest request) {
+    protected void sendTransferExecutionNotifications(StudentRequest request) {
         String oldClassCode = request.getCurrentClass().getCode();
         String newClassCode = request.getTargetClass().getCode();
         
@@ -2482,7 +2485,7 @@ public class StudentRequestService {
     }
 
     @Async("emailTaskExecutor")
-    private void sendOnBehalfCreationNotifications(StudentRequest request) {
+    protected void sendOnBehalfCreationNotifications(StudentRequest request) {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
             String requestTypeName = getRequestTypeName(request.getRequestType());
@@ -2602,7 +2605,7 @@ public class StudentRequestService {
      * Send notification and email to student when request is approved
      */
     @Async("emailTaskExecutor")
-    private void sendApprovalNotificationsToStudent(StudentRequest request) {
+    protected void sendApprovalNotificationsToStudent(StudentRequest request) {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
             String requestTypeName = getRequestTypeName(request.getRequestType());
@@ -2664,7 +2667,7 @@ public class StudentRequestService {
      * Send notification and email to student when request is rejected
      */
     @Async("emailTaskExecutor")
-    private void sendRejectionNotificationsToStudent(StudentRequest request, String rejectionReason) {
+    protected void sendRejectionNotificationsToStudent(StudentRequest request, String rejectionReason) {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
             String requestTypeName = getRequestTypeName(request.getRequestType());
@@ -2939,5 +2942,109 @@ public class StudentRequestService {
         }
         
         return message.toString();
+    }
+
+    /**
+     * CRITICAL BUSINESS RULE: Validate that session has not passed before approving request.
+     * This ensures requests cannot be approved for past sessions.
+     * 
+     * For ABSENCE: Check targetSession datetime
+     * For MAKEUP: Check makeupSession datetime  
+     * 
+     * Note: TRANSFER is NOT validated here because:
+     * - TRANSFER requests are created by AA on-behalf and auto-approved immediately
+     * - There's no flow where student creates TRANSFER -> AA approves later
+     * 
+     * Logic: Session is considered "passed" when session end time has passed.
+     * Example: Session 14:00-16:30 on 19/12 → cannot approve after 16:30 on 19/12
+     */
+    private void validateSessionNotPassed(StudentRequest request) {
+        // Skip validation for TRANSFER - AA on-behalf auto-approved
+        if (request.getRequestType() == StudentRequestType.TRANSFER) {
+            return;
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        Session relevantSession = null;
+        String sessionType = "";
+
+        switch (request.getRequestType()) {
+            case ABSENCE:
+                relevantSession = request.getTargetSession();
+                sessionType = "buổi học bị nghỉ";
+                break;
+            case MAKEUP:
+                relevantSession = request.getMakeupSession();
+                sessionType = "buổi học bù";
+                break;
+            default:
+                return; // Unknown type, skip validation
+        }
+
+        if (relevantSession == null || relevantSession.getDate() == null) {
+            return; // No session to validate
+        }
+
+        LocalDate sessionDate = relevantSession.getDate();
+        LocalTime sessionStartTime = null;
+        
+        // Get session START time from TimeSlotTemplate
+        if (relevantSession.getTimeSlotTemplate() != null 
+            && relevantSession.getTimeSlotTemplate().getStartTime() != null) {
+            sessionStartTime = relevantSession.getTimeSlotTemplate().getStartTime();
+        }
+
+        boolean sessionStarted = false;
+        String errorMessage = "";
+
+        if (sessionStartTime != null) {
+            // Check với DATE + START TIME: session đã bắt đầu thì không được approve
+            OffsetDateTime sessionStartDateTime = OffsetDateTime.of(
+                sessionDate, 
+                sessionStartTime, 
+                now.getOffset()
+            );
+            
+            if (sessionStartDateTime.isBefore(now) || sessionStartDateTime.isEqual(now)) {
+                sessionStarted = true;
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+                String dateTimeStr = sessionStartDateTime.format(formatter);
+                long minutesPassed = java.time.Duration.between(sessionStartDateTime, now).toMinutes();
+                
+                if (minutesPassed < 60) {
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã bắt đầu %d phút trước (lúc %s).", 
+                                      sessionType, minutesPassed, dateTimeStr);
+                } else if (minutesPassed < 1440) { // < 24 hours
+                    long hoursPassed = minutesPassed / 60;
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã bắt đầu %d giờ trước (lúc %s).", 
+                                      sessionType, hoursPassed, dateTimeStr);
+                } else {
+                    long daysPassed = minutesPassed / 1440;
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã bắt đầu %d ngày trước (lúc %s).", 
+                                      sessionType, daysPassed, dateTimeStr);
+                }
+            }
+        } else {
+            // Fallback: Nếu không có time info, check theo date only
+            // Session is started if date <= today (conservative: same day = started)
+            if (!sessionDate.isAfter(now.toLocalDate())) {
+                sessionStarted = true;
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                String dateStr = sessionDate.format(formatter);
+                
+                if (sessionDate.isBefore(now.toLocalDate())) {
+                    long daysPassed = ChronoUnit.DAYS.between(sessionDate, now.toLocalDate());
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã qua %d ngày (ngày %s).", 
+                                      sessionType, daysPassed, dateStr);
+                } else {
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s diễn ra hôm nay (ngày %s) và không có thông tin giờ học.", 
+                                      sessionType, dateStr);
+                }
+            }
+        }
+
+        if (sessionStarted) {
+            throw new BusinessRuleException("SESSION_ALREADY_STARTED", errorMessage);
+        }
     }
 }
