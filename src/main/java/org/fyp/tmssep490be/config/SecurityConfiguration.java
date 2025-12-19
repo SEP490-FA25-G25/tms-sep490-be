@@ -69,9 +69,9 @@ public class SecurityConfiguration {
                 CorsConfiguration configuration = new CorsConfiguration();
                 configuration.setAllowedOrigins(
                                 List.of(
-                                        "http://localhost:5173",
                                         "https://tms-language.com",
-                                        "http://tms-language.com"
+                                        "http://tms-language.com",
+                                        "http://localhost:5173" // For local development only
                                 ));
                 configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
                 configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
