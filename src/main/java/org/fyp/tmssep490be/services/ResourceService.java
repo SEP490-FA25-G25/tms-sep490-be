@@ -114,7 +114,8 @@ public class ResourceService {
 
         // 5. Kiểm tra trùng tên
         if (resourceRepository.existsByBranchIdAndNameIgnoreCase(branchId, request.getName().trim())) {
-            throw new BusinessRuleException("Tên tài nguyên '" + request.getName() + "' đã tồn tại trong chi nhánh này");
+            throw new BusinessRuleException(
+                    "Tên tài nguyên '" + request.getName() + "' đã tồn tại trong chi nhánh này");
         }
 
         // 6. Validate type-specific fields
@@ -156,7 +157,7 @@ public class ResourceService {
 
     private void validateCapacity(ResourceRequestDTO request, boolean isVirtual) {
         if (request.getCapacity() != null) {
-            int maxCapacity = isVirtual ? 100 : 40;
+            int maxCapacity = isVirtual ? 100 : 50;
             if (request.getCapacity() <= 0) {
                 throw new BusinessRuleException("Sức chứa phải là số dương lớn hơn 0");
             }
@@ -164,7 +165,7 @@ public class ResourceService {
                 if (isVirtual) {
                     throw new BusinessRuleException("Sức chứa của phòng ảo (Zoom) tối đa là 100 người");
                 } else {
-                    throw new BusinessRuleException("Sức chứa của phòng học tối đa là 40 người");
+                    throw new BusinessRuleException("Sức chứa của phòng học tối đa là 50 người");
                 }
             }
         }
@@ -248,7 +249,8 @@ public class ResourceService {
             resource.setExpiryDate(request.getExpiryDate().isEmpty() ? null : LocalDate.parse(request.getExpiryDate()));
         }
         if (request.getRenewalDate() != null) {
-            resource.setRenewalDate(request.getRenewalDate().isEmpty() ? null : LocalDate.parse(request.getRenewalDate()));
+            resource.setRenewalDate(
+                    request.getRenewalDate().isEmpty() ? null : LocalDate.parse(request.getRenewalDate()));
         }
 
         if (resource.getCreatedBy() == null && userId != null) {
@@ -282,7 +284,8 @@ public class ResourceService {
         // Validate tên nếu thay đổi
         if (request.getName() != null && !request.getName().trim().isEmpty()) {
             if (resourceRepository.existsByBranchIdAndNameIgnoreCaseAndIdNot(branchId, request.getName().trim(), id)) {
-                throw new BusinessRuleException("Tên tài nguyên '" + request.getName() + "' đã tồn tại trong chi nhánh này");
+                throw new BusinessRuleException(
+                        "Tên tài nguyên '" + request.getName() + "' đã tồn tại trong chi nhánh này");
             }
         }
 
@@ -389,12 +392,11 @@ public class ResourceService {
         return sessions.stream().map(this::convertSessionToDTO).collect(Collectors.toList());
     }
 
-
-
     // ==================== HELPER METHODS ======================
 
     private List<Long> getBranchIdsForUser(Long userId) {
-        if (userId == null) return List.of();
+        if (userId == null)
+            return List.of();
         UserAccount user = userAccountRepository.findById(userId).orElse(null);
         if (user != null && !user.getUserBranches().isEmpty()) {
             return user.getUserBranches().stream()
