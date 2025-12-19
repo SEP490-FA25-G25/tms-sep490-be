@@ -21,6 +21,10 @@ import org.fyp.tmssep490be.entities.Role;
 import org.fyp.tmssep490be.entities.UserRole;
 import org.fyp.tmssep490be.entities.Branch;
 import org.fyp.tmssep490be.entities.UserBranches;
+import org.fyp.tmssep490be.entities.Teacher;
+import org.fyp.tmssep490be.repositories.TeacherRepository;
+import org.fyp.tmssep490be.entities.Student;
+import org.fyp.tmssep490be.repositories.StudentRepository;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -37,6 +41,8 @@ public class UserAccountService {
     private final UserRoleRepository userRoleRepository;
     private final UserBranchesRepository userBranchesRepository;
     private final EmailService emailService;
+    private final TeacherRepository teacherRepository;
+    private final StudentRepository studentRepository;
 
     @Transactional
     public UserResponse createUser(CreateUserRequest request) {
@@ -46,6 +52,16 @@ public class UserAccountService {
         // Kiểm tra xem email đã tồn tại chưa
         if (userAccountRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email đã tồn tại: " + request.getEmail());
+        }
+
+        // Kiểm tra chi nhánh bắt buộc cho các role không phải ADMIN/MANAGER
+        boolean hasGlobalRole = request.getRoleIds().stream().anyMatch(roleId -> {
+            Role role = roleRepository.findById(roleId).orElse(null);
+            return role != null && ("ADMIN".equals(role.getCode()) || "MANAGER".equals(role.getCode()));
+        });
+        
+        if (!hasGlobalRole && (request.getBranchIds() == null || request.getBranchIds().isEmpty())) {
+            throw new IllegalArgumentException("Chi nhánh là bắt buộc cho role này.");
         }
 
         // Tạo entity UserAccount từ request
@@ -79,7 +95,18 @@ public class UserAccountService {
         }
 
         // Gán branch cho user
-        if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
+        // ADMIN/MANAGER: tự động gán vào TẤT CẢ chi nhánh
+        if (hasGlobalRole) {
+            List<Branch> allBranches = branchRepository.findAll();
+            for (Branch branch : allBranches) {
+                UserBranches userBranch = new UserBranches();
+                userBranch.setUserAccount(user);
+                userBranch.setBranch(branch);
+                userBranchesRepository.save(userBranch);
+            }
+            log.info("ADMIN/MANAGER {} được gán vào {} chi nhánh", user.getFullName(), allBranches.size());
+        } else if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
+            // Các role khác: gán theo branch đã chọn
             for (Long branchId : request.getBranchIds()) {
                 Branch branch = branchRepository.findById(branchId)
                         .orElseThrow(() -> new IllegalArgumentException("Branch không tồn tại: " + branchId));
@@ -88,6 +115,24 @@ public class UserAccountService {
                 userBranch.setBranch(branch);
                 userBranchesRepository.save(userBranch);
             }
+        }
+
+        // Nếu user có role TEACHER, tự động tạo Teacher profile
+        boolean hasTeacherRole = request.getRoleIds().stream().anyMatch(roleId -> {
+            Role role = roleRepository.findById(roleId).orElse(null);
+            return role != null && "TEACHER".equals(role.getCode());
+        });
+        if (hasTeacherRole) {
+            createTeacherProfile(user);
+        }
+
+        // Nếu user có role STUDENT, tự động tạo Student profile
+        boolean hasStudentRole = request.getRoleIds().stream().anyMatch(roleId -> {
+            Role role = roleRepository.findById(roleId).orElse(null);
+            return role != null && "STUDENT".equals(role.getCode());
+        });
+        if (hasStudentRole) {
+            createStudentProfile(user);
         }
 
         // Lấy danh sách tên chi nhánh
@@ -260,13 +305,31 @@ public class UserAccountService {
     public UserResponse updateUserStatus(Long userId, String status) {
         log.info("Updating status for user {}: {}", userId, status);
 
+        // Lấy current user từ Security Context
+        Long currentUserId = getCurrentUserId();
+        
+        // Không cho phép tự inactive/suspend chính mình
+        UserStatus newStatus = UserStatus.valueOf(status);
+        if (userId.equals(currentUserId) && (newStatus == UserStatus.INACTIVE || newStatus == UserStatus.SUSPENDED)) {
+            throw new IllegalArgumentException("Không thể vô hiệu hóa hoặc tạm khóa tài khoản của chính mình.");
+        }
+
         UserAccount user = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User không tồn tại: " + userId));
 
-        user.setStatus(UserStatus.valueOf(status));
+        user.setStatus(newStatus);
         userAccountRepository.save(user);
 
         return mapToResponse(user);
+    }
+    
+    private Long getCurrentUserId() {
+        org.springframework.security.core.Authentication authentication = 
+            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof org.fyp.tmssep490be.security.UserPrincipal userPrincipal) {
+            return userPrincipal.getId();
+        }
+        throw new RuntimeException("Không xác định được người dùng hiện tại");
     }
 
     public boolean checkEmailExists(String email) {
@@ -357,6 +420,52 @@ public class UserAccountService {
                     user.getUserBranches().stream().map(ub -> ub.getBranch().getName()).collect(Collectors.toSet()) :
                     java.util.Collections.emptySet())
                 .build();
+    }
+
+    /**
+     * Tạo Teacher profile tự động khi tạo user với role TEACHER
+     */
+    private void createTeacherProfile(UserAccount user) {
+        String employeeCode = generateTeacherEmployeeCode();
+        
+        Teacher teacher = Teacher.builder()
+            .userAccount(user)
+            .employeeCode(employeeCode)
+            .hireDate(java.time.LocalDate.now())
+            .contractType("full-time")
+            .createdAt(java.time.OffsetDateTime.now())
+            .updatedAt(java.time.OffsetDateTime.now())
+            .build();
+        
+        teacherRepository.save(teacher);
+        log.info("Đã tạo Teacher profile cho user {} với mã nhân viên {}", 
+            user.getFullName(), employeeCode);
+    }
+
+    private String generateTeacherEmployeeCode() {
+        long count = teacherRepository.count() + 1;
+        return String.format("TCH-%03d", count);
+    }
+
+    /**
+     * Tạo Student profile tự động khi tạo user với role STUDENT
+     */
+    private void createStudentProfile(UserAccount user) {
+        String studentCode = generateStudentCode();
+        
+        Student student = Student.builder()
+            .userAccount(user)
+            .studentCode(studentCode)
+            .build();
+        
+        studentRepository.save(student);
+        log.info("Đã tạo Student profile cho user {} với mã học viên {}", 
+            user.getFullName(), studentCode);
+    }
+
+    private String generateStudentCode() {
+        long count = studentRepository.count() + 1;
+        return String.format("STD-%04d", count);
     }
 
 }

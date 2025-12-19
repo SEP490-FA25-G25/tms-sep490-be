@@ -57,6 +57,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -2394,6 +2395,9 @@ public class TeacherRequestService {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Request is not in PENDING status");
         }
 
+        // CRITICAL VALIDATION: Prevent approval if session has already passed
+        validateSessionNotPassedForApproval(request);
+
         // Kiểm tra quyền: academic staff phải có branch trùng với teacher
         List<Long> academicBranchIds = getBranchIdsForUser(academicStaffUserId);
         if (academicBranchIds.isEmpty()) {
@@ -3646,6 +3650,132 @@ public class TeacherRequestService {
 
         log.info("Request {} cancelled by teacher {} (user {})", requestId, request.getTeacher().getId(), userId);
         return mapToResponseDTO(request);
+    }
+
+    /**
+     * CRITICAL BUSINESS RULE: Validate that session has not passed before approving teacher request.
+     * This ensures requests cannot be approved for past sessions.
+     * 
+     * For REPLACEMENT: Check original session datetime
+     * For MODALITY_CHANGE: Check session datetime
+     * For RESCHEDULE: Check the earlier datetime between original session and new session
+     * 
+     * Logic: Session is considered "passed" when session end time has passed.
+     * Example: Session 14:00-16:30 on 19/12 → cannot approve after 16:30 on 19/12
+     */
+    private void validateSessionNotPassedForApproval(TeacherRequest request) {
+        OffsetDateTime now = OffsetDateTime.now();
+        Session relevantSession = null;
+        String sessionType = "";
+
+        switch (request.getRequestType()) {
+            case REPLACEMENT:
+            case MODALITY_CHANGE:
+                relevantSession = request.getSession();
+                sessionType = "buổi học gốc";
+                break;
+            case RESCHEDULE:
+                // For RESCHEDULE: check the earlier session (closer to now)
+                Session originalSession = request.getSession();
+                Session newSession = request.getNewSession();
+                
+                if (originalSession != null && newSession != null) {
+                    // Compare which one starts first (earlier session takes priority)
+                    OffsetDateTime origStart = getSessionStartDateTime(originalSession, now);
+                    OffsetDateTime newStart = getSessionStartDateTime(newSession, now);
+                    
+                    if (origStart != null && newStart != null) {
+                        if (origStart.isBefore(newStart)) {
+                            relevantSession = originalSession;
+                            sessionType = "buổi học gốc";
+                        } else {
+                            relevantSession = newSession;
+                            sessionType = "buổi học mới";
+                        }
+                    } else if (origStart != null) {
+                        relevantSession = originalSession;
+                        sessionType = "buổi học gốc";
+                    } else if (newStart != null) {
+                        relevantSession = newSession;
+                        sessionType = "buổi học mới";
+                    }
+                } else if (originalSession != null) {
+                    relevantSession = originalSession;
+                    sessionType = "buổi học gốc";
+                } else if (newSession != null) {
+                    relevantSession = newSession;
+                    sessionType = "buổi học mới";
+                }
+                break;
+        }
+
+        if (relevantSession == null || relevantSession.getDate() == null) {
+            return; // No session to validate
+        }
+        
+        OffsetDateTime sessionStartDateTime = getSessionStartDateTime(relevantSession, now);
+        
+        if (sessionStartDateTime != null && (sessionStartDateTime.isBefore(now) || sessionStartDateTime.isEqual(now))) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            String dateTimeStr = sessionStartDateTime.format(formatter);
+            long minutesPassed = java.time.Duration.between(sessionStartDateTime, now).toMinutes();
+            
+            String errorMessage;
+            if (minutesPassed < 60) {
+                errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã bắt đầu %d phút trước (lúc %s).", 
+                                  sessionType, minutesPassed, dateTimeStr);
+            } else if (minutesPassed < 1440) { // < 24 hours
+                long hoursPassed = minutesPassed / 60;
+                errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã bắt đầu %d giờ trước (lúc %s).", 
+                                  sessionType, hoursPassed, dateTimeStr);
+            } else {
+                long daysPassed = minutesPassed / 1440;
+                errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã bắt đầu %d ngày trước (lúc %s).", 
+                                  sessionType, daysPassed, dateTimeStr);
+            }
+            
+            throw new CustomException(ErrorCode.INVALID_INPUT, errorMessage);
+        } else if (sessionStartDateTime == null) {
+            // Fallback: check date only if no time info (conservative: same day = started)
+            LocalDate sessionDate = relevantSession.getDate();
+            if (!sessionDate.isAfter(now.toLocalDate())) {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                String dateStr = sessionDate.format(formatter);
+                
+                String errorMessage;
+                if (sessionDate.isBefore(now.toLocalDate())) {
+                    long daysPassed = ChronoUnit.DAYS.between(sessionDate, now.toLocalDate());
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã qua %d ngày (ngày %s).", 
+                                      sessionType, daysPassed, dateStr);
+                } else {
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s diễn ra hôm nay (ngày %s) và không có thông tin giờ học.", 
+                                      sessionType, dateStr);
+                }
+                
+                throw new CustomException(ErrorCode.INVALID_INPUT, errorMessage);
+            }
+        }
+    }
+
+    /**
+     * Helper method to get session START datetime.
+     * Returns null if time info is not available.
+     */
+    private OffsetDateTime getSessionStartDateTime(Session session, OffsetDateTime reference) {
+        if (session == null || session.getDate() == null) {
+            return null;
+        }
+        
+        LocalTime startTime = null;
+        if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null) {
+            startTime = session.getTimeSlotTemplate().getStartTime();
+        }
+        
+        if (startTime != null) {
+            return OffsetDateTime.of(session.getDate(), startTime, reference.getOffset());
+        }
+        
+        return null;
     }
 }
 

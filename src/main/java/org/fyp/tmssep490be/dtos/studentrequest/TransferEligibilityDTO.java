@@ -38,6 +38,9 @@ public class TransferEligibilityDTO {
         private String scheduleInfo;        // e.g. "Mon, Wed, Fri - 2025-01-01 to 2025-06-01"
         private String scheduleTime;        // e.g. "T2 07:00-08:30, T4 07:00-08:30, T6 07:00-08:30"
         
+        private Integer currentEnrollment;
+        private Integer maxCapacity;
+        
         private TransferQuota transferQuota;
         private Boolean hasPendingTransfer;
         private Boolean canTransfer;

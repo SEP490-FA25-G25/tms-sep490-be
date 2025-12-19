@@ -119,11 +119,11 @@ public class S3StorageService {
             return String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, fileName);
 
         } catch (IOException e) {
-            log.error("Error creating temp file or transferring content", e);
-            throw new RuntimeException("Failed to prepare file for upload", e);
+            log.error("Error creating temp file or transferring content: {} - {}", e.getClass().getSimpleName(), e.getMessage(), e);
+            throw new RuntimeException("Failed to prepare file for upload: " + e.getMessage(), e);
         } catch (Exception e) {
-            log.error("Error uploading file to S3", e);
-            throw new RuntimeException("Failed to upload file to S3", e);
+            log.error("Error uploading file to S3: {} - {}", e.getClass().getSimpleName(), e.getMessage(), e);
+            throw new RuntimeException("Failed to upload file to S3: " + e.getMessage(), e);
         } finally {
             // Clean up temporary file
             if (tempFile != null) {

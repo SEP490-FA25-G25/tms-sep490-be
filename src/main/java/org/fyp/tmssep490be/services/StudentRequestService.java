@@ -319,6 +319,12 @@ public class StudentRequestService {
             effectiveDateStr = request.getTargetSession().getDate().toString();
         }
         
+        // For MAKEUP requests, calculate days until MAKEUP session (the actual deadline)
+        // For ABSENCE/TRANSFER, calculate days until TARGET session
+        Session sessionForCountdown = (request.getRequestType() == StudentRequestType.MAKEUP && request.getMakeupSession() != null)
+                ? request.getMakeupSession()
+                : request.getTargetSession();
+        
         return AARequestResponseDTO.builder()
                 .id(request.getId())
                 .requestType(request.getRequestType() != null ? request.getRequestType().toString() : null)
@@ -335,7 +341,7 @@ public class StudentRequestService {
                 .submittedBy(mapUserToAAUserSummary(request.getSubmittedBy()))
                 .decidedAt(request.getDecidedAt())
                 .decidedBy(mapUserToAAUserSummary(request.getDecidedBy()))
-                .daysUntilSession(calculateDaysUntilSession(request.getTargetSession()))
+                .daysUntilSession(calculateDaysUntilSession(sessionForCountdown))
                 .attendanceStats(calculateAttendanceStats(request))
                 .build();
     }
@@ -653,6 +659,9 @@ public class StudentRequestService {
         if (!request.getStatus().equals(RequestStatus.PENDING)) {
             throw new BusinessRuleException("INVALID_STATUS", "Only pending requests can be approved");
         }
+
+        // CRITICAL VALIDATION: Prevent approval if session has already passed
+        validateSessionNotPassed(request);
 
         UserAccount decidedBy = userAccountRepository.findById(decidedById)
                 .orElseThrow(() -> new ResourceNotFoundException("Deciding user not found"));
@@ -1896,7 +1905,39 @@ public class StudentRequestService {
             throw new BusinessRuleException("PAST_SESSION", "Target session must be in the future");
         }
 
-        // 6b. Check schedule conflicts with other classes (including makeup sessions)
+        // 6b. Check for completed makeup sessions that would become orphaned
+        // If student already attended a makeup for a future session (originalSession.date >= joinDate),
+        // block transfer to preserve attendance data integrity
+        LocalDate joinDate = targetSession.getDate();
+        List<StudentSession> completedMakeups = studentSessionRepository.findAllByStudentId(studentId)
+                .stream()
+                .filter(ss -> Boolean.TRUE.equals(ss.getIsMakeup()))
+                .filter(ss -> ss.getAttendanceStatus() == AttendanceStatus.PRESENT)
+                .filter(ss -> ss.getOriginalSession() != null)
+                .filter(ss -> ss.getOriginalSession().getClassEntity().getId().equals(dto.getCurrentClassId()))
+                .filter(ss -> !ss.getOriginalSession().getDate().isBefore(joinDate)) // originalSession >= joinDate
+                .toList();
+        
+        if (!completedMakeups.isEmpty()) {
+            // Get the earliest originalSession that blocks transfer
+            StudentSession blockingMakeup = completedMakeups.stream()
+                    .min(Comparator.comparing(ss -> ss.getOriginalSession().getDate()))
+                    .orElse(null);
+            
+            if (blockingMakeup != null) {
+                Session originalSession = blockingMakeup.getOriginalSession();
+                throw new BusinessRuleException("MAKEUP_CONFLICT",
+                        String.format("Không thể chuyển lớp từ buổi này. Học viên đã học bù cho buổi %s (%s) nhưng buổi đó chưa diễn ra. " +
+                                "Vui lòng chọn buổi bắt đầu sau ngày %s.",
+                                originalSession.getSubjectSession() != null 
+                                        ? originalSession.getSubjectSession().getSequenceNo() 
+                                        : originalSession.getId(),
+                                originalSession.getDate(),
+                                originalSession.getDate()));
+            }
+        }
+
+        // 6c. Check schedule conflicts with other classes (including makeup sessions)
         List<Session> targetClassFutureSessions = sessionRepository.findByClassEntityIdAndDateAfterOrEqual(
                 dto.getTargetClassId(), targetSession.getDate());
         validateScheduleConflictsForTransfer(studentId, dto.getCurrentClassId(), dto.getTargetClassId(), targetClassFutureSessions);
@@ -2027,8 +2068,8 @@ public class StudentRequestService {
         log.info("Created new enrollment {} for target class {} (capacityOverride: {})", 
                 newEnrollment.getId(), targetClass.getId(), newEnrollment.getCapacityOverride());
 
-        // 4. DELETE sessions from old class that would conflict with new class schedule
-        // Use datetime comparison: only delete sessions that start AT or AFTER joinSession's start time
+        // 4. Identify sessions from old class that will be removed
+        // Use datetime comparison: only remove sessions that start AT or AFTER joinSession's start time
         // This allows student to attend morning class in old class even if joining evening class in new class on same day
         List<StudentSession> allOldClassSessions = studentSessionRepository
                 .findByStudentIdAndClassEntityId(studentId, currentClass.getId());
@@ -2061,6 +2102,43 @@ public class StudentRequestService {
                 })
                 .toList();
 
+        // 4b. Clean up related requests and makeup sessions BEFORE deleting StudentSessions
+        // Get session IDs that will be removed
+        List<Long> removedSessionIds = futureOldSessions.stream()
+                .map(ss -> ss.getSession().getId())
+                .toList();
+        
+        if (!removedSessionIds.isEmpty()) {
+            // Delete ABSENCE/MAKEUP requests targeting these sessions (no longer relevant after transfer)
+            List<StudentRequest> relatedRequests = studentRequestRepository
+                    .findByStudentIdAndTargetSessionIdInAndRequestTypeIn(
+                            studentId, 
+                            removedSessionIds, 
+                            List.of(StudentRequestType.ABSENCE, StudentRequestType.MAKEUP));
+            
+            if (!relatedRequests.isEmpty()) {
+                log.info("Deleting {} related ABSENCE/MAKEUP requests for removed sessions", relatedRequests.size());
+                studentRequestRepository.deleteAll(relatedRequests);
+            }
+            
+            // Delete makeup StudentSessions at OTHER classes that reference these sessions as originalSession
+            // (Student no longer needs to make up for sessions they won't attend)
+            // EXCEPTION: Keep makeup sessions that student already attended (PRESENT) - preserve attendance record
+            List<StudentSession> orphanedMakeupSessions = studentSessionRepository
+                    .findMakeupSessionsByOriginalSessionIds(removedSessionIds)
+                    .stream()
+                    .filter(ss -> ss.getStudent().getId().equals(studentId))
+                    .filter(ss -> ss.getAttendanceStatus() != AttendanceStatus.PRESENT) // Don't delete attended sessions
+                    .toList();
+            
+            if (!orphanedMakeupSessions.isEmpty()) {
+                log.info("Deleting {} orphaned makeup StudentSessions referencing removed sessions (skipping attended ones)", 
+                        orphanedMakeupSessions.size());
+                studentSessionRepository.deleteAll(orphanedMakeupSessions);
+            }
+        }
+
+        // 4c. Delete the identified old class StudentSessions
         studentSessionRepository.deleteAll(futureOldSessions);
 
         log.info("Deleted {} future StudentSessions from old class (sessions on/after {})", 
@@ -2115,6 +2193,12 @@ public class StudentRequestService {
 
         List<Session> classSessions = sessionRepository.findByClassEntityIdOrderByDateAsc(classEntity.getId());
 
+        // Calculate current enrollment count (ENROLLED only)
+        int currentEnrollment = enrollmentRepository.countByClassIdAndStatus(
+                classEntity.getId(), 
+                EnrollmentStatus.ENROLLED
+        );
+
         List<TransferEligibilityDTO.SessionInfo> allSessions = classSessions.stream()
                 .map(session -> {
                     String timeSlot = "Chưa xếp lịch";
@@ -2154,6 +2238,8 @@ public class StudentRequestService {
                 .enrollmentDate(enrollment.getEnrolledAt() != null ? enrollment.getEnrolledAt().toLocalDate().toString() : null)
                 .scheduleInfo(scheduleInfo)
                 .scheduleTime(scheduleTime)
+                .currentEnrollment(currentEnrollment)
+                .maxCapacity(classEntity.getMaxCapacity())
                 .allSessions(allSessions)
                 .transferQuota(TransferEligibilityDTO.TransferQuota.builder()
                         .used(used)
@@ -2370,7 +2456,7 @@ public class StudentRequestService {
      * Send notification to student when transfer is executed successfully
      */
     @Async("emailTaskExecutor")
-    private void sendTransferExecutionNotifications(StudentRequest request) {
+    protected void sendTransferExecutionNotifications(StudentRequest request) {
         String oldClassCode = request.getCurrentClass().getCode();
         String newClassCode = request.getTargetClass().getCode();
         
@@ -2399,7 +2485,7 @@ public class StudentRequestService {
     }
 
     @Async("emailTaskExecutor")
-    private void sendOnBehalfCreationNotifications(StudentRequest request) {
+    protected void sendOnBehalfCreationNotifications(StudentRequest request) {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
             String requestTypeName = getRequestTypeName(request.getRequestType());
@@ -2519,7 +2605,7 @@ public class StudentRequestService {
      * Send notification and email to student when request is approved
      */
     @Async("emailTaskExecutor")
-    private void sendApprovalNotificationsToStudent(StudentRequest request) {
+    protected void sendApprovalNotificationsToStudent(StudentRequest request) {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
             String requestTypeName = getRequestTypeName(request.getRequestType());
@@ -2581,7 +2667,7 @@ public class StudentRequestService {
      * Send notification and email to student when request is rejected
      */
     @Async("emailTaskExecutor")
-    private void sendRejectionNotificationsToStudent(StudentRequest request, String rejectionReason) {
+    protected void sendRejectionNotificationsToStudent(StudentRequest request, String rejectionReason) {
         try {
             Long studentUserId = request.getStudent().getUserAccount().getId();
             String requestTypeName = getRequestTypeName(request.getRequestType());
@@ -2856,5 +2942,109 @@ public class StudentRequestService {
         }
         
         return message.toString();
+    }
+
+    /**
+     * CRITICAL BUSINESS RULE: Validate that session has not passed before approving request.
+     * This ensures requests cannot be approved for past sessions.
+     * 
+     * For ABSENCE: Check targetSession datetime
+     * For MAKEUP: Check makeupSession datetime  
+     * 
+     * Note: TRANSFER is NOT validated here because:
+     * - TRANSFER requests are created by AA on-behalf and auto-approved immediately
+     * - There's no flow where student creates TRANSFER -> AA approves later
+     * 
+     * Logic: Session is considered "passed" when session end time has passed.
+     * Example: Session 14:00-16:30 on 19/12 → cannot approve after 16:30 on 19/12
+     */
+    private void validateSessionNotPassed(StudentRequest request) {
+        // Skip validation for TRANSFER - AA on-behalf auto-approved
+        if (request.getRequestType() == StudentRequestType.TRANSFER) {
+            return;
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        Session relevantSession = null;
+        String sessionType = "";
+
+        switch (request.getRequestType()) {
+            case ABSENCE:
+                relevantSession = request.getTargetSession();
+                sessionType = "buổi học bị nghỉ";
+                break;
+            case MAKEUP:
+                relevantSession = request.getMakeupSession();
+                sessionType = "buổi học bù";
+                break;
+            default:
+                return; // Unknown type, skip validation
+        }
+
+        if (relevantSession == null || relevantSession.getDate() == null) {
+            return; // No session to validate
+        }
+
+        LocalDate sessionDate = relevantSession.getDate();
+        LocalTime sessionStartTime = null;
+        
+        // Get session START time from TimeSlotTemplate
+        if (relevantSession.getTimeSlotTemplate() != null 
+            && relevantSession.getTimeSlotTemplate().getStartTime() != null) {
+            sessionStartTime = relevantSession.getTimeSlotTemplate().getStartTime();
+        }
+
+        boolean sessionStarted = false;
+        String errorMessage = "";
+
+        if (sessionStartTime != null) {
+            // Check với DATE + START TIME: session đã bắt đầu thì không được approve
+            OffsetDateTime sessionStartDateTime = OffsetDateTime.of(
+                sessionDate, 
+                sessionStartTime, 
+                now.getOffset()
+            );
+            
+            if (sessionStartDateTime.isBefore(now) || sessionStartDateTime.isEqual(now)) {
+                sessionStarted = true;
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+                String dateTimeStr = sessionStartDateTime.format(formatter);
+                long minutesPassed = java.time.Duration.between(sessionStartDateTime, now).toMinutes();
+                
+                if (minutesPassed < 60) {
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã bắt đầu %d phút trước (lúc %s).", 
+                                      sessionType, minutesPassed, dateTimeStr);
+                } else if (minutesPassed < 1440) { // < 24 hours
+                    long hoursPassed = minutesPassed / 60;
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã bắt đầu %d giờ trước (lúc %s).", 
+                                      sessionType, hoursPassed, dateTimeStr);
+                } else {
+                    long daysPassed = minutesPassed / 1440;
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã bắt đầu %d ngày trước (lúc %s).", 
+                                      sessionType, daysPassed, dateTimeStr);
+                }
+            }
+        } else {
+            // Fallback: Nếu không có time info, check theo date only
+            // Session is started if date <= today (conservative: same day = started)
+            if (!sessionDate.isAfter(now.toLocalDate())) {
+                sessionStarted = true;
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                String dateStr = sessionDate.format(formatter);
+                
+                if (sessionDate.isBefore(now.toLocalDate())) {
+                    long daysPassed = ChronoUnit.DAYS.between(sessionDate, now.toLocalDate());
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s đã qua %d ngày (ngày %s).", 
+                                      sessionType, daysPassed, dateStr);
+                } else {
+                    errorMessage = String.format("Không thể duyệt yêu cầu vì %s diễn ra hôm nay (ngày %s) và không có thông tin giờ học.", 
+                                      sessionType, dateStr);
+                }
+            }
+        }
+
+        if (sessionStarted) {
+            throw new BusinessRuleException("SESSION_ALREADY_STARTED", errorMessage);
+        }
     }
 }

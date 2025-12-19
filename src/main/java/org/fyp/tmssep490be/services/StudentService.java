@@ -1379,5 +1379,24 @@ public class StudentService {
         log.info("Successfully deleted skill assessment {} for student {}", assessmentId, studentId);
     }
 
+    public List<AssessorDTO> getAssessorsByBranch(Long branchId) {
+        log.debug("Getting assessors (teachers) for branch {}", branchId);
+        
+        // Validate branch exists
+        branchRepository.findById(branchId)
+                .orElseThrow(() -> new CustomException(ErrorCode.BRANCH_NOT_FOUND));
+        
+        List<UserAccount> teachers = userAccountRepository.findActiveTeachersByBranchId(branchId);
+        
+        return teachers.stream()
+                .map(teacher -> AssessorDTO.builder()
+                        .userId(teacher.getId())
+                        .fullName(teacher.getFullName())
+                        .email(teacher.getEmail())
+                        .phone(teacher.getPhone())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
 }
 
