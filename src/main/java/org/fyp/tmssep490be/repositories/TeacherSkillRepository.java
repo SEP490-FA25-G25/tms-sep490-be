@@ -26,9 +26,9 @@ public interface TeacherSkillRepository extends JpaRepository<TeacherSkill, Teac
     @Query("SELECT ts.id.teacherId, ts.specialization FROM TeacherSkill ts WHERE ts.id.teacherId IN :teacherIds")
     List<Object[]> findSpecializationsByTeacherIds(@Param("teacherIds") List<Long> teacherIds);
 
-    // Tìm tất cả chi tiết skill (skill, specialization, level) của nhiều giáo viên
-    // Trả về danh sách tuple [teacherId, skill, specialization, level]
-    @Query("SELECT ts.id.teacherId, ts.id.skill, ts.specialization, ts.level FROM TeacherSkill ts WHERE ts.id.teacherId IN :teacherIds ORDER BY ts.id.teacherId, ts.specialization, ts.id.skill")
+    // Tìm tất cả chi tiết skill (skill, specialization, level, language) của nhiều
+    // giáo viên
+    // Trả về danh sách tuple [teacherId, skill, specialization, level, language]
+    @Query("SELECT ts.id.teacherId, ts.id.skill, ts.specialization, ts.level, ts.language FROM TeacherSkill ts WHERE ts.id.teacherId IN :teacherIds ORDER BY ts.id.teacherId, ts.specialization, ts.id.skill")
     List<Object[]> findSkillDetailsByTeacherIds(@Param("teacherIds") List<Long> teacherIds);
 }
-

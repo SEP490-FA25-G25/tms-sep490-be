@@ -1,15 +1,17 @@
 # Multi-stage build: Frontend + Backend in one image
-# Build context: .. (CAPSTONE folder)
-# Stage 1: Build Frontend (bỏ qua TypeScript check và lint)
+# Build context: parent directory (~/projects/tms/)
+# Hardcoded for VPS deployment with tms-fe-temp and tms-be-temp
+
+# Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
-# Copy frontend source (from CAPSTONE/tms-sep490-fe/)
-COPY tms-sep490-fe/package.json tms-sep490-fe/pnpm-lock.yaml ./
-COPY tms-sep490-fe/ ./
+# Copy frontend source
+COPY tms-fe-temp/package.json tms-fe-temp/pnpm-lock.yaml ./
+COPY tms-fe-temp/ ./
 
-# Install dependencies và build (bỏ qua tsc và lint)
+# Install dependencies và build
 ENV CI=true
 RUN npm install -g pnpm && \
     pnpm install --frozen-lockfile && \
@@ -20,42 +22,42 @@ FROM eclipse-temurin:21-jdk-alpine AS backend-builder
 
 WORKDIR /app/backend
 
-# Copy Maven wrapper và pom.xml (from CAPSTONE/tms-sep490-be/)
-COPY tms-sep490-be/mvnw .
-COPY tms-sep490-be/.mvn .mvn
-COPY tms-sep490-be/pom.xml .
+# Copy Maven wrapper và pom.xml
+COPY tms-be-temp/mvnw .
+COPY tms-be-temp/.mvn .mvn
+COPY tms-be-temp/pom.xml .
 
 # Make Maven wrapper executable
 RUN chmod +x ./mvnw
 
-# Download dependencies (cached nếu pom.xml không đổi)
+# Download dependencies
 RUN ./mvnw dependency:go-offline -B
 
-# Copy source code (from CAPSTONE/tms-sep490-be/src)
-COPY tms-sep490-be/src src
+# Copy source code
+COPY tms-be-temp/src src
 
-# Build application (skip tests)
-RUN ./mvnw clean package -DskipTests -B
+# Build application (skip test compilation and execution)
+RUN ./mvnw clean package -Dmaven.test.skip=true -B
 
 # Stage 3: Production - Combined Frontend + Backend
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# Install nginx để serve frontend
+# Install nginx
 RUN apk add --no-cache nginx
 
 # Create non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy frontend build từ stage 1
+# Copy frontend build
 COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 
-# Copy backend JAR từ stage 2
+# Copy backend JAR
 COPY --from=backend-builder /app/backend/target/tms-sep490-be-0.0.1-SNAPSHOT.jar app.jar
 
-# Copy nginx config (from CAPSTONE/tms-sep490-be/)
-COPY tms-sep490-be/nginx-combined.conf /etc/nginx/http.d/default.conf
+# Copy nginx config
+COPY tms-be-temp/nginx-combined.conf /etc/nginx/http.d/default.conf
 
 # Create nginx directories với proper permissions
 RUN mkdir -p /var/log/nginx /var/lib/nginx/tmp /run/nginx && \

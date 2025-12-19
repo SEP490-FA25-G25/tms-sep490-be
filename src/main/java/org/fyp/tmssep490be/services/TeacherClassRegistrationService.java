@@ -79,16 +79,16 @@ public class TeacherClassRegistrationService {
 
         return availableClasses.stream()
                 .map(c -> mapToAvailableClassDTO(c, teacher, teacherSpecializations, teacherLanguages, now))
-                // Filter out CLOSED classes - only show PENDING_OPEN and OPEN
+                // Filter: only show classes that are PENDING_OPEN or OPEN
                 .filter(dto -> dto.getRegistrationStatus() != RegistrationWindowStatus.CLOSED)
-                // Sort: no conflict first, then OPEN, then matched, then by close date
+                // Filter: only show classes that match teacher's language AND specialization
+                .filter(dto -> Boolean.TRUE.equals(dto.getIsMatch()))
+                // Filter: hide classes with schedule conflicts
+                .filter(dto -> !Boolean.TRUE.equals(dto.getHasScheduleConflict()))
+                // Sort: OPEN first, then by close date
                 .sorted(Comparator
-                        .comparing((AvailableClassDTO dto) -> Boolean.TRUE.equals(dto.getHasScheduleConflict())) // No
-                                                                                                                 // conflict
-                                                                                                                 // first
-                        .thenComparing(dto -> dto.getRegistrationStatus() != RegistrationWindowStatus.OPEN) // OPEN
-                                                                                                            // first
-                        .thenComparing(dto -> !Boolean.TRUE.equals(dto.getIsMatch())) // matched second
+                        .comparing(
+                                (AvailableClassDTO dto) -> dto.getRegistrationStatus() != RegistrationWindowStatus.OPEN)
                         .thenComparing(AvailableClassDTO::getRegistrationCloseDate))
                 .collect(Collectors.toList());
     }
@@ -334,13 +334,22 @@ public class TeacherClassRegistrationService {
         sendRegistrationOpenedNotification(classEntity);
     }
 
-    // Helper method to send notifications to teachers when registration opens
+    // Helper method to send notifications to qualified teachers when registration
+    // opens
     private void sendRegistrationOpenedNotification(ClassEntity classEntity) {
         try {
             Long branchId = classEntity.getBranch().getId();
             String className = classEntity.getName();
             String classCode = classEntity.getCode();
             String subjectName = classEntity.getSubject().getName();
+
+            // Get curriculum info for matching
+            String curriculumCode = null;
+            String curriculumLanguage = null;
+            if (classEntity.getSubject() != null && classEntity.getSubject().getCurriculum() != null) {
+                curriculumCode = classEntity.getSubject().getCurriculum().getCode();
+                curriculumLanguage = classEntity.getSubject().getCurriculum().getLanguage();
+            }
 
             // Get all teachers in the class's branch
             List<Teacher> teachers = teacherRepository.findByBranchIds(List.of(branchId));
@@ -349,15 +358,111 @@ public class TeacherClassRegistrationService {
                 return;
             }
 
-            // Get user IDs of teachers
-            List<Long> teacherUserIds = teachers.stream()
+            // Get teacher IDs
+            List<Long> teacherIds = teachers.stream().map(Teacher::getId).collect(Collectors.toList());
+
+            // Get skill details including language
+            List<Object[]> skillDetails = teacherSkillRepository.findSkillDetailsByTeacherIds(teacherIds);
+
+            // Build teacher skills and languages map
+            java.util.Map<Long, Set<String>> teacherLanguagesMap = new java.util.HashMap<>();
+            java.util.Map<Long, Set<String>> teacherSpecializationsMap = new java.util.HashMap<>();
+
+            for (Object[] row : skillDetails) {
+                Long teacherId = (Long) row[0];
+                String specialization = (String) row[2];
+                String language = (String) row[4];
+
+                if (language != null) {
+                    teacherLanguagesMap
+                            .computeIfAbsent(teacherId, k -> new java.util.HashSet<>())
+                            .add(language.toLowerCase());
+                }
+                if (specialization != null) {
+                    teacherSpecializationsMap
+                            .computeIfAbsent(teacherId, k -> new java.util.HashSet<>())
+                            .add(specialization.toLowerCase());
+                }
+            }
+
+            // Get class sessions for conflict detection
+            List<Session> targetSessions = sessionRepository.findByClassEntityId(classEntity.getId());
+            log.info("Notification check: class {} has {} sessions", classCode, targetSessions.size());
+            for (Session s : targetSessions) {
+                log.info("  Target session: date={}, time={}-{}",
+                        s.getDate(),
+                        s.getTimeSlotTemplate().getStartTime(),
+                        s.getTimeSlotTemplate().getEndTime());
+            }
+
+            final String finalCurriculumCode = curriculumCode;
+            final String finalCurriculumLanguage = curriculumLanguage;
+
+            // Filter teachers by: language match, specialization match, no schedule
+            // conflict
+            List<Long> qualifiedTeacherUserIds = teachers.stream()
+                    .filter(teacher -> {
+                        // Check language match
+                        if (finalCurriculumLanguage != null) {
+                            Set<String> langs = teacherLanguagesMap.getOrDefault(teacher.getId(), Set.of());
+                            if (!langs.contains(finalCurriculumLanguage.toLowerCase())) {
+                                return false;
+                            }
+                        }
+
+                        // Check specialization match
+                        if (finalCurriculumCode != null) {
+                            Set<String> specs = teacherSpecializationsMap.getOrDefault(teacher.getId(), Set.of());
+                            if (!specs.contains(finalCurriculumCode.toLowerCase())) {
+                                return false;
+                            }
+                        }
+
+                        // Check schedule conflict
+                        log.info("Checking conflicts for teacher {} (ID={}), has {} assigned classes",
+                                teacher.getEmployeeCode(), teacher.getId(), teacher.getAssignedClasses().size());
+                        for (ClassEntity assignedClass : teacher.getAssignedClasses()) {
+                            log.info("  Assigned class: {} (ID={}, status={})",
+                                    assignedClass.getName(), assignedClass.getId(), assignedClass.getStatus());
+                            if (assignedClass.getStatus() == ClassStatus.COMPLETED ||
+                                    assignedClass.getStatus() == ClassStatus.CANCELLED) {
+                                continue;
+                            }
+
+                            List<Session> assignedSessions = sessionRepository
+                                    .findByClassEntityId(assignedClass.getId());
+                            log.info("    Assigned class has {} sessions", assignedSessions.size());
+                            for (Session targetSession : targetSessions) {
+                                for (Session assignedSession : assignedSessions) {
+                                    if (targetSession.getDate().equals(assignedSession.getDate())) {
+                                        LocalTime targetStart = targetSession.getTimeSlotTemplate().getStartTime();
+                                        LocalTime targetEnd = targetSession.getTimeSlotTemplate().getEndTime();
+                                        LocalTime assignedStart = assignedSession.getTimeSlotTemplate().getStartTime();
+                                        LocalTime assignedEnd = assignedSession.getTimeSlotTemplate().getEndTime();
+
+                                        if (targetStart.isBefore(assignedEnd) && assignedStart.isBefore(targetEnd)) {
+                                            return false; // Has conflict
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        return true; // Qualified
+                    })
                     .map(t -> t.getUserAccount().getId())
                     .collect(Collectors.toList());
 
-            // Format dates for notification
+            if (qualifiedTeacherUserIds.isEmpty()) {
+                log.info("No qualified teachers found for class {} notification", classCode);
+                return;
+            }
+
+            // Format dates for notification - use Vietnam timezone
+            java.time.ZoneId vietnamZone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-            String openDate = classEntity.getRegistrationOpenDate().format(formatter);
-            String closeDate = classEntity.getRegistrationCloseDate().format(formatter);
+            String openDate = classEntity.getRegistrationOpenDate().atZoneSameInstant(vietnamZone).format(formatter);
+            String closeDate = classEntity.getRegistrationCloseDate().atZoneSameInstant(vietnamZone).format(formatter);
 
             // Check if registration is already open or pending
             OffsetDateTime now = OffsetDateTime.now();
@@ -366,34 +471,25 @@ public class TeacherClassRegistrationService {
             String title = "Mở đăng ký dạy lớp: " + className;
             String message;
             if (isAlreadyOpen) {
-                // Registration is already open
                 message = String.format(
                         "Lớp %s (%s) - Môn %s đang mở đăng ký dạy. Hạn đăng ký: %s. " +
                                 "Vào mục 'Đăng ký dạy' để đăng ký ngay!",
-                        className,
-                        classCode,
-                        subjectName,
-                        closeDate);
+                        className, classCode, subjectName, closeDate);
             } else {
-                // Registration will open in the future
                 message = String.format(
                         "Lớp %s (%s) - Môn %s sẽ mở đăng ký dạy từ %s đến %s. " +
                                 "Vào mục 'Đăng ký dạy' để theo dõi!",
-                        className,
-                        classCode,
-                        subjectName,
-                        openDate,
-                        closeDate);
+                        className, classCode, subjectName, openDate, closeDate);
             }
 
             notificationService.sendBulkNotifications(
-                    teacherUserIds,
+                    qualifiedTeacherUserIds,
                     NotificationType.NOTIFICATION,
                     title,
                     message);
 
-            log.info("Sent registration notification to {} teachers for class {}",
-                    teacherUserIds.size(), classCode);
+            log.info("Sent registration notification to {} qualified teachers for class {}",
+                    qualifiedTeacherUserIds.size(), classCode);
         } catch (Exception e) {
             log.error("Failed to send registration notifications: {}", e.getMessage());
         }
@@ -600,6 +696,30 @@ public class TeacherClassRegistrationService {
             throw new CustomException(ErrorCode.INVALID_INPUT, "Lớp đã có giáo viên được gán");
         }
 
+        // Validate registration deadline - AA chỉ được gán trực tiếp sau khi hết hạn
+        // đăng ký
+        // HOẶC khi lớp ở trạng thái khẩn cấp (gần/quá ngày bắt đầu, không còn thời gian
+        // mở đăng ký bình thường)
+        OffsetDateTime now = OffsetDateTime.now();
+        boolean isEmergency = isEmergencyAssignAllowed(classEntity);
+
+        if (!isEmergency) {
+            // Normal flow: require registration to be opened and expired
+            if (classEntity.getRegistrationCloseDate() == null) {
+                throw new CustomException(ErrorCode.INVALID_INPUT,
+                        "Lớp chưa được mở đăng ký. Vui lòng mở đăng ký trước khi gán trực tiếp giáo viên.");
+            }
+            if (now.isBefore(classEntity.getRegistrationCloseDate())) {
+                throw new CustomException(ErrorCode.INVALID_INPUT,
+                        "Chưa hết hạn đăng ký. Chỉ được gán trực tiếp giáo viên sau khi hết hạn đăng ký (" +
+                                classEntity.getRegistrationCloseDate()
+                                        .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                                + ").");
+            }
+        }
+        // If isEmergency = true, skip registration check - allow direct assign for
+        // urgent cases
+
         // Validate schedule conflict (check thời gian overlap)
         List<Session> targetSessions = sessionRepository.findByClassEntityId(classEntity.getId());
 
@@ -646,8 +766,6 @@ public class TeacherClassRegistrationService {
                 }
             }
         }
-
-        OffsetDateTime now = OffsetDateTime.now();
 
         // Gán teacher vào class
         classEntity.setAssignedTeacher(teacher);
@@ -724,6 +842,24 @@ public class TeacherClassRegistrationService {
         if (!hasAccess) {
             throw new CustomException(ErrorCode.BRANCH_ACCESS_DENIED);
         }
+    }
+
+    /**
+     * Check if emergency direct assign is allowed for a class.
+     * Emergency assign is allowed when:
+     * - Class start date is within 2 days or already passed
+     * - This means normal registration flow is no longer possible
+     * (because registrationCloseDate must be at least 2 days before startDate)
+     */
+    private boolean isEmergencyAssignAllowed(ClassEntity classEntity) {
+        if (classEntity.getStartDate() == null) {
+            return false;
+        }
+        LocalDate today = LocalDate.now();
+        // Latest possible close date is startDate - 2 days
+        LocalDate latestCloseDate = classEntity.getStartDate().minusDays(2);
+        // If today >= latestCloseDate, it's too late for normal registration
+        return !today.isBefore(latestCloseDate);
     }
 
     private void validateRegistration(ClassEntity classEntity, Teacher teacher, Long userId) {
@@ -1202,8 +1338,10 @@ public class TeacherClassRegistrationService {
 
         // Get curriculum info for matching
         String curriculumCode = null;
+        String curriculumLanguage = null;
         if (classEntity.getSubject() != null && classEntity.getSubject().getCurriculum() != null) {
             curriculumCode = classEntity.getSubject().getCurriculum().getCode(); // e.g., "IELTS"
+            curriculumLanguage = classEntity.getSubject().getCurriculum().getLanguage(); // e.g., "English"
         }
 
         // Get all teachers in this branch
@@ -1216,16 +1354,19 @@ public class TeacherClassRegistrationService {
         // Get teacher IDs
         List<Long> teacherIds = teachers.stream().map(Teacher::getId).collect(Collectors.toList());
 
-        // Get all skills for these teachers
+        // Get all skills for these teachers (now includes language)
         List<Object[]> skillDetails = teacherSkillRepository.findSkillDetailsByTeacherIds(teacherIds);
 
-        // Group skills by teacher ID
+        // Group skills by teacher ID and track languages taught by each teacher
         java.util.Map<Long, List<QualifiedTeacherDTO.TeacherSkillInfo>> teacherSkillsMap = new java.util.HashMap<>();
+        java.util.Map<Long, Set<String>> teacherLanguagesMap = new java.util.HashMap<>();
+
         for (Object[] row : skillDetails) {
             Long teacherId = (Long) row[0];
             String skill = row[1] != null ? row[1].toString() : null;
             String specialization = (String) row[2];
             Short level = row[3] != null ? ((Number) row[3]).shortValue() : null;
+            String language = (String) row[4];
 
             teacherSkillsMap
                     .computeIfAbsent(teacherId, k -> new java.util.ArrayList<>())
@@ -1233,25 +1374,47 @@ public class TeacherClassRegistrationService {
                             .skill(skill)
                             .specialization(specialization)
                             .level(level)
+                            .language(language)
                             .build());
+
+            // Track languages
+            if (language != null) {
+                teacherLanguagesMap
+                        .computeIfAbsent(teacherId, k -> new java.util.HashSet<>())
+                        .add(language.toLowerCase());
+            }
         }
 
         final String finalCurriculumCode = curriculumCode;
+        final String finalCurriculumLanguage = curriculumLanguage;
 
         // Get target class sessions for schedule conflict detection
         List<Session> targetClassSessions = sessionRepository.findByClassEntityId(classId);
 
         // Map to DTOs with match scoring, workload, and schedule conflict
+        // FILTER: Only include teachers who teach the curriculum language
         List<QualifiedTeacherDTO> result = teachers.stream()
+                .filter(teacher -> {
+                    // If no curriculum language defined, show all teachers
+                    if (finalCurriculumLanguage == null)
+                        return true;
+
+                    // Only show teachers who have skills in matching language
+                    Set<String> teacherLanguages = teacherLanguagesMap.getOrDefault(teacher.getId(), Set.of());
+                    return teacherLanguages.contains(finalCurriculumLanguage.toLowerCase());
+                })
                 .map(teacher -> {
                     UserAccount user = teacher.getUserAccount();
                     List<QualifiedTeacherDTO.TeacherSkillInfo> skills = teacherSkillsMap.getOrDefault(teacher.getId(),
                             List.of());
 
-                    // Calculate match score
+                    // Calculate match score: requires BOTH specialization AND language match for
+                    // "Phù hợp"
                     boolean hasMatchingSpecialization = skills.stream()
                             .anyMatch(s -> s.getSpecialization() != null &&
-                                    s.getSpecialization().equalsIgnoreCase(finalCurriculumCode));
+                                    s.getSpecialization().equalsIgnoreCase(finalCurriculumCode) &&
+                                    s.getLanguage() != null &&
+                                    s.getLanguage().equalsIgnoreCase(finalCurriculumLanguage));
 
                     int matchScore = 0;
                     String matchReason = null;
@@ -1260,8 +1423,9 @@ public class TeacherClassRegistrationService {
                         matchScore = 100;
                         matchReason = "Phù hợp chuyên môn " + finalCurriculumCode;
                     } else if (!skills.isEmpty()) {
+                        // Has language match but different specialization
                         matchScore = 50;
-                        matchReason = "Có kỹ năng giảng dạy";
+                        matchReason = "Khác chuyên môn";
                     } else {
                         matchScore = 0;
                         matchReason = "Chưa có thông tin kỹ năng";
@@ -1356,12 +1520,11 @@ public class TeacherClassRegistrationService {
                             .currentWorkload(workload)
                             .build();
                 })
-                // Sort by: no conflict first, then match score descending, then workload
-                // ascending, then name
+                // FILTER: Only show teachers who are matched AND have no schedule conflict
+                .filter(dto -> dto.getIsMatch() && !dto.getHasScheduleConflict())
+                // Sort by: workload ascending, then name
                 .sorted(Comparator
-                        .comparing(QualifiedTeacherDTO::getHasScheduleConflict)
-                        .thenComparing(Comparator.comparing(QualifiedTeacherDTO::getMatchScore).reversed())
-                        .thenComparing(QualifiedTeacherDTO::getCurrentWorkload)
+                        .comparing(QualifiedTeacherDTO::getCurrentWorkload)
                         .thenComparing(QualifiedTeacherDTO::getFullName))
                 .collect(Collectors.toList());
 
