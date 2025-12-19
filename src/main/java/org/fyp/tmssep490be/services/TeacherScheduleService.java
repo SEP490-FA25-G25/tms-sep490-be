@@ -15,6 +15,7 @@ import org.fyp.tmssep490be.entities.enums.SessionStatus;
 import org.fyp.tmssep490be.exceptions.CustomException;
 import org.fyp.tmssep490be.exceptions.ErrorCode;
 import org.fyp.tmssep490be.repositories.*;
+import org.fyp.tmssep490be.scheduler.SessionAutoUpdateService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,7 @@ public class TeacherScheduleService {
     private final TimeSlotTemplateRepository timeSlotTemplateRepository;
     private final TeacherRequestRepository teacherRequestRepository;
     private final QAReportRepository qaReportRepository;
+    private final SessionAutoUpdateService sessionAutoUpdateService;
     private final ObjectMapper objectMapper;
 
     public LocalDate getCurrentWeekStart() {
@@ -62,6 +64,24 @@ public class TeacherScheduleService {
                 teacherId, weekStart, weekEnd, classId);
 
         log.debug("Found {} sessions for week {} to {}", sessions.size(), weekStart, weekEnd);
+
+        // 4.5. Tự động kiểm tra và cập nhật session status nếu cần (cho các session đã đủ điều kiện)
+        // Sử dụng batch update để tránh nhiều transaction riêng lẻ
+        for (Session session : sessions) {
+            if (session.getStatus() == SessionStatus.PLANNED) {
+                try {
+                    sessionAutoUpdateService.checkAndUpdateSessionStatusIfNeeded(session.getId());
+                } catch (Exception e) {
+                    log.warn("Failed to auto-update session {} status in weekly schedule: {}", 
+                            session.getId(), e.getMessage());
+                    // Không throw exception để không block request
+                }
+            }
+        }
+        
+        // Refresh sessions sau khi có thể đã được cập nhật
+        sessions = sessionRepository.findWeeklySessionsForTeacher(
+                teacherId, weekStart, weekEnd, classId);
 
         // 5. Lấy toàn bộ khung giờ của các cơ sở mà giáo viên có lớp
         List<TimeSlotDTO> timeSlots = getAllTimeSlotsForTeacher(teacherId);
@@ -108,6 +128,18 @@ public class TeacherScheduleService {
 
         if (!isAssigned) {
             throw new CustomException(ErrorCode.FORBIDDEN, "Teacher is not assigned to this session");
+        }
+
+        // 3. Tự động kiểm tra và cập nhật session status nếu cần
+        // (Chỉ cập nhật nếu session đã đủ điều kiện, không block request)
+        try {
+            sessionAutoUpdateService.checkAndUpdateSessionStatusIfNeeded(sessionId);
+            // Refresh session sau khi có thể đã được cập nhật
+            session = sessionRepository.findById(sessionId)
+                    .orElse(session);
+        } catch (Exception e) {
+            log.warn("Failed to auto-update session {} status: {}", sessionId, e.getMessage());
+            // Không throw exception để không block request
         }
 
         return mapToTeacherSessionDetailDTO(session);
@@ -500,7 +532,10 @@ public class TeacherScheduleService {
 
     private String determineResourceOnlineLink(Resource resource) {
         if (resource.getResourceType() == ResourceType.VIRTUAL) {
-            return resource.getName();
+            // Return meetingUrl if available, otherwise fallback to name
+            return resource.getMeetingUrl() != null && !resource.getMeetingUrl().trim().isEmpty()
+                    ? resource.getMeetingUrl()
+                    : resource.getName();
         }
         return null;
     }

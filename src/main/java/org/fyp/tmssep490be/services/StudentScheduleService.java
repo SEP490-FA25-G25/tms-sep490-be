@@ -455,7 +455,10 @@ public class StudentScheduleService {
 
     private String determineResourceOnlineLink(Resource resource) {
         if (resource.getResourceType() == org.fyp.tmssep490be.entities.enums.ResourceType.VIRTUAL) {
-            return resource.getName();
+            // Return meetingUrl if available, otherwise fallback to name
+            return resource.getMeetingUrl() != null && !resource.getMeetingUrl().trim().isEmpty()
+                    ? resource.getMeetingUrl()
+                    : resource.getName();
         }
         return null;
     }

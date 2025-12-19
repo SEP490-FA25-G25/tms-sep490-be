@@ -48,6 +48,7 @@ public class ClassService {
         private final ReplacementSkillAssessmentRepository skillAssessmentRepository;
         private final StudentSessionRepository studentSessionRepository;
         private final BranchRepository branchRepository;
+        private final AttendanceService attendanceService;
         private final SubjectRepository subjectRepository;
         private final SubjectSessionRepository subjectSessionRepository;
         private final TimeSlotTemplateRepository timeSlotTemplateRepository;
@@ -425,109 +426,21 @@ public class ClassService {
         }
 
         private ClassDetailDTO.PerformanceMetrics calculatePerformanceMetrics(Long classId) {
-                // Get all student sessions for this class
+                // Sử dụng cùng logic tính tỷ lệ chuyên cần như AttendanceService để đảm bảo nhất quán
+                // Tính tỷ lệ chuyên cần: tổng PRESENT / (PRESENT + ABSENT) của các buổi đã điểm danh
+                double classAttendanceRate = attendanceService.calculateClassAttendanceRate(classId);
+                double attendanceRate = classAttendanceRate * 100; // Convert to percentage
+
+                // Calculate homework completion rate (chỉ tính session DONE)
                 List<StudentSession> studentSessions = studentSessionRepository
                                 .findByClassIdWithSessionAndStudent(classId);
 
-                if (studentSessions.isEmpty()) {
-                        return ClassDetailDTO.PerformanceMetrics.builder()
-                                        .attendanceRate(0.0)
-                                        .homeworkCompletionRate(0.0)
-                                        .build();
-                }
-
-                // Only count sessions that are DONE (completed)
+                // Only count sessions that are DONE (completed) for homework
                 List<StudentSession> completedStudentSessions = studentSessions.stream()
                                 .filter(ss -> ss.getSession().getStatus() == SessionStatus.DONE)
                                 .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup())) // Bỏ qua học bù
                                 .toList();
 
-                if (completedStudentSessions.isEmpty()) {
-                        return ClassDetailDTO.PerformanceMetrics.builder()
-                                        .attendanceRate(0.0)
-                                        .homeworkCompletionRate(0.0)
-                                        .build();
-                }
-
-                // Map thông tin học bù
-                List<Long> sessionIds = completedStudentSessions.stream()
-                                .map(ss -> ss.getSession().getId())
-                                .distinct()
-                                .toList();
-                Map<Long, Map<Long, Boolean>> makeupCompletedMap = new HashMap<>();
-                if (!sessionIds.isEmpty()) {
-                        studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
-                                        .forEach(ss -> {
-                                                Session originalSession = ss.getOriginalSession();
-                                                if (originalSession == null || ss.getStudent() == null) {
-                                                        return;
-                                                }
-                                                Long originalSessionId = originalSession.getId();
-                                                Long studentId = ss.getStudent().getId();
-                                                if (originalSessionId == null || studentId == null) {
-                                                        return;
-                                                }
-
-                                                makeupCompletedMap
-                                                                .computeIfAbsent(originalSessionId,
-                                                                                k -> new HashMap<>())
-                                                                .merge(
-                                                                                studentId,
-                                                                                ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
-                                                                                (oldVal, newVal) -> oldVal || newVal);
-                                        });
-                }
-
-                // Calculate attendance rate với logic EXCUSED mới
-                long totalRecorded = 0;
-                long presentCount = 0;
-                LocalDateTime now = LocalDateTime.now();
-
-                for (StudentSession ss : completedStudentSessions) {
-                        AttendanceStatus status = ss.getAttendanceStatus();
-                        Session session = ss.getSession();
-
-                        if (status == AttendanceStatus.PRESENT) {
-                                presentCount++;
-                                totalRecorded++;
-                        } else if (status == AttendanceStatus.ABSENT) {
-                                totalRecorded++;
-                        } else if (status == AttendanceStatus.EXCUSED) {
-                                // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
-                                boolean hasMakeupCompleted = makeupCompletedMap
-                                                .getOrDefault(session.getId(), Map.of())
-                                                .getOrDefault(ss.getStudent().getId(), false);
-
-                                if (hasMakeupCompleted) {
-                                        // EXCUSED có học bù (chấm xanh) → tính như PRESENT
-                                        presentCount++;
-                                        totalRecorded++;
-                                } else {
-                                        // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
-                                        LocalDate sessionDate = session.getDate();
-                                        LocalDateTime sessionEndDateTime;
-                                        if (session.getTimeSlotTemplate() != null
-                                                        && session.getTimeSlotTemplate().getEndTime() != null) {
-                                                LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
-                                                sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
-                                        } else {
-                                                sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
-                                        }
-
-                                        boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
-                                        if (isAfterSessionEnd) {
-                                                // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như
-                                                // ABSENT
-                                                totalRecorded++;
-                                        }
-                                        // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
-                                }
-                        }
-                }
-
-                double attendanceRate = totalRecorded > 0 ? (double) presentCount / totalRecorded * 100 : 0.0;
-
-                // Calculate homework completion rate
                 long totalWithHomework = completedStudentSessions.stream()
                                 .filter(ss -> ss.getHomeworkStatus() != null)
                                 .count();

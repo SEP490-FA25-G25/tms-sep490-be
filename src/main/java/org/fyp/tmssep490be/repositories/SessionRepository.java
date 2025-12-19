@@ -185,6 +185,24 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("status") SessionStatus status);
 
     /**
+     * Find all sessions that have ended (passed end time), regardless of teacher note
+     * Used to auto-update attendance from PLANNED to ABSENT
+     */
+    @Query("""
+            SELECT s FROM Session s
+            JOIN s.timeSlotTemplate tst
+            WHERE s.status = :status
+              AND (
+                s.date < :today
+                OR (s.date = :today AND tst.endTime < :currentTime)
+              )
+            """)
+    List<Session> findAllEndedSessions(
+            @Param("today") LocalDate today,
+            @Param("currentTime") LocalTime currentTime,
+            @Param("status") SessionStatus status);
+
+    /**
      * Find sessions that have ended more than 48 hours ago and don't have teacher note
      * Used to auto-complete sessions that teacher forgot to submit report
      */

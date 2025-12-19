@@ -36,12 +36,13 @@ public class CenterHeadDashboardController {
             @org.springframework.web.bind.annotation.RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @org.springframework.web.bind.annotation.RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long branchId) {
 
         Long userId = currentUser != null ? currentUser.getId() : null;
-        log.info("Center Head {} requesting dashboard overview from {} to {}", userId, fromDate, toDate);
+        log.info("Center Head {} yêu cầu dashboard từ {} đến {} (chi nhánh: {})", userId, fromDate, toDate, branchId);
 
-        CenterHeadDashboardDTO dashboard = centerHeadDashboardService.getDashboard(userId, fromDate, toDate);
+        CenterHeadDashboardDTO dashboard = centerHeadDashboardService.getDashboard(userId, fromDate, toDate, branchId);
         return ResponseEntity.ok(ResponseObject.success("Lấy dashboard Center Head thành công", dashboard));
     }
 }

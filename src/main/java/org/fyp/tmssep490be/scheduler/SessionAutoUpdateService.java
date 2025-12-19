@@ -18,6 +18,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -49,6 +50,36 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
     public void updateOnStartup() {
         log.info("Application ready: Checking for past sessions that need to be updated to DONE status");
         try {
+            // First, update attendance for all ended sessions to ensure attendance rate is correct
+            // Note: Only updates PLANNED status. PRESENT and ABSENT remain unchanged (already recorded by teacher)
+            LocalDate today = LocalDate.now();
+            LocalTime currentTime = LocalTime.now();
+            List<Session> allEndedSessions = sessionRepository.findAllEndedSessions(
+                today, currentTime, SessionStatus.PLANNED);
+            
+            int updatedAttendanceCount = 0;
+            List<StudentSession> attendanceToUpdate = new ArrayList<>();
+            
+            for (Session session : allEndedSessions) {
+                List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(session.getId());
+                for (StudentSession studentSession : studentSessions) {
+                    // Only update if status is PLANNED (not yet recorded)
+                    // If already PRESENT or ABSENT, keep it as is (teacher already recorded)
+                    if (studentSession.getAttendanceStatus() == AttendanceStatus.PLANNED) {
+                        studentSession.setAttendanceStatus(AttendanceStatus.ABSENT);
+                        studentSession.setRecordedAt(OffsetDateTime.now());
+                        attendanceToUpdate.add(studentSession);
+                        updatedAttendanceCount++;
+                    }
+                }
+            }
+            
+            if (!attendanceToUpdate.isEmpty()) {
+                studentSessionRepository.saveAll(attendanceToUpdate);
+                log.info("On startup: Auto-marked {} attendance records as ABSENT for ended sessions", updatedAttendanceCount);
+            }
+            
+            // Then update session status to DONE
             updatePastSessionsToDone();
             // Also create QA reports for existing DONE sessions that don't have reports
             createQAReportsForDoneSessionsWithoutReports();
@@ -70,6 +101,34 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
             
             LocalDate today = LocalDate.now();
             LocalTime currentTime = LocalTime.now();
+
+            // First, auto-update attendance from PLANNED to ABSENT for all ended sessions
+            // This ensures attendance rate is calculated correctly immediately
+            // Note: Only updates PLANNED status. PRESENT and ABSENT remain unchanged (already recorded by teacher)
+            List<Session> allEndedSessions = sessionRepository.findAllEndedSessions(
+                today, currentTime, SessionStatus.PLANNED);
+            
+            int updatedAttendanceForEndedSessions = 0;
+            List<StudentSession> attendanceToUpdate = new ArrayList<>();
+            
+            for (Session session : allEndedSessions) {
+                List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(session.getId());
+                for (StudentSession studentSession : studentSessions) {
+                    // Only update if status is PLANNED (not yet recorded)
+                    // If already PRESENT or ABSENT, keep it as is (teacher already recorded)
+                    if (studentSession.getAttendanceStatus() == AttendanceStatus.PLANNED) {
+                        studentSession.setAttendanceStatus(AttendanceStatus.ABSENT);
+                        studentSession.setRecordedAt(OffsetDateTime.now());
+                        attendanceToUpdate.add(studentSession);
+                        updatedAttendanceForEndedSessions++;
+                    }
+                }
+            }
+            
+            if (!attendanceToUpdate.isEmpty()) {
+                studentSessionRepository.saveAll(attendanceToUpdate);
+                logJobInfo(String.format("Auto-marked %d attendance records as ABSENT for ended sessions", updatedAttendanceForEndedSessions));
+            }
 
             // Find sessions that have ended (passed end time) and have teacher note
             List<Session> endedSessionsWithNote = sessionRepository.findEndedSessionsWithTeacherNote(
@@ -239,6 +298,183 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
     public void updatePastSessionsToDoneNow() {
         updatePastSessionsToDone();
         createQAReportsForDoneSessionsWithoutReports();
+    }
+
+    /**
+     * Check and update a specific session status if it meets the criteria.
+     * This is called when accessing session detail to ensure status is up-to-date.
+     * Uses REQUIRES_NEW to avoid transaction conflicts with read-only transactions.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void checkAndUpdateSessionStatusIfNeeded(Long sessionId) {
+        try {
+            Optional<Session> sessionOpt = sessionRepository.findById(sessionId);
+            if (sessionOpt.isEmpty()) {
+                return;
+            }
+
+            Session session = sessionOpt.get();
+            
+            // Only process PLANNED sessions
+            if (session.getStatus() != SessionStatus.PLANNED) {
+                return;
+            }
+
+            LocalDate today = LocalDate.now();
+            LocalTime currentTime = LocalTime.now();
+            
+            // Check if session has ended
+            boolean hasEnded = false;
+            if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                LocalDate sessionDate = session.getDate();
+                LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                hasEnded = sessionDate.isBefore(today) || 
+                          (sessionDate.equals(today) && endTime.isBefore(currentTime));
+            } else {
+                // If no end time, check by date only
+                hasEnded = session.getDate().isBefore(today);
+            }
+
+            if (!hasEnded) {
+                return;
+            }
+
+            // Check if session has teacher note
+            boolean hasTeacherNote = session.getTeacherNote() != null && 
+                                    !session.getTeacherNote().trim().isEmpty();
+
+            if (hasTeacherNote) {
+                // Update to DONE immediately if has teacher note
+                session.setStatus(SessionStatus.DONE);
+                sessionRepository.save(session);
+                
+                // Update attendance and create QA report
+                updateAttendanceAndCreateQAReport(session);
+                log.debug("Auto-updated session {} to DONE (has teacher note)", sessionId);
+            } else {
+                // Check if 48 hours have passed
+                LocalDateTime sessionEndDateTime;
+                if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                    sessionEndDateTime = LocalDateTime.of(session.getDate(), session.getTimeSlotTemplate().getEndTime());
+                } else {
+                    sessionEndDateTime = LocalDateTime.of(session.getDate(), LocalTime.MAX);
+                }
+                
+                LocalDateTime fortyEightHoursAfterEnd = sessionEndDateTime.plusHours(48);
+                LocalDateTime now = LocalDateTime.now();
+                
+                if (now.isAfter(fortyEightHoursAfterEnd)) {
+                    // Update to DONE after 48 hours
+                    session.setStatus(SessionStatus.DONE);
+                    sessionRepository.save(session);
+                    
+                    // Update attendance and create QA report with special message
+                    updateAttendanceAndCreateQAReportWithoutNote(session);
+                    log.debug("Auto-updated session {} to DONE (48h passed without teacher note)", sessionId);
+                } else {
+                    // Just update attendance from PLANNED to ABSENT, but keep status as PLANNED
+                    updateAttendanceForEndedSession(session);
+                    log.debug("Updated attendance for session {} (ended but < 48h, no teacher note)", sessionId);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error checking/updating session {} status: {}", sessionId, e.getMessage(), e);
+            // Don't rethrow to avoid aborting the calling transaction
+        }
+    }
+
+    private void updateAttendanceAndCreateQAReport(Session session) {
+        Optional<UserAccount> qaUserOpt = userAccountRepository.findUsersByRole("QA").stream()
+                .findFirst();
+
+        // Update attendance
+        List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(session.getId());
+        List<StudentSession> attendanceToUpdate = new ArrayList<>();
+        for (StudentSession studentSession : studentSessions) {
+            if (studentSession.getAttendanceStatus() == AttendanceStatus.PLANNED) {
+                studentSession.setAttendanceStatus(AttendanceStatus.ABSENT);
+                studentSession.setRecordedAt(OffsetDateTime.now());
+                attendanceToUpdate.add(studentSession);
+            }
+        }
+        if (!attendanceToUpdate.isEmpty()) {
+            studentSessionRepository.saveAll(attendanceToUpdate);
+        }
+
+        // Create QA report
+        if (qaUserOpt.isPresent()) {
+            long existingSubmittedReports = qaReportRepository.countSubmittedReportsBySessionId(session.getId());
+            if (existingSubmittedReports == 0) {
+                QAReport autoReport = QAReport.builder()
+                        .classEntity(session.getClassEntity())
+                        .session(session)
+                        .reportedBy(qaUserOpt.get())
+                        .reportType(QAReportType.CLASSROOM_OBSERVATION)
+                        .status(QAReportStatus.SUBMITTED)
+                        .content(String.format("Buổi học đã tự động được đánh dấu hoàn thành do đã qua ngày. Session ID: %d, Date: %s", 
+                                session.getId(), session.getDate()))
+                        .build();
+                qaReportRepository.save(autoReport);
+            }
+        }
+    }
+
+    private void updateAttendanceAndCreateQAReportWithoutNote(Session session) {
+        Optional<UserAccount> qaUserOpt = userAccountRepository.findUsersByRole("QA").stream()
+                .findFirst();
+
+        // Update attendance
+        List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(session.getId());
+        List<StudentSession> attendanceToUpdate = new ArrayList<>();
+        for (StudentSession studentSession : studentSessions) {
+            if (studentSession.getAttendanceStatus() == AttendanceStatus.PLANNED) {
+                studentSession.setAttendanceStatus(AttendanceStatus.ABSENT);
+                studentSession.setRecordedAt(OffsetDateTime.now());
+                attendanceToUpdate.add(studentSession);
+            }
+        }
+        if (!attendanceToUpdate.isEmpty()) {
+            studentSessionRepository.saveAll(attendanceToUpdate);
+        }
+
+        // Create QA report with special message
+        if (qaUserOpt.isPresent()) {
+            long existingSubmittedReports = qaReportRepository.countSubmittedReportsBySessionId(session.getId());
+            if (existingSubmittedReports == 0) {
+                QAReport autoReport = QAReport.builder()
+                        .classEntity(session.getClassEntity())
+                        .session(session)
+                        .reportedBy(qaUserOpt.get())
+                        .reportType(QAReportType.CLASSROOM_OBSERVATION)
+                        .status(QAReportStatus.SUBMITTED)
+                        .content(String.format(
+                                "Buổi học đã tự động được đánh dấu hoàn thành sau 48 giờ kể từ khi kết thúc. " +
+                                "Chưa có báo cáo từ giáo viên. Session ID: %d, Date: %s, End Time: %s",
+                                session.getId(),
+                                session.getDate(),
+                                session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null
+                                        ? session.getTimeSlotTemplate().getEndTime().toString()
+                                        : "N/A"))
+                        .build();
+                qaReportRepository.save(autoReport);
+            }
+        }
+    }
+
+    private void updateAttendanceForEndedSession(Session session) {
+        // Only update attendance from PLANNED to ABSENT, keep status as PLANNED
+        List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(session.getId());
+        List<StudentSession> attendanceToUpdate = new ArrayList<>();
+        for (StudentSession studentSession : studentSessions) {
+            if (studentSession.getAttendanceStatus() == AttendanceStatus.PLANNED) {
+                studentSession.setAttendanceStatus(AttendanceStatus.ABSENT);
+                studentSession.setRecordedAt(OffsetDateTime.now());
+                attendanceToUpdate.add(studentSession);
+            }
+        }
+        if (!attendanceToUpdate.isEmpty()) {
+            studentSessionRepository.saveAll(attendanceToUpdate);
+        }
     }
 
     /**

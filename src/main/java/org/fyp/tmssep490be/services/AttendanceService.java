@@ -140,25 +140,15 @@ public class AttendanceService {
                         ? AttendanceStatus.PLANNED
                         : AttendanceStatus.ABSENT;
 
-                boolean hasPreviousHomework;
-                HomeworkStatus homeworkStatus;
-                if (previousSession != null && previousSession.getSubjectSession() != null &&
-                        previousSession.getSubjectSession().getStudentTask() != null &&
-                        !previousSession.getSubjectSession().getStudentTask().trim().isEmpty()) {
-                    hasPreviousHomework = true;
-                    homeworkStatus = null;
-                } else {
-                    hasPreviousHomework = false;
-                    homeworkStatus = HomeworkStatus.NO_HOMEWORK;
-                }
-
+                // Luôn cho phép teacher chọn homework status, không cần kiểm tra buổi trước
+                // Mặc định là null để teacher tự chọn
                 students.add(StudentAttendanceDTO.builder()
                         .studentId(studentId)
                         .studentCode(enrollment.getStudent().getStudentCode())
                         .fullName(enrollment.getStudent().getUserAccount().getFullName())
                         .attendanceStatus(defaultStatus)
-                        .homeworkStatus(homeworkStatus)
-                        .hasPreviousHomework(hasPreviousHomework)
+                        .homeworkStatus(null) // Teacher sẽ tự chọn
+                        .hasPreviousHomework(true) // Luôn true để hiển thị các nút chọn
                         .note(null)
                         .makeup(false)
                         .makeupSessionId(null)
@@ -171,9 +161,8 @@ public class AttendanceService {
         AttendanceSummaryDTO summary = buildSummary(allStudentSessions);
 
         // Check if session has homework
-        boolean hasHomework = session.getSubjectSession() != null &&
-                session.getSubjectSession().getStudentTask() != null &&
-                !session.getSubjectSession().getStudentTask().trim().isEmpty();
+        // Luôn cho phép teacher chọn homework status, không cần kiểm tra buổi trước
+        boolean hasHomework = true;
 
         return StudentsAttendanceResponseDTO.builder()
                 .sessionId(session.getId())
@@ -205,12 +194,6 @@ public class AttendanceService {
             throw new CustomException(ErrorCode.SESSION_ALREADY_DONE);
         }
 
-        Session previousSession = findPreviousSession(session);
-        boolean hasPreviousHomework = previousSession != null
-                && previousSession.getSubjectSession() != null
-                && previousSession.getSubjectSession().getStudentTask() != null
-                && !previousSession.getSubjectSession().getStudentTask().trim().isEmpty();
-
         OffsetDateTime now = OffsetDateTime.now();
         for (AttendanceRecordDTO record : request.getRecords()) {
             StudentSession.StudentSessionId id = new StudentSession.StudentSessionId(record.getStudentId(), sessionId);
@@ -218,15 +201,7 @@ public class AttendanceService {
                     .orElseThrow(() -> new ResourceNotFoundException("Student is not part of this session"));
             studentSession.setAttendanceStatus(record.getAttendanceStatus());
 
-            if (record.getHomeworkStatus() != null) {
-                if (!hasPreviousHomework && record.getHomeworkStatus() != HomeworkStatus.NO_HOMEWORK) {
-                    throw new CustomException(ErrorCode.HOMEWORK_STATUS_INVALID_NO_PREVIOUS_HOMEWORK);
-                }
-                if (hasPreviousHomework && record.getHomeworkStatus() == HomeworkStatus.NO_HOMEWORK) {
-                    throw new CustomException(ErrorCode.HOMEWORK_STATUS_INVALID_HAS_PREVIOUS_HOMEWORK);
-                }
-            }
-
+            // Teacher tự chọn homework status, không cần kiểm tra buổi trước
             studentSession.setHomeworkStatus(record.getHomeworkStatus());
             studentSession.setNote(record.getNote());
             studentSession.setRecordedAt(now);
@@ -616,28 +591,10 @@ public class AttendanceService {
         Session makeupSession = studentSession.getMakeupSession();
 
         HomeworkStatus homeworkStatus = studentSession.getHomeworkStatus();
-        Boolean hasPreviousHomework = false;
-
-        if (previousSession != null) {
-            SubjectSession previousSubjectSession = previousSession.getSubjectSession();
-            if (previousSubjectSession != null &&
-                    previousSubjectSession.getStudentTask() != null &&
-                    !previousSubjectSession.getStudentTask().trim().isEmpty()) {
-                hasPreviousHomework = true;
-                if (homeworkStatus == null) {
-                    homeworkStatus = null;
-                }
-            } else {
-                hasPreviousHomework = false;
-                if (homeworkStatus == null) {
-                    homeworkStatus = HomeworkStatus.NO_HOMEWORK;
-                }
-            }
-        } else {
-            hasPreviousHomework = false;
-            if (homeworkStatus == null) {
-                homeworkStatus = HomeworkStatus.NO_HOMEWORK;
-            }
+        // Luôn cho phép teacher chọn homework status
+        // Nếu chưa có thì giữ nguyên null để teacher tự chọn
+        if (homeworkStatus == null) {
+            homeworkStatus = null; // Teacher sẽ tự chọn
         }
 
         return StudentAttendanceDTO.builder()
@@ -646,7 +603,7 @@ public class AttendanceService {
                 .fullName(studentSession.getStudent().getUserAccount().getFullName())
                 .attendanceStatus(status)
                 .homeworkStatus(homeworkStatus)
-                .hasPreviousHomework(hasPreviousHomework)
+                .hasPreviousHomework(true) // Luôn true để hiển thị các nút chọn
                 .note(studentSession.getNote())
                 .makeup(Boolean.TRUE.equals(studentSession.getIsMakeup()))
                 .makeupSessionId(makeupSession != null ? makeupSession.getId() : null)
@@ -798,7 +755,7 @@ public class AttendanceService {
         return total > 0 ? (double) present / total : 0.0;
     }
 
-    private double calculateClassAttendanceRate(Long classId) {
+    public double calculateClassAttendanceRate(Long classId) {
         // Chỉ tính các buổi đã điểm danh (đã học), không tính các buổi chưa học
         List<Session> sessions = sessionRepository.findAllByClassIdOrderByDateAndTime(classId).stream()
                 .filter(session -> session.getStatus() != SessionStatus.CANCELLED)
