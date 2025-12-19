@@ -183,6 +183,7 @@ public class StudentAttendanceService {
                             .courseCode(classEntity.getSubject().getCode())
                             .courseName(classEntity.getSubject().getName())
                             .startDate(classEntity.getStartDate())
+                            .expectedEndDate(classEntity.getPlannedEndDate())
                             .actualEndDate(classEntity.getActualEndDate())
                             .totalSessions(activeSessions.size())
                             .attended(attended)
