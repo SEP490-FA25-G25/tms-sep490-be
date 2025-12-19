@@ -134,6 +134,10 @@ public class ApprovalService {
             // Send notification to class creator
             sendNotificationForClassApproval(savedClass);
 
+            // Check if class needs emergency teacher assignment
+            // If startDate is within 2 days, notify AA to assign teacher immediately
+            sendEmergencyAssignNotificationIfNeeded(savedClass);
+
             log.info("Class ID: {} successfully approved by user: {}", classId, approverUserId);
 
         } catch (CustomException e) {
@@ -357,5 +361,70 @@ public class ApprovalService {
 
     private String buildScheduleDisplay(ClassEntity classEntity) {
         return ScheduleUtils.generateScheduleDisplayFromMetadata(classEntity);
+    }
+
+    /**
+     * Check if class needs emergency teacher assignment and notify AA.
+     * Emergency = startDate is within 2 days (or today is the deadline for opening
+     * registration)
+     */
+    private void sendEmergencyAssignNotificationIfNeeded(ClassEntity classEntity) {
+        try {
+            if (classEntity.getStartDate() == null) {
+                return;
+            }
+
+            java.time.LocalDate today = java.time.LocalDate.now();
+            java.time.LocalDate startDate = classEntity.getStartDate();
+
+            // If start date has already passed, no notification needed
+            if (today.isAfter(startDate)) {
+                return;
+            }
+
+            // Latest possible close date for registration is startDate - 2 days
+            java.time.LocalDate latestCloseDate = startDate.minusDays(2);
+
+            // If today >= latestCloseDate, it's an emergency - can't open normal
+            // registration
+            if (!today.isBefore(latestCloseDate)) {
+                Long branchId = classEntity.getBranch().getId();
+
+                // Find AA users in the same branch
+                List<UserAccount> aaUsers = userAccountRepository.findByRoleCodeAndBranches(
+                        "ACADEMIC_AFFAIR", List.of(branchId));
+
+                if (!aaUsers.isEmpty()) {
+                    String title = String.format("⚠️ Lớp khẩn cấp cần gán GV: %s", classEntity.getCode());
+                    String message = String.format(
+                            "Lớp %s (%s) vừa được duyệt nhưng ngày khai giảng là %s. " +
+                                    "Do không còn đủ thời gian mở đăng ký (tối thiểu 2 ngày), " +
+                                    "bạn cần gán giáo viên trực tiếp ngay. " +
+                                    "Vào mục 'Duyệt đăng ký dạy lớp' → 'Chờ mở đăng ký' để thực hiện.",
+                            classEntity.getCode(),
+                            classEntity.getSubject() != null ? classEntity.getSubject().getName() : "N/A",
+                            startDate.toString());
+
+                    List<Long> recipientIds = aaUsers.stream()
+                            .map(UserAccount::getId)
+                            .collect(Collectors.toList());
+
+                    notificationService.sendBulkNotifications(
+                            recipientIds,
+                            NotificationType.REQUEST,
+                            title,
+                            message);
+
+                    log.info("Sent emergency assign notification to {} AA users for class {}",
+                            aaUsers.size(), classEntity.getId());
+                } else {
+                    log.warn("No ACADEMIC_AFFAIR users found for branch {} to receive emergency notification",
+                            branchId);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error sending emergency assign notification for class {}: {}",
+                    classEntity.getId(), e.getMessage(), e);
+        }
     }
 }

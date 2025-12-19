@@ -1242,8 +1242,21 @@ INSERT INTO student_request (id, student_id, current_class_id, request_type, tar
 (3, 35, 3, 'ABSENCE', 210, 'REJECTED', 'Want to attend friend birthday party', 135, '2025-12-02 10:00:00+07', 6, '2025-12-02 15:00:00+07', 'Rejected - not a valid reason for academic absence');
 
 -- SCENARIO 4: Approved Makeup Request (Class 2 -> Class 3 parallel Foundation classes, student 22 - Vu Thi My Hanh)
+-- Student 22 vắng buổi 105 (Class 2, 10/12/2025) -> xin học bù tại buổi 205 (Class 3, 12/12/2025)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, makeup_session_id, status, request_reason, submitted_by, submitted_at, decided_by, decided_at) VALUES
 (4, 22, 2, 'MAKEUP', 105, 205, 'APPROVED', 'Missed session due to illness, want to makeup in parallel class', 122, '2025-12-01 10:00:00+07', 6, '2025-12-01 16:00:00+07');
+
+-- Khi APPROVED: Cần tạo StudentSession cho buổi học bù (session 205) và update buổi vắng (session 105) thành EXCUSED
+-- 4a. Update buổi vắng gốc (session 105) thành EXCUSED + link tới makeup session
+UPDATE student_session 
+SET attendance_status = 'EXCUSED', 
+    makeup_session_id = 205,
+    note = 'Excused - học bù tại HN-IELTS-F3 ngày 12/12/2025 (14:00-16:30)'
+WHERE student_id = 22 AND session_id = 105;
+
+-- 4b. Tạo StudentSession cho buổi học bù (student 22 tham gia session 205 của Class 3)
+INSERT INTO student_session (student_id, session_id, is_makeup, original_session_id, attendance_status, note, created_at, updated_at) VALUES
+(22, 205, true, 105, 'PLANNED', 'Makeup for session 105', NOW(), NOW());
 
 -- SCENARIO 5: Pending Makeup Request (Class 2, student 23 - Doan Van Khanh)
 INSERT INTO student_request (id, student_id, current_class_id, request_type, target_session_id, makeup_session_id, status, request_reason, submitted_by, submitted_at) VALUES

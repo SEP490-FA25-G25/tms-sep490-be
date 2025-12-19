@@ -26,7 +26,7 @@ public class CreateUserRequest {
     private String fullName;
 
     // Phone - chỉ cho phép số, 10-11 ký tự
-    @Pattern(regexp = "^(0[3|5|7|8|9])[0-9]{8}$", message = "Phone is invalid")
+    @Pattern(regexp = "^0[0-9]{9}$", message = "Phone must be 10 digits starting with 0")
     private String phone;
 
     private String facebookUrl;
