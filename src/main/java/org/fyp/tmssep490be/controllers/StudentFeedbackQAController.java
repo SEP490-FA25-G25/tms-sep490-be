@@ -23,7 +23,7 @@ public class StudentFeedbackQAController {
     private final StudentFeedbackService studentFeedbackService;
 
     @GetMapping("/classes/{classId}/feedbacks")
-    @PreAuthorize("hasAnyRole('QA','MANAGER')")
+    @PreAuthorize("hasAnyRole('QA','MANAGER','CENTER_HEAD')")
     public ResponseEntity<ResponseObject<StudentFeedbackListResponse>> getClassFeedbacks(
         @PathVariable Long classId,
         @RequestParam(required = false) Long phaseId,
@@ -49,7 +49,7 @@ public class StudentFeedbackQAController {
     }
 
     @GetMapping("/feedbacks/{feedbackId}")
-    @PreAuthorize("hasAnyRole('QA','MANAGER')")
+    @PreAuthorize("hasAnyRole('QA','MANAGER','CENTER_HEAD')")
     public ResponseEntity<ResponseObject<StudentFeedbackDetailDTO>> getFeedbackDetail(
         @PathVariable Long feedbackId,
         @AuthenticationPrincipal UserPrincipal currentUser

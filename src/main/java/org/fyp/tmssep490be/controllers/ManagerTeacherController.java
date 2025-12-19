@@ -29,7 +29,7 @@ public class ManagerTeacherController {
 
     // Lấy danh sách giáo viên trong phạm vi quản lý
     @GetMapping
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','CENTER_HEAD')")
     public ResponseEntity<ResponseObject<List<ManagerTeacherListItemDTO>>> getManagedTeachers(
             @AuthenticationPrincipal UserPrincipal currentUser) {
         log.info("Manager {} requesting managed teachers list", currentUser.getId());
@@ -63,7 +63,7 @@ public class ManagerTeacherController {
 
     // Lấy chi tiết hồ sơ giáo viên trong phạm vi quản lý
     @GetMapping("/{teacherId}/profile")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','CENTER_HEAD')")
     public ResponseEntity<ResponseObject<TeacherProfileDTO>> getTeacherProfile(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long teacherId) {
@@ -74,7 +74,7 @@ public class ManagerTeacherController {
 
     // Lấy lịch dạy theo tuần của giáo viên trong phạm vi quản lý
     @GetMapping("/{teacherId}/schedule")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','CENTER_HEAD')")
     public ResponseEntity<ResponseObject<WeeklyScheduleResponseDTO>> getTeacherWeeklySchedule(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long teacherId,

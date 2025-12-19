@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -127,6 +128,32 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
                         "AND c.approvalStatus = 'APPROVED' " +
                         "AND c.startDate >= :today " +
                         "ORDER BY c.startDate ASC")
-        List<ClassEntity> findUpcomingScheduledClasses(@Param("today") java.time.LocalDate today);
+        List<ClassEntity> findUpcomingScheduledClasses(@Param("today") LocalDate today);
+
+        // Find classes by branches and startDate in range (for Center Head classes-per-day chart)
+        @Query("SELECT c FROM ClassEntity c " +
+                "WHERE c.branch.id IN :branchIds " +
+                "AND c.status != org.fyp.tmssep490be.entities.enums.ClassStatus.CANCELLED " +
+                "AND c.startDate BETWEEN :fromDate AND :toDate")
+        List<ClassEntity> findByBranchesAndStartDateBetween(
+                @Param("branchIds") List<Long> branchIds,
+                @Param("fromDate") LocalDate fromDate,
+                @Param("toDate") LocalDate toDate);
+
+        // Find upcoming classes for specific branches in a date range (for Center Head dashboard)
+        @Query("SELECT c FROM ClassEntity c " +
+                "LEFT JOIN FETCH c.subject s " +
+                "LEFT JOIN FETCH c.branch b " +
+                "LEFT JOIN FETCH c.assignedTeacher t " +
+                "LEFT JOIN FETCH t.userAccount ua " +
+                "WHERE c.branch.id IN :branchIds " +
+                "AND c.status = 'SCHEDULED' " +
+                "AND c.approvalStatus = 'APPROVED' " +
+                "AND c.startDate BETWEEN :fromDate AND :toDate " +
+                "ORDER BY c.startDate ASC")
+        List<ClassEntity> findUpcomingClassesForBranches(
+                @Param("branchIds") List<Long> branchIds,
+                @Param("fromDate") LocalDate fromDate,
+                @Param("toDate") LocalDate toDate);
 
 }
