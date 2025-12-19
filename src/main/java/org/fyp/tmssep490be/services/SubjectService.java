@@ -1062,23 +1062,18 @@ public class SubjectService {
         Subject originalSubject = subjectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học với ID: " + id));
 
-        // Get curriculum and level codes
-        String curriculumCode = originalSubject.getCurriculum() != null ? originalSubject.getCurriculum().getCode()
-                : "UNKNOWN";
-        String levelCode = originalSubject.getLevel() != null ? originalSubject.getLevel().getCode() : "UNKNOWN";
-        int year = originalSubject.getEffectiveDate() != null
-                ? originalSubject.getEffectiveDate().getYear()
-                : java.time.LocalDate.now().getYear();
+        // Get the original code and calculate next version
+        String originalCode = originalSubject.getCode();
 
-        // Calculate new version
-        Integer nextVersion = getNextVersionNumber(curriculumCode, levelCode, year);
-        String logicalCode = String.format("%s-%s-%d", curriculumCode, levelCode, year);
-        String newCode = String.format("%s-V%d", logicalCode, nextVersion);
+        // Extract base code (remove existing version suffix if present, e.g., -V2, -V3)
+        String baseCode = originalCode.replaceAll("-V\\d+$", "");
 
-        // Ensure code uniqueness
+        // Find next available version number for this base code
+        int nextVersion = 2; // Start from V2
+        String newCode = baseCode + "-V" + nextVersion;
         while (subjectRepository.existsByCode(newCode)) {
             nextVersion++;
-            newCode = String.format("%s-V%d", logicalCode, nextVersion);
+            newCode = baseCode + "-V" + nextVersion;
         }
 
         // Get creator
@@ -1089,10 +1084,10 @@ public class SubjectService {
         Subject newSubject = new Subject();
         newSubject.setCurriculum(originalSubject.getCurriculum());
         newSubject.setLevel(originalSubject.getLevel());
-        newSubject.setLogicalSubjectCode(logicalCode);
+        newSubject.setLogicalSubjectCode(baseCode);
         newSubject.setVersion(nextVersion);
         newSubject.setCode(newCode);
-        newSubject.setName(originalSubject.getName() + " (V" + nextVersion + ")");
+        newSubject.setName(originalSubject.getName() + " (Bản sao)");
         newSubject.setDescription(originalSubject.getDescription());
         newSubject.setScoreScale(originalSubject.getScoreScale());
         newSubject.setTotalHours(originalSubject.getTotalHours());

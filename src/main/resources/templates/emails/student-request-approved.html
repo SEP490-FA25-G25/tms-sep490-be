@@ -109,16 +109,11 @@
             <div class="request-info">
                 <p><strong>Loại yêu cầu:</strong> <span th:text="${requestType}">Nghỉ học có phép</span></p>
                 <p><strong>Lớp học:</strong> <span th:text="${className}">PRE-IELTS-001</span></p>
-                <p><strong>Buổi học:</strong> <span th:text="${sessionInfo}">25/12/2025 - Slot 1</span></p>
-                <p th:if="${makeupSessionInfo}"><strong>Buổi học bù:</strong> <span th:text="${makeupSessionInfo}">28/12/2025 - Slot 2</span></p>
+                <p><strong>Buổi học:</strong> <span th:text="${sessionInfo}">Thứ 6, 20/12/2025 | 18:30-20:30 | Phòng 301</span></p>
+                <p th:if="${makeupSessionInfo}"><strong>Buổi học bù:</strong> <span th:text="${makeupSessionInfo}">Thứ 7, 28/12/2025 | 14:00-16:00 | Phòng 205</span></p>
                 <p th:if="${targetClassInfo}"><strong>Lớp chuyển đến:</strong> <span th:text="${targetClassInfo}">PRE-IELTS-002</span></p>
                 <p><strong>Người duyệt:</strong> <span th:text="${decidedBy}">Giáo vụ</span></p>
-                <p><strong>Ngày duyệt:</strong> <span th:text="${decidedAt}">18/12/2025</span></p>
-            </div>
-
-            <div class="info-box" th:if="${note}">
-                <strong>📝 Ghi chú từ giáo vụ:</strong>
-                <p th:text="${note}">Đã xác nhận yêu cầu của bạn.</p>
+                <p><strong>Ngày duyệt:</strong> <span th:text="${decidedAt}">18/12/2025 15:30</span></p>
             </div>
 
             <div style="text-align: center;">

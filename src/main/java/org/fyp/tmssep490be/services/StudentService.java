@@ -978,9 +978,20 @@ public class StudentService {
 
         if (studentOpt.isEmpty()) {
             // User exists but not a student (maybe teacher, AA, etc.)
+            // Get user's primary role for display (using role code like TEACHER, QA, etc.)
+            String roleDisplay = user.getUserRoles().stream()
+                    .findFirst()
+                    .map(userRole -> userRole.getRole().getCode())
+                    .orElse("USER");
+            
             return CheckStudentExistenceResponse.builder()
-                    .exists(false)
-                    .canAddToCurrentBranch(true)
+                    .exists(false) // Not a student
+                    .isUserAccount(true) // But is an existing user
+                    .userRole(roleDisplay)
+                    .fullName(user.getFullName())
+                    .email(user.getEmail())
+                    .phone(user.getPhone())
+                    .canAddToCurrentBranch(false) // Cannot use this email/phone
                     .build();
         }
 
