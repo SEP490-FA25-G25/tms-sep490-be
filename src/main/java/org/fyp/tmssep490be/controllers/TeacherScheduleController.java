@@ -47,19 +47,19 @@ public class TeacherScheduleController {
             @RequestParam(required = false)
             Long classId
     ) {
-        log.info("Teacher {} requesting weekly schedule for week: {}, class: {}",
+        log.info("Giáo viên {} yêu cầu lịch dạy tuần: {}, lớp: {}",
                 userPrincipal.getId(), weekStart, classId);
 
         Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
 
         if (weekStart == null) {
             weekStart = teacherScheduleService.getCurrentWeekStart();
-            log.debug("Using current week start: {}", weekStart);
+            log.debug("Sử dụng tuần hiện tại bắt đầu từ: {}", weekStart);
         }
 
         // Validate weekStart is Monday
         if (weekStart.getDayOfWeek() != java.time.DayOfWeek.MONDAY) {
-            log.warn("Invalid weekStart provided: {} (not a Monday)", weekStart);
+            log.warn("weekStart không hợp lệ: {} (không phải thứ Hai)", weekStart);
             return ResponseEntity.badRequest().body(
                     ResponseObject.<WeeklyScheduleResponseDTO>builder()
                             .success(false)
@@ -68,7 +68,7 @@ public class TeacherScheduleController {
             );
         }
 
-        WeeklyScheduleResponseDTO schedule = teacherScheduleService.getWeeklySchedule(teacherId, weekStart, classId);
+        WeeklyScheduleResponseDTO schedule = teacherScheduleService.getWeeklySchedule(teacherId, weekStart, classId, null);
 
         return ResponseEntity.ok(
                 ResponseObject.<WeeklyScheduleResponseDTO>builder()
@@ -85,7 +85,7 @@ public class TeacherScheduleController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long sessionId
     ) {
-        log.info("Teacher {} requesting details for session: {}", userPrincipal.getId(), sessionId);
+        log.info("Giáo viên {} yêu cầu chi tiết buổi học: {}", userPrincipal.getId(), sessionId);
 
         Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
 

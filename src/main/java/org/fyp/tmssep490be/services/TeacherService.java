@@ -91,7 +91,7 @@ public class TeacherService {
         }
 
         // Lấy tất cả các lớp học riêng biệt mà giáo viên này dạy
-        List<ClassEntity> allClasses = teachingSlotRepository.findDistinctClassesByTeacherId(teacher.getId());
+        List<ClassEntity> allClasses = teachingSlotRepository.findDistinctClassesByTeacherId(teacher.getId(), null);
 
         // Lọc lớp học theo trạng thái
         long totalClasses = allClasses.size();

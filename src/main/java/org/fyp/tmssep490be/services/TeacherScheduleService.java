@@ -42,8 +42,8 @@ public class TeacherScheduleService {
     }
 
     @Transactional(readOnly = true)
-    public WeeklyScheduleResponseDTO getWeeklySchedule(Long teacherId, LocalDate weekStart, Long classId) {
-        log.info("Getting weekly schedule for teacher: {}, week: {}, class: {}", teacherId, weekStart, classId);
+    public WeeklyScheduleResponseDTO getWeeklySchedule(Long teacherId, LocalDate weekStart, Long classId, Long branchId) {
+        log.info("Lấy lịch dạy tuần cho giáo viên: {}, tuần: {}, lớp: {}, chi nhánh: {}", teacherId, weekStart, classId, branchId);
 
         // 1. Kiểm tra weekStart phải là thứ Hai
         if (weekStart.getDayOfWeek() != DayOfWeek.MONDAY) {
@@ -57,11 +57,11 @@ public class TeacherScheduleService {
         Teacher teacher = teacherRepository.findById(teacherId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEACHER_NOT_FOUND));
 
-        // 4. Lấy tất cả buổi trong tuần (mọi trạng thái)
+        // 4. Lấy tất cả buổi trong tuần (mọi trạng thái), filter theo branchId nếu có
         List<Session> sessions = sessionRepository.findWeeklySessionsForTeacher(
-                teacherId, weekStart, weekEnd, classId);
+                teacherId, weekStart, weekEnd, classId, branchId);
 
-        log.debug("Found {} sessions for week {} to {}", sessions.size(), weekStart, weekEnd);
+        log.debug("Tìm thấy {} buổi học trong tuần từ {} đến {}", sessions.size(), weekStart, weekEnd);
 
         // 5. Lấy toàn bộ khung giờ của các cơ sở mà giáo viên có lớp
         List<TimeSlotDTO> timeSlots = getAllTimeSlotsForTeacher(teacherId);
@@ -78,7 +78,7 @@ public class TeacherScheduleService {
             scheduleMap.putIfAbsent(day, new ArrayList<>());
         }
 
-        log.info("Schedule map for teacher {}: {} total sessions across {} days with data",
+        log.info("Bản đồ lịch dạy cho giáo viên {}: tổng {} buổi học trên {} ngày có dữ liệu",
                 teacherId,
                 scheduleMap.values().stream().mapToInt(List::size).sum(),
                 scheduleMap.values().stream().filter(list -> !list.isEmpty()).count());
@@ -96,7 +96,7 @@ public class TeacherScheduleService {
 
     @Transactional(readOnly = true)
     public TeacherSessionDetailDTO getSessionDetail(Long teacherId, Long sessionId) {
-        log.info("Getting session detail for teacher: {}, session: {}", teacherId, sessionId);
+        log.info("Lấy chi tiết buổi học cho giáo viên: {}, buổi học: {}", teacherId, sessionId);
 
         // 1. Lấy session và kiểm tra quyền truy cập
         Session session = sessionRepository.findById(sessionId)
@@ -257,7 +257,7 @@ public class TeacherScheduleService {
                 try {
                     return objectMapper.readValue(skillsText, new TypeReference<List<String>>() {});
                 } catch (JsonProcessingException e) {
-                    log.warn("Failed to parse skills JSON array: {}", skillsText, e);
+                    log.warn("Không thể parse mảng JSON skills: {}", skillsText, e);
                     return new ArrayList<>();
                 }
             }
@@ -322,14 +322,14 @@ public class TeacherScheduleService {
     }
 
     private List<TimeSlotDTO> getAllTimeSlotsForTeacher(Long teacherId) {
-        log.debug("Getting all time slots for teacher: {}", teacherId);
+        log.debug("Lấy tất cả khung giờ cho giáo viên: {}", teacherId);
 
         // 1. Lấy tất cả chi nhánh nơi giáo viên có lớp
         // Dò phiên dạy trong dải ngày rộng để gom đủ chi nhánh
         LocalDate fromDate = LocalDate.now().minusYears(1);
         LocalDate toDate = LocalDate.now().plusYears(1);
         List<Session> allSessions = sessionRepository.findWeeklySessionsForTeacher(
-                teacherId, fromDate, toDate, null);
+                teacherId, fromDate, toDate, null, null);
         
         Set<Long> branchIds = allSessions.stream()
                 .map(s -> s.getClassEntity().getBranch().getId())

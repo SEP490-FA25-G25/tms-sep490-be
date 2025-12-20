@@ -47,13 +47,14 @@ public class TeacherController {
     @GetMapping("/classes")
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ResponseObject<List<TeacherClassListItemDTO>>> getTeacherClasses(
-            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam(required = false) Long branchId) {
         
         // Lấy ID giáo viên từ JWT token
         Long teacherId = teacherContextHelper.getTeacherId(userPrincipal);
         
-        // Lấy lớp học được phân công cho giáo viên theo teacherId
-        List<TeacherClassListItemDTO> classes = teacherClassService.getTeacherClasses(teacherId);
+        // Lấy lớp học được phân công cho giáo viên theo teacherId và branchId
+        List<TeacherClassListItemDTO> classes = teacherClassService.getTeacherClasses(teacherId, branchId);
         
         // Trả về response
         return ResponseEntity.ok(

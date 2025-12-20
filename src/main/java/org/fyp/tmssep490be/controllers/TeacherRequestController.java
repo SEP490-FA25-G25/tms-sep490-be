@@ -46,8 +46,10 @@ public class TeacherRequestController {
     public ResponseEntity<ResponseObject<List<TeacherRequestListDTO>>> getMyRequests(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         
-        // Lấy danh sách yêu cầu của giáo viên
-        List<TeacherRequestListDTO> requests = teacherRequestService.getMyRequests(userPrincipal.getId());
+        log.info("Giáo viên {} yêu cầu danh sách yêu cầu", userPrincipal.getId());
+        
+        // Lấy danh sách yêu cầu của giáo viên (hiển thị tất cả, không filter theo branch)
+        List<TeacherRequestListDTO> requests = teacherRequestService.getMyRequests(userPrincipal.getId(), null);
         
         return ResponseEntity.ok(
                 ResponseObject.<List<TeacherRequestListDTO>>builder()

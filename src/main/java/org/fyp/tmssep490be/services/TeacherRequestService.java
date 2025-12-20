@@ -868,16 +868,19 @@ public class TeacherRequestService {
     }
 
     //Lấy tất cả yêu cầu của giáo viên theo userId
-    public List<TeacherRequestListDTO> getMyRequests(Long userId) {
-        log.debug("Getting requests for user {}", userId);
+    public List<TeacherRequestListDTO> getMyRequests(Long userId, Long branchId) {
+        log.debug("Lấy danh sách yêu cầu cho user {}, chi nhánh: {}", userId, branchId);
 
         // Lấy teacher từ userAccountId
         Teacher teacher = teacherRepository.findByUserAccountId(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND, "Teacher profile not found for current user"));
 
         // Lấy tất cả yêu cầu: cả yêu cầu do giáo viên tạo và yêu cầu mà giáo viên là người thay thế
+        // Filter theo branchId nếu có (null = hiển thị tất cả)
         List<TeacherRequest> requests = teacherRequestRepository
-                .findByTeacherIdOrReplacementTeacherIdOrderBySubmittedAtDesc(teacher.getId());
+                .findByTeacherIdOrReplacementTeacherIdOrderBySubmittedAtDesc(teacher.getId(), branchId);
+
+        log.info("Tìm thấy {} yêu cầu cho giáo viên {} (chi nhánh: {})", requests.size(), teacher.getId(), branchId);
 
         // Map sang DTO
         return requests.stream()

@@ -14,6 +14,7 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
 
     //Lấy tất cả yêu cầu của giáo viên (bao gồm cả yêu cầu mà giáo viên là người thay thế)
     //Sắp xếp theo thời gian submit giảm dần
+    //Filter theo branchId nếu có
     @Query("SELECT tr FROM TeacherRequest tr " +
            "LEFT JOIN FETCH tr.teacher t " +
            "LEFT JOIN FETCH t.userAccount ua " +
@@ -21,9 +22,10 @@ public interface TeacherRequestRepository extends JpaRepository<TeacherRequest, 
            "LEFT JOIN FETCH rt.userAccount rua " +
            "LEFT JOIN FETCH tr.session s " +
            "LEFT JOIN FETCH s.classEntity c " +
-           "WHERE tr.teacher.id = :teacherId OR (tr.replacementTeacher IS NOT NULL AND tr.replacementTeacher.id = :teacherId) " +
+           "WHERE (tr.teacher.id = :teacherId OR (tr.replacementTeacher IS NOT NULL AND tr.replacementTeacher.id = :teacherId)) " +
+           "AND (:branchId IS NULL OR s.classEntity.branch.id = :branchId) " +
            "ORDER BY tr.submittedAt DESC")
-    List<TeacherRequest> findByTeacherIdOrReplacementTeacherIdOrderBySubmittedAtDesc(@Param("teacherId") Long teacherId);
+    List<TeacherRequest> findByTeacherIdOrReplacementTeacherIdOrderBySubmittedAtDesc(@Param("teacherId") Long teacherId, @Param("branchId") Long branchId);
 
     //Lất tất cả yêu cầu của giáo viên
     //Sắp xếp theo thời gian submit giảm dần

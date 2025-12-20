@@ -569,7 +569,7 @@ public class AttendanceService {
     }
 
     public List<TeacherClassListItemDTO> getTeacherClasses(Long teacherId) {
-        List<ClassEntity> classes = teachingSlotRepository.findDistinctClassesByTeacherId(teacherId);
+        List<ClassEntity> classes = teachingSlotRepository.findDistinctClassesByTeacherId(teacherId, null);
         return classes.stream()
                 .map(this::mapToTeacherClassListItemDTO)
                 .collect(Collectors.toList());

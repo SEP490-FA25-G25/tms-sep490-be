@@ -50,10 +50,14 @@ public class TeacherClassService {
     private final SubjectService subjectService;
     private final AttendanceService attendanceService;
 
-    // Lấy tất cả lớp học được phân công cho giáo viên theo teacherId
-    public List<TeacherClassListItemDTO> getTeacherClasses(Long teacherId) {
+    // Lấy tất cả lớp học được phân công cho giáo viên theo teacherId và branchId
+    public List<TeacherClassListItemDTO> getTeacherClasses(Long teacherId, Long branchId) {
+        log.debug("Lấy danh sách lớp học cho giáo viên: {}, chi nhánh: {}", teacherId, branchId);
+        
         // Query các lớp học riêng biệt mà giáo viên có teaching slots với trạng thái SCHEDULED
-        List<ClassEntity> classes = teachingSlotRepository.findDistinctClassesByTeacherId(teacherId);
+        List<ClassEntity> classes = teachingSlotRepository.findDistinctClassesByTeacherId(teacherId, branchId);
+        
+        log.info("Tìm thấy {} lớp học cho giáo viên {} (chi nhánh: {})", classes.size(), teacherId, branchId);
         
         // Chuyển đổi Entity sang DTO để trả về
         return classes.stream()

@@ -338,6 +338,8 @@ INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES
 INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 1, 6 FROM user_account WHERE id BETWEEN 20 AND 27;
 -- Teachers - HCM (original)
 INSERT INTO user_branches (user_id, branch_id, assigned_by) SELECT id, 2, 8 FROM user_account WHERE id BETWEEN 28 AND 35;
+-- Teacher 20 (John Smith) dạy cả HN và HCM
+INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES (20, 2, 6);
 -- New Teachers - HN (TOEIC, Weekend, Evening)
 INSERT INTO user_branches (user_id, branch_id, assigned_by) VALUES (36, 1, 6), (37, 1, 6), (38, 1, 6), (39, 1, 6), (40, 1, 6), (43, 1, 6);
 -- New Teachers - HCM (TOEIC, Weekend)

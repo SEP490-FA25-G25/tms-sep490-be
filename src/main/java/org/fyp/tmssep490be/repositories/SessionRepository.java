@@ -98,12 +98,14 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             WHERE slotTeacher.id = :teacherId
               AND s.date BETWEEN :fromDate AND :toDate
               AND (:classId IS NULL OR c.id = :classId)
+              AND (:branchId IS NULL OR c.branch.id = :branchId)
             ORDER BY s.date ASC, tst.startTime ASC
             """)
     List<Session> findWeeklySessionsForTeacher(@Param("teacherId") Long teacherId,
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate,
-            @Param("classId") Long classId);
+            @Param("classId") Long classId,
+            @Param("branchId") Long branchId);
 
     // Học viên chọn buổi học bù -> join với class để kiểm tra chi nhánh và hình
     // thức điều kiện cùng môn

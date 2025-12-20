@@ -22,10 +22,12 @@ public interface TeachingSlotRepository extends JpaRepository<TeachingSlot, Teac
         JOIN FETCH c.branch
         WHERE ts.teacher.id = :teacherId
           AND ts.status = 'SCHEDULED'
+          AND (:branchId IS NULL OR c.branch.id = :branchId)
         ORDER BY c.code ASC
         """)
     List<org.fyp.tmssep490be.entities.ClassEntity> findDistinctClassesByTeacherId(
-        @Param("teacherId") Long teacherId);
+        @Param("teacherId") Long teacherId,
+        @Param("branchId") Long branchId);
 
     @Query("SELECT ts FROM TeachingSlot ts WHERE ts.session.classEntity.id = :classId AND ts.status = :status")
     List<TeachingSlot> findByClassEntityIdAndStatus(@Param("classId") Long classId,

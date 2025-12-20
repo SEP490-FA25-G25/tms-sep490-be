@@ -217,7 +217,7 @@ public class ManagerTeacherService {
 
         ensureTeacherInManagerScope(managerUserId, teacher);
 
-        return teacherScheduleService.getWeeklySchedule(teacher.getId(), weekStart, null);
+        return teacherScheduleService.getWeeklySchedule(teacher.getId(), weekStart, null, null);
     }
 
     // Đảm bảo giáo viên thuộc ít nhất một chi nhánh trong phạm vi quản lý của manager
