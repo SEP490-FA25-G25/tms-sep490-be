@@ -125,7 +125,10 @@ public class QAService {
             List<Long> sessionIds = sessions.stream().map(Session::getId).toList();
 
             // Map thông tin học bù
+            // makeupCompletedMap: sessionId -> studentId -> hasCompletedMakeup (PRESENT)
+            // makeupAttemptedMap: sessionId -> Set<studentId> (có attempt bất kể PRESENT hay ABSENT)
             Map<Long, Map<Long, Boolean>> makeupCompletedMap = new HashMap<>();
+            Map<Long, Set<Long>> makeupAttemptedMap = new HashMap<>();
             if (!sessionIds.isEmpty()) {
                 studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
                         .forEach(ss -> {
@@ -139,6 +142,10 @@ public class QAService {
                                 return;
                             }
 
+                            // Track attempt
+                            makeupAttemptedMap.computeIfAbsent(originalSessionId, k -> new HashSet<>()).add(studentId);
+                            
+                            // Track completion
                             makeupCompletedMap
                                     .computeIfAbsent(originalSessionId, k -> new HashMap<>())
                                     .merge(
@@ -171,33 +178,8 @@ public class QAService {
                     } else if (status == AttendanceStatus.ABSENT) {
                         totalCounts.put(classId, totalCounts.getOrDefault(classId, 0L) + 1);
                     } else if (status == AttendanceStatus.EXCUSED) {
-                        // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
-                        boolean hasMakeupCompleted = makeupCompletedMap
-                                .getOrDefault(session.getId(), Map.of())
-                                .getOrDefault(ss.getStudent().getId(), false);
-
-                        if (hasMakeupCompleted) {
-                            // EXCUSED có học bù (chấm xanh) → tính như PRESENT
-                            presentCounts.put(classId, presentCounts.getOrDefault(classId, 0L) + 1);
-                            totalCounts.put(classId, totalCounts.getOrDefault(classId, 0L) + 1);
-                        } else {
-                            // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
-                            LocalDate sessionDate = session.getDate();
-                            LocalDateTime sessionEndDateTime;
-                            if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
-                                java.time.LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
-                                sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
-                            } else {
-                                sessionEndDateTime = LocalDateTime.of(sessionDate, java.time.LocalTime.MAX);
-                            }
-
-                            boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
-                            if (isAfterSessionEnd) {
-                                // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
-                                totalCounts.put(classId, totalCounts.getOrDefault(classId, 0L) + 1);
-                            }
-                            // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
-                        }
+                        // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
+                        // Không tính vào present hay absent
                     }
                 }
             }

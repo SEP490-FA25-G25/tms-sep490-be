@@ -121,6 +121,7 @@ public class StudentAttendanceService {
                     int attended = 0;
                     int absent = 0;
                     int excused = 0;
+                    int excusedCompleted = 0;  // Số buổi EXCUSED đã học bù thành công
                     int upcoming = 0;
                     LocalDateTime now = LocalDateTime.now();
                     
@@ -135,38 +136,18 @@ public class StudentAttendanceService {
                             case PRESENT -> attended++;
                             case ABSENT -> absent++;
                             case EXCUSED -> {
-                                excused++; // Vẫn đếm riêng để hiển thị
+                                excused++; // Đếm tổng EXCUSED
                                 
-                                // Logic: EXCUSED phải có makeup PRESENT mới tính là PRESENT
+                                // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
+                                // Chỉ tracking "X/Y buổi đã học bù" để hiển thị riêng
                                 Map<Long, Boolean> studentMakeupMap = makeupCompletedMap.getOrDefault(session.getId(), Map.of());
                                 Long currentStudentId = ss.getStudent().getId();
-                                boolean hasMakeupAttempt = studentMakeupMap.containsKey(currentStudentId);
                                 boolean hasMakeupCompleted = studentMakeupMap.getOrDefault(currentStudentId, false);
 
                                 if (hasMakeupCompleted) {
-                                    // EXCUSED có makeup PRESENT → tính như PRESENT
-                                    attended++;
-                                } else if (hasMakeupAttempt) {
-                                    // EXCUSED có makeup ABSENT → tính như ABSENT
-                                    absent++;
-                                } else {
-                                    // EXCUSED không có makeup
-                                    LocalDate sessionDate = session.getDate();
-                                    LocalDateTime sessionEndDateTime;
-                                    if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
-                                        LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
-                                        sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
-                                    } else {
-                                        sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
-                                    }
-
-                                    boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
-                                    if (isAfterSessionEnd) {
-                                        // EXCUSED không makeup + qua deadline → tính như ABSENT
-                                        absent++;
-                                    }
-                                    // Chưa qua deadline → bỏ qua (chờ học bù)
+                                    excusedCompleted++;
                                 }
+                                // Không tính vào attended hay absent - EXCUSED là trung hòa
                             }
                             case PLANNED -> upcoming++;
                             default -> {
@@ -189,6 +170,7 @@ public class StudentAttendanceService {
                             .attended(attended)
                             .absent(absent)
                             .excused(excused)
+                            .excusedCompleted(excusedCompleted)
                             .upcoming(upcoming)
                             .status(classEntity.getStatus().name())
                             .enrollmentStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : null)
@@ -286,6 +268,7 @@ public class StudentAttendanceService {
         int attended = 0;
         int absent = 0;
         int excused = 0;
+        int excusedCompleted = 0;  // Số buổi EXCUSED đã học bù thành công
         int upcoming = 0;
         LocalDateTime now = LocalDateTime.now();
         
@@ -300,43 +283,18 @@ public class StudentAttendanceService {
                 case PRESENT -> attended++;
                 case ABSENT -> absent++;
                 case EXCUSED -> {
-                    excused++; // Vẫn đếm riêng để hiển thị
+                    excused++; // Đếm tổng EXCUSED
                     
-                    // Logic: EXCUSED phải có makeup PRESENT mới tính là PRESENT
-                    // 1. EXCUSED có makeup PRESENT → attended++
-                    // 2. EXCUSED có makeup ABSENT → absent++
-                    // 3. EXCUSED không có makeup + qua deadline → absent++
-                    // 4. EXCUSED không có makeup + chưa qua deadline → bỏ qua (chờ học bù)
-                    
+                    // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
+                    // Chỉ tracking "X/Y buổi đã học bù" để hiển thị riêng
                     Map<Long, Boolean> studentMakeupMap = makeupCompletedMap.getOrDefault(session.getId(), Map.of());
                     Long currentStudentId = ss.getStudent().getId();
-                    boolean hasMakeupAttempt = studentMakeupMap.containsKey(currentStudentId);
                     boolean hasMakeupCompleted = studentMakeupMap.getOrDefault(currentStudentId, false);
 
                     if (hasMakeupCompleted) {
-                        // Case 1: EXCUSED có makeup PRESENT → tính như PRESENT
-                        attended++;
-                    } else if (hasMakeupAttempt) {
-                        // Case 2: EXCUSED có makeup ABSENT → tính như ABSENT
-                        absent++;
-                    } else {
-                        // Case 3 & 4: EXCUSED không có makeup
-                        LocalDate sessionDate = session.getDate();
-                        LocalDateTime sessionEndDateTime;
-                        if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
-                            LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
-                            sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
-                        } else {
-                            sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
-                        }
-
-                        boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
-                        if (isAfterSessionEnd) {
-                            // Case 3: EXCUSED không makeup + qua deadline → tính như ABSENT
-                            absent++;
-                        }
-                        // Case 4: Chưa qua deadline → bỏ qua (chờ học bù)
+                        excusedCompleted++;
                     }
+                    // Không tính vào attended hay absent - EXCUSED là trung hòa
                 }
                 case PLANNED -> upcoming++;
                 default -> {
@@ -433,6 +391,7 @@ public class StudentAttendanceService {
                 .attended(attended)
                 .absent(absent)
                 .excused(excused)
+                .excusedCompleted(excusedCompleted)
                 .upcoming(upcoming)
                 .attendanceRate(rate)
                 .build();

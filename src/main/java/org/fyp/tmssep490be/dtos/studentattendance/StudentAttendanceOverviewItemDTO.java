@@ -28,6 +28,7 @@ public class StudentAttendanceOverviewItemDTO {
     private int attended;
     private int absent;
     private int excused;
+    private int excusedCompleted;  // Số buổi EXCUSED đã học bù thành công
     private int upcoming;
     private String status;
     private String enrollmentStatus;  // ENROLLED, TRANSFERRED, COMPLETED

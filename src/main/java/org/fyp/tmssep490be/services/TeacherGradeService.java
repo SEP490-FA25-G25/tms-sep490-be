@@ -39,6 +39,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -264,11 +265,13 @@ public class TeacherGradeService {
                                                         .toList();
 
                                         // Map thông tin học bù
+                                        // Key: originalSessionId, Value: Boolean (true = có PRESENT, false = chỉ có ABSENT)
                                         List<Long> sessionIds = studentSessions.stream()
                                                         .map(ss -> ss.getSession().getId())
                                                         .distinct()
                                                         .toList();
                                         Map<Long, Boolean> makeupCompletedMap = new HashMap<>();
+                                        Set<Long> makeupAttemptedSessions = new HashSet<>();
                                         if (!sessionIds.isEmpty()) {
                                                 studentSessionRepository
                                                                 .findMakeupSessionsByOriginalSessionIds(sessionIds)
@@ -279,8 +282,10 @@ public class TeacherGradeService {
                                                                                         .getOriginalSession();
                                                                         if (originalSession != null && originalSession
                                                                                         .getId() != null) {
+                                                                                Long origId = originalSession.getId();
+                                                                                makeupAttemptedSessions.add(origId);
                                                                                 makeupCompletedMap.merge(
-                                                                                                originalSession.getId(),
+                                                                                                origId,
                                                                                                 ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
                                                                                                 (oldVal, newVal) -> oldVal
                                                                                                                 || newVal);
@@ -301,41 +306,8 @@ public class TeacherGradeService {
                                                 } else if (status == AttendanceStatus.ABSENT) {
                                                         absent++;
                                                 } else if (status == AttendanceStatus.EXCUSED) {
-                                                        // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
-                                                        boolean hasMakeupCompleted = makeupCompletedMap
-                                                                        .getOrDefault(session.getId(), false);
-
-                                                        if (hasMakeupCompleted) {
-                                                                // EXCUSED có học bù (chấm xanh) → tính như PRESENT
-                                                                present++;
-                                                        } else {
-                                                                // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
-                                                                LocalDate sessionDate = session.getDate();
-                                                                LocalDateTime sessionEndDateTime;
-                                                                if (session.getTimeSlotTemplate() != null
-                                                                                && session.getTimeSlotTemplate()
-                                                                                                .getEndTime() != null) {
-                                                                        java.time.LocalTime endTime = session
-                                                                                        .getTimeSlotTemplate()
-                                                                                        .getEndTime();
-                                                                        sessionEndDateTime = LocalDateTime
-                                                                                        .of(sessionDate, endTime);
-                                                                } else {
-                                                                        sessionEndDateTime = LocalDateTime.of(
-                                                                                        sessionDate,
-                                                                                        java.time.LocalTime.MAX);
-                                                                }
-
-                                                                boolean isAfterSessionEnd = now
-                                                                                .isAfter(sessionEndDateTime);
-                                                                if (isAfterSessionEnd) {
-                                                                        // EXCUSED không học bù và đã qua giờ kết thúc
-                                                                        // (chấm đỏ) → tính như ABSENT
-                                                                        absent++;
-                                                                }
-                                                                // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ
-                                                                // lệ)
-                                                        }
+                                                        // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
+                                                        // Không tính vào present hay absent
                                                 }
                                         }
 
