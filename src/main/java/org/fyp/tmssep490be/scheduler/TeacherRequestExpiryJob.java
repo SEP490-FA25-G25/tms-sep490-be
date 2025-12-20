@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -22,8 +24,8 @@ import java.util.List;
  * Scheduled job to automatically cancel expired teacher requests.
  *
  * Functionality:
- * - Cancels PENDING teacher requests after configurable days (default: 7 days) OR when session date has passed
- * - Cancels WAITING_CONFIRM replacement requests after configurable days (default: 3 days) OR when session date has passed
+ * - Cancels PENDING teacher requests after configurable days (default: 7 days) OR when session startTime has passed
+ * - Cancels WAITING_CONFIRM replacement requests after configurable days (default: 7 days) OR when session startTime has passed
  * - Updates status to CANCELLED and adds expiry note
  *
  * Runs daily at 3:30 AM (configurable via application.yml)
@@ -45,7 +47,7 @@ public class TeacherRequestExpiryJob extends BaseScheduledJob {
     @Value("${tms.scheduler.jobs.teacher-request-expiry.pending-expiry-days:7}")
     private int pendingExpiryDays;
 
-    @Value("${tms.scheduler.jobs.teacher-request-expiry.waiting-confirm-expiry-days:3}")
+    @Value("${tms.scheduler.jobs.teacher-request-expiry.waiting-confirm-expiry-days:7}")
     private int waitingConfirmExpiryDays;
 
     @PostConstruct
@@ -72,7 +74,7 @@ public class TeacherRequestExpiryJob extends BaseScheduledJob {
             logJobStart("TeacherRequestExpiry");
 
             OffsetDateTime now = OffsetDateTime.now();
-            LocalDate today = LocalDate.now();
+            LocalDateTime nowDateTime = LocalDateTime.now();
             OffsetDateTime pendingCutoffDate = now.minusDays(pendingExpiryDays);
             OffsetDateTime waitingConfirmCutoffDate = now.minusDays(waitingConfirmExpiryDays);
 
@@ -92,12 +94,17 @@ public class TeacherRequestExpiryJob extends BaseScheduledJob {
                     expiryReason = String.format("Tự động hủy do quá %d ngày không xử lý (hệ thống)", pendingExpiryDays);
                 }
                 
-                // Check 2: Session date đã qua (ưu tiên hơn)
-                LocalDate sessionDate = getSessionDateForExpiry(request);
-                if (sessionDate != null && sessionDate.isBefore(today)) {
+                // Check 2: Session startTime đã qua (ưu tiên hơn)
+                LocalDateTime sessionStartDateTime = getSessionStartDateTimeForExpiry(request);
+                if (sessionStartDateTime != null && sessionStartDateTime.isBefore(nowDateTime)) {
                     shouldExpire = true;
-                    long daysPassed = java.time.temporal.ChronoUnit.DAYS.between(sessionDate, today);
-                    expiryReason = String.format("Tự động hủy do buổi học đã qua %d ngày (hệ thống)", daysPassed);
+                    long hoursPassed = java.time.temporal.ChronoUnit.HOURS.between(sessionStartDateTime, nowDateTime);
+                    long daysPassed = hoursPassed / 24;
+                    if (daysPassed > 0) {
+                        expiryReason = String.format("Tự động hủy do buổi học đã bắt đầu từ %d ngày trước (hệ thống)", daysPassed);
+                    } else {
+                        expiryReason = String.format("Tự động hủy do buổi học đã bắt đầu từ %d giờ trước (hệ thống)", hoursPassed);
+                    }
                 }
 
                 if (shouldExpire) {
@@ -129,12 +136,17 @@ public class TeacherRequestExpiryJob extends BaseScheduledJob {
                     expiryReason = String.format("Tự động hủy do giáo viên thay thế không xác nhận trong %d ngày (hệ thống)", waitingConfirmExpiryDays);
                 }
                 
-                // Check 2: Session date đã qua (ưu tiên hơn)
-                LocalDate sessionDate = getSessionDateForExpiry(request);
-                if (sessionDate != null && sessionDate.isBefore(today)) {
+                // Check 2: Session startTime đã qua (ưu tiên hơn)
+                LocalDateTime sessionStartDateTime = getSessionStartDateTimeForExpiry(request);
+                if (sessionStartDateTime != null && sessionStartDateTime.isBefore(nowDateTime)) {
                     shouldExpire = true;
-                    long daysPassed = java.time.temporal.ChronoUnit.DAYS.between(sessionDate, today);
-                    expiryReason = String.format("Tự động hủy do buổi học đã qua %d ngày (hệ thống)", daysPassed);
+                    long hoursPassed = java.time.temporal.ChronoUnit.HOURS.between(sessionStartDateTime, nowDateTime);
+                    long daysPassed = hoursPassed / 24;
+                    if (daysPassed > 0) {
+                        expiryReason = String.format("Tự động hủy do buổi học đã bắt đầu từ %d ngày trước (hệ thống)", daysPassed);
+                    } else {
+                        expiryReason = String.format("Tự động hủy do buổi học đã bắt đầu từ %d giờ trước (hệ thống)", hoursPassed);
+                    }
                 }
 
                 if (shouldExpire) {
@@ -165,35 +177,60 @@ public class TeacherRequestExpiryJob extends BaseScheduledJob {
     }
 
     /**
-     * Lấy session date để check expiry.
-     * Với RESCHEDULE: lấy ngày sớm hơn giữa session gốc và newSession (ngày gần hơn với hôm nay)
-     * Với các loại khác: lấy session.date
+     * Lấy session startDateTime để check expiry.
+     * Với RESCHEDULE: lấy startDateTime sớm hơn giữa session gốc và newSession
+     * Với các loại khác: lấy session.date + session.startTime
      */
-    private LocalDate getSessionDateForExpiry(TeacherRequest request) {
-        LocalDate originalDate = null;
-        LocalDate newDate = null;
+    private LocalDateTime getSessionStartDateTimeForExpiry(TeacherRequest request) {
+        LocalDateTime originalStartDateTime = null;
+        LocalDateTime newStartDateTime = null;
 
-        // Lấy date của session gốc
+        // Lấy startDateTime của session gốc
         if (request.getSession() != null) {
-            originalDate = request.getSession().getDate();
+            originalStartDateTime = getSessionStartDateTime(request.getSession());
         }
 
-        // Với RESCHEDULE, lấy date của session mới
+        // Với RESCHEDULE, lấy startDateTime của session mới
         if (request.getRequestType() == TeacherRequestType.RESCHEDULE) {
             if (request.getNewSession() != null) {
-                newDate = request.getNewSession().getDate();
-            } else if (request.getNewDate() != null) {
-                newDate = request.getNewDate();
+                newStartDateTime = getSessionStartDateTime(request.getNewSession());
+            } else if (request.getNewDate() != null && request.getNewTimeSlot() != null) {
+                // Nếu chưa có newSession nhưng có newDate và newTimeSlot
+                LocalTime startTime = request.getNewTimeSlot().getStartTime();
+                if (startTime != null) {
+                    newStartDateTime = LocalDateTime.of(request.getNewDate(), startTime);
+                }
             }
         }
 
-        // Nếu có cả 2 date, lấy ngày sớm hơn (gần hơn với hôm nay)
-        if (originalDate != null && newDate != null) {
-            return originalDate.isBefore(newDate) ? originalDate : newDate;
+        // Nếu có cả 2 startDateTime, lấy cái sớm hơn
+        if (originalStartDateTime != null && newStartDateTime != null) {
+            return originalStartDateTime.isBefore(newStartDateTime) ? originalStartDateTime : newStartDateTime;
         }
 
-        // Nếu chỉ có 1 trong 2, trả về date đó
-        return originalDate != null ? originalDate : newDate;
+        // Nếu chỉ có 1 trong 2, trả về startDateTime đó
+        return originalStartDateTime != null ? originalStartDateTime : newStartDateTime;
+    }
+
+    /**
+     * Lấy LocalDateTime từ Session (date + startTime)
+     */
+    private LocalDateTime getSessionStartDateTime(org.fyp.tmssep490be.entities.Session session) {
+        if (session == null || session.getDate() == null) {
+            return null;
+        }
+        
+        LocalTime startTime = null;
+        if (session.getTimeSlotTemplate() != null) {
+            startTime = session.getTimeSlotTemplate().getStartTime();
+        }
+        
+        // Nếu không có startTime, dùng 00:00:00
+        if (startTime == null) {
+            startTime = LocalTime.MIN;
+        }
+        
+        return LocalDateTime.of(session.getDate(), startTime);
     }
 }
 

@@ -39,6 +39,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -256,19 +257,44 @@ public class TeacherGradeService {
                                         int gradedCount = (int) percents.size();
 
                                         // Chuyên cần: tính ngay, không cần chờ môn học kết thúc
+                                        // Lấy enrollment để xác định timeline (joinSessionId, leftSessionId)
+                                        org.fyp.tmssep490be.entities.Enrollment enrollment = e;
+                                        
                                         List<StudentSession> studentSessions = studentSessionRepository
                                                         .findByStudentIdAndClassEntityId(studentId, classId)
                                                         .stream()
-                                                        .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup())) // Bỏ qua
-                                                                                                              // học bù
+                                                        .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup())) // Bỏ qua học bù
+                                                        .filter(ss -> {
+                                                                // Filter CANCELLED sessions
+                                                                Session session = ss.getSession();
+                                                                if (session == null || session.getStatus() == org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED) {
+                                                                        return false;
+                                                                }
+                                                                
+                                                                // Filter theo enrollment timeline
+                                                                Long sessionId = session.getId();
+                                                                Long joinId = enrollment.getJoinSessionId();
+                                                                Long leftId = enrollment.getLeftSessionId();
+                                                                
+                                                                if (enrollment.getStatus() == EnrollmentStatus.TRANSFERRED) {
+                                                                        return leftId == null || sessionId <= leftId;
+                                                                } else if (enrollment.getStatus() == EnrollmentStatus.ENROLLED) {
+                                                                        return joinId == null || sessionId >= joinId;
+                                                                } else if (enrollment.getStatus() == org.fyp.tmssep490be.entities.enums.EnrollmentStatus.COMPLETED) {
+                                                                        return joinId == null || sessionId >= joinId;
+                                                                }
+                                                                return true;
+                                                        })
                                                         .toList();
 
                                         // Map thông tin học bù
+                                        // Key: originalSessionId, Value: Boolean (true = có PRESENT, false = chỉ có ABSENT)
                                         List<Long> sessionIds = studentSessions.stream()
                                                         .map(ss -> ss.getSession().getId())
                                                         .distinct()
                                                         .toList();
                                         Map<Long, Boolean> makeupCompletedMap = new HashMap<>();
+                                        Set<Long> makeupAttemptedSessions = new HashSet<>();
                                         if (!sessionIds.isEmpty()) {
                                                 studentSessionRepository
                                                                 .findMakeupSessionsByOriginalSessionIds(sessionIds)
@@ -279,8 +305,10 @@ public class TeacherGradeService {
                                                                                         .getOriginalSession();
                                                                         if (originalSession != null && originalSession
                                                                                         .getId() != null) {
+                                                                                Long origId = originalSession.getId();
+                                                                                makeupAttemptedSessions.add(origId);
                                                                                 makeupCompletedMap.merge(
-                                                                                                originalSession.getId(),
+                                                                                                origId,
                                                                                                 ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
                                                                                                 (oldVal, newVal) -> oldVal
                                                                                                                 || newVal);
@@ -289,8 +317,9 @@ public class TeacherGradeService {
                                         }
 
                                         LocalDateTime now = LocalDateTime.now();
-                                        long present = 0;
-                                        long absent = 0;
+                                        long present = 0;      // Số buổi có mặt (display)
+                                        long ratePresent = 0;  // Tử số
+                                        long rateTotal = 0;    // Mẫu số
 
                                         for (StudentSession ss : studentSessions) {
                                                 AttendanceStatus status = ss.getAttendanceStatus();
@@ -298,49 +327,43 @@ public class TeacherGradeService {
 
                                                 if (status == AttendanceStatus.PRESENT) {
                                                         present++;
+                                                        ratePresent++;
+                                                        rateTotal++;
                                                 } else if (status == AttendanceStatus.ABSENT) {
-                                                        absent++;
+                                                        rateTotal++;
                                                 } else if (status == AttendanceStatus.EXCUSED) {
-                                                        // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
-                                                        boolean hasMakeupCompleted = makeupCompletedMap
-                                                                        .getOrDefault(session.getId(), false);
+                                                        Long sessionId = session.getId();
+                                                        boolean hasMakeupAttempt = makeupAttemptedSessions.contains(sessionId);
+                                                        boolean hasMakeupCompleted = makeupCompletedMap.getOrDefault(sessionId, false);
 
                                                         if (hasMakeupCompleted) {
-                                                                // EXCUSED có học bù (chấm xanh) → tính như PRESENT
-                                                                present++;
+                                                                // EXCUSED + makeup PRESENT -> tính như PRESENT
+                                                                ratePresent++;
+                                                                rateTotal++;
+                                                        } else if (hasMakeupAttempt) {
+                                                                // EXCUSED + makeup ABSENT -> tính vào mẫu số
+                                                                rateTotal++;
                                                         } else {
-                                                                // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
+                                                                // Check deadline
                                                                 LocalDate sessionDate = session.getDate();
                                                                 LocalDateTime sessionEndDateTime;
                                                                 if (session.getTimeSlotTemplate() != null
-                                                                                && session.getTimeSlotTemplate()
-                                                                                                .getEndTime() != null) {
-                                                                        java.time.LocalTime endTime = session
-                                                                                        .getTimeSlotTemplate()
-                                                                                        .getEndTime();
-                                                                        sessionEndDateTime = LocalDateTime
-                                                                                        .of(sessionDate, endTime);
+                                                                                && session.getTimeSlotTemplate().getEndTime() != null) {
+                                                                        java.time.LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                                                                        sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
                                                                 } else {
-                                                                        sessionEndDateTime = LocalDateTime.of(
-                                                                                        sessionDate,
-                                                                                        java.time.LocalTime.MAX);
+                                                                        sessionEndDateTime = LocalDateTime.of(sessionDate, java.time.LocalTime.MAX);
                                                                 }
 
-                                                                boolean isAfterSessionEnd = now
-                                                                                .isAfter(sessionEndDateTime);
-                                                                if (isAfterSessionEnd) {
-                                                                        // EXCUSED không học bù và đã qua giờ kết thúc
-                                                                        // (chấm đỏ) → tính như ABSENT
-                                                                        absent++;
+                                                                if (now.isAfter(sessionEndDateTime)) {
+                                                                        // Qua deadline + không makeup -> tính vào mẫu số
+                                                                        rateTotal++;
                                                                 }
-                                                                // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ
-                                                                // lệ)
                                                         }
                                                 }
                                         }
 
-                                        long totalDone = present + absent;
-                                        Double attendanceRate = totalDone > 0 ? (present * 100d / totalDone) : null;
+                                        Double attendanceRate = rateTotal > 0 ? (ratePresent * 100d / rateTotal) : null;
                                         Double attendanceScore = attendanceRate;
 
                                         return GradebookStudentDTO.builder()
@@ -352,7 +375,7 @@ public class TeacherGradeService {
                                                         .gradedCount(gradedCount)
                                                         .totalAssessments(assessments.size())
                                                         .attendedSessions((int) present)
-                                                        .totalSessions((int) totalDone)
+                                                        .totalSessions((int) rateTotal)
                                                         .attendanceRate(attendanceRate)
                                                         .attendanceScore(attendanceScore)
                                                         .attendanceFinalized(true)

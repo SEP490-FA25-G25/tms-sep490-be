@@ -763,11 +763,14 @@ public class StudentPortalService {
                 .toList();
 
         // Map thông tin học bù
+        // makeupCompletedMap: sessionId -> hasCompletedMakeup (có ít nhất 1 lần PRESENT)
+        // makeupAttemptedSessions: Set các sessionId đã có attempt (dù PRESENT hay ABSENT)
         List<Long> sessionIds = studentSessions.stream()
                 .map(ss -> ss.getSession().getId())
                 .distinct()
                 .toList();
         Map<Long, Boolean> makeupCompletedMap = new HashMap<>();
+        Set<Long> makeupAttemptedSessions = new HashSet<>();
         if (!sessionIds.isEmpty()) {
             studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
                     .stream()
@@ -775,8 +778,10 @@ public class StudentPortalService {
                     .forEach(ss -> {
                         Session originalSession = ss.getOriginalSession();
                         if (originalSession != null && originalSession.getId() != null) {
+                            Long origId = originalSession.getId();
+                            makeupAttemptedSessions.add(origId);
                             makeupCompletedMap.merge(
-                                    originalSession.getId(),
+                                    origId,
                                     ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
                                     (oldVal, newVal) -> oldVal || newVal
                             );
@@ -798,30 +803,32 @@ public class StudentPortalService {
             } else if (status == AttendanceStatus.ABSENT) {
                 totalRecorded++;
             } else if (status == AttendanceStatus.EXCUSED) {
-                // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
-                boolean hasMakeupCompleted = makeupCompletedMap.getOrDefault(session.getId(), false);
+                Long sessionId = session.getId();
+                boolean hasMakeupAttempt = makeupAttemptedSessions.contains(sessionId);
+                boolean hasMakeupCompleted = makeupCompletedMap.getOrDefault(sessionId, false);
 
                 if (hasMakeupCompleted) {
-                    // EXCUSED có học bù (chấm xanh) → tính như PRESENT
+                    // EXCUSED + makeup PRESENT -> tính như PRESENT
                     presentCount++;
                     totalRecorded++;
+                } else if (hasMakeupAttempt) {
+                    // EXCUSED + makeup ABSENT -> chỉ tính vào mẫu số
+                    totalRecorded++;
                 } else {
-                    // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
+                    // Chưa học bù - check deadline
                     LocalDate sessionDate = session.getDate();
                     LocalDateTime sessionEndDateTime;
                     if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
-                        LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                        java.time.LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
                         sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
                     } else {
-                        sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+                        sessionEndDateTime = LocalDateTime.of(sessionDate, java.time.LocalTime.MAX);
                     }
 
-                    boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
-                    if (isAfterSessionEnd) {
-                        // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
+                    if (now.isAfter(sessionEndDateTime)) {
+                        // Qua deadline + không makeup -> tính vào mẫu số
                         totalRecorded++;
                     }
-                    // Nếu chưa qua giờ kết thúc → bỏ qua (không tính vào tỷ lệ)
                 }
             }
         }

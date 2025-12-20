@@ -81,7 +81,7 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
             }
             
             // Then update session status to DONE
-            updatePastSessionsToDone();
+                    updatePastSessionsToDone();
             // Also create QA reports for existing DONE sessions that don't have reports
             createQAReportsForDoneSessionsWithoutReports();
         } catch (Exception e) {
@@ -122,7 +122,7 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
                         studentSession.setRecordedAt(OffsetDateTime.now());
                         attendanceToUpdate.add(studentSession);
                         updatedAttendanceForEndedSessions++;
-                    }
+            }
                 }
             }
             
@@ -163,16 +163,16 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
                     Session refreshedSession = sessionRepository.findById(session.getId())
                             .orElse(session);
                     
-                    // Auto-mark students with PLANNED attendance as ABSENT
+                // Auto-mark students with PLANNED attendance as ABSENT
                     List<StudentSession> studentSessions = studentSessionRepository.findBySessionId(refreshedSession.getId());
-                    for (StudentSession studentSession : studentSessions) {
-                        if (studentSession.getAttendanceStatus() == AttendanceStatus.PLANNED) {
-                            studentSession.setAttendanceStatus(AttendanceStatus.ABSENT);
-                            studentSession.setRecordedAt(OffsetDateTime.now());
-                            studentSessionsToSave.add(studentSession);
-                            updatedAttendanceCount++;
-                        }
+                for (StudentSession studentSession : studentSessions) {
+                    if (studentSession.getAttendanceStatus() == AttendanceStatus.PLANNED) {
+                        studentSession.setAttendanceStatus(AttendanceStatus.ABSENT);
+                        studentSession.setRecordedAt(OffsetDateTime.now());
+                        studentSessionsToSave.add(studentSession);
+                        updatedAttendanceCount++;
                     }
+                }
                     
                     // Create QA report if session is now DONE and doesn't have a submitted QA report yet
                     if (refreshedSession.getStatus() == SessionStatus.DONE && qaUserOpt.isPresent()) {
@@ -201,7 +201,7 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
             if (!studentSessionsToSave.isEmpty()) {
                 studentSessionRepository.saveAll(studentSessionsToSave);
             }
-            
+
             // Batch save all created QA reports
             if (!qaReportsToSave.isEmpty()) {
                 qaReportRepository.saveAll(qaReportsToSave);
@@ -260,22 +260,23 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
                 logJobInfo("No sessions that have passed their date without teacher note to update");
             }
 
-            // Handle sessions that ended more than 48 hours ago without teacher note - create QA reports
-            LocalDateTime fortyEightHoursAgo = LocalDateTime.now().minusHours(48);
-            LocalDate cutoffDate = fortyEightHoursAgo.toLocalDate();
-            LocalTime cutoffTime = fortyEightHoursAgo.toLocalTime();
+            // Handle sessions that have passed 2 days after their date without teacher note - create QA reports
+            // Example: session on 20/12 9:00-11:00 -> auto-create report after 22/12 (2 days later, hết ngày 22)
+            // Logic: session.date <= today.minusDays(2) means session has passed 2 days
+            // Ví dụ: hôm nay là 22/12 -> twoDaysAgoDate = 20/12 -> tìm sessions có date <= 20/12
+            LocalDate twoDaysAgoDate = today.minusDays(2);
 
-            List<Session> endedSessionsWithoutNoteAfter48h = sessionRepository.findEndedSessionsWithoutTeacherNoteAfter48Hours(
-                    cutoffDate, cutoffTime, SessionStatus.DONE);
+            List<Session> sessionsWithoutNoteAfter2Days = sessionRepository.findSessionsWithoutTeacherNoteAfter2Days(
+                    twoDaysAgoDate, SessionStatus.DONE);
 
-            if (!endedSessionsWithoutNoteAfter48h.isEmpty()) {
-                logJobInfo(String.format("Found %d DONE sessions ended more than 48 hours ago without teacher note - creating QA reports", 
-                        endedSessionsWithoutNoteAfter48h.size()));
+            if (!sessionsWithoutNoteAfter2Days.isEmpty()) {
+                logJobInfo(String.format("Found %d DONE sessions that have passed 2 days after their date without teacher note - creating QA reports", 
+                        sessionsWithoutNoteAfter2Days.size()));
 
-                int createdQAReportAfter48hCount = 0;
-                List<QAReport> qaReportsAfter48hToSave = new ArrayList<>();
+                int createdQAReportAfter2DaysCount = 0;
+                List<QAReport> qaReportsAfter2DaysToSave = new ArrayList<>();
 
-                for (Session session : endedSessionsWithoutNoteAfter48h) {
+                for (Session session : sessionsWithoutNoteAfter2Days) {
                     // Check if QA report already exists
                     long existingSubmittedReports = qaReportRepository.countSubmittedReportsBySessionId(session.getId());
                     
@@ -287,23 +288,20 @@ public class SessionAutoUpdateService extends BaseScheduledJob {
                                 .reportType(QAReportType.CLASSROOM_OBSERVATION)
                                 .status(QAReportStatus.SUBMITTED)
                                 .content(String.format(
-                                        "Buổi học đã tự động được đánh dấu hoàn thành sau 48 giờ kể từ khi kết thúc. " +
-                                        "Chưa có báo cáo từ giáo viên. Session ID: %d, Date: %s, End Time: %s",
+                                        "Buổi học đã tự động được đánh dấu hoàn thành sau 2 ngày kể từ ngày buổi học. " +
+                                        "Chưa có báo cáo từ giáo viên. Session ID: %d, Date: %s",
                                         session.getId(),
-                                        session.getDate(),
-                                        session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null
-                                                ? session.getTimeSlotTemplate().getEndTime().toString()
-                                                : "N/A"))
+                                        session.getDate()))
                                 .build();
-                        qaReportsAfter48hToSave.add(autoReport);
-                        createdQAReportAfter48hCount++;
+                        qaReportsAfter2DaysToSave.add(autoReport);
+                        createdQAReportAfter2DaysCount++;
                     }
                 }
 
                 // Batch save all created QA reports
-                if (!qaReportsAfter48hToSave.isEmpty()) {
-                    qaReportRepository.saveAll(qaReportsAfter48hToSave);
-                    logJobInfo(String.format("Created %d QA reports for sessions without teacher note after 48h", createdQAReportAfter48hCount));
+                if (!qaReportsAfter2DaysToSave.isEmpty()) {
+                    qaReportRepository.saveAll(qaReportsAfter2DaysToSave);
+                    logJobInfo(String.format("Created %d QA reports for sessions without teacher note after 2 days", createdQAReportAfter2DaysCount));
                 }
             }
 

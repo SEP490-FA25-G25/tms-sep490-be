@@ -87,6 +87,10 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
             
             // Sau 36 giờ: kiểm tra cả điểm danh và báo cáo
             notificationsSent += checkSessionsEndedAtMilestone(now, 36, "36 giờ");
+            
+            // Sau 48 giờ: kiểm tra cả điểm danh và báo cáo (nhắc nhở cuối cùng trước khi tự động nộp report)
+            // Sau khi session kết thúc 48h, nhắc giáo viên điểm danh hoặc nộp báo cáo nếu thiếu
+            notificationsSent += checkSessionsEndedAtMilestone(now, 48, "48 giờ");
 
             logJobEnd(jobName, String.format("Sent %d attendance/report reminder notifications", notificationsSent));
         } catch (Exception e) {
@@ -120,13 +124,20 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
                 if (!isAttendanceSubmitted(session.getId())) {
                     String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
                     String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                    String timeSlot = session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                            ? String.format("%02d:%02d - %02d:%02d",
+                            session.getTimeSlotTemplate().getStartTime().getHour(),
+                            session.getTimeSlotTemplate().getStartTime().getMinute(),
+                            session.getTimeSlotTemplate().getEndTime().getHour(),
+                            session.getTimeSlotTemplate().getEndTime().getMinute())
+                            : null;
 
                     String title = "Nhắc nhở: Buổi học sắp kết thúc";
                     String message = String.format(
                             "Buổi học %s ngày %s sẽ kết thúc trong %d phút. Vui lòng hoàn thành điểm danh cho học viên.",
                             classCode, formattedDate, warningMinutesBeforeEnd);
 
-                    sendReminderToTeachers(session, title, message);
+                    sendReminderToTeachers(session, title, message, "ATTENDANCE", timeSlot, null);
                     notificationsSent++;
                 }
             }
@@ -162,13 +173,20 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
                 if (!isAttendanceSubmitted(session.getId())) {
                     String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
                     String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                    String timeSlot = session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                            ? String.format("%02d:%02d - %02d:%02d",
+                            session.getTimeSlotTemplate().getStartTime().getHour(),
+                            session.getTimeSlotTemplate().getStartTime().getMinute(),
+                            session.getTimeSlotTemplate().getEndTime().getHour(),
+                            session.getTimeSlotTemplate().getEndTime().getMinute())
+                            : null;
 
                     String title = "Nhắc nhở: Chưa điểm danh sau 24 giờ";
                     String message = String.format(
                             "Bạn chưa điểm danh cho buổi học %s ngày %s. Buổi học đã kết thúc khoảng 24 giờ trước.",
                             classCode, formattedDate);
 
-                    sendReminderToTeachers(session, title, message);
+                    sendReminderToTeachers(session, title, message, "ATTENDANCE", timeSlot, "24 giờ");
                     notificationsSent++;
                 }
             }
@@ -204,13 +222,20 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
                 if (!isAttendanceSubmitted(session.getId())) {
                     String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
                     String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                    String timeSlot = session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                            ? String.format("%02d:%02d - %02d:%02d",
+                            session.getTimeSlotTemplate().getStartTime().getHour(),
+                            session.getTimeSlotTemplate().getStartTime().getMinute(),
+                            session.getTimeSlotTemplate().getEndTime().getHour(),
+                            session.getTimeSlotTemplate().getEndTime().getMinute())
+                            : null;
 
                     String title = "Nhắc nhở: Chưa điểm danh sau 36 giờ";
                     String message = String.format(
                             "Bạn chưa điểm danh cho buổi học %s ngày %s. Buổi học đã kết thúc khoảng 36 giờ trước.",
                             classCode, formattedDate);
 
-                    sendReminderToTeachers(session, title, message);
+                    sendReminderToTeachers(session, title, message, "ATTENDANCE", timeSlot, "36 giờ");
                     notificationsSent++;
                 }
             }
@@ -251,6 +276,13 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
 
             String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
             String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String timeSlot = session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                    ? String.format("%02d:%02d - %02d:%02d",
+                    session.getTimeSlotTemplate().getStartTime().getHour(),
+                    session.getTimeSlotTemplate().getStartTime().getMinute(),
+                    session.getTimeSlotTemplate().getEndTime().getHour(),
+                    session.getTimeSlotTemplate().getEndTime().getMinute())
+                    : null;
 
             boolean attendanceNotSubmitted = !isAttendanceSubmitted(session.getId());
             boolean reportNotSubmitted = session.getTeacherNote() == null || session.getTeacherNote().trim().isEmpty();
@@ -260,28 +292,33 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
                 continue;
             }
 
-            // Nhắc nhở điểm danh nếu chưa làm
-            if (attendanceNotSubmitted) {
-                String title = String.format("Nhắc nhở: Chưa điểm danh sau %s", milestoneText);
-                String message = String.format(
+            // Xác định loại nhắc nhở và gửi một email duy nhất nếu cả hai đều chưa làm
+            String reminderType;
+            String title;
+            String message;
+            
+            if (attendanceNotSubmitted && reportNotSubmitted) {
+                reminderType = "BOTH";
+                title = String.format("Nhắc nhở: Chưa điểm danh và nộp báo cáo sau %s", milestoneText);
+                message = String.format(
+                        "Bạn chưa điểm danh và chưa nộp báo cáo cho buổi học %s ngày %s. Buổi học đã kết thúc khoảng %s trước.",
+                        classCode, formattedDate, milestoneText);
+            } else if (attendanceNotSubmitted) {
+                reminderType = "ATTENDANCE";
+                title = String.format("Nhắc nhở: Chưa điểm danh sau %s", milestoneText);
+                message = String.format(
                         "Bạn chưa điểm danh cho buổi học %s ngày %s. Buổi học đã kết thúc khoảng %s trước.",
                         classCode, formattedDate, milestoneText);
-
-                if (sendReminderToTeachersIfNotSent(session, title, message, checkSince)) {
-                    notificationsSent++;
-                }
-            }
-
-            // Nhắc nhở báo cáo nếu chưa làm
-            if (reportNotSubmitted) {
-                String title = String.format("Nhắc nhở: Chưa nộp báo cáo buổi học sau %s", milestoneText);
-                String message = String.format(
+            } else {
+                reminderType = "REPORT";
+                title = String.format("Nhắc nhở: Chưa nộp báo cáo buổi học sau %s", milestoneText);
+                message = String.format(
                         "Bạn chưa nộp báo cáo buổi học cho lớp %s ngày %s. Buổi học đã kết thúc khoảng %s trước.",
                         classCode, formattedDate, milestoneText);
+            }
 
-                if (sendReminderToTeachersIfNotSent(session, title, message, checkSince)) {
-                    notificationsSent++;
-                }
+            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince, reminderType, timeSlot, milestoneText)) {
+                notificationsSent++;
             }
         }
 
@@ -320,12 +357,19 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
 
             String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
             String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String timeSlot = session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                    ? String.format("%02d:%02d - %02d:%02d",
+                    session.getTimeSlotTemplate().getStartTime().getHour(),
+                    session.getTimeSlotTemplate().getStartTime().getMinute(),
+                    session.getTimeSlotTemplate().getEndTime().getHour(),
+                    session.getTimeSlotTemplate().getEndTime().getMinute())
+                    : null;
 
             String message = String.format(
                     "Bạn chưa nộp báo cáo buổi học cho lớp %s ngày %s. Buổi học đã kết thúc khoảng 1 giờ trước.",
                     classCode, formattedDate);
 
-            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince)) {
+            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince, "REPORT", timeSlot, "1 giờ")) {
                 notificationsSent++;
             }
         }
@@ -366,12 +410,19 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
 
             String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
             String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String timeSlot = session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                    ? String.format("%02d:%02d - %02d:%02d",
+                    session.getTimeSlotTemplate().getStartTime().getHour(),
+                    session.getTimeSlotTemplate().getStartTime().getMinute(),
+                    session.getTimeSlotTemplate().getEndTime().getHour(),
+                    session.getTimeSlotTemplate().getEndTime().getMinute())
+                    : null;
 
             String message = String.format(
                     "Bạn chưa nộp báo cáo buổi học cho lớp %s ngày %s. Buổi học đã kết thúc khoảng 3 giờ trước.",
                     classCode, formattedDate);
 
-            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince)) {
+            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince, "REPORT", timeSlot, "3 giờ")) {
                 notificationsSent++;
             }
         }
@@ -412,12 +463,19 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
 
             String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
             String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String timeSlot = session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                    ? String.format("%02d:%02d - %02d:%02d",
+                    session.getTimeSlotTemplate().getStartTime().getHour(),
+                    session.getTimeSlotTemplate().getStartTime().getMinute(),
+                    session.getTimeSlotTemplate().getEndTime().getHour(),
+                    session.getTimeSlotTemplate().getEndTime().getMinute())
+                    : null;
 
             String message = String.format(
                     "Bạn chưa nộp báo cáo buổi học cho lớp %s ngày %s. Buổi học đã kết thúc khoảng 12 giờ trước.",
                     classCode, formattedDate);
 
-            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince)) {
+            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince, "REPORT", timeSlot, "12 giờ")) {
                 notificationsSent++;
             }
         }
@@ -458,12 +516,19 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
 
             String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
             String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String timeSlot = session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                    ? String.format("%02d:%02d - %02d:%02d",
+                    session.getTimeSlotTemplate().getStartTime().getHour(),
+                    session.getTimeSlotTemplate().getStartTime().getMinute(),
+                    session.getTimeSlotTemplate().getEndTime().getHour(),
+                    session.getTimeSlotTemplate().getEndTime().getMinute())
+                    : null;
 
             String message = String.format(
                     "Bạn chưa nộp báo cáo buổi học cho lớp %s ngày %s. Buổi học đã kết thúc khoảng 24 giờ trước.",
                     classCode, formattedDate);
 
-            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince)) {
+            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince, "REPORT", timeSlot, "24 giờ")) {
                 notificationsSent++;
             }
         }
@@ -504,12 +569,19 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
 
             String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
             String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String timeSlot = session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
+                    ? String.format("%02d:%02d - %02d:%02d",
+                    session.getTimeSlotTemplate().getStartTime().getHour(),
+                    session.getTimeSlotTemplate().getStartTime().getMinute(),
+                    session.getTimeSlotTemplate().getEndTime().getHour(),
+                    session.getTimeSlotTemplate().getEndTime().getMinute())
+                    : null;
 
             String message = String.format(
                     "Bạn chưa nộp báo cáo buổi học cho lớp %s ngày %s. Buổi học đã kết thúc khoảng 36 giờ trước.",
                     classCode, formattedDate);
 
-            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince)) {
+            if (sendReminderToTeachersIfNotSent(session, title, message, checkSince, "REPORT", timeSlot, "36 giờ")) {
                 notificationsSent++;
             }
         }
@@ -525,12 +597,15 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
                         && ss.getAttendanceStatus() != AttendanceStatus.PLANNED);
     }
 
-    // Gửi notification + (tuỳ chọn) email cho giáo viên
+    // Gửi notification + email template cho giáo viên
     @Async("emailTaskExecutor")
-    private void sendReminderToTeachers(Session session, String title, String message) {
+    private void sendReminderToTeachers(Session session, String title, String message, String reminderType, String timeSlot, String milestoneText) {
         if (session.getTeachingSlots() == null || session.getTeachingSlots().isEmpty()) {
             return;
         }
+
+        String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
+        String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
 
         for (TeachingSlot slot : session.getTeachingSlots()) {
             if (slot.getTeacher() == null || slot.getTeacher().getUserAccount() == null) {
@@ -552,15 +627,21 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
                         + " session " + session.getId() + ": " + e.getMessage());
             }
 
-            // Email đơn giản (không bắt buộc, không block)
+            // Email với template
             try {
                 if (teacherAccount.getEmail() != null && !teacherAccount.getEmail().trim().isEmpty()) {
-                    String subject = title;
-                    StringBuilder body = new StringBuilder();
-                    body.append("Xin chào ").append(teacherAccount.getFullName()).append(",<br/><br/>")
-                            .append(message)
-                            .append("<br/><br/>Trân trọng,<br/>Hệ thống TMS");
-                    emailService.sendEmailAsync(teacherAccount.getEmail(), subject, body.toString());
+                    emailService.sendTeacherAttendanceReminderAsync(
+                            teacherAccount.getEmail(),
+                            teacherAccount.getFullName(),
+                            title,
+                            message,
+                            classCode,
+                            formattedDate,
+                            timeSlot,
+                            milestoneText,
+                            reminderType,
+                            session.getId()
+                    );
                 }
             } catch (Exception e) {
                 logJobWarning("Không thể gửi email nhắc nhở cho teacher " + teacherAccount.getId()
@@ -574,10 +655,13 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
      * Đảm bảo chỉ gửi 1 lần cho mỗi mốc thời gian
      * @return true nếu đã gửi, false nếu đã gửi rồi hoặc không gửi được
      */
-    private boolean sendReminderToTeachersIfNotSent(Session session, String title, String message, LocalDateTime checkSince) {
+    private boolean sendReminderToTeachersIfNotSent(Session session, String title, String message, LocalDateTime checkSince, String reminderType, String timeSlot, String milestoneText) {
         if (session.getTeachingSlots() == null || session.getTeachingSlots().isEmpty()) {
             return false;
         }
+
+        String classCode = session.getClassEntity() != null ? session.getClassEntity().getCode() : "N/A";
+        String formattedDate = session.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
 
         boolean sent = false;
         for (TeachingSlot slot : session.getTeachingSlots()) {
@@ -611,15 +695,21 @@ public class TeacherAttendanceReminderJob extends BaseScheduledJob {
                         + " session " + session.getId() + ": " + e.getMessage());
             }
 
-            // Email đơn giản (không bắt buộc, không block)
+            // Email với template
             try {
                 if (teacherAccount.getEmail() != null && !teacherAccount.getEmail().trim().isEmpty()) {
-                    String subject = title;
-                    StringBuilder body = new StringBuilder();
-                    body.append("Xin chào ").append(teacherAccount.getFullName()).append(",<br/><br/>")
-                            .append(message)
-                            .append("<br/><br/>Trân trọng,<br/>Hệ thống TMS");
-                    emailService.sendEmailAsync(teacherAccount.getEmail(), subject, body.toString());
+                    emailService.sendTeacherAttendanceReminderAsync(
+                            teacherAccount.getEmail(),
+                            teacherAccount.getFullName(),
+                            title,
+                            message,
+                            classCode,
+                            formattedDate,
+                            timeSlot,
+                            milestoneText,
+                            reminderType,
+                            session.getId()
+                    );
                 }
             } catch (Exception e) {
                 logJobWarning("Không thể gửi email nhắc nhở cho teacher " + teacherAccount.getId()

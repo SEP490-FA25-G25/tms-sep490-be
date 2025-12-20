@@ -71,32 +71,6 @@ public class TeacherClassService {
 
         int totalSessions = sessions.size();
 
-        // Map thông tin học bù để xác định EXCUSED có học bù hay không
-        List<Long> sessionIds = sessions.stream().map(Session::getId).toList();
-        Map<Long, Map<Long, Boolean>> makeupCompletedMap = new HashMap<>();
-        if (!sessionIds.isEmpty()) {
-            studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
-                    .forEach(ss -> {
-                        Session originalSession = ss.getOriginalSession();
-                        if (originalSession == null || ss.getStudent() == null) {
-                            return;
-                        }
-                        Long originalSessionId = originalSession.getId();
-                        Long studentId = ss.getStudent().getId();
-                        if (originalSessionId == null || studentId == null) {
-                            return;
-                        }
-
-                        makeupCompletedMap
-                                .computeIfAbsent(originalSessionId, k -> new HashMap<>())
-                                .merge(
-                                        studentId,
-                                        ss.getAttendanceStatus() == AttendanceStatus.PRESENT,
-                                        (oldVal, newVal) -> oldVal || newVal
-                                );
-                    });
-        }
-
         // Sử dụng cùng logic tính tỷ lệ chuyên cần như AttendanceService để đảm bảo nhất quán
         // Tính tỷ lệ chuyên cần: tổng PRESENT / (PRESENT + ABSENT) của các buổi đã điểm danh
         double classAttendanceRate = attendanceService.calculateClassAttendanceRate(classEntity.getId());

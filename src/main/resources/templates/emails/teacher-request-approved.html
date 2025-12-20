@@ -82,6 +82,69 @@
         border-radius: 6px;
         margin: 10px 5px;
       }
+      .comparison-box {
+        margin: 20px 0;
+      }
+      .schedule-card {
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+      }
+      .schedule-card.old {
+        background-color: #fef2f2;
+        border-color: #fecaca;
+        position: relative;
+      }
+      .schedule-card.old::after {
+        content: "CŨ";
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: #dc2626;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .schedule-card.new {
+        background-color: #f0fdf4;
+        border-color: #86efac;
+        position: relative;
+      }
+      .schedule-card.new::after {
+        content: "MỚI";
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: #16a34a;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .schedule-row {
+        display: flex;
+        padding: 6px 0;
+      }
+      .schedule-label {
+        font-weight: 600;
+        min-width: 100px;
+        color: #666;
+      }
+      .schedule-value {
+        color: #333;
+        flex: 1;
+      }
+      .arrow {
+        text-align: center;
+        font-size: 20px;
+        color: #3b82f6;
+        margin: 10px 0;
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
@@ -112,13 +175,77 @@
             >Điều chỉnh lịch</span
           >
         </div>
-        <div class="detail-row">
+        <div
+          class="detail-row"
+          th:if="${oldDate == newDate && oldTime == newTime && oldRoom == newRoom}"
+        >
           <span class="detail-label">Buổi học:</span>
           <span class="detail-value" th:text="${sessionInfo}">N/A</span>
+        </div>
+        <div class="detail-row" th:if="${replacementTeacherName}">
+          <span class="detail-label">Giáo viên dạy thay:</span>
+          <span class="detail-value" th:text="${replacementTeacherName}"
+            >-</span
+          >
         </div>
         <div class="detail-row" th:if="${approvalNote}">
           <span class="detail-label">Ghi chú:</span>
           <span class="detail-value" th:text="${approvalNote}">-</span>
+        </div>
+      </div>
+
+      <div
+        class="comparison-box"
+        th:if="${oldDate != newDate || oldTime != newTime || oldRoom != newRoom || oldModality != newModality}"
+      >
+        <div class="schedule-card old">
+          <div class="schedule-row">
+            <span class="schedule-label">Ngày:</span>
+            <span class="schedule-value" th:text="${oldDate}">21/12/2025</span>
+          </div>
+          <div class="schedule-row">
+            <span class="schedule-label">Giờ:</span>
+            <span class="schedule-value" th:text="${oldTime}"
+              >10:00 - 11:00</span
+            >
+          </div>
+          <div class="schedule-row" th:if="${oldRoom && oldRoom != 'N/A'}">
+            <span class="schedule-label">Phòng:</span>
+            <span class="schedule-value" th:text="${oldRoom}">A101</span>
+          </div>
+          <div
+            class="schedule-row"
+            th:if="${oldModality && oldModality != 'N/A'}"
+          >
+            <span class="schedule-label">Phương thức:</span>
+            <span class="schedule-value" th:text="${oldModality}">Offline</span>
+          </div>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="schedule-card new">
+          <div class="schedule-row">
+            <span class="schedule-label">Ngày:</span>
+            <span class="schedule-value" th:text="${newDate}">22/12/2025</span>
+          </div>
+          <div class="schedule-row">
+            <span class="schedule-label">Giờ:</span>
+            <span class="schedule-value" th:text="${newTime}"
+              >14:00 - 15:00</span
+            >
+          </div>
+          <div class="schedule-row" th:if="${newRoom && newRoom != 'N/A'}">
+            <span class="schedule-label">Phòng:</span>
+            <span class="schedule-value" th:text="${newRoom}">B205</span>
+          </div>
+          <div
+            class="schedule-row"
+            th:if="${newModality && newModality != 'N/A'}"
+          >
+            <span class="schedule-label">Phương thức:</span>
+            <span class="schedule-value" th:text="${newModality}">Online</span>
+          </div>
         </div>
       </div>
 

@@ -54,6 +54,7 @@ import java.time.format.DateTimeFormatter;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -1026,7 +1027,7 @@ public class TeacherRequestService {
     }
 
     /**
-     * Tự động hủy request nếu session date đã qua.
+     * Tự động hủy request nếu session startTime đã qua.
      * Logic giống với TeacherRequestExpiryJob nhưng được gọi khi load request detail.
      * Chỉ áp dụng cho PENDING và WAITING_CONFIRM requests.
      */
@@ -1036,13 +1037,19 @@ public class TeacherRequestService {
             return;
         }
 
-        LocalDate today = LocalDate.now();
-        LocalDate sessionDate = getSessionDateForExpiry(request);
+        LocalDateTime nowDateTime = LocalDateTime.now();
+        LocalDateTime sessionStartDateTime = getSessionStartDateTimeForExpiry(request);
 
-        // Nếu session date đã qua, tự động hủy
-        if (sessionDate != null && sessionDate.isBefore(today)) {
-            long daysPassed = java.time.temporal.ChronoUnit.DAYS.between(sessionDate, today);
-            String expiryReason = String.format("Tự động hủy do buổi học đã qua %d ngày (hệ thống)", daysPassed);
+        // Nếu session startTime đã qua, tự động hủy
+        if (sessionStartDateTime != null && sessionStartDateTime.isBefore(nowDateTime)) {
+            long hoursPassed = java.time.temporal.ChronoUnit.HOURS.between(sessionStartDateTime, nowDateTime);
+            long daysPassed = hoursPassed / 24;
+            String expiryReason;
+            if (daysPassed > 0) {
+                expiryReason = String.format("Tự động hủy do buổi học đã bắt đầu từ %d ngày trước (hệ thống)", daysPassed);
+            } else {
+                expiryReason = String.format("Tự động hủy do buổi học đã bắt đầu từ %d giờ trước (hệ thống)", hoursPassed);
+            }
             
             request.setStatus(RequestStatus.CANCELLED);
             String existingNote = request.getNote();
@@ -1052,41 +1059,66 @@ public class TeacherRequestService {
                 request.setNote(expiryReason);
             }
             teacherRequestRepository.save(request);
-            log.info("Auto-cancelled request {} because session date {} has passed ({} days ago)", 
-                    request.getId(), sessionDate, daysPassed);
+            log.info("Auto-cancelled request {} because session startTime {} has passed ({} hours ago)", 
+                    request.getId(), sessionStartDateTime, hoursPassed);
         }
     }
 
     /**
-     * Lấy session date để check expiry.
-     * Với RESCHEDULE: lấy ngày sớm hơn giữa session gốc và newSession (ngày gần hơn với hôm nay)
-     * Với các loại khác: lấy session.date
+     * Lấy session startDateTime để check expiry.
+     * Với RESCHEDULE: lấy startDateTime sớm hơn giữa session gốc và newSession
+     * Với các loại khác: lấy session.date + session.startTime
      */
-    private LocalDate getSessionDateForExpiry(TeacherRequest request) {
-        LocalDate originalDate = null;
-        LocalDate newDate = null;
+    private LocalDateTime getSessionStartDateTimeForExpiry(TeacherRequest request) {
+        LocalDateTime originalStartDateTime = null;
+        LocalDateTime newStartDateTime = null;
 
-        // Lấy date của session gốc
+        // Lấy startDateTime của session gốc
         if (request.getSession() != null) {
-            originalDate = request.getSession().getDate();
+            originalStartDateTime = getSessionStartDateTime(request.getSession());
         }
 
-        // Với RESCHEDULE, lấy date của session mới
+        // Với RESCHEDULE, lấy startDateTime của session mới
         if (request.getRequestType() == TeacherRequestType.RESCHEDULE) {
             if (request.getNewSession() != null) {
-                newDate = request.getNewSession().getDate();
-            } else if (request.getNewDate() != null) {
-                newDate = request.getNewDate();
+                newStartDateTime = getSessionStartDateTime(request.getNewSession());
+            } else if (request.getNewDate() != null && request.getNewTimeSlot() != null) {
+                // Nếu chưa có newSession nhưng có newDate và newTimeSlot
+                LocalTime startTime = request.getNewTimeSlot().getStartTime();
+                if (startTime != null) {
+                    newStartDateTime = LocalDateTime.of(request.getNewDate(), startTime);
+                }
             }
         }
 
-        // Nếu có cả 2 date, lấy ngày sớm hơn (gần hơn với hôm nay)
-        if (originalDate != null && newDate != null) {
-            return originalDate.isBefore(newDate) ? originalDate : newDate;
+        // Nếu có cả 2 startDateTime, lấy cái sớm hơn
+        if (originalStartDateTime != null && newStartDateTime != null) {
+            return originalStartDateTime.isBefore(newStartDateTime) ? originalStartDateTime : newStartDateTime;
         }
 
-        // Nếu chỉ có 1 trong 2, trả về date đó
-        return originalDate != null ? originalDate : newDate;
+        // Nếu chỉ có 1 trong 2, trả về startDateTime đó
+        return originalStartDateTime != null ? originalStartDateTime : newStartDateTime;
+    }
+
+    /**
+     * Lấy LocalDateTime từ Session (date + startTime)
+     */
+    private LocalDateTime getSessionStartDateTime(Session session) {
+        if (session == null || session.getDate() == null) {
+            return null;
+        }
+        
+        LocalTime startTime = null;
+        if (session.getTimeSlotTemplate() != null) {
+            startTime = session.getTimeSlotTemplate().getStartTime();
+        }
+        
+        // Nếu không có startTime, dùng 00:00:00
+        if (startTime == null) {
+            startTime = LocalTime.MIN;
+        }
+        
+        return LocalDateTime.of(session.getDate(), startTime);
     }
 
     //Lấy danh sách teachers cho academic staff (filter theo branch)
@@ -1507,18 +1539,74 @@ public class TeacherRequestService {
             String teacherName = teacherAccount.getFullName();
 
             String requestTypeName = getRequestTypeName(request.getRequestType());
-            Session session = request.getSession();
-            String sessionInfo = session != null
+            Session oldSession = request.getSession();
+            Session newSession = request.getNewSession();
+            
+            String sessionInfo = oldSession != null
                     ? String.format("%s - %s", 
-                        session.getDate().format(DATE_FORMATTER), 
-                        session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
-                            ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                        oldSession.getDate().format(DATE_FORMATTER), 
+                        oldSession.getTimeSlotTemplate() != null && oldSession.getTimeSlotTemplate().getStartTime() != null && oldSession.getTimeSlotTemplate().getEndTime() != null
+                            ? String.format("%s - %s", oldSession.getTimeSlotTemplate().getStartTime(), oldSession.getTimeSlotTemplate().getEndTime())
                             : "N/A")
                     : "N/A";
 
             String approvalNote = request.getNote() != null ? request.getNote() : "";
 
-            emailService.sendTeacherRequestApprovedAsync(email, teacherName, requestTypeName, sessionInfo, approvalNote);
+            // Old schedule info
+            String oldDate = oldSession != null ? oldSession.getDate().format(DATE_FORMATTER) : "N/A";
+            String oldTime = oldSession != null && oldSession.getTimeSlotTemplate() != null
+                ? String.format("%s - %s", 
+                    oldSession.getTimeSlotTemplate().getStartTime(),
+                    oldSession.getTimeSlotTemplate().getEndTime())
+                : "N/A";
+            String oldRoom = "N/A";
+            String oldModality = "N/A";
+            if (oldSession != null && !oldSession.getSessionResources().isEmpty()) {
+                Resource oldResource = oldSession.getSessionResources().iterator().next().getResource();
+                oldRoom = oldResource.getName();
+                oldModality = oldResource.getResourceType() != null 
+                    ? (oldResource.getResourceType() == ResourceType.ROOM ? "Offline" : "Online")
+                    : "N/A";
+            }
+
+            // New schedule info
+            String newDate = oldDate; // default to old if not changed
+            String newTime = oldTime;
+            String newRoom = oldRoom;
+            String newModality = oldModality;
+            
+            // Replacement teacher name (for REPLACEMENT requests)
+            String replacementTeacherName = null;
+            if (request.getRequestType() == TeacherRequestType.REPLACEMENT && request.getReplacementTeacher() != null) {
+                replacementTeacherName = request.getReplacementTeacher().getUserAccount() != null
+                    ? request.getReplacementTeacher().getUserAccount().getFullName()
+                    : null;
+            }
+            
+            if (request.getRequestType() == TeacherRequestType.RESCHEDULE && newSession != null) {
+                newDate = newSession.getDate().format(DATE_FORMATTER);
+                newTime = newSession.getTimeSlotTemplate() != null
+                    ? String.format("%s - %s",
+                        newSession.getTimeSlotTemplate().getStartTime(),
+                        newSession.getTimeSlotTemplate().getEndTime())
+                    : oldTime;
+                if (!newSession.getSessionResources().isEmpty()) {
+                    Resource newResource = newSession.getSessionResources().iterator().next().getResource();
+                    newRoom = newResource.getName();
+                    newModality = newResource.getResourceType() != null
+                        ? (newResource.getResourceType() == ResourceType.ROOM ? "Offline" : "Online")
+                        : "N/A";
+                }
+            } else if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE && request.getNewResource() != null) {
+                // MODALITY_CHANGE: only resource changes, date/time stay same
+                newRoom = request.getNewResource().getName();
+                newModality = request.getNewResource().getResourceType() != null
+                    ? (request.getNewResource().getResourceType() == ResourceType.ROOM ? "Offline" : "Online")
+                    : "N/A";
+            }
+
+            emailService.sendTeacherRequestApprovedAsync(email, teacherName, requestTypeName, sessionInfo, approvalNote,
+                    oldDate, oldTime, oldRoom, oldModality, newDate, newTime, newRoom, newModality, replacementTeacherName);
         } catch (Exception e) {
             log.error("Lỗi khi gửi approval email cho teacher về request {}: {}", request.getId(), e.getMessage());
         }

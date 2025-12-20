@@ -729,29 +729,23 @@ public class AttendanceService {
     }
 
     private double calculateStudentAttendanceRate(List<StudentAttendanceMatrixDTO.Cell> cells) {
+        // NOTE: Phương thức này đơn giản chỉ dùng cho matrix view
+        // Không có đủ context để check makeup cho EXCUSED
+        // EXCUSED tạm tính trung hòa trong context này
         int present = 0;
-        int absent = 0;
+        int total = 0;
 
         for (StudentAttendanceMatrixDTO.Cell cell : cells) {
             AttendanceStatus status = cell.getAttendanceStatus();
             if (status == AttendanceStatus.PRESENT) {
                 present++;
+                total++;
             } else if (status == AttendanceStatus.ABSENT) {
-                absent++;
-            } else if (status == AttendanceStatus.EXCUSED) {
-                // EXCUSED có học bù (chấm xanh) → tính như PRESENT
-                if (Boolean.TRUE.equals(cell.getHasMakeupCompleted())) {
-                    present++;
-                }
-                // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
-                else if (Boolean.TRUE.equals(cell.getHasMakeupPlanned())) {
-                    absent++;
-                }
-                // EXCUSED chưa qua giờ kết thúc → bỏ qua (không tính)
+                total++;
             }
+            // EXCUSED: không có context makeup trong Cell -> bỏ qua
         }
 
-        int total = present + absent;
         return total > 0 ? (double) present / total : 0.0;
     }
 
@@ -776,7 +770,10 @@ public class AttendanceService {
                 .toList();
 
         // Map thông tin học bù để xác định EXCUSED có học bù hay không
+        // makeupCompletedMap: sessionId -> studentId -> hasCompletedMakeup (PRESENT)
+        // makeupAttemptedMap: sessionId -> Set<studentId> (có attempt bất kể PRESENT hay ABSENT)
         Map<Long, Map<Long, Boolean>> makeupCompletedMap = new HashMap<>();
+        Map<Long, Set<Long>> makeupAttemptedMap = new HashMap<>();
         studentSessionRepository.findMakeupSessionsByOriginalSessionIds(sessionIds)
                 .forEach(ss -> {
                     Session originalSession = ss.getOriginalSession();
@@ -788,6 +785,9 @@ public class AttendanceService {
                     if (originalSessionId == null || studentId == null) {
                         return;
                     }
+
+                    // Track attempt
+                    makeupAttemptedMap.computeIfAbsent(originalSessionId, k -> new HashSet<>()).add(studentId);
 
                     makeupCompletedMap
                             .computeIfAbsent(originalSessionId, k -> new HashMap<>())
@@ -812,32 +812,37 @@ public class AttendanceService {
             } else if (status == AttendanceStatus.ABSENT) {
                 totalRecorded++;
             } else if (status == AttendanceStatus.EXCUSED) {
-                // Kiểm tra xem đã có buổi học bù PRESENT hay chưa
+                Long sessionId = session.getId();
+                Long studentId = ss.getStudent().getId();
+                boolean hasMakeupAttempt = makeupAttemptedMap
+                        .getOrDefault(sessionId, Set.of())
+                        .contains(studentId);
                 boolean hasMakeupCompleted = makeupCompletedMap
-                        .getOrDefault(session.getId(), Map.of())
-                        .getOrDefault(ss.getStudent().getId(), false);
+                        .getOrDefault(sessionId, Map.of())
+                        .getOrDefault(studentId, false);
 
                 if (hasMakeupCompleted) {
-                    // EXCUSED có học bù (chấm xanh) → tính như PRESENT
+                    // EXCUSED + makeup PRESENT -> tính như PRESENT
                     totalPresent++;
                     totalRecorded++;
+                } else if (hasMakeupAttempt) {
+                    // EXCUSED + makeup ABSENT -> chỉ tính vào mẫu số
+                    totalRecorded++;
                 } else {
-                    // Kiểm tra xem đã qua giờ kết thúc buổi gốc chưa
+                    // Chưa học bù - check deadline
                     LocalDate sessionDate = session.getDate();
                     LocalDateTime sessionEndDateTime;
                     if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
-                        LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                        java.time.LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
                         sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
                     } else {
-                        sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+                        sessionEndDateTime = LocalDateTime.of(sessionDate, java.time.LocalTime.MAX);
                     }
 
-                    boolean isAfterSessionEnd = now.isAfter(sessionEndDateTime);
-                    if (isAfterSessionEnd) {
-                        // EXCUSED không học bù và đã qua giờ kết thúc (chấm đỏ) → tính như ABSENT
+                    if (now.isAfter(sessionEndDateTime)) {
+                        // Qua deadline + không makeup -> tính vào mẫu số
                         totalRecorded++;
                     }
-                    // Nếu chưa qua giờ kết thúc → bỏ qua (không tính)
                 }
             }
         }
