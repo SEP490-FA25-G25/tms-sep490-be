@@ -961,7 +961,10 @@ INSERT INTO "class" (id, branch_id, subject_id, code, name, modality, start_date
 -- IELTS Intermediate (Subject 2) - 3 classes
 (14, 2, 2, 'HCM-IELTS-I1', 'HCM IELTS Intermediate 1', 'OFFLINE', '2025-12-19', '2026-02-11', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-12 10:00:00+07', '2025-12-13 14:00:00+07', '2025-12-12 10:00:00+07', NOW()),
 (15, 2, 2, 'HCM-IELTS-I2', 'HCM IELTS Intermediate 2', 'OFFLINE', '2025-12-21', '2026-02-13', NULL, ARRAY[1,3,5]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-14 10:00:00+07', '2025-12-15 14:00:00+07', '2025-12-14 10:00:00+07', NOW()),
-(16, 2, 2, 'HCM-IELTS-I3', 'HCM IELTS Intermediate 3 (Online)', 'ONLINE', '2025-12-23', '2026-02-15', NULL, ARRAY[2,4,6]::smallint[], 25, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-16 10:00:00+07', '2025-12-17 14:00:00+07', '2025-12-16 10:00:00+07', NOW());
+(16, 2, 2, 'HCM-IELTS-I3', 'HCM IELTS Intermediate 3 (Online)', 'ONLINE', '2025-12-23', '2026-02-15', NULL, ARRAY[2,4,6]::smallint[], 25, 'SCHEDULED', 'APPROVED', NULL, 8, 4, '2025-12-16 10:00:00+07', '2025-12-17 14:00:00+07', '2025-12-16 10:00:00+07', NOW()),
+
+-- New class for demo - Tue/Thu/Sat schedule starting 2025-12-20
+(31, 1, 1, 'HN-IELTS-F6', 'HN IELTS Foundation 6 (Demo T3/T5/T7)', 'OFFLINE', '2025-12-20', '2026-02-12', NULL, ARRAY[2,4,6]::smallint[], 20, 'SCHEDULED', 'APPROVED', NULL, 6, 3, '2025-12-13 10:00:00+07', '2025-12-14 14:00:00+07', '2025-12-13 10:00:00+07', NOW());
 
 -- Class 1: HN IELTS Foundation 1 (Early) - Mon/Wed/Fri, starts 2025-11-17 (2 weeks ahead)
 INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
@@ -1082,6 +1085,15 @@ SELECT 1500 + s.idx, 16, 24 + s.idx, 13, ('2025-12-23'::date + ((s.idx - 1) / 3)
 FROM generate_series(1, 24) AS s(idx);
 INSERT INTO session_resource (session_id, resource_id) SELECT id, 8 FROM session WHERE class_id = 16;
 INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 14, 'SCHEDULED' FROM session WHERE class_id = 16;
+
+-- Class 31: HN IELTS Foundation 6 (Demo T3/T5/T7) - Tue/Thu/Sat, starts 2025-12-20
+-- 20/12/2025 is Saturday, schedule [2,4,6] = Tue/Thu/Sat
+-- Session 1: 20/12 (Sat), Session 2: 23/12 (Tue), Session 3: 25/12 (Thu), Session 4: 27/12 (Sat)...
+INSERT INTO session (id, class_id, subject_session_id, time_slot_template_id, date, type, status, created_at, updated_at)
+SELECT 3100 + s.idx, 31, s.idx, 3, ('2025-12-20'::date + ((s.idx - 1) / 3) * 7 + CASE (s.idx - 1) % 3 WHEN 0 THEN 0 WHEN 1 THEN 3 ELSE 5 END), 'CLASS', 'PLANNED', '2025-12-13 10:00:00+07', NOW()
+FROM generate_series(1, 24) AS s(idx);
+INSERT INTO session_resource (session_id, resource_id) SELECT id, 1 FROM session WHERE class_id = 31;
+INSERT INTO teaching_slot (session_id, teacher_id, status) SELECT id, 5, 'SCHEDULED' FROM session WHERE class_id = 31;
 
 -- ========== UPDATE assigned_teacher_id for some classes (leave some for testing) ==========
 -- Only assign teachers to ONGOING classes (1-4), leave SCHEDULED classes (5+) without teacher
