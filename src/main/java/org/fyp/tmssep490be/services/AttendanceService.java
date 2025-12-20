@@ -729,22 +729,23 @@ public class AttendanceService {
     }
 
     private double calculateStudentAttendanceRate(List<StudentAttendanceMatrixDTO.Cell> cells) {
+        // NOTE: Phương thức này đơn giản chỉ dùng cho matrix view
+        // Không có đủ context để check makeup cho EXCUSED
+        // EXCUSED tạm tính trung hòa trong context này
         int present = 0;
-        int absent = 0;
+        int total = 0;
 
         for (StudentAttendanceMatrixDTO.Cell cell : cells) {
             AttendanceStatus status = cell.getAttendanceStatus();
             if (status == AttendanceStatus.PRESENT) {
                 present++;
+                total++;
             } else if (status == AttendanceStatus.ABSENT) {
-                absent++;
-                } else if (status == AttendanceStatus.EXCUSED) {
-                // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
-                // Không tính vào present hay absent
+                total++;
             }
+            // EXCUSED: không có context makeup trong Cell -> bỏ qua
         }
 
-        int total = present + absent;
         return total > 0 ? (double) present / total : 0.0;
     }
 
@@ -811,8 +812,38 @@ public class AttendanceService {
             } else if (status == AttendanceStatus.ABSENT) {
                 totalRecorded++;
             } else if (status == AttendanceStatus.EXCUSED) {
-                // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
-                // Không tính vào present hay totalRecorded
+                Long sessionId = session.getId();
+                Long studentId = ss.getStudent().getId();
+                boolean hasMakeupAttempt = makeupAttemptedMap
+                        .getOrDefault(sessionId, Set.of())
+                        .contains(studentId);
+                boolean hasMakeupCompleted = makeupCompletedMap
+                        .getOrDefault(sessionId, Map.of())
+                        .getOrDefault(studentId, false);
+
+                if (hasMakeupCompleted) {
+                    // EXCUSED + makeup PRESENT -> tính như PRESENT
+                    totalPresent++;
+                    totalRecorded++;
+                } else if (hasMakeupAttempt) {
+                    // EXCUSED + makeup ABSENT -> chỉ tính vào mẫu số
+                    totalRecorded++;
+                } else {
+                    // Chưa học bù - check deadline
+                    LocalDate sessionDate = session.getDate();
+                    LocalDateTime sessionEndDateTime;
+                    if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                        java.time.LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                        sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                    } else {
+                        sessionEndDateTime = LocalDateTime.of(sessionDate, java.time.LocalTime.MAX);
+                    }
+
+                    if (now.isAfter(sessionEndDateTime)) {
+                        // Qua deadline + không makeup -> tính vào mẫu số
+                        totalRecorded++;
+                    }
+                }
             }
         }
 
