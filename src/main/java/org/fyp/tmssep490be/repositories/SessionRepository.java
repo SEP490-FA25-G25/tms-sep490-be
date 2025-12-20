@@ -236,6 +236,22 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
             @Param("status") SessionStatus status);
 
     /**
+     * Find sessions that have passed 2 days after their date without teacher note
+     * Used to auto-create QA reports for sessions that teacher forgot to submit report
+     * Example: session on 20/12 -> find after 22/12 (2 days later)
+     * Logic: session.date <= today.minusDays(2) means session has passed 2 days
+     */
+    @Query("""
+            SELECT s FROM Session s
+            WHERE s.status = :status
+              AND s.date <= :twoDaysAgoDate
+              AND (s.teacherNote IS NULL OR s.teacherNote = '')
+            """)
+    List<Session> findSessionsWithoutTeacherNoteAfter2Days(
+            @Param("twoDaysAgoDate") LocalDate twoDaysAgoDate,
+            @Param("status") SessionStatus status);
+
+    /**
      * Update sessions to DONE status if they have ended and have teacher note
      * Uses native query because JPQL doesn't support JOIN in UPDATE
      */
@@ -262,7 +278,9 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     /**
      * Update sessions to DONE status if they have ended more than 48 hours ago without teacher note
      * Uses native query because JPQL doesn't support JOIN in UPDATE
+     * @deprecated Use updateSessionsWithoutTeacherNoteAfter2DaysToDone instead
      */
+    @Deprecated
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE session s
@@ -279,6 +297,24 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     int updateEndedSessionsWithoutTeacherNoteAfter48HoursToDone(
             @Param("cutoffDate") LocalDate cutoffDate,
             @Param("cutoffTime") LocalTime cutoffTime,
+            @Param("oldStatus") SessionStatus oldStatus,
+            @Param("newStatus") SessionStatus newStatus);
+
+    /**
+     * Update sessions to DONE status if they have passed 2 days after their date without teacher note
+     * Uses native query for efficiency
+     * Example: session on 20/12 -> auto-create report after 22/12 (2 days later)
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            UPDATE session s
+            SET status = CAST(:newStatus AS VARCHAR)
+            WHERE s.status = CAST(:oldStatus AS VARCHAR)
+              AND (s.teacher_note IS NULL OR s.teacher_note = '')
+              AND s.date < :twoDaysAgoDate
+            """, nativeQuery = true)
+    int updateSessionsWithoutTeacherNoteAfter2DaysToDone(
+            @Param("twoDaysAgoDate") LocalDate twoDaysAgoDate,
             @Param("oldStatus") SessionStatus oldStatus,
             @Param("newStatus") SessionStatus newStatus);
 

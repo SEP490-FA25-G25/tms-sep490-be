@@ -296,13 +296,25 @@ public class EmailService {
     }
 
     public void sendTeacherRequestApprovedAsync(String to, String teacherName, String requestType,
-                                                String sessionInfo, String approvalNote) {
+                                                String sessionInfo, String approvalNote,
+                                                String oldDate, String oldTime, String oldRoom, String oldModality,
+                                                String newDate, String newTime, String newRoom, String newModality,
+                                                String replacementTeacherName) {
         String subject = String.format("Yêu cầu %s đã được duyệt", requestType);
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("teacherName", teacherName);
         templateData.put("requestType", requestType);
         templateData.put("sessionInfo", sessionInfo);
         templateData.put("approvalNote", approvalNote);
+        templateData.put("oldDate", oldDate);
+        templateData.put("oldTime", oldTime);
+        templateData.put("oldRoom", oldRoom);
+        templateData.put("oldModality", oldModality);
+        templateData.put("newDate", newDate);
+        templateData.put("newTime", newTime);
+        templateData.put("newRoom", newRoom);
+        templateData.put("newModality", newModality);
+        templateData.put("replacementTeacherName", replacementTeacherName);
         templateData.put("scheduleUrl", frontendUrl + "/teacher/schedule");
         templateData.put("frontendUrl", frontendUrl);
 
@@ -334,6 +346,46 @@ public class EmailService {
         templateData.put("frontendUrl", frontendUrl);
 
         sendEmailWithTemplateAsync(to, subject, "emails/teacher-replacement-confirmed", templateData);
+    }
+
+    /**
+     * Gửi email nhắc nhở giáo viên về điểm danh hoặc báo cáo buổi học
+     * @param to Email của giáo viên
+     * @param teacherName Tên giáo viên
+     * @param title Tiêu đề thông báo
+     * @param message Nội dung thông báo
+     * @param classCode Mã lớp học
+     * @param formattedDate Ngày buổi học (dd/MM/yyyy)
+     * @param timeSlot Khung giờ buổi học (HH:mm - HH:mm)
+     * @param milestoneText Mốc thời gian (ví dụ: "1 giờ", "3 giờ")
+     * @param reminderType Loại nhắc nhở: "ATTENDANCE", "REPORT", hoặc "BOTH"
+     * @param sessionId ID của buổi học để tạo link điểm danh
+     */
+    public void sendTeacherAttendanceReminderAsync(
+            String to,
+            String teacherName,
+            String title,
+            String message,
+            String classCode,
+            String formattedDate,
+            String timeSlot,
+            String milestoneText,
+            String reminderType,
+            Long sessionId) {
+        String subject = title;
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("teacherName", teacherName);
+        templateData.put("title", title);
+        templateData.put("message", message);
+        templateData.put("classCode", classCode);
+        templateData.put("formattedDate", formattedDate);
+        templateData.put("timeSlot", timeSlot);
+        templateData.put("milestoneText", milestoneText);
+        templateData.put("reminderType", reminderType);
+        templateData.put("attendanceUrl", frontendUrl + "/teacher/attendance/" + sessionId);
+        templateData.put("frontendUrl", frontendUrl);
+
+        sendEmailWithTemplateAsync(to, subject, "emails/teacher-attendance-reminder", templateData);
     }
 
 }

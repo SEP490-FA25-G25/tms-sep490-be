@@ -1507,18 +1507,74 @@ public class TeacherRequestService {
             String teacherName = teacherAccount.getFullName();
 
             String requestTypeName = getRequestTypeName(request.getRequestType());
-            Session session = request.getSession();
-            String sessionInfo = session != null
+            Session oldSession = request.getSession();
+            Session newSession = request.getNewSession();
+            
+            String sessionInfo = oldSession != null
                     ? String.format("%s - %s", 
-                        session.getDate().format(DATE_FORMATTER), 
-                        session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getStartTime() != null && session.getTimeSlotTemplate().getEndTime() != null
-                            ? String.format("%s - %s", session.getTimeSlotTemplate().getStartTime(), session.getTimeSlotTemplate().getEndTime())
+                        oldSession.getDate().format(DATE_FORMATTER), 
+                        oldSession.getTimeSlotTemplate() != null && oldSession.getTimeSlotTemplate().getStartTime() != null && oldSession.getTimeSlotTemplate().getEndTime() != null
+                            ? String.format("%s - %s", oldSession.getTimeSlotTemplate().getStartTime(), oldSession.getTimeSlotTemplate().getEndTime())
                             : "N/A")
                     : "N/A";
 
             String approvalNote = request.getNote() != null ? request.getNote() : "";
 
-            emailService.sendTeacherRequestApprovedAsync(email, teacherName, requestTypeName, sessionInfo, approvalNote);
+            // Old schedule info
+            String oldDate = oldSession != null ? oldSession.getDate().format(DATE_FORMATTER) : "N/A";
+            String oldTime = oldSession != null && oldSession.getTimeSlotTemplate() != null
+                ? String.format("%s - %s", 
+                    oldSession.getTimeSlotTemplate().getStartTime(),
+                    oldSession.getTimeSlotTemplate().getEndTime())
+                : "N/A";
+            String oldRoom = "N/A";
+            String oldModality = "N/A";
+            if (oldSession != null && !oldSession.getSessionResources().isEmpty()) {
+                Resource oldResource = oldSession.getSessionResources().iterator().next().getResource();
+                oldRoom = oldResource.getName();
+                oldModality = oldResource.getResourceType() != null 
+                    ? (oldResource.getResourceType() == ResourceType.ROOM ? "Offline" : "Online")
+                    : "N/A";
+            }
+
+            // New schedule info
+            String newDate = oldDate; // default to old if not changed
+            String newTime = oldTime;
+            String newRoom = oldRoom;
+            String newModality = oldModality;
+            
+            // Replacement teacher name (for REPLACEMENT requests)
+            String replacementTeacherName = null;
+            if (request.getRequestType() == TeacherRequestType.REPLACEMENT && request.getReplacementTeacher() != null) {
+                replacementTeacherName = request.getReplacementTeacher().getUserAccount() != null
+                    ? request.getReplacementTeacher().getUserAccount().getFullName()
+                    : null;
+            }
+            
+            if (request.getRequestType() == TeacherRequestType.RESCHEDULE && newSession != null) {
+                newDate = newSession.getDate().format(DATE_FORMATTER);
+                newTime = newSession.getTimeSlotTemplate() != null
+                    ? String.format("%s - %s",
+                        newSession.getTimeSlotTemplate().getStartTime(),
+                        newSession.getTimeSlotTemplate().getEndTime())
+                    : oldTime;
+                if (!newSession.getSessionResources().isEmpty()) {
+                    Resource newResource = newSession.getSessionResources().iterator().next().getResource();
+                    newRoom = newResource.getName();
+                    newModality = newResource.getResourceType() != null
+                        ? (newResource.getResourceType() == ResourceType.ROOM ? "Offline" : "Online")
+                        : "N/A";
+                }
+            } else if (request.getRequestType() == TeacherRequestType.MODALITY_CHANGE && request.getNewResource() != null) {
+                // MODALITY_CHANGE: only resource changes, date/time stay same
+                newRoom = request.getNewResource().getName();
+                newModality = request.getNewResource().getResourceType() != null
+                    ? (request.getNewResource().getResourceType() == ResourceType.ROOM ? "Offline" : "Online")
+                    : "N/A";
+            }
+
+            emailService.sendTeacherRequestApprovedAsync(email, teacherName, requestTypeName, sessionInfo, approvalNote,
+                    oldDate, oldTime, oldRoom, oldModality, newDate, newTime, newRoom, newModality, replacementTeacherName);
         } catch (Exception e) {
             log.error("Lỗi khi gửi approval email cho teacher về request {}: {}", request.getId(), e.getMessage());
         }

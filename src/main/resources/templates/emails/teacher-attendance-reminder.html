@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nhắc nhở: Điểm danh/Báo cáo buổi học</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f4f4f4;
+      }
+      .container {
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .logo {
+        color: #4caf50;
+        font-size: 28px;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+      .title {
+        font-size: 24px;
+        color: #ff9800;
+        margin-bottom: 20px;
+        font-weight: bold;
+      }
+      .content {
+        margin-bottom: 30px;
+      }
+      .session-info {
+        background-color: #fff3e0;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+        border-left: 4px solid #ff9800;
+      }
+      .session-info p {
+        margin: 8px 0;
+      }
+      .session-info .class-name {
+        font-size: 18px;
+        font-weight: bold;
+        color: #e65100;
+      }
+      .reminder-type {
+        background-color: #fff3e0;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        border-left: 4px solid #ff9800;
+      }
+      .reminder-type.attendance {
+        background-color: #e3f2fd;
+        border-left-color: #2196f3;
+      }
+      .reminder-type.report {
+        background-color: #fce4ec;
+        border-left-color: #e91e63;
+      }
+      .btn {
+        display: inline-block;
+        padding: 14px 40px;
+        background-color: #4caf50;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        margin: 20px 0;
+        font-weight: 600;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      .btn:hover {
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+      }
+      .info-box {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-left: 4px solid #757575;
+        margin: 20px 0;
+        border-radius: 4px;
+      }
+      .footer {
+        text-align: center;
+        font-size: 14px;
+        color: #666;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+      }
+      .footer a {
+        color: #4caf50;
+        text-decoration: none;
+      }
+      .time-badge {
+        display: inline-block;
+        background-color: #ff9800;
+        color: white;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: bold;
+        margin: 5px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="logo">Hệ thống TMS</div>
+        <div class="title" th:text="${title}">Nhắc nhở</div>
+      </div>
+
+      <div class="content">
+        <p>Xin chào <strong th:text="${teacherName}">Giáo viên</strong>,</p>
+
+        <p th:text="${message}">Thông báo nhắc nhở về buổi học.</p>
+
+        <div class="session-info">
+          <p class="class-name" th:text="${classCode}">Lớp học</p>
+          <p>
+            <strong>Ngày:</strong>
+            <span th:text="${formattedDate}">dd/MM/yyyy</span>
+          </p>
+          <p th:if="${timeSlot}">
+            <strong>Khung giờ:</strong>
+            <span th:text="${timeSlot}">HH:mm - HH:mm</span>
+          </p>
+          <p th:if="${milestoneText}">
+            <span class="time-badge" th:text="'Đã qua ' + ${milestoneText}"
+              >Đã qua X giờ</span
+            >
+          </p>
+        </div>
+
+        <div
+          th:if="${reminderType == 'ATTENDANCE'}"
+          class="reminder-type attendance"
+        >
+          <p><strong>Bạn chưa điểm danh cho buổi học này.</strong></p>
+          <p>Vui lòng hoàn thành điểm danh cho học viên càng sớm càng tốt.</p>
+        </div>
+
+        <div th:if="${reminderType == 'REPORT'}" class="reminder-type report">
+          <p><strong>Bạn chưa nộp báo cáo buổi học.</strong></p>
+          <p>Vui lòng nộp báo cáo để hoàn tất quy trình sau buổi học.</p>
+        </div>
+
+        <div th:if="${reminderType == 'BOTH'}" class="reminder-type">
+          <p>
+            <strong
+              >Bạn chưa điểm danh và chưa nộp báo cáo cho buổi học này.</strong
+            >
+          </p>
+          <p>Vui lòng hoàn thành cả hai nhiệm vụ càng sớm càng tốt.</p>
+        </div>
+
+        <div style="text-align: center">
+          <a
+            th:href="${attendanceUrl}"
+            class="btn"
+            th:if="${reminderType == 'ATTENDANCE' || reminderType == 'BOTH'}"
+          >
+            Điểm danh ngay
+          </a>
+          <a
+            th:href="${attendanceUrl}"
+            class="btn"
+            th:if="${reminderType == 'REPORT' || reminderType == 'BOTH'}"
+          >
+            Nộp báo cáo ngay
+          </a>
+        </div>
+
+        <div class="info-box" th:if="${milestoneText == '48 giờ'}">
+          <p><strong>Lưu ý quan trọng:</strong></p>
+          <p>
+            Sau 48 giờ kể từ khi buổi học kết thúc, nếu bạn vẫn chưa nộp báo
+            cáo, hệ thống sẽ tự động tạo báo cáo với nội dung "Chưa có báo cáo
+            từ giáo viên".
+          </p>
+        </div>
+
+        <p style="margin-top: 20px">Cảm ơn bạn đã dành thời gian!</p>
+      </div>
+
+      <div class="footer">
+        <p>Đây là email tự động, vui lòng không trả lời trực tiếp.</p>
+        <p>
+          Nếu cần hỗ trợ, vui lòng liên hệ:
+          <a href="mailto:support@tms-edu.vn">support@tms-edu.vn</a>
+        </p>
+        <p style="margin-top: 15px">
+          <a th:href="${frontendUrl}">Truy cập Hệ thống TMS</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
