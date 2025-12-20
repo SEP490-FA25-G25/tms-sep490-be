@@ -364,9 +364,9 @@ public class ApprovalService {
     }
 
     /**
-     * Check if class needs emergency teacher assignment and notify AA.
-     * Emergency = startDate is within 2 days (or today is the deadline for opening
-     * registration)
+     * Notify AA about newly approved class.
+     * - Emergency (startDate within 2 days): "Cần gán GV ngay"
+     * - Normal (startDate > 2 days): "Vui lòng mở đăng ký"
      */
     private void sendEmergencyAssignNotificationIfNeeded(ClassEntity classEntity) {
         try {
@@ -374,6 +374,7 @@ public class ApprovalService {
                 return;
             }
 
+            Long branchId = classEntity.getBranch().getId();
             java.time.LocalDate today = java.time.LocalDate.now();
             java.time.LocalDate startDate = classEntity.getStartDate();
 
@@ -382,48 +383,67 @@ public class ApprovalService {
                 return;
             }
 
+            // Find AA users in the same branch
+            List<UserAccount> aaUsers = userAccountRepository.findByRoleCodeAndBranches(
+                    "ACADEMIC_AFFAIR", List.of(branchId));
+
+            if (aaUsers.isEmpty()) {
+                log.warn("No ACADEMIC_AFFAIR users found for branch {} to receive class approval notification",
+                        branchId);
+                return;
+            }
+
+            List<Long> recipientIds = aaUsers.stream()
+                    .map(UserAccount::getId)
+                    .collect(Collectors.toList());
+
             // Latest possible close date for registration is startDate - 2 days
             java.time.LocalDate latestCloseDate = startDate.minusDays(2);
+            boolean isEmergency = !today.isBefore(latestCloseDate);
 
-            // If today >= latestCloseDate, it's an emergency - can't open normal
-            // registration
-            if (!today.isBefore(latestCloseDate)) {
-                Long branchId = classEntity.getBranch().getId();
+            String title;
+            String message;
 
-                // Find AA users in the same branch
-                List<UserAccount> aaUsers = userAccountRepository.findByRoleCodeAndBranches(
-                        "ACADEMIC_AFFAIR", List.of(branchId));
-
-                if (!aaUsers.isEmpty()) {
-                    String title = String.format("⚠️ Lớp khẩn cấp cần gán GV: %s", classEntity.getCode());
-                    String message = String.format(
-                            "Lớp %s (%s) vừa được duyệt nhưng ngày khai giảng là %s. " +
-                                    "Do không còn đủ thời gian mở đăng ký (tối thiểu 2 ngày), " +
-                                    "bạn cần gán giáo viên trực tiếp ngay. " +
-                                    "Vào mục 'Duyệt đăng ký dạy lớp' → 'Chờ mở đăng ký' để thực hiện.",
-                            classEntity.getCode(),
-                            classEntity.getSubject() != null ? classEntity.getSubject().getName() : "N/A",
-                            startDate.toString());
-
-                    List<Long> recipientIds = aaUsers.stream()
-                            .map(UserAccount::getId)
-                            .collect(Collectors.toList());
-
-                    notificationService.sendBulkNotifications(
-                            recipientIds,
-                            NotificationType.REQUEST,
-                            title,
-                            message);
-
-                    log.info("Sent emergency assign notification to {} AA users for class {}",
-                            aaUsers.size(), classEntity.getId());
-                } else {
-                    log.warn("No ACADEMIC_AFFAIR users found for branch {} to receive emergency notification",
-                            branchId);
-                }
+            if (isEmergency) {
+                // Emergency case: startDate within 2 days
+                title = String.format("⚠️ Lớp khẩn cấp cần gán GV: %s", classEntity.getCode());
+                message = String.format(
+                        "Lớp %s (%s) vừa được duyệt nhưng ngày khai giảng là %s. " +
+                                "Do không còn đủ thời gian mở đăng ký (tối thiểu 2 ngày), " +
+                                "bạn cần gán giáo viên trực tiếp ngay.\n\n" +
+                                "📍 Vào 'Duyệt đăng ký dạy lớp' → 'Chờ mở đăng ký' → 'Gán GV (Khẩn cấp)'",
+                        classEntity.getCode(),
+                        classEntity.getSubject() != null ? classEntity.getSubject().getName() : "N/A",
+                        startDate.toString());
+            } else {
+                // Normal case: startDate > 2 days, can open registration
+                long daysUntilStart = java.time.temporal.ChronoUnit.DAYS.between(today, startDate);
+                title = String.format("📢 Lớp mới được duyệt: %s", classEntity.getCode());
+                message = String.format(
+                        "Lớp %s (%s) vừa được duyệt.\n" +
+                                "• Ngày khai giảng: %s (còn %d ngày)\n" +
+                                "• Lịch học: %s\n\n" +
+                                "Vui lòng mở đăng ký cho giáo viên.\n" +
+                                "📍 Vào 'Duyệt đăng ký dạy lớp' → 'Chờ mở đăng ký' → 'Mở đăng ký'",
+                        classEntity.getCode(),
+                        classEntity.getSubject() != null ? classEntity.getSubject().getName() : "N/A",
+                        startDate.toString(),
+                        daysUntilStart,
+                        buildScheduleDisplay(classEntity));
             }
+
+            notificationService.sendBulkNotifications(
+                    recipientIds,
+                    NotificationType.REQUEST,
+                    title,
+                    message);
+
+            log.info("Sent {} notification to {} AA users for class {}",
+                    isEmergency ? "emergency" : "normal approval",
+                    aaUsers.size(), classEntity.getId());
+
         } catch (Exception e) {
-            log.error("Error sending emergency assign notification for class {}: {}",
+            log.error("Error sending class approval notification for class {}: {}",
                     classEntity.getId(), e.getMessage(), e);
         }
     }
