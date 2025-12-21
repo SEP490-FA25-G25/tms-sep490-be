@@ -778,7 +778,7 @@ public class EnrollmentService {
     }
 
     /**
-     * Validate Vietnamese phone number format (10-11 digits starting with 0)
+     * Validate Vietnamese phone number format (10 digits starting with 0)
      */
     private boolean isValidPhone(String phone) {
         if (phone == null || phone.isBlank()) {
@@ -786,7 +786,7 @@ public class EnrollmentService {
         }
         // Remove spaces and check format
         String cleaned = phone.replaceAll("\\s", "");
-        return cleaned.matches("^0[0-9]{9,10}$");
+        return cleaned.matches("^0[0-9]{9}$");
     }
 
     private String generateStudentCode(Long branchId, String fullName, String email) {

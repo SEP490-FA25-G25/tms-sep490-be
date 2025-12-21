@@ -973,7 +973,7 @@ public class StudentService {
         }
         // Remove spaces and check format
         String cleaned = phone.replaceAll("\\s", "");
-        return cleaned.matches("^0[0-9]{9,10}$");
+        return cleaned.matches("^0[0-9]{9}$");
     }
 
     public CheckStudentExistenceResponse checkStudentExistence(
