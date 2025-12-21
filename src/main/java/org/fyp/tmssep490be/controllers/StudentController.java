@@ -4,11 +4,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fyp.tmssep490be.dtos.common.ResponseObject;
+import org.fyp.tmssep490be.dtos.studentattendance.StudentAttendanceOverviewResponseDTO;
+import org.fyp.tmssep490be.dtos.studentattendance.StudentAttendanceReportResponseDTO;
 import org.fyp.tmssep490be.dtos.studentmanagement.*;
 import org.fyp.tmssep490be.dtos.studentportal.StudentClassDTO;
 import org.fyp.tmssep490be.entities.enums.Gender;
 import org.fyp.tmssep490be.entities.enums.UserStatus;
 import org.fyp.tmssep490be.security.UserPrincipal;
+import org.fyp.tmssep490be.services.StudentAttendanceService;
 import org.fyp.tmssep490be.services.StudentService;
 import org.fyp.tmssep490be.services.StudentPortalService;
 import org.fyp.tmssep490be.utils.StudentContextHelper;
@@ -32,6 +35,7 @@ public class StudentController {
 
     private final StudentService studentService;
     private final StudentPortalService studentPortalService;
+    private final StudentAttendanceService studentAttendanceService;
     private final StudentContextHelper studentContextHelper;
     private static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -348,6 +352,53 @@ public class StudentController {
                 .success(true)
                 .message("Lấy danh sách giảng viên thành công")
                 .data(assessors)
+                .build());
+    }
+
+    // ===== MANAGEMENT ENDPOINTS: View student attendance (for AA, QA, Center Head) =====
+
+    /**
+     * Get attendance overview for a specific student
+     * Used by: Academic Affairs, QA, Center Head
+     */
+    @GetMapping("/{studentId}/attendance/overview")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'QA', 'CENTER_HEAD', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<ResponseObject<StudentAttendanceOverviewResponseDTO>> getStudentAttendanceOverview(
+            @PathVariable Long studentId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} (role: {}) viewing attendance overview for student {}",
+                currentUser.getId(), currentUser.getAuthorities(), studentId);
+
+        StudentAttendanceOverviewResponseDTO data = studentAttendanceService.getOverview(studentId);
+
+        return ResponseEntity.ok(ResponseObject.<StudentAttendanceOverviewResponseDTO>builder()
+                .success(true)
+                .message("OK")
+                .data(data)
+                .build());
+    }
+
+    /**
+     * Get detailed attendance report for a specific student in a specific class
+     * Used by: Academic Affairs, QA, Center Head
+     */
+    @GetMapping("/{studentId}/attendance/report")
+    @PreAuthorize("hasAnyRole('ACADEMIC_AFFAIR', 'QA', 'CENTER_HEAD', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<ResponseObject<StudentAttendanceReportResponseDTO>> getStudentAttendanceReport(
+            @PathVariable Long studentId,
+            @RequestParam Long classId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.info("User {} (role: {}) viewing attendance report for student {} in class {}",
+                currentUser.getId(), currentUser.getAuthorities(), studentId, classId);
+
+        StudentAttendanceReportResponseDTO data = studentAttendanceService.getReport(studentId, classId);
+
+        return ResponseEntity.ok(ResponseObject.<StudentAttendanceReportResponseDTO>builder()
+                .success(true)
+                .message("OK")
+                .data(data)
                 .build());
     }
 
