@@ -123,6 +123,9 @@ public class StudentAttendanceService {
                     int excused = 0;
                     int excusedCompleted = 0;  // Số buổi EXCUSED đã học bù thành công
                     int upcoming = 0;
+                    // Biến riêng cho rate calculation
+                    int ratePresent = 0;  // Tử số
+                    int rateTotal = 0;    // Mẫu số
                     LocalDateTime now = LocalDateTime.now();
                     
                     for (StudentSession ss : activeSessions) {
@@ -133,21 +136,48 @@ public class StudentAttendanceService {
                         Session session = ss.getSession();
                         
                         switch (displayStatus) {
-                            case PRESENT -> attended++;
-                            case ABSENT -> absent++;
+                            case PRESENT -> {
+                                attended++;
+                                ratePresent++;
+                                rateTotal++;
+                            }
+                            case ABSENT -> {
+                                absent++;
+                                rateTotal++;  // Ảnh hưởng rate như absent
+                            }
                             case EXCUSED -> {
-                                excused++; // Đếm tổng EXCUSED
+                                excused++;
                                 
-                                // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
-                                // Chỉ tracking "X/Y buổi đã học bù" để hiển thị riêng
                                 Map<Long, Boolean> studentMakeupMap = makeupCompletedMap.getOrDefault(session.getId(), Map.of());
                                 Long currentStudentId = ss.getStudent().getId();
+                                boolean hasMakeupAttempt = studentMakeupMap.containsKey(currentStudentId);
                                 boolean hasMakeupCompleted = studentMakeupMap.getOrDefault(currentStudentId, false);
 
                                 if (hasMakeupCompleted) {
+                                    // EXCUSED + makeup PRESENT -> tính như PRESENT cho rate
                                     excusedCompleted++;
+                                    ratePresent++;
+                                    rateTotal++;
+                                } else if (hasMakeupAttempt) {
+                                    // EXCUSED + makeup ABSENT -> tính vào mẫu số (như absent)
+                                    rateTotal++;
+                                } else {
+                                    // EXCUSED không có makeup - check deadline
+                                    LocalDate sessionDate = session.getDate();
+                                    LocalDateTime sessionEndDateTime;
+                                    if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                                        LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                                        sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                                    } else {
+                                        sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+                                    }
+
+                                    if (now.isAfter(sessionEndDateTime)) {
+                                        // Qua deadline + không makeup -> tính vào mẫu số
+                                        rateTotal++;
+                                    }
+                                    // Chưa qua deadline -> không tính vào rate (chờ học bù)
                                 }
-                                // Không tính vào attended hay absent - EXCUSED là trung hòa
                             }
                             case PLANNED -> upcoming++;
                             default -> {
@@ -155,6 +185,9 @@ public class StudentAttendanceService {
                             }
                         }
                     }
+
+                    // Tính rate và build DTO
+                    Double attendanceRate = rateTotal > 0 ? (double) ratePresent / rateTotal : null;
 
                     return StudentAttendanceOverviewItemDTO.builder()
                             .classId(classId)
@@ -172,6 +205,7 @@ public class StudentAttendanceService {
                             .excused(excused)
                             .excusedCompleted(excusedCompleted)
                             .upcoming(upcoming)
+                            .attendanceRate(attendanceRate)
                             .status(classEntity.getStatus().name())
                             .enrollmentStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : null)
                             .lastUpdated(null) // Can be set if needed
@@ -270,6 +304,9 @@ public class StudentAttendanceService {
         int excused = 0;
         int excusedCompleted = 0;  // Số buổi EXCUSED đã học bù thành công
         int upcoming = 0;
+        // Biến riêng cho rate calculation
+        int ratePresent = 0;  // Tử số
+        int rateTotal = 0;    // Mẫu số
         LocalDateTime now = LocalDateTime.now();
         
         for (StudentSession ss : activeSessions) {
@@ -280,28 +317,55 @@ public class StudentAttendanceService {
             Session session = ss.getSession();
             
             switch (displayStatus) {
-                case PRESENT -> attended++;
-                case ABSENT -> absent++;
+                case PRESENT -> {
+                    attended++;
+                    ratePresent++;
+                    rateTotal++;
+                }
+                case ABSENT -> {
+                    absent++;
+                    rateTotal++;  // Ảnh hưởng rate như absent
+                }
                 case EXCUSED -> {
-                    excused++; // Đếm tổng EXCUSED
+                    excused++;
                     
-                    // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
-                    // Chỉ tracking "X/Y buổi đã học bù" để hiển thị riêng
                     Map<Long, Boolean> studentMakeupMap = makeupCompletedMap.getOrDefault(session.getId(), Map.of());
                     Long currentStudentId = ss.getStudent().getId();
+                    boolean hasMakeupAttempt = studentMakeupMap.containsKey(currentStudentId);
                     boolean hasMakeupCompleted = studentMakeupMap.getOrDefault(currentStudentId, false);
 
                     if (hasMakeupCompleted) {
+                        // EXCUSED + makeup PRESENT -> tính như PRESENT cho rate
                         excusedCompleted++;
+                        ratePresent++;
+                        rateTotal++;
+                    } else if (hasMakeupAttempt) {
+                        // EXCUSED + makeup ABSENT -> tính vào mẫu số (như absent)
+                        rateTotal++;
+                    } else {
+                        // EXCUSED không có makeup - check deadline
+                        LocalDate sessionDate = session.getDate();
+                        LocalDateTime sessionEndDateTime;
+                        if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                            LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                            sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                        } else {
+                            sessionEndDateTime = LocalDateTime.of(sessionDate, LocalTime.MAX);
+                        }
+
+                        if (now.isAfter(sessionEndDateTime)) {
+                            // Qua deadline + không makeup -> tính vào mẫu số
+                            rateTotal++;
+                        }
+                        // Chưa qua deadline -> không tính vào rate (chờ học bù)
                     }
-                    // Không tính vào attended hay absent - EXCUSED là trung hòa
                 }
                 case PLANNED -> upcoming++;
                 default -> {
                 }
             }
         }
-        double rate = (attended + absent) == 0 ? 0d : (double) attended / (double) (attended + absent);
+        double rate = rateTotal == 0 ? 0d : (double) ratePresent / (double) rateTotal;
 
         // Map sessions DTO
         List<StudentAttendanceReportSessionDTO> sessionItems = activeSessions.stream()

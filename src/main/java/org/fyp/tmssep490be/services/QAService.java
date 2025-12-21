@@ -178,8 +178,38 @@ public class QAService {
                     } else if (status == AttendanceStatus.ABSENT) {
                         totalCounts.put(classId, totalCounts.getOrDefault(classId, 0L) + 1);
                     } else if (status == AttendanceStatus.EXCUSED) {
-                        // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
-                        // Không tính vào present hay absent
+                        Long sessionId = session.getId();
+                        Long studentId = ss.getStudent().getId();
+                        boolean hasMakeupAttempt = makeupAttemptedMap
+                                .getOrDefault(sessionId, Set.of())
+                                .contains(studentId);
+                        boolean hasMakeupCompleted = makeupCompletedMap
+                                .getOrDefault(sessionId, Map.of())
+                                .getOrDefault(studentId, false);
+
+                        if (hasMakeupCompleted) {
+                            // EXCUSED + makeup PRESENT -> tính như PRESENT
+                            presentCounts.put(classId, presentCounts.getOrDefault(classId, 0L) + 1);
+                            totalCounts.put(classId, totalCounts.getOrDefault(classId, 0L) + 1);
+                        } else if (hasMakeupAttempt) {
+                            // EXCUSED + makeup ABSENT -> tính vào mẫu số
+                            totalCounts.put(classId, totalCounts.getOrDefault(classId, 0L) + 1);
+                        } else {
+                            // Check deadline
+                            LocalDate sessionDate = session.getDate();
+                            LocalDateTime sessionEndDateTime;
+                            if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                                java.time.LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                                sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                            } else {
+                                sessionEndDateTime = LocalDateTime.of(sessionDate, java.time.LocalTime.MAX);
+                            }
+
+                            if (now.isAfter(sessionEndDateTime)) {
+                                // Qua deadline + không makeup -> tính vào mẫu số
+                                totalCounts.put(classId, totalCounts.getOrDefault(classId, 0L) + 1);
+                            }
+                        }
                     }
                 }
             }

@@ -803,8 +803,33 @@ public class StudentPortalService {
             } else if (status == AttendanceStatus.ABSENT) {
                 totalRecorded++;
             } else if (status == AttendanceStatus.EXCUSED) {
-                // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
-                // Không tính vào present hay totalRecorded
+                Long sessionId = session.getId();
+                boolean hasMakeupAttempt = makeupAttemptedSessions.contains(sessionId);
+                boolean hasMakeupCompleted = makeupCompletedMap.getOrDefault(sessionId, false);
+
+                if (hasMakeupCompleted) {
+                    // EXCUSED + makeup PRESENT -> tính như PRESENT
+                    presentCount++;
+                    totalRecorded++;
+                } else if (hasMakeupAttempt) {
+                    // EXCUSED + makeup ABSENT -> chỉ tính vào mẫu số
+                    totalRecorded++;
+                } else {
+                    // Chưa học bù - check deadline
+                    LocalDate sessionDate = session.getDate();
+                    LocalDateTime sessionEndDateTime;
+                    if (session.getTimeSlotTemplate() != null && session.getTimeSlotTemplate().getEndTime() != null) {
+                        java.time.LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                        sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                    } else {
+                        sessionEndDateTime = LocalDateTime.of(sessionDate, java.time.LocalTime.MAX);
+                    }
+
+                    if (now.isAfter(sessionEndDateTime)) {
+                        // Qua deadline + không makeup -> tính vào mẫu số
+                        totalRecorded++;
+                    }
+                }
             }
         }
 

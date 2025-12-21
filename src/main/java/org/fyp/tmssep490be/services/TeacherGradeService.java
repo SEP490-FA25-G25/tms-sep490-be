@@ -257,11 +257,34 @@ public class TeacherGradeService {
                                         int gradedCount = (int) percents.size();
 
                                         // Chuyên cần: tính ngay, không cần chờ môn học kết thúc
+                                        // Lấy enrollment để xác định timeline (joinSessionId, leftSessionId)
+                                        org.fyp.tmssep490be.entities.Enrollment enrollment = e;
+                                        
                                         List<StudentSession> studentSessions = studentSessionRepository
                                                         .findByStudentIdAndClassEntityId(studentId, classId)
                                                         .stream()
-                                                        .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup())) // Bỏ qua
-                                                                                                              // học bù
+                                                        .filter(ss -> !Boolean.TRUE.equals(ss.getIsMakeup())) // Bỏ qua học bù
+                                                        .filter(ss -> {
+                                                                // Filter CANCELLED sessions
+                                                                Session session = ss.getSession();
+                                                                if (session == null || session.getStatus() == org.fyp.tmssep490be.entities.enums.SessionStatus.CANCELLED) {
+                                                                        return false;
+                                                                }
+                                                                
+                                                                // Filter theo enrollment timeline
+                                                                Long sessionId = session.getId();
+                                                                Long joinId = enrollment.getJoinSessionId();
+                                                                Long leftId = enrollment.getLeftSessionId();
+                                                                
+                                                                if (enrollment.getStatus() == EnrollmentStatus.TRANSFERRED) {
+                                                                        return leftId == null || sessionId <= leftId;
+                                                                } else if (enrollment.getStatus() == EnrollmentStatus.ENROLLED) {
+                                                                        return joinId == null || sessionId >= joinId;
+                                                                } else if (enrollment.getStatus() == org.fyp.tmssep490be.entities.enums.EnrollmentStatus.COMPLETED) {
+                                                                        return joinId == null || sessionId >= joinId;
+                                                                }
+                                                                return true;
+                                                        })
                                                         .toList();
 
                                         // Map thông tin học bù
@@ -294,8 +317,9 @@ public class TeacherGradeService {
                                         }
 
                                         LocalDateTime now = LocalDateTime.now();
-                                        long present = 0;
-                                        long absent = 0;
+                                        long present = 0;      // Số buổi có mặt (display)
+                                        long ratePresent = 0;  // Tử số
+                                        long rateTotal = 0;    // Mẫu số
 
                                         for (StudentSession ss : studentSessions) {
                                                 AttendanceStatus status = ss.getAttendanceStatus();
@@ -303,16 +327,43 @@ public class TeacherGradeService {
 
                                                 if (status == AttendanceStatus.PRESENT) {
                                                         present++;
+                                                        ratePresent++;
+                                                        rateTotal++;
                                                 } else if (status == AttendanceStatus.ABSENT) {
-                                                        absent++;
+                                                        rateTotal++;
                                                 } else if (status == AttendanceStatus.EXCUSED) {
-                                                        // EXCUSED = TRUNG HÒA hoàn toàn, không ảnh hưởng rate
-                                                        // Không tính vào present hay absent
+                                                        Long sessionId = session.getId();
+                                                        boolean hasMakeupAttempt = makeupAttemptedSessions.contains(sessionId);
+                                                        boolean hasMakeupCompleted = makeupCompletedMap.getOrDefault(sessionId, false);
+
+                                                        if (hasMakeupCompleted) {
+                                                                // EXCUSED + makeup PRESENT -> tính như PRESENT
+                                                                ratePresent++;
+                                                                rateTotal++;
+                                                        } else if (hasMakeupAttempt) {
+                                                                // EXCUSED + makeup ABSENT -> tính vào mẫu số
+                                                                rateTotal++;
+                                                        } else {
+                                                                // Check deadline
+                                                                LocalDate sessionDate = session.getDate();
+                                                                LocalDateTime sessionEndDateTime;
+                                                                if (session.getTimeSlotTemplate() != null
+                                                                                && session.getTimeSlotTemplate().getEndTime() != null) {
+                                                                        java.time.LocalTime endTime = session.getTimeSlotTemplate().getEndTime();
+                                                                        sessionEndDateTime = LocalDateTime.of(sessionDate, endTime);
+                                                                } else {
+                                                                        sessionEndDateTime = LocalDateTime.of(sessionDate, java.time.LocalTime.MAX);
+                                                                }
+
+                                                                if (now.isAfter(sessionEndDateTime)) {
+                                                                        // Qua deadline + không makeup -> tính vào mẫu số
+                                                                        rateTotal++;
+                                                                }
+                                                        }
                                                 }
                                         }
 
-                                        long totalDone = present + absent;
-                                        Double attendanceRate = totalDone > 0 ? (present * 100d / totalDone) : null;
+                                        Double attendanceRate = rateTotal > 0 ? (ratePresent * 100d / rateTotal) : null;
                                         Double attendanceScore = attendanceRate;
 
                                         return GradebookStudentDTO.builder()
@@ -324,7 +375,7 @@ public class TeacherGradeService {
                                                         .gradedCount(gradedCount)
                                                         .totalAssessments(assessments.size())
                                                         .attendedSessions((int) present)
-                                                        .totalSessions((int) totalDone)
+                                                        .totalSessions((int) rateTotal)
                                                         .attendanceRate(attendanceRate)
                                                         .attendanceScore(attendanceScore)
                                                         .attendanceFinalized(true)
